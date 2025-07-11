@@ -1,0 +1,43 @@
+# Basic Noolang Examples
+
+# Function definitions
+add = (x, y) => x + y;
+multiply = (a, b) => a * b;
+square = (n) => n * n;
+
+# Function applications
+add 2 3
+multiply 4 5
+square 6
+
+# Pipeline operator
+[1, 2, 3, 4, 5] |> head
+[1, 2, 3, 4, 5] |> tail |> head
+
+# Conditional expressions
+(if true then "yes" else "no")
+(if 2 < 3 then "smaller" else "larger")
+
+# Local bindings (using function definitions)
+localAdd = (x, y) => x + y;
+localAdd 10 20
+
+localMultiply = (a, b) => multiply a b;
+localMultiply 5 3
+
+# List operations
+[1, 2, 3] |> head
+[1, 2, 3] |> tail
+cons 0 [1, 2, 3]
+
+# Comparison operations
+2 == 2
+3 != 4
+5 > 3
+1 < 10
+
+# Arithmetic operations
+10 + 5
+20 - 7
+4 * 6
+15 / 3 
