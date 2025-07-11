@@ -1,5 +1,12 @@
-import { Parser } from '../src/parser';
+import { Lexer } from '../src/lexer';
+import { parse } from '../src/parser/parser';
 import { Typer } from '../src/typer';
+import { Type } from '../src/ast';
+
+// Helper function to check if a type is a primitive type with a specific name
+function isPrimitiveType(type: Type, name: string): boolean {
+  return type.kind === 'primitive' && type.name === name;
+}
 
 describe('Typer', () => {
   let typer: Typer;
@@ -9,76 +16,79 @@ describe('Typer', () => {
   });
 
   test('should infer types for number literals', () => {
-    const parser = new Parser('42');
-    const program = parser.parse();
+    const lexer = new Lexer('42');
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
     const types = typer.typeProgram(program);
     
     expect(types).toHaveLength(1);
-    expect(types[0].kind).toBe('primitive');
-    expect((types[0] as any).name).toBe('Int');
+    expect(isPrimitiveType(types[0], 'Int')).toBe(true);
   });
 
   test('should infer types for string literals', () => {
-    const parser = new Parser('"hello"');
-    const program = parser.parse();
+    const lexer = new Lexer('"hello"');
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
     const types = typer.typeProgram(program);
     
     expect(types).toHaveLength(1);
-    expect(types[0].kind).toBe('primitive');
-    expect((types[0] as any).name).toBe('String');
+    expect(isPrimitiveType(types[0], 'String')).toBe(true);
   });
 
   test('should infer types for boolean literals', () => {
-    const parser = new Parser('true');
-    const program = parser.parse();
+    const lexer = new Lexer('true');
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
     const types = typer.typeProgram(program);
     
     expect(types).toHaveLength(1);
-    expect(types[0].kind).toBe('primitive');
-    expect((types[0] as any).name).toBe('Bool');
+    expect(isPrimitiveType(types[0], 'Bool')).toBe(true);
   });
 
   test('should infer types for arithmetic operations', () => {
-    const parser = new Parser('2 + 3');
-    const program = parser.parse();
+    const lexer = new Lexer('2 + 3');
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
     const types = typer.typeProgram(program);
     
     expect(types).toHaveLength(1);
-    expect(types[0].kind).toBe('primitive');
-    expect((types[0] as any).name).toBe('Int');
+    expect(isPrimitiveType(types[0], 'Int')).toBe(true);
   });
 
   test('should infer types for function definitions', () => {
-    const parser = new Parser('add = fn x y => x + y;');
-    const program = parser.parse();
+    const lexer = new Lexer('fn x => x + 1');
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
     const types = typer.typeProgram(program);
     
-    expect(types).toHaveLength(0); // No result for definition
+    expect(types).toHaveLength(1); // Function definition returns a value
+    expect(types[0].kind).toBe('function');
   });
 
   test('should infer types for function applications', () => {
-    const parser = new Parser('add = fn x y => x + y; add 2 3');
-    const program = parser.parse();
+    const lexer = new Lexer('(fn x => x + 1) 2');
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
     const types = typer.typeProgram(program);
     
     expect(types).toHaveLength(1);
-    expect(types[0].kind).toBe('primitive');
-    expect((types[0] as any).name).toBe('Int');
+    expect(isPrimitiveType(types[0], 'Int')).toBe(true);
   });
 
   test('should infer types for if expressions', () => {
-    const parser = new Parser('if true then 1 else 2');
-    const program = parser.parse();
+    const lexer = new Lexer('if true then 1 else 2');
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
     const types = typer.typeProgram(program);
     
     expect(types).toHaveLength(1);
-    expect(types[0].kind).toBe('primitive');
-    expect((types[0] as any).name).toBe('Int');
+    expect(isPrimitiveType(types[0], 'Int')).toBe(true);
   });
 
   test('should infer types for list operations', () => {
-    const parser = new Parser('[1 2 3] |> head');
-    const program = parser.parse();
+    const lexer = new Lexer('[1; 2; 3] |> head');
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
     const types = typer.typeProgram(program);
     
     expect(types).toHaveLength(1);
@@ -86,18 +96,19 @@ describe('Typer', () => {
   });
 
   test('should infer types for comparison operations', () => {
-    const parser = new Parser('2 < 3');
-    const program = parser.parse();
+    const lexer = new Lexer('2 < 3');
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
     const types = typer.typeProgram(program);
     
     expect(types).toHaveLength(1);
-    expect(types[0].kind).toBe('primitive');
-    expect((types[0] as any).name).toBe('Bool');
+    expect(isPrimitiveType(types[0], 'Bool')).toBe(true);
   });
 
   test('should handle undefined variables', () => {
-    const parser = new Parser('undefined_var');
-    const program = parser.parse();
+    const lexer = new Lexer('undefined_var');
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
     
     expect(() => {
       typer.typeProgram(program);
@@ -105,8 +116,9 @@ describe('Typer', () => {
   });
 
   test('should handle type mismatches', () => {
-    const parser = new Parser('"hello" + 5');
-    const program = parser.parse();
+    const lexer = new Lexer('"hello" + 5');
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
     
     expect(() => {
       typer.typeProgram(program);

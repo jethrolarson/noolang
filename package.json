@@ -7,12 +7,16 @@
     "build": "tsc",
     "start": "node dist/repl.js",
     "dev": "ts-node src/repl.ts",
+    "cli": "node dist/cli.js",
     "test": "jest",
     "test:watch": "jest --watch"
   },
   "keywords": ["programming-language", "interpreter", "typescript"],
   "author": "",
   "license": "MIT",
+  "bin": {
+    "noo": "dist/cli.js"
+  },
   "devDependencies": {
     "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",

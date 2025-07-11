@@ -12,7 +12,7 @@ export type Location = {
 
 // Type system
 export type Type = 
-  | { kind: 'primitive'; name: 'Int' | 'String' | 'Bool' | 'List' }
+  | { kind: 'primitive'; name: 'Int' | 'String' | 'Bool' | 'List' | 'Nil' }
   | { kind: 'function'; params: Type[]; return: Type }
   | { kind: 'variable'; name: string }
   | { kind: 'unknown' };
@@ -25,11 +25,15 @@ export type Expression =
   | ApplicationExpression
   | PipelineExpression
   | BinaryExpression
-  | IfExpression;
+  | IfExpression
+  | DefinitionExpression
+  | ImportExpression
+  | RecordExpression
+  | AccessorExpression;
 
 export interface LiteralExpression {
   kind: 'literal';
-  value: number | string | boolean | any[];
+  value: number | string | boolean | Expression[];
   type?: Type;
   location: Location;
 }
@@ -66,7 +70,7 @@ export interface PipelineExpression {
 
 export interface BinaryExpression {
   kind: 'binary';
-  operator: '+' | '-' | '*' | '/' | '==' | '!=' | '<' | '>' | '<=' | '>=';
+  operator: '+' | '-' | '*' | '/' | '==' | '!=' | '<' | '>' | '<=' | '>=' | '|' | '|>' | '<|' | ';';
   left: Expression;
   right: Expression;
   type?: Type;
@@ -82,18 +86,38 @@ export interface IfExpression {
   location: Location;
 }
 
-
-
-// Top-level constructs
-export type TopLevel = Definition | Expression;
-
-export interface Definition {
+export interface DefinitionExpression {
   kind: 'definition';
   name: string;
   value: Expression;
   type?: Type;
   location: Location;
 }
+
+export interface ImportExpression {
+  kind: 'import';
+  path: string;
+  type?: Type;
+  location: Location;
+}
+
+export interface RecordExpression {
+  kind: 'record';
+  fields: { name: string; value: Expression }[];
+  type?: Type;
+  location: Location;
+}
+
+export interface AccessorExpression {
+  kind: 'accessor';
+  field: string;
+  type?: Type;
+  location: Location;
+}
+
+
+// Top-level constructs
+export type TopLevel = Expression;
 
 // Program
 export interface Program {

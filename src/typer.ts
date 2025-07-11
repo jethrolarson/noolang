@@ -1,7 +1,14 @@
 import {
   Expression,
   Program,
-  Definition,
+  DefinitionExpression,
+  LiteralExpression,
+  VariableExpression,
+  FunctionExpression,
+  ApplicationExpression,
+  PipelineExpression,
+  BinaryExpression,
+  IfExpression,
   Type,
   intType,
   stringType,
@@ -43,8 +50,31 @@ export class Typer {
     this.environment.set('tail', functionType([listType()], listType()));
     this.environment.set('cons', functionType([typeVariable('a'), listType()], listType()));
 
+    // Pipeline operator
+    this.environment.set('|>', functionType([typeVariable('a'), functionType([typeVariable('a')], typeVariable('b'))], typeVariable('b')));
+
+    // Semicolon operator (left must be Nil, returns right type)
+    this.environment.set(';', functionType([{ kind: 'primitive', name: 'Nil' }, typeVariable('b')], typeVariable('b')));
+
     // Utility functions
     this.environment.set('print', functionType([typeVariable('a')], typeVariable('a')));
+
+    // List utility functions
+    this.environment.set('map', functionType([functionType([typeVariable('a')], typeVariable('b')), listType()], listType()));
+    this.environment.set('filter', functionType([functionType([typeVariable('a')], boolType()), listType()], listType()));
+    this.environment.set('reduce', functionType([functionType([typeVariable('b'), typeVariable('a')], typeVariable('b')), typeVariable('b'), listType()], typeVariable('b')));
+    this.environment.set('length', functionType([listType()], intType()));
+    this.environment.set('isEmpty', functionType([listType()], boolType()));
+    this.environment.set('append', functionType([listType(), listType()], listType()));
+
+    // Math utilities
+    this.environment.set('abs', functionType([intType()], intType()));
+    this.environment.set('max', functionType([intType(), intType()], intType()));
+    this.environment.set('min', functionType([intType(), intType()], intType()));
+
+    // String utilities
+    this.environment.set('concat', functionType([stringType(), stringType()], stringType()));
+    this.environment.set('toString', functionType([typeVariable('a')], stringType()));
   }
 
   private freshTypeVariable(): Type {
@@ -55,17 +85,13 @@ export class Typer {
     const types: Type[] = [];
     
     for (const statement of program.statements) {
-      if (statement.kind === 'definition') {
-        this.typeDefinition(statement);
-      } else {
-        types.push(this.typeExpression(statement));
-      }
+      types.push(this.typeExpression(statement));
     }
     
     return types;
   }
 
-  private typeDefinition(def: Definition): void {
+  private typeDefinition(def: DefinitionExpression): void {
     const type = this.typeExpression(def.value);
     this.environment.set(def.name, type);
   }
@@ -93,14 +119,16 @@ export class Typer {
       case 'if':
         return this.typeIf(expr);
       
-
+      case 'definition':
+        this.typeDefinition(expr);
+        return { kind: 'primitive', name: 'Nil' }; // Return Nil type for definitions
       
       default:
-        throw new Error(`Unknown expression kind: ${(expr as any).kind}`);
+        throw new Error(`Unknown expression kind: ${(expr as Expression).kind}`);
     }
   }
 
-  private typeLiteral(expr: any): Type {
+  private typeLiteral(expr: LiteralExpression): Type {
     const value = expr.value;
     
     if (typeof value === 'number') {
@@ -118,7 +146,7 @@ export class Typer {
     }
   }
 
-  private typeVariable(expr: any): Type {
+  private typeVariable(expr: VariableExpression): Type {
     const type = this.environment.get(expr.name);
     if (type === undefined) {
       throw new Error(`Undefined variable: ${expr.name}`);
@@ -126,7 +154,7 @@ export class Typer {
     return type;
   }
 
-  private typeFunction(expr: any): Type {
+  private typeFunction(expr: FunctionExpression): Type {
     // Create new type environment for function scope
     const functionEnv = new Map(this.environment);
     
@@ -147,7 +175,7 @@ export class Typer {
     return functionType(paramTypes, returnType);
   }
 
-  private typeApplication(expr: any): Type {
+  private typeApplication(expr: ApplicationExpression): Type {
     const funcType = this.typeExpression(expr.func);
     const argTypes = expr.args.map((arg: Expression) => this.typeExpression(arg));
 
@@ -169,7 +197,7 @@ export class Typer {
     }
   }
 
-  private typePipeline(expr: any): Type {
+  private typePipeline(expr: PipelineExpression): Type {
     let currentType = this.typeExpression(expr.steps[0]);
     
     for (let i = 1; i < expr.steps.length; i++) {
@@ -193,7 +221,7 @@ export class Typer {
     return currentType;
   }
 
-  private typeBinary(expr: any): Type {
+  private typeBinary(expr: BinaryExpression): Type {
     const leftType = this.typeExpression(expr.left);
     const rightType = this.typeExpression(expr.right);
 
@@ -219,7 +247,7 @@ export class Typer {
     return operatorType.return;
   }
 
-  private typeIf(expr: any): Type {
+  private typeIf(expr: IfExpression): Type {
     const conditionType = this.typeExpression(expr.condition);
     const thenType = this.typeExpression(expr.then);
     const elseType = this.typeExpression(expr.else);

@@ -1,0 +1,6 @@
+# Test importing a module that exports functions as a record
+math = import "math_functions";
+result1 = (@add math) 2 3;
+result2 = (@multiply math) 4 5;
+result3 = (@square math) 6;
+{ @sum result1; @product result2; @squared result3 } 

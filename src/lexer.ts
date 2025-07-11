@@ -11,6 +11,8 @@ export type TokenType =
   | 'NEWLINE'
   | 'INDENT'
   | 'DEDENT'
+  | 'COMMENT'
+  | 'ACCESSOR'
   | 'EOF';
 
 export interface Token {
@@ -59,6 +61,19 @@ export class Lexer {
   private skipWhitespace(): void {
     while (!this.isEOF() && /\s/.test(this.peek()) && this.peek() !== '\n') {
       this.advance();
+    }
+    // Also skip comments
+    this.skipComment();
+  }
+
+  private skipComment(): void {
+    if (this.peek() === '#') {
+      // Skip the # character
+      this.advance();
+      // Skip everything until newline or EOF
+      while (!this.isEOF() && this.peek() !== '\n') {
+        this.advance();
+      }
     }
   }
 
@@ -115,12 +130,18 @@ export class Lexer {
     const start = this.createPosition();
     let value = '';
 
-    while (!this.isEOF() && /[a-zA-Z_][a-zA-Z0-9_]*/.test(this.peek())) {
+    // Read the first character (must be letter or underscore)
+    if (!this.isEOF() && /[a-zA-Z_]/.test(this.peek())) {
+      value += this.advance();
+    }
+
+    // Read subsequent characters (can be letters, digits, or underscores)
+    while (!this.isEOF() && /[a-zA-Z0-9_]/.test(this.peek())) {
       value += this.advance();
     }
 
     // Check if it's a keyword
-    const keywords = ['if', 'then', 'else', 'let', 'in', 'true', 'false', 'fn'];
+    const keywords = ['if', 'then', 'else', 'let', 'in', 'true', 'false', 'fn', 'import'];
     const type = keywords.includes(value) ? 'KEYWORD' : 'IDENTIFIER';
 
     return {
@@ -135,7 +156,7 @@ export class Lexer {
     let value = '';
 
     // Multi-character operators (must have spaces around them)
-    const operators = ['|>', '==', '!=', '<=', '>=', '=>', '->', '+', '-', '*', '/', '<', '>', '=', '|'];
+    const operators = ['|>', '<|', '==', '!=', '<=', '>=', '=>', '->', '+', '-', '*', '/', '<', '>', '=', '|'];
     
     // Try to match multi-character operators first
     for (const op of operators) {
@@ -167,6 +188,22 @@ export class Lexer {
     return {
       type: 'PUNCTUATION',
       value,
+      location: this.createLocation(start),
+    };
+  }
+
+  private readAccessor(): Token {
+    const start = this.createPosition();
+    this.advance(); // consume @
+    let field = '';
+
+    while (!this.isEOF() && /[a-zA-Z_][a-zA-Z0-9_]*/.test(this.peek())) {
+      field += this.advance();
+    }
+
+    return {
+      type: 'ACCESSOR',
+      value: field,
       location: this.createLocation(start),
     };
   }
@@ -216,6 +253,8 @@ export class Lexer {
       }
     }
 
+
+
     return null;
   }
 
@@ -256,10 +295,6 @@ export class Lexer {
 
     const char = this.peek();
 
-    if (/\d/.test(char)) {
-      return this.readNumber();
-    }
-
     if (char === '"' || char === "'") {
       return this.readString();
     }
@@ -268,12 +303,28 @@ export class Lexer {
       return this.readIdentifier();
     }
 
+    if (/\d/.test(char)) {
+      return this.readNumber();
+    }
+
     if (/[+\-*/<>=!|]/.test(char)) {
       return this.readOperator();
     }
 
     if (/[(),;:\[\]{}]/.test(char)) {
       return this.readPunctuation();
+    }
+
+    // Handle accessors
+    if (char === '@') {
+      return this.readAccessor();
+    }
+
+    // Handle comments
+    if (char === '#') {
+      this.skipComment();
+      // After skipping comment, get the next token
+      return this.nextToken();
     }
 
     // Unknown character
