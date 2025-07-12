@@ -301,6 +301,12 @@ export class Evaluator {
       throw new Error('min requires two numbers');
     }));
 
+    // Effectful functions
+    this.environment.set('print', createNativeFunction('print', (value: Value) => {
+      console.log(this.valueToString(value));
+      return value; // Return the value that was printed
+    }));
+
     // String utilities
     this.environment.set('concat', createNativeFunction('concat', (a: Value) => (b: Value) => {
       if (isString(a) && isString(b)) return createString(a.value + b.value);

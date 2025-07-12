@@ -745,7 +745,8 @@ const parseSequenceTerm: C.Parser<Expression> = C.choice(
   parseIdentifier,
   parseList,
   parseAccessor,
-  parseParenExpr
+  parseParenExpr,
+  parseTypedExpression
 );
 
 // Version without records to avoid circular dependency

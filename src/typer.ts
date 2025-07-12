@@ -60,7 +60,7 @@ export class Typer {
     // Pipeline operator (pure)
     this.environment.set('|>', functionType([typeVariable('a'), functionType([typeVariable('a')], typeVariable('b'))], typeVariable('b')));
 
-    // Semicolon operator (pure)
+    // Semicolon operator (effectful - effects are unioned)
     this.environment.set(';', functionType([typeVariable('a'), typeVariable('b')], typeVariable('b')));
 
     // Effectful functions
@@ -86,6 +86,34 @@ export class Typer {
 
   private freshTypeVariable(): Type {
     return typeVariable(`t${this.typeVariableCounter++}`);
+  }
+
+  private extractEffects(type: Type): Effect[] {
+    if (type.kind === 'function') {
+      return type.effects;
+    }
+    return [];
+  }
+
+  private unionEffects(effects1: Effect[], effects2: Effect[]): Effect[] {
+    const union = new Set<Effect>([...effects1, ...effects2]);
+    return Array.from(union);
+  }
+
+  private addEffectsToType(type: Type, effects: Effect[]): Type {
+    if (effects.length === 0) {
+      return type;
+    }
+    
+    if (type.kind === 'function') {
+      return {
+        ...type,
+        effects: this.unionEffects(type.effects, effects)
+      };
+    }
+    
+    // If the type isn't a function, wrap it in a function that has the effects
+    return functionType([], type, effects);
   }
 
   typeProgram(program: Program): Type[] {
@@ -269,7 +297,8 @@ export class Typer {
         }
       }
 
-      return funcType.return;
+      // Return the function's return type with its effects
+      return this.addEffectsToType(funcType.return, funcType.effects);
     } else {
       throw new Error(`Cannot apply non-function type: ${this.typeToString(funcType)}`);
     }
@@ -302,6 +331,17 @@ export class Typer {
   private typeBinary(expr: BinaryExpression): Type {
     const leftType = this.typeExpression(expr.left);
     const rightType = this.typeExpression(expr.right);
+
+    // Special handling for semicolon sequences (effect union)
+    if (expr.operator === ';') {
+      // For sequences: type is rightmost expression, effects are union of all expressions
+      const leftEffects = this.extractEffects(leftType);
+      const rightEffects = this.extractEffects(rightType);
+      const unionEffects = this.unionEffects(leftEffects, rightEffects);
+      
+      // Return rightmost type with unioned effects
+      return this.addEffectsToType(rightType, unionEffects);
+    }
 
     // Get the operator's type from environment
     const operatorType = this.environment.get(expr.operator);
