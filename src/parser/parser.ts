@@ -9,8 +9,17 @@ import {
   createLocation,
   DefinitionExpression,
   ImportExpression,
-  RecordExpression,
-  AccessorExpression
+  AccessorExpression,
+  Type,
+  intType,
+  stringType,
+  boolType,
+  unitType,
+  listTypeWithElement,
+  functionType,
+  typeVariable,
+  TypedExpression,
+  ListExpression
 } from '../ast';
 import * as C from './combinators';
 
@@ -55,46 +64,19 @@ const parseRecordFieldName = C.map(
 
 // Parse an expression that stops at @ (accessor tokens) or semicolon
 const parseRecordFieldValue = (tokens: Token[]): C.ParseResult<Expression> => {
-  let currentTokens = tokens;
-  let expressionTokens: Token[] = [];
-  
-  while (currentTokens.length > 0) {
-    const token = currentTokens[0];
-    // Stop if we encounter an accessor (@) - that's the start of the next field
-    if (token.type === 'ACCESSOR') {
-      break;
-    }
-    // Stop if we encounter closing brace
-    if (token.type === 'PUNCTUATION' && token.value === '}') {
-      break;
-    }
-    // Stop if we encounter semicolon
-    if (token.type === 'PUNCTUATION' && token.value === ';') {
-      break;
-    }
-    
-    expressionTokens.push(token);
-    currentTokens = currentTokens.slice(1);
-  }
-  
-  if (expressionTokens.length === 0) {
-    return {
-      success: false,
-      error: 'Expected expression for record field value',
-      position: tokens[0]?.location.start.line || 0
-    };
-  }
-  
-  // Parse the collected tokens as a full expression
-  const result = C.lazy(() => parseSequenceTermWithIfExceptRecord)(expressionTokens);
+  // Use the full expression parser to parse the complete expression
+  // This includes records, so we can parse nested records
+  const result = C.lazy(() => parseSequence)(tokens);
   if (!result.success) {
     return result;
   }
   
+  // The expression parser should have consumed all the tokens it needs
+  // and left us with the remaining tokens that come after the expression
   return {
     success: true,
     value: result.value,
-    remaining: currentTokens
+    remaining: result.remaining
   };
 };
 
@@ -156,24 +138,24 @@ const parseRecordFields: C.Parser<{ name: string; value: Expression }[]> = (toke
   fields.push(firstFieldResult.value);
   rest = firstFieldResult.remaining;
   const isNamed = firstFieldResult.value.isNamed;
-  // Parse additional fields, each preceded by a semicolon
+  // Parse additional fields, each preceded by a comma
   while (rest.length > 0) {
-    const semiResult = C.punctuation(';')(rest);
-    if (!semiResult.success) {
-      break; // No more semicolons, we're done
+    const commaResult = C.punctuation(',')(rest);
+    if (!commaResult.success) {
+      break; // No more commas, we're done
     }
-    rest = semiResult.remaining;
+    rest = commaResult.remaining;
     const fieldResult = parseRecordFieldOrPositional(fields.length)(rest);
     if (!fieldResult.success) {
-      // Check if this is a trailing semicolon (no more fields after semicolon)
+      // Check if this is a trailing comma (no more fields after comma)
       // Look ahead to see if the next token is a closing brace
       if (rest.length > 0 && rest[0].type === 'PUNCTUATION' && rest[0].value === '}') {
-        // This is a trailing semicolon, which is allowed
+        // This is a trailing comma, which is allowed
         break;
       }
       return {
         success: false,
-        error: 'Expected field after semicolon',
+        error: 'Expected field after comma',
         position: rest[0]?.location.start.line || 0
       };
     }
@@ -240,7 +222,7 @@ const parseRecord = C.map(
 const parseParenExpr: C.Parser<Expression> = C.map(
   C.seq(
     C.punctuation('('),
-    C.lazy(() => parseExpr), // Use lazy evaluation to handle circular dependency
+    C.lazy(() => parseSequence), // Use lazy evaluation to handle circular dependency
     C.punctuation(')')
   ),
   ([open, expr, close]) => expr
@@ -248,36 +230,85 @@ const parseParenExpr: C.Parser<Expression> = C.map(
 
 
 
+// --- Function Body Parser ---
+// Allows a parenthesized sequence, or a single non-sequence expression
+const parseFunctionBody: C.Parser<Expression> = (tokens) => {
+  // Try parenthesized expression first
+  const parenResult = parseParenExpr(tokens);
+  if (parenResult.success) return parenResult;
+
+  // Try a single non-sequence expression, but fail if next token is a semicolon
+  const exprResult = parseAdditive(tokens);
+  if (!exprResult.success) return exprResult;
+  const next = exprResult.remaining[0];
+  if (next && next.type === 'PUNCTUATION' && next.value === ';') {
+    return { success: false, error: 'Unexpected semicolon in function body', position: next.location.start.line };
+  }
+  return exprResult;
+};
+
 // --- Lambda Expression ---
-const parseLambdaExpression: C.Parser<FunctionExpression> = C.map(
-  C.seq(
-    C.keyword('fn'),
-    C.choice(
-      C.many(C.identifier()), // Support multiple parameters
-      C.seq(C.punctuation('('), C.punctuation(')')) // Support zero parameters (unit)
-    ),
-    C.operator('=>'),
-    C.lazy(() => parseSequenceTermWithIf) // Allow full expressions as function bodies
-  ),
-  ([fn, params, _arrow, body]): FunctionExpression => {
-    // Handle both parameter lists and unit parameter
-    let paramNames: string[] = [];
-    if (Array.isArray(params)) {
-      // Regular parameter list
-      paramNames = params.map(p => p.value);
+const parseLambdaExpression: C.Parser<FunctionExpression> = (tokens) => {
+  // Try to parse fn keyword first
+  const fnResult = C.keyword('fn')(tokens);
+  if (!fnResult.success) {
+    return fnResult;
+  }
+  
+  // Try unit parameter patterns first
+  let paramNames: string[] = [];
+  let remaining = fnResult.remaining;
+  
+  const parenResult = C.seq(C.punctuation('('), C.punctuation(')'))(remaining);
+  if (parenResult.success) {
+    // No parameters (should not be used in Noolang, but keep for syntax completeness)
+    paramNames = [];
+    remaining = parenResult.remaining;
+  } else {
+    const braceResult = C.seq(C.punctuation('{'), C.punctuation('}'))(remaining);
+    if (braceResult.success) {
+      // Unit parameter
+      paramNames = ['_unit'];
+      remaining = braceResult.remaining;
     } else {
-      // Unit parameter - empty array
-      paramNames = [];
+      // Try multiple identifiers last
+      const idResult = C.many(C.identifier())(remaining);
+      if (idResult.success) {
+        paramNames = idResult.value.map(p => p.value);
+        remaining = idResult.remaining;
+      } else {
+        return {
+          success: false,
+          error: 'Expected parameter list, parentheses, or braces',
+          position: remaining[0]?.location.start.line || 0
+        };
+      }
     }
-    
-    return {
+  }
+  
+  // Parse the arrow
+  const arrowResult = C.operator('=>')(remaining);
+  if (!arrowResult.success) {
+    return arrowResult;
+  }
+  
+  // Parse the body (use parseSequenceTermWithIf to allow full expressions)
+  const bodyResult = C.lazy(() => parseSequenceTermWithIf)(arrowResult.remaining);
+  if (!bodyResult.success) {
+    return bodyResult;
+  }
+  
+  return {
+    success: true,
+    value: {
       kind: 'function',
       params: paramNames,
-      body,
-      location: fn.location
-    };
-  }
-);
+      body: bodyResult.value,
+      location: fnResult.value.location
+    },
+    remaining: bodyResult.remaining
+  };
+};
 
 // --- List Parsing ---
 // Custom parser for a sequence of expressions separated by semicolons
@@ -297,25 +328,25 @@ const parseListElements: C.Parser<Expression[]> = (tokens) => {
   elements.push(firstElementResult.value);
   rest = firstElementResult.remaining;
   
-  // Parse additional elements, each preceded by a semicolon
+  // Parse additional elements, each preceded by a comma
   while (rest.length > 0) {
-    const semiResult = C.punctuation(';')(rest);
-    if (!semiResult.success) {
-      break; // No more semicolons, we're done
+    const commaResult = C.punctuation(',')(rest);
+    if (!commaResult.success) {
+      break; // No more commas, we're done
     }
-    rest = semiResult.remaining;
+    rest = commaResult.remaining;
     
     const elementResult = C.lazy(() => parseThrush)(rest);
     if (!elementResult.success) {
-      // Check if this is a trailing semicolon (no more elements after semicolon)
+      // Check if this is a trailing comma (no more elements after comma)
       // Look ahead to see if the next token is a closing bracket
       if (rest.length > 0 && rest[0].type === 'PUNCTUATION' && rest[0].value === ']') {
-        // This is a trailing semicolon, which is allowed
+        // This is a trailing comma, which is allowed
         break;
       }
       return {
         success: false,
-        error: 'Expected element after semicolon',
+        error: 'Expected element after comma',
         position: rest[0]?.location.start.line || 0
       };
     }
@@ -330,7 +361,7 @@ const parseListElements: C.Parser<Expression[]> = (tokens) => {
   };
 };
 
-const parseList: C.Parser<LiteralExpression> = C.map(
+const parseList: C.Parser<ListExpression> = C.map(
   C.seq(
     C.punctuation('['),
     C.optional(parseListElements),
@@ -339,8 +370,8 @@ const parseList: C.Parser<LiteralExpression> = C.map(
   ([open, elements, close]) => {
     const elementsList: Expression[] = elements || [];
     return {
-      kind: 'literal',
-      value: elementsList,
+      kind: 'list',
+      elements: elementsList,
       location: open.location
     };
   }
@@ -359,8 +390,77 @@ const parseImportExpression: C.Parser<ImportExpression> = C.map(
   })
 );
 
+// --- Type Expression ---
+const parseTypeExpression: C.Parser<Type> = (tokens) => {
+  // Try primitive types first
+  const primitiveTypes = ['Number', 'String', 'Bool', 'Unit'];
+  for (const typeName of primitiveTypes) {
+    const result = C.keyword(typeName)(tokens);
+    if (result.success) {
+      switch (typeName) {
+        case 'Number': return { success: true, value: intType(), remaining: result.remaining };
+        case 'String': return { success: true, value: stringType(), remaining: result.remaining };
+        case 'Bool': return { success: true, value: boolType(), remaining: result.remaining };
+        case 'Unit': return { success: true, value: unitType(), remaining: result.remaining };
+      }
+    }
+  }
+  
+  // Try List type
+  const listResult = C.seq(C.keyword('List'), C.lazy(() => parseTypeExpression))(tokens);
+  if (listResult.success) {
+    return { success: true, value: listTypeWithElement(listResult.value[1]), remaining: listResult.remaining };
+  }
+  
+  // Try function type (a -> b)
+  const arrowResult = C.seq(
+    C.lazy(() => parseTypeExpression),
+    C.operator('->'),
+    C.lazy(() => parseTypeExpression)
+  )(tokens);
+  if (arrowResult.success) {
+    return { 
+      success: true, 
+      value: functionType([arrowResult.value[0]], arrowResult.value[2]), 
+      remaining: arrowResult.remaining 
+    };
+  }
+  
+  // Try type variable (lowercase identifier)
+  if (tokens.length > 0 && tokens[0].type === 'IDENTIFIER' && /^[a-z]/.test(tokens[0].value)) {
+    const varResult = C.identifier()(tokens);
+    if (varResult.success) {
+      return { success: true, value: typeVariable(varResult.value.value), remaining: varResult.remaining };
+    }
+  }
+  
+  return { success: false, error: 'Expected type expression', position: tokens[0]?.location.start.line || 0 };
+};
+
+// --- If Expression (special: do not allow semicolon in branches) ---
+const parseIfExpression: C.Parser<Expression> = C.map(
+  C.seq(
+    C.keyword('if'),
+    C.lazy(() => parseSequenceTerm),
+    C.keyword('then'),
+    C.lazy(() => parseSequenceTerm),
+    C.keyword('else'),
+    C.lazy(() => parseSequenceTerm)
+  ),
+  ([ifKw, condition, thenKw, thenExpr, elseKw, elseExpr]) => {
+    return {
+      kind: 'if',
+      condition,
+      then: thenExpr,
+      else: elseExpr,
+      location: ifKw.location
+    };
+  }
+);
+
 // Add parseList to parsePrimary after it's defined
 const parsePrimaryWithList: C.Parser<Expression> = C.choice(
+  parseIfExpression, // <-- allow if expressions
   parseNumber,
   parseString,
   parseBoolean,
@@ -368,8 +468,9 @@ const parsePrimaryWithList: C.Parser<Expression> = C.choice(
   parseList,
   parseRecord,
   parseAccessor,
-  parseParenExpr,
-  parseLambdaExpression, // <-- allow lambdas as arguments
+  parseParenExpr, // <-- try parenthesized expressions first
+  parseLambdaExpression, // <-- allow lambda expressions as primary expressions
+  C.lazy(() => parseDefinitionWithType), // <-- allow definitions as primary expressions
   parseImportExpression // <-- allow import as a primary expression
 );
 
@@ -403,49 +504,9 @@ const parseSimpleExpression: C.Parser<Expression> = C.map(
   }
 );
 
-// --- Definition ---
-// Note: The right side of '=' in a definition can be any expression, including a sequence (e.g., foo = (1; 2)).
-// However, 'foo = 1; 2' is parsed as two sequenced expressions: (foo = 1); 2.
-// Use parentheses to assign the result of a sequence to a variable.
-// This matches the semantics of expression-based languages like OCaml or Haskell.
-const parseDefinition: C.Parser<DefinitionExpression> = C.map(
-  C.seq(
-    C.identifier(),
-    C.operator('='),
-    C.lazy(() => parseSequenceTermWithIf)
-  ),
-  ([name, equals, value]): DefinitionExpression => {
-    return {
-      kind: 'definition',
-      name: name.value,
-      value,
-      location: name.location
-    };
-  }
-);
 
 
 
-// --- If Expression (special: do not allow semicolon in branches) ---
-const parseIfExpression: C.Parser<Expression> = C.map(
-  C.seq(
-    C.keyword('if'),
-    C.lazy(() => parseSequenceTerm),
-    C.keyword('then'),
-    C.lazy(() => parseSequenceTerm),
-    C.keyword('else'),
-    C.lazy(() => parseSequenceTerm)
-  ),
-  ([ifKw, condition, thenKw, thenExpr, elseKw, elseExpr]) => {
-    return {
-      kind: 'if',
-      condition,
-      then: thenExpr,
-      else: elseExpr,
-      location: ifKw.location
-    };
-  }
-);
 
 // --- Unary Operators (negation) ---
 const parseUnary: C.Parser<Expression> = C.choice(
@@ -620,6 +681,55 @@ const parseThrush: C.Parser<Expression> = C.map(
   }
 );
 
+// --- Typed Expression (expr : type) ---
+const parseTypedExpression: C.Parser<Expression> = C.map(
+  C.seq(
+    parseThrush,
+    C.punctuation(':'),
+    C.lazy(() => parseTypeExpression)
+  ),
+  ([expr, colon, type]): TypedExpression => ({
+    kind: 'typed',
+    expression: expr,
+    type,
+    location: expr.location
+  })
+);
+
+// --- Definition ---
+const parseDefinition: C.Parser<DefinitionExpression> = C.map(
+  C.seq(
+    C.identifier(),
+    C.operator('='),
+    C.lazy(() => parseSequenceTermWithIf)
+  ),
+  ([name, equals, value]): DefinitionExpression => {
+    return {
+      kind: 'definition',
+      name: name.value,
+      value,
+      location: name.location
+    };
+  }
+);
+
+// --- Definition with typed expression ---
+const parseDefinitionWithType: C.Parser<DefinitionExpression> = C.map(
+  C.seq(
+    C.identifier(),
+    C.operator('='),
+    C.lazy(() => parseExprWithType)
+  ),
+  ([name, equals, value]): DefinitionExpression => {
+    return {
+      kind: 'definition',
+      name: name.value,
+      value,
+      location: name.location
+    };
+  }
+);
+
 // --- Sequence term: everything else ---
 const parseSequenceTerm: C.Parser<Expression> = C.choice(
   parseIfExpression,
@@ -663,7 +773,32 @@ const parseSequenceTermWithIfExceptRecord: C.Parser<Expression> = C.choice(
   parseIfExpression
 );
 
+// --- Sequence Term: definition or expression ---
+const parseSequenceTermNew: C.Parser<Expression> = C.choice(
+  parseDefinitionWithType, // allow definitions
+  parseThrush // allow full expressions with precedence
+);
+
+// --- Expression with type annotation (just above semicolon) ---
+const parseExprWithType: C.Parser<Expression> = C.choice(
+  C.map(
+    C.seq(
+      parseSequenceTermNew,
+      C.punctuation(':'),
+      C.lazy(() => parseTypeExpression)
+    ),
+    ([expr, colon, type]): TypedExpression => ({
+      kind: 'typed',
+      expression: expr,
+      type,
+      location: expr.location
+    })
+  ),
+  parseSequenceTermNew
+);
+
 // --- Sequence (semicolon) ---
+// Accepts a sequence of definitions and/or expressions, separated by semicolons
 const parseSequence: C.Parser<Expression> = C.map(
   C.seq(
     C.lazy(() => parseSequenceTermWithIf),

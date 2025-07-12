@@ -6,7 +6,7 @@ add = @add;
 result1 = add std.math 5 3;
 
 # Use list functions
-list = [1; 2; 3; 4; 5];
+list = [1, 2, 3, 4, 5];
 head = @head;
 first = head std.list list;
 

@@ -1,2 +1,2 @@
 # Math functions module
-{ @add fn x y => x + y; @multiply fn x y => x * y; @square fn x => x * x } 
+{ @add fn x y => x + y, @multiply fn x y => x * y, @square fn x => x * x } 

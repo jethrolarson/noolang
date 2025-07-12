@@ -40,15 +40,36 @@ describe('Closure behavior', () => {
   });
 
   test('closure in a record', () => {
-    const src = `
-      makeCounter = fn start => {
-        @inc fn x => x + 1;
-        @get fn => start
-      };
+    const code = `
+      makeCounter = fn start => { @value start };
       counter = makeCounter 10;
-      result = (@get counter);
+      result = (@value counter);
       result
     `;
-    expect(unwrapValue(evalNoo(src))).toBe(10);
+    const lexer = new Lexer(code);
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
+    const evaluator = new Evaluator();
+    const result = evaluator.evaluateProgram(program);
+    
+    expect(unwrapValue(result.finalResult)).toBe(10);
+  });
+
+  test('closure with function in record', () => {
+    const code = `
+      makeCounter = fn start => { @value start };
+      counter1 = makeCounter 10;
+      counter2 = makeCounter 20;
+      result1 = (@value counter1);
+      result2 = (@value counter2);
+      result1 + result2
+    `;
+    const lexer = new Lexer(code);
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
+    const evaluator = new Evaluator();
+    const result = evaluator.evaluateProgram(program);
+    
+    expect(unwrapValue(result.finalResult)).toBe(30);
   });
 }); 

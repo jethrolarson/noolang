@@ -13,6 +13,7 @@ import {
   RecordExpression,
   AccessorExpression
 } from './ast';
+import { createError, NoolangError } from './errors';
 
 // Value types (Phase 6: functions and native functions as tagged union)
 export type Value =
@@ -147,7 +148,16 @@ export class Evaluator {
     }));
     this.environment.set('/', createNativeFunction('/', (a: Value) => (b: Value) => {
       if (isNumber(a) && isNumber(b)) {
-        if (b.value === 0) throw new Error('Division by zero');
+        if (b.value === 0) {
+          const error = createError(
+            'RuntimeError',
+            'Division by zero',
+            undefined,
+            `${a.value} / ${b.value}`,
+            'Check that the divisor is not zero before dividing'
+          );
+          throw error;
+        }
         return createNumber(a.value / b.value);
       }
       throw new Error(`Cannot divide ${a?.tag || 'unit'} by ${b?.tag || 'unit'}`);
@@ -485,6 +495,22 @@ export class Evaluator {
         // Return unit value
         return createUnit();
       }
+      case 'list': {
+        // Evaluate all elements and return a tagged list value
+        const elements = expr.elements.map(e => this.evaluateExpression(e));
+        return createList(elements);
+      }
+      case 'tuple': {
+        // Evaluate all elements and return a tagged tuple value
+        const elements = expr.elements.map(e => this.evaluateExpression(e));
+        return createTuple(elements);
+      }
+      case 'record': {
+        return this.evaluateRecord(expr);
+      }
+      case 'if': {
+        return this.evaluateIf(expr);
+      }
       default:
         throw new Error(`Unknown expression kind: ${(expr as Expression).kind}`);
     }
@@ -522,7 +548,19 @@ export class Evaluator {
   private evaluateVariable(expr: VariableExpression): Value {
     const value = this.environment.get(expr.name);
     if (value === undefined) {
-      throw new Error(`Undefined variable: ${expr.name}`);
+      const error = createError(
+        'RuntimeError',
+        `Undefined variable: ${expr.name}`,
+        {
+          line: expr.location.start.line,
+          column: expr.location.start.column,
+          start: expr.location.start.line,
+          end: expr.location.end.line
+        },
+        expr.name,
+        `Define the variable before using it: ${expr.name} = value`
+      );
+      throw error;
     }
     return value;
   }
@@ -531,32 +569,35 @@ export class Evaluator {
     const self = this;
     // Create a manually curried function
     function createCurriedFunction(params: string[], body: Expression, env: Environment): Value {
-      if (params.length === 0) {
-        // No more parameters, evaluate the body
-        const tempEvaluator = new Evaluator();
-        tempEvaluator.environment = env;
-        return tempEvaluator.evaluateExpression(body);
-      }
-      
-      // Return a function that takes the next parameter
+      // Always curry by parameter count; no zero-parameter functions in Noolang
       return createFunction((arg: Value) => {
         const newEnv = new Map(env);
         newEnv.set(params[0], arg);
-        return createCurriedFunction(params.slice(1), body, newEnv);
+        if (params.length === 1) {
+          const oldEnv = self.environment;
+          self.environment = newEnv;
+          const result = self.evaluateExpression(body);
+          self.environment = oldEnv;
+          return result;
+        } else {
+          return createCurriedFunction(params.slice(1), body, newEnv);
+        }
       });
     }
-    
     return createCurriedFunction(expr.params, expr.body, this.environment);
   }
 
   private evaluateApplication(expr: ApplicationExpression): Value {
     const func = this.evaluateExpression(expr.func);
     
+    // Only apply the function to the arguments present in the AST
+    const args = expr.args;
+
     if (isFunction(func)) {
       // Handle tagged function application
       let result: any = func.fn;
       
-      for (const argExpr of expr.args) {
+      for (const argExpr of args) {
         const arg = this.evaluateExpression(argExpr);
         if (typeof result === 'function') {
           result = result(arg);
@@ -570,7 +611,7 @@ export class Evaluator {
       // Handle native function application
       let result: any = func.fn;
       
-      for (const argExpr of expr.args) {
+      for (const argExpr of args) {
         const arg = this.evaluateExpression(argExpr);
         if (typeof result === 'function') {
           result = result(arg);
@@ -725,7 +766,20 @@ export class Evaluator {
       
       return result.finalResult;
     } catch (error) {
-      throw new Error(`Failed to import '${expr.path}': ${(error as Error).message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const structuredError = createError(
+        'ImportError',
+        `Failed to import '${expr.path}': ${errorMessage}`,
+        {
+          line: expr.location.start.line,
+          column: expr.location.start.column,
+          start: expr.location.start.line,
+          end: expr.location.end.line
+        },
+        `import "${expr.path}"`,
+        'Check that the file exists and can be parsed'
+      );
+      throw structuredError;
     }
   }
 

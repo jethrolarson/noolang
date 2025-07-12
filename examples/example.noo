@@ -11,14 +11,14 @@ multiply 4 5;
 square 6;
 
 # Records
-user = { @name "Alice"; @age 30; @city "NYC" };
+user = { @name "Alice", @age 30, @city "NYC" };
 
 # Accessors
 (@name user);
 (@age user);
 
 # Lists
-numbers = [1; 2; 3; 4; 5];
+numbers = [1, 2, 3, 4, 5];
 
 # Pipeline operations
 numbers |> head;

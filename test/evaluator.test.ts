@@ -79,7 +79,7 @@ describe('Evaluator', () => {
   });
 
   test('should evaluate list operations', () => {
-    const lexer = new Lexer('[1; 2; 3] |> head');
+    const lexer = new Lexer('[1, 2, 3] |> head');
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
@@ -89,7 +89,7 @@ describe('Evaluator', () => {
   });
 
   test('should evaluate map function', () => {
-    const lexer = new Lexer('map (fn x => x * 2) [1; 2; 3]');
+    const lexer = new Lexer('map (fn x => x * 2) [1, 2, 3]');
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
@@ -99,7 +99,7 @@ describe('Evaluator', () => {
   });
 
   test('should evaluate filter function', () => {
-    const lexer = new Lexer('filter (fn x => x > 2) [1; 2; 3; 4; 5]');
+    const lexer = new Lexer('filter (fn x => x > 2) [1, 2, 3, 4, 5]');
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
@@ -108,7 +108,7 @@ describe('Evaluator', () => {
   });
 
   test('should evaluate length function', () => {
-    const lexer = new Lexer('length [1; 2; 3; 4; 5]');
+    const lexer = new Lexer('length [1, 2, 3, 4, 5]');
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
@@ -118,7 +118,7 @@ describe('Evaluator', () => {
   });
 
   test('should evaluate isEmpty function', () => {
-    const lexer = new Lexer('isEmpty []; isEmpty [1; 2; 3]');
+    const lexer = new Lexer('isEmpty []; isEmpty [1, 2, 3]');
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
@@ -128,7 +128,7 @@ describe('Evaluator', () => {
   });
 
   test('should evaluate append function', () => {
-    const lexer = new Lexer('append [1; 2] [3; 4]');
+    const lexer = new Lexer('append [1, 2] [3, 4]');
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
@@ -224,15 +224,7 @@ describe('Evaluator', () => {
   });
 
   test('should evaluate single-field record', () => {
-    const lexer = new Lexer('{ @name "Alice" }');
-    const tokens = lexer.tokenize();
-    const program = parse(tokens);
-    const result = evaluator.evaluateProgram(program);
-    expect(unwrapValue(result.finalResult)).toEqual({ name: 'Alice' });
-  });
-
-  test('should evaluate multi-field record (semicolon separated)', () => {
-    const lexer = new Lexer('{ @name "Alice"; @age 30 }');
+    const lexer = new Lexer('{ @name "Alice", @age 30 }');
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
@@ -240,7 +232,15 @@ describe('Evaluator', () => {
   });
 
   test('should evaluate multi-field record (semicolon separated)', () => {
-    const lexer = new Lexer('{ @name "Alice"; @age 30 }');
+    const lexer = new Lexer('{ @name "Alice", @age 30 }');
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
+    const result = evaluator.evaluateProgram(program);
+    expect(unwrapValue(result.finalResult)).toEqual({ name: 'Alice', age: 30 });
+  });
+
+  test('should evaluate multi-field record (semicolon separated)', () => {
+    const lexer = new Lexer('{ @name "Alice", @age 30 }');
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
@@ -248,7 +248,7 @@ describe('Evaluator', () => {
   });
 
   test('should evaluate accessor on record', () => {
-    const lexer = new Lexer('user = { @name "Alice"; @age 30 }; (@name user)');
+    const lexer = new Lexer('user = { @name "Alice", @age 30 }; (@name user)');
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
@@ -273,6 +273,14 @@ describe('Evaluator', () => {
     // (not directly testable here, but no error should occur)
   });
 
+  test('should evaluate function with unit parameter', () => {
+    const lexer = new Lexer('foo = fn {} => "joe"; foo {}');
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
+    const result = evaluator.evaluateProgram(program);
+    expect(unwrapValue(result.finalResult)).toBe('joe');
+  });
+
   describe('Top-level sequence evaluation', () => {
     test('multiple definitions and final expression', () => {
       const lexer = new Lexer('a = 1; b = 2; a + b');
@@ -286,7 +294,7 @@ describe('Evaluator', () => {
       const code = `
         add = fn x y => x + y;
         sub = fn x y => x - y;
-        math = { @add add; @sub sub };
+        math = { @add add, @sub sub };
         math
       `;
       const lexer = new Lexer(code);

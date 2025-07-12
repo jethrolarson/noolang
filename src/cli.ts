@@ -2,6 +2,7 @@
 import { Lexer } from './lexer';
 import { parse } from './parser/parser';
 import { Evaluator } from './evaluator';
+import { Typer } from './typer';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -13,6 +14,11 @@ function printUsage() {
   console.log('       noo --ast <expr>');
   console.log('       noo --tokens-file <file>');
   console.log('       noo --ast-file <file>');
+  console.log('       noo --types <expr>');
+  console.log('       noo --types-file <file>');
+  console.log('       noo --types-detailed <expr>');
+  console.log('       noo --types-env <expr>');
+  console.log('       noo --types-ast <expr>');
   console.log('');
   console.log('Examples:');
   console.log('  noo my_program.noo');
@@ -23,6 +29,11 @@ function printUsage() {
   console.log('  noo --ast "if x > 0 then x else -x"');
   console.log('  noo --tokens-file std/math.noo');
   console.log('  noo --ast-file std/math.noo');
+  console.log('  noo --types "fn x => x + 1"');
+  console.log('  noo --types-file std/math.noo');
+  console.log('  noo --types-detailed "fn x => x + 1"');
+  console.log('  noo --types-env "fn x => x + 1"');
+  console.log('  noo --types-ast "fn x => x + 1"');
   console.log('');
   console.log('Or use the REPL:');
   console.log('  noo');
@@ -112,6 +123,104 @@ async function main() {
     return;
   }
 
+  // Check for --types flag
+  if (args[0] === '--types' && args[1]) {
+    const expr = args[1];
+    try {
+      const lexer = new Lexer(expr);
+      const tokens = lexer.tokenize();
+      const program = parse(tokens);
+      const typer = new Typer();
+      const typedProgram = typer.typeAndDecorate(program);
+      console.log('Types:');
+      typedProgram.statements.forEach((stmt, i) => {
+        console.log(`  ${i}: ${typer.typeToString(stmt.type!)}`);
+      });
+    } catch (err) {
+      console.error('Error:', (err as Error).message);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // Check for --types-file flag
+  if (args[0] === '--types-file' && args[1]) {
+    const file = args[1];
+    try {
+      const fullPath = path.resolve(file);
+      const code = fs.readFileSync(fullPath, 'utf8');
+      const lexer = new Lexer(code);
+      const tokens = lexer.tokenize();
+      const program = parse(tokens);
+      const typer = new Typer();
+      const typedProgram = typer.typeAndDecorate(program);
+      console.log('Types:');
+      typedProgram.statements.forEach((stmt, i) => {
+        console.log(`  ${i}: ${typer.typeToString(stmt.type!)}`);
+      });
+    } catch (err) {
+      console.error('Error:', (err as Error).message);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // Check for --types-detailed flag
+  if (args[0] === '--types-detailed' && args[1]) {
+    const expr = args[1];
+    try {
+      const lexer = new Lexer(expr);
+      const tokens = lexer.tokenize();
+      const program = parse(tokens);
+      const typer = new Typer();
+      const typedProgram = typer.typeAndDecorate(program);
+      console.log('Types (detailed):');
+      typedProgram.statements.forEach((stmt, i) => {
+        console.log(`  ${i}: ${typer.typeToString(stmt.type!)}`);
+      });
+    } catch (err) {
+      console.error('Error:', (err as Error).message);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // Check for --types-env flag
+  if (args[0] === '--types-env' && args[1]) {
+    const expr = args[1];
+    try {
+      const lexer = new Lexer(expr);
+      const tokens = lexer.tokenize();
+      const program = parse(tokens);
+      const typer = new Typer();
+      const typedProgram = typer.typeAndDecorate(program);
+      console.log('Type Environment:');
+      typer.printTypeEnvironment(typedProgram);
+    } catch (err) {
+      console.error('Error:', (err as Error).message);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // Check for --types-ast flag
+  if (args[0] === '--types-ast' && args[1]) {
+    const expr = args[1];
+    try {
+      const lexer = new Lexer(expr);
+      const tokens = lexer.tokenize();
+      const program = parse(tokens);
+      const typer = new Typer();
+      const typedProgram = typer.typeAndDecorate(program);
+      console.log('Typed AST:');
+      console.log(JSON.stringify(typedProgram, null, 2));
+    } catch (err) {
+      console.error('Error:', (err as Error).message);
+      process.exit(1);
+    }
+    return;
+  }
+
   // Check for --eval or -e flag
   if ((args[0] === '--eval' || args[0] === '-e') && args[1]) {
     const expr = args[1];
@@ -119,8 +228,10 @@ async function main() {
       const lexer = new Lexer(expr);
       const tokens = lexer.tokenize();
       const program = parse(tokens);
+      const typer = new Typer();
+      const typedProgram = typer.typeAndDecorate(program);
       const evaluator = new Evaluator();
-      const result = evaluator.evaluateProgram(program);
+      const result = evaluator.evaluateProgram(typedProgram);
       console.log(result.finalResult);
     } catch (err) {
       console.error('Error:', (err as Error).message);
@@ -142,8 +253,10 @@ async function main() {
     const lexer = new Lexer(code);
     const tokens = lexer.tokenize();
     const program = parse(tokens);
+    const typer = new Typer();
+    const typedProgram = typer.typeAndDecorate(program);
     const evaluator = new Evaluator();
-    const result = evaluator.evaluateProgram(program);
+    const result = evaluator.evaluateProgram(typedProgram);
     console.log(result.finalResult);
   } catch (err) {
     console.error('Error:', (err as Error).message);

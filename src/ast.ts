@@ -11,10 +11,23 @@ export type Location = {
 };
 
 // Type system
+export type Effect = 
+  | 'io'
+  | 'log' 
+  | 'mut'
+  | 'rand'
+  | 'err';
+
 export type Type = 
-  | { kind: 'primitive'; name: 'Int' | 'String' | 'Bool' | 'List' | 'Nil' }
-  | { kind: 'function'; params: Type[]; return: Type }
+  | { kind: 'primitive'; name: 'Int' | 'String' | 'Bool' | 'List' }
+  | { kind: 'function'; params: Type[]; return: Type; effects: Effect[] }
   | { kind: 'variable'; name: string }
+  | { kind: 'list'; element: Type }
+  | { kind: 'tuple'; elements: Type[] }
+  | { kind: 'record'; fields: { [key: string]: Type } }
+  | { kind: 'result'; success: Type; error: Type }
+  | { kind: 'option'; element: Type }
+  | { kind: 'unit' }
   | { kind: 'unknown' };
 
 // Expressions
@@ -31,7 +44,9 @@ export type Expression =
   | RecordExpression
   | TupleExpression
   | UnitExpression
-  | AccessorExpression;
+  | AccessorExpression
+  | TypedExpression
+  | ListExpression;
 
 export interface LiteralExpression {
   kind: 'literal';
@@ -130,6 +145,20 @@ export interface UnitExpression {
   location: Location;
 }
 
+export interface TypedExpression {
+  kind: 'typed';
+  expression: Expression;
+  type: Type;
+  location: Location;
+}
+
+export interface ListExpression {
+  kind: 'list';
+  elements: Expression[];
+  type?: Type;
+  location: Location;
+}
+
 
 // Top-level constructs
 export type TopLevel = Expression;
@@ -156,10 +185,23 @@ export const intType = (): Type => ({ kind: 'primitive', name: 'Int' });
 export const stringType = (): Type => ({ kind: 'primitive', name: 'String' });
 export const boolType = (): Type => ({ kind: 'primitive', name: 'Bool' });
 export const listType = (): Type => ({ kind: 'primitive', name: 'List' });
-export const functionType = (params: Type[], returnType: Type): Type => ({
+export const functionType = (params: Type[], returnType: Type, effects: Effect[] = []): Type => ({
   kind: 'function',
   params,
   return: returnType,
+  effects,
 });
 export const typeVariable = (name: string): Type => ({ kind: 'variable', name });
-export const unknownType = (): Type => ({ kind: 'unknown' }); 
+export const unknownType = (): Type => ({ kind: 'unknown' });
+
+// New type constructors
+export const listTypeWithElement = (element: Type): Type => ({ kind: 'list', element });
+export const tupleType = (elements: Type[]): Type => ({ kind: 'tuple', elements });
+export const recordType = (fields: { [key: string]: Type }): Type => ({ kind: 'record', fields });
+export const resultType = (success: Type, error: Type): Type => ({ kind: 'result', success, error });
+export const optionType = (element: Type): Type => ({ kind: 'option', element });
+
+// Convenience functions for common types
+export const unitType = (): Type => ({ kind: 'unit' });
+export const optionInt = (): Type => optionType(intType());
+export const resultString = (error: Type): Type => resultType(stringType(), error); 

@@ -10,6 +10,7 @@ import {
   BinaryExpression,
   IfExpression,
   Type,
+  Effect,
   intType,
   stringType,
   boolType,
@@ -17,6 +18,12 @@ import {
   functionType,
   typeVariable,
   unknownType,
+  unitType,
+  listTypeWithElement,
+  tupleType,
+  recordType,
+  resultType,
+  optionType,
 } from './ast';
 
 export type TypeEnvironment = Map<string, Type>;
@@ -31,13 +38,13 @@ export class Typer {
   }
 
   private initializeBuiltins(): void {
-    // Arithmetic operators
+    // Arithmetic operators (pure)
     this.environment.set('+', functionType([intType(), intType()], intType()));
     this.environment.set('-', functionType([intType(), intType()], intType()));
     this.environment.set('*', functionType([intType(), intType()], intType()));
     this.environment.set('/', functionType([intType(), intType()], intType()));
 
-    // Comparison operators
+    // Comparison operators (pure)
     this.environment.set('==', functionType([typeVariable('a'), typeVariable('a')], boolType()));
     this.environment.set('!=', functionType([typeVariable('a'), typeVariable('a')], boolType()));
     this.environment.set('<', functionType([intType(), intType()], boolType()));
@@ -45,34 +52,34 @@ export class Typer {
     this.environment.set('<=', functionType([intType(), intType()], boolType()));
     this.environment.set('>=', functionType([intType(), intType()], boolType()));
 
-    // List operations
-    this.environment.set('head', functionType([listType()], typeVariable('a')));
-    this.environment.set('tail', functionType([listType()], listType()));
-    this.environment.set('cons', functionType([typeVariable('a'), listType()], listType()));
+    // List operations (pure)
+    this.environment.set('head', functionType([listTypeWithElement(typeVariable('a'))], typeVariable('a')));
+    this.environment.set('tail', functionType([listTypeWithElement(typeVariable('a'))], listTypeWithElement(typeVariable('a'))));
+    this.environment.set('cons', functionType([typeVariable('a'), listTypeWithElement(typeVariable('a'))], listTypeWithElement(typeVariable('a'))));
 
-    // Pipeline operator
+    // Pipeline operator (pure)
     this.environment.set('|>', functionType([typeVariable('a'), functionType([typeVariable('a')], typeVariable('b'))], typeVariable('b')));
 
-    // Semicolon operator (left must be Nil, returns right type)
-    this.environment.set(';', functionType([{ kind: 'primitive', name: 'Nil' }, typeVariable('b')], typeVariable('b')));
+    // Semicolon operator (pure)
+    this.environment.set(';', functionType([typeVariable('a'), typeVariable('b')], typeVariable('b')));
 
-    // Utility functions
-    this.environment.set('print', functionType([typeVariable('a')], typeVariable('a')));
+    // Effectful functions
+    this.environment.set('print', functionType([typeVariable('a')], typeVariable('a'), ['log']));
 
-    // List utility functions
-    this.environment.set('map', functionType([functionType([typeVariable('a')], typeVariable('b')), listType()], listType()));
-    this.environment.set('filter', functionType([functionType([typeVariable('a')], boolType()), listType()], listType()));
-    this.environment.set('reduce', functionType([functionType([typeVariable('b'), typeVariable('a')], typeVariable('b')), typeVariable('b'), listType()], typeVariable('b')));
-    this.environment.set('length', functionType([listType()], intType()));
-    this.environment.set('isEmpty', functionType([listType()], boolType()));
-    this.environment.set('append', functionType([listType(), listType()], listType()));
+    // List utility functions (pure)
+    this.environment.set('map', functionType([functionType([typeVariable('a')], typeVariable('b')), listTypeWithElement(typeVariable('a'))], listTypeWithElement(typeVariable('b'))));
+    this.environment.set('filter', functionType([functionType([typeVariable('a')], boolType()), listTypeWithElement(typeVariable('a'))], listTypeWithElement(typeVariable('a'))));
+    this.environment.set('reduce', functionType([functionType([typeVariable('b'), typeVariable('a')], typeVariable('b')), typeVariable('b'), listTypeWithElement(typeVariable('a'))], typeVariable('b')));
+    this.environment.set('length', functionType([listTypeWithElement(typeVariable('a'))], intType()));
+    this.environment.set('isEmpty', functionType([listTypeWithElement(typeVariable('a'))], boolType()));
+    this.environment.set('append', functionType([listTypeWithElement(typeVariable('a')), listTypeWithElement(typeVariable('a'))], listTypeWithElement(typeVariable('a'))));
 
-    // Math utilities
+    // Math utilities (pure)
     this.environment.set('abs', functionType([intType()], intType()));
     this.environment.set('max', functionType([intType(), intType()], intType()));
     this.environment.set('min', functionType([intType(), intType()], intType()));
 
-    // String utilities
+    // String utilities (pure)
     this.environment.set('concat', functionType([stringType(), stringType()], stringType()));
     this.environment.set('toString', functionType([typeVariable('a')], stringType()));
   }
@@ -85,10 +92,21 @@ export class Typer {
     const types: Type[] = [];
     
     for (const statement of program.statements) {
-      types.push(this.typeExpression(statement));
+      const type = this.typeExpression(statement);
+      types.push(type);
     }
     
     return types;
+  }
+
+  typeAndDecorate(program: Program): Program {
+    // Type check and decorate each statement
+    for (const statement of program.statements) {
+      const type = this.typeExpression(statement);
+      statement.type = type;
+    }
+    
+    return program;
   }
 
   private typeDefinition(def: DefinitionExpression): void {
@@ -97,35 +115,89 @@ export class Typer {
   }
 
   typeExpression(expr: Expression): Type {
+    let type: Type;
+    
     switch (expr.kind) {
       case 'literal':
-        return this.typeLiteral(expr);
+        type = this.typeLiteral(expr);
+        break;
       
       case 'variable':
-        return this.typeVariable(expr);
+        type = this.typeVariable(expr);
+        break;
       
       case 'function':
-        return this.typeFunction(expr);
+        type = this.typeFunction(expr);
+        break;
       
       case 'application':
-        return this.typeApplication(expr);
+        type = this.typeApplication(expr);
+        break;
       
       case 'pipeline':
-        return this.typePipeline(expr);
+        type = this.typePipeline(expr);
+        break;
       
       case 'binary':
-        return this.typeBinary(expr);
+        type = this.typeBinary(expr);
+        break;
       
       case 'if':
-        return this.typeIf(expr);
+        type = this.typeIf(expr);
+        break;
       
       case 'definition':
         this.typeDefinition(expr);
-        return { kind: 'primitive', name: 'Nil' }; // Return Nil type for definitions
+        type = unitType(); // Return unit type for definitions
+        break;
+      
+      case 'import':
+        type = this.typeImport(expr);
+        break;
+      
+      case 'record':
+        type = this.typeRecord(expr);
+        break;
+      
+      case 'accessor':
+        type = this.typeAccessor(expr);
+        break;
+      
+      case 'list':
+        type = this.typeList(expr);
+        break;
+      
+      case 'tuple':
+        type = this.typeTuple(expr);
+        break;
+      
+      case 'record':
+        type = this.typeRecord(expr);
+        break;
+      
+      case 'unit':
+        type = unitType();
+        break;
+      
+      case 'typed':
+        // For typed expressions, validate that the explicit type matches the inferred type
+        const inferredType = this.typeExpression(expr.expression);
+        const explicitType = expr.type;
+        
+        if (!this.typesCompatible(inferredType, explicitType)) {
+          throw new Error(`Type annotation mismatch: expected ${this.typeToString(explicitType)}, but inferred ${this.typeToString(inferredType)}`);
+        }
+        
+        type = explicitType; // Use the explicit type
+        break;
       
       default:
         throw new Error(`Unknown expression kind: ${(expr as Expression).kind}`);
     }
+    
+    // Decorate the expression with its type
+    expr.type = type;
+    return type;
   }
 
   private typeLiteral(expr: LiteralExpression): Type {
@@ -138,9 +210,9 @@ export class Typer {
     } else if (typeof value === 'boolean') {
       return boolType();
     } else if (Array.isArray(value)) {
-      // For now, assume all lists have the same type
+      // For now, assume all lists have Int elements
       // In a more sophisticated system, we'd infer the element type
-      return listType();
+      return listTypeWithElement(intType());
     } else {
       return unknownType();
     }
@@ -158,12 +230,18 @@ export class Typer {
     // Create new type environment for function scope
     const functionEnv = new Map(this.environment);
     
-    // Assign fresh type variables to parameters
-    const paramTypes: Type[] = [];
-    for (const param of expr.params) {
-      const paramType = this.freshTypeVariable();
-      paramTypes.push(paramType);
-      functionEnv.set(param, paramType);
+    let paramTypes: Type[] = [];
+    if (expr.params.length === 0) {
+      // Treat as a function from unit to return type
+      paramTypes = [unitType()];
+      functionEnv.set('_unit', unitType());
+    } else {
+      // Assign fresh type variables to parameters
+      for (const param of expr.params) {
+        const paramType = this.freshTypeVariable();
+        paramTypes.push(paramType);
+        functionEnv.set(param, paramType);
+      }
     }
 
     // Create temporary typer with function environment
@@ -265,6 +343,49 @@ export class Typer {
     return thenType;
   }
 
+  private typeImport(expr: any): Type {
+    // For now, assume imports return a record type
+    return recordType({});
+  }
+
+  private typeRecord(expr: any): Type {
+    const fields: { [key: string]: Type } = {};
+    for (const field of expr.fields) {
+      fields[field.name] = this.typeExpression(field.value);
+    }
+    return recordType(fields);
+  }
+
+  private typeAccessor(expr: any): Type {
+    // Accessors return functions that take a record and return the field type
+    return functionType([recordType({})], typeVariable('a'));
+  }
+
+  private typeTuple(expr: any): Type {
+    const elements = expr.elements.map((element: any) => this.typeExpression(element));
+    return tupleType(elements);
+  }
+
+  private typeList(expr: any): Type {
+    if (expr.elements.length === 0) {
+      // Empty list - we can't infer the element type
+      return listTypeWithElement(typeVariable('a'));
+    }
+    
+    // Infer the type from the first element
+    const firstElementType = this.typeExpression(expr.elements[0]);
+    
+    // Check that all elements have the same type
+    for (let i = 1; i < expr.elements.length; i++) {
+      const elementType = this.typeExpression(expr.elements[i]);
+      if (!this.typesCompatible(firstElementType, elementType)) {
+        throw new Error(`List elements must have the same type: ${this.typeToString(firstElementType)} vs ${this.typeToString(elementType)}`);
+      }
+    }
+    
+    return listTypeWithElement(firstElementType);
+  }
+
 
 
   private typesCompatible(t1: Type, t2: Type): boolean {
@@ -297,18 +418,87 @@ export class Typer {
       return this.typesCompatible(t1.return, t2.return);
     }
     
+    if (t1.kind === 'list' && t2.kind === 'list') {
+      return this.typesCompatible(t1.element, t2.element);
+    }
+    
+    if (t1.kind === 'tuple' && t2.kind === 'tuple') {
+      if (t1.elements.length !== t2.elements.length) {
+        return false;
+      }
+      
+      for (let i = 0; i < t1.elements.length; i++) {
+        if (!this.typesCompatible(t1.elements[i], t2.elements[i])) {
+          return false;
+        }
+      }
+      
+      return true;
+    }
+    
+    if (t1.kind === 'record' && t2.kind === 'record') {
+      const t1Keys = Object.keys(t1.fields);
+      const t2Keys = Object.keys(t2.fields);
+      
+      if (t1Keys.length !== t2Keys.length) {
+        return false;
+      }
+      
+      for (const key of t1Keys) {
+        if (!t2.fields[key]) {
+          return false;
+        }
+        
+        if (!this.typesCompatible(t1.fields[key], t2.fields[key])) {
+          return false;
+        }
+      }
+      
+      return true;
+    }
+    
+    if (t1.kind === 'result' && t2.kind === 'result') {
+      return this.typesCompatible(t1.success, t2.success) && 
+             this.typesCompatible(t1.error, t2.error);
+    }
+    
+    if (t1.kind === 'option' && t2.kind === 'option') {
+      return this.typesCompatible(t1.element, t2.element);
+    }
+    
+    if (t1.kind === 'unit' && t2.kind === 'unit') {
+      return true;
+    }
+    
     return false;
   }
 
-  private typeToString(type: Type): string {
+  typeToString(type: Type): string {
     switch (type.kind) {
       case 'primitive':
         return type.name;
       case 'function':
         const paramStr = type.params.map(this.typeToString.bind(this)).join(' ');
-        return `(${paramStr}) -> ${this.typeToString(type.return)}`;
+        const effectStr = type.effects.length > 0 ? ` !${type.effects.join(' !')}` : '';
+        return `(${paramStr}) -> ${this.typeToString(type.return)}${effectStr}`;
       case 'variable':
         return type.name;
+      case 'list':
+        return `List ${this.typeToString(type.element)}`;
+      case 'tuple':
+        const elementStr = type.elements.map(this.typeToString.bind(this)).join(' ');
+        return `(${elementStr})`;
+      case 'record':
+        const fieldStr = Object.entries(type.fields)
+          .map(([name, fieldType]) => `${name}: ${this.typeToString(fieldType)}`)
+          .join(' ');
+        return `{ ${fieldStr} }`;
+      case 'result':
+        return `Result ${this.typeToString(type.success)} ${this.typeToString(type.error)}`;
+      case 'option':
+        return `Option ${this.typeToString(type.element)}`;
+      case 'unit':
+        return 'unit';
       case 'unknown':
         return '?';
       default:
@@ -319,5 +509,18 @@ export class Typer {
   // Get the current type environment (useful for debugging)
   getTypeEnvironment(): TypeEnvironment {
     return new Map(this.environment);
+  }
+
+  // Print the current type environment in a readable format
+  printTypeEnvironment(program: Program): void {
+    console.log('Global Type Environment:');
+    for (const [name, type] of this.environment) {
+      console.log(`  ${name}: ${this.typeToString(type)}`);
+    }
+    
+    console.log('\nLocal Type Environment (after typing):');
+    for (const [name, type] of this.environment) {
+      console.log(`  ${name}: ${this.typeToString(type)}`);
+    }
   }
 } 

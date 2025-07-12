@@ -73,13 +73,13 @@ add = fn x y => x + y
 add 2 3
 
 # Pipeline operator
-[1; 2; 3] |> head
+[1, 2, 3] |> head
 
 # Conditional expressions
 if true then 1 else 2
 
 # Records
-user = { @name "Alice"; @age 30 }
+user = { @name "Alice", @age 30 }
 
 # Accessors
 (@name user)
@@ -89,7 +89,7 @@ localAdd = fn x y => x + y;
 localAdd 1 2
 
 # List operations
-[1; 2; 3] |> tail |> head
+[1, 2, 3] |> tail |> head
 ```
 
 ## Language Syntax
@@ -109,7 +109,7 @@ localAdd 1 2
 x = 10; x + 5
 
 # This evaluates to [8, 10, 12] (the result of map)
-print "hello"; map fn x => x * 2 [4; 5; 6]
+print "hello"; map fn x => x * 2 [4, 5, 6]
 ```
 
 ### Literals
@@ -118,8 +118,8 @@ print "hello"; map fn x => x * 2 [4; 5; 6]
 42          # Integer
 "hello"     # String
 true        # Boolean
-[1; 2; 3]   # List (semicolon-separated)
-{ @name "Alice"; @age 30 }  # Record (semicolon-separated fields)
+[1, 2, 3]   # List (comma-separated)
+{ @name "Alice", @age 30 }  # Record (comma-separated fields)
 ```
 
 ### Function Definitions
@@ -146,7 +146,7 @@ add (multiply 2 3) 4
 
 ```noolang
 # Chain functions
-[1; 2; 3] |> head |> add 5
+[1, 2, 3] |> head |> add 5
 ```
 
 ### Conditional Expressions
@@ -159,7 +159,7 @@ if condition then value1 else value2
 
 ```noolang
 # Record creation
-user = { @name "Alice"; @age 30; @city "NYC" }
+user = { @name "Alice", @age 30, @city "NYC" }
 
 # Accessor usage (accessors are functions)
 (@name user)        # Returns "Alice"
@@ -186,23 +186,23 @@ localAdd 1 2
 
 ### Data Structure Syntax
 
-Noolang uses semicolons as separators for all data structures to eliminate parsing ambiguity:
+Noolang uses commas as separators for all data structures:
 
 ```noolang
-# Lists - semicolon separated
-[1; 2; 3]
-[1;2;3;1 ;2 ; 3]  # Flexible whitespace around semicolons
+# Lists - comma separated
+[1, 2, 3]
+[1,2,3,1 ,2 , 3]  # Flexible whitespace around commas
 
 # Records - semicolon separated fields
-{ @name "Alice"; @age 30 }
-{ @x 1; @y 2; @z 3 }
+{ @name "Alice", @age 30 }
+{ @x 1, @y 2, @z 3 }
 
 # Future: Tuples (planned)
-# (1; 2; 3)
+# (1, 2, 3)
 ```
 
-**Why semicolons?** This eliminates ambiguity between multiple elements vs. function applications:
-- `[1; 2; 3]` = list with three elements
+**Why commas?** This eliminates ambiguity between multiple elements vs. function applications:
+- `[1, 2, 3]` = list with three elements
 - `[1 2 3]` = list with one element that's the function application `1(2)(3)` (fails with clear error)
 
 ### Built-in Functions

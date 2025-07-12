@@ -137,7 +137,7 @@ export class Lexer {
     }
 
     // Check if it's a keyword
-    const keywords = ['if', 'then', 'else', 'let', 'in', 'true', 'false', 'fn', 'import'];
+    const keywords = ['if', 'then', 'else', 'let', 'in', 'true', 'false', 'fn', 'import', 'Number', 'String', 'Bool', 'Unit', 'List', 'Tuple', 'Record', 'Result', 'Option'];
     const type = keywords.includes(value) ? 'KEYWORD' : 'IDENTIFIER';
 
     return {

@@ -9,7 +9,7 @@ describe('Records, Tuples, and Unit', () => {
   }
 
   test('parses named record', () => {
-    const program = parseNoo('{ @a 1; @b 2 }');
+    const program = parseNoo('{ @a 1, @b 2 }');
     const record = program.statements[0];
     expect(record.kind).toBe('record');
     if (record.kind === 'record') {
@@ -21,7 +21,7 @@ describe('Records, Tuples, and Unit', () => {
   });
 
   test('parses tuple (nameless record)', () => {
-    const program = parseNoo('{ 1; 2 }');
+    const program = parseNoo('{ 1, 2 }');
     const tuple = program.statements[0];
     expect(tuple.kind).toBe('tuple');
     if (tuple.kind === 'tuple') {
@@ -38,7 +38,7 @@ describe('Records, Tuples, and Unit', () => {
   });
 
   test('throws on mixed named and positional fields', () => {
-    expect(() => parseNoo('{ 1; @a 2 }')).toThrow();
-    expect(() => parseNoo('{ @a 2; 1 }')).toThrow();
+    expect(() => parseNoo('{ 1, @a 2 }')).toThrow();
+    expect(() => parseNoo('{ @a 2, 1 }')).toThrow();
   });
 }); 
