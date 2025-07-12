@@ -559,10 +559,6 @@ export class Evaluator {
       case 'where': {
         return this.evaluateWhere(expr);
       }
-      case 'typed': {
-        // For typed expressions, just evaluate the inner expression
-        return this.evaluateExpression(expr.expression);
-      }
       default:
         throw new Error(`Unknown expression kind: ${(expr as Expression).kind}`);
     }

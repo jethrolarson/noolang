@@ -1,0 +1,39 @@
+# Noolang Demo: Core Language Features
+
+# Literals and simple expressions
+x = 42;
+y = 3.14;
+z = "hello, Noolang!";
+
+# Function definition and application
+add = fn a => fn b => a + b;
+sum = add 10 5;
+
+# Lists and records
+nums = [1, 2, 3, 4, 5];
+person = { @name "Alice", @age 30 };
+
+# Sequence and variable shadowing
+result = (
+  a = 100;
+  b = a + 23;
+  b * 2
+);
+
+# If-expression (check if number is even using division)
+is_even = fn n => if (n / 2) * 2 == n then true else false;
+check = is_even 10;
+
+# Where block (local definitions for an expression)
+square_plus_one = fn n => n * n + 1 where (n = 7);
+
+# Nested data structures
+nested = { @data [ { @x 1, @y 2 }, { @x 3, @y 4 } ] };
+
+# Final result (just for demo)
+final = (
+  sum;
+  check;
+  square_plus_one;
+  nested
+) 

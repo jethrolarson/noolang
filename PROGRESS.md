@@ -9,9 +9,9 @@
 
 ### Outstanding / Next Steps
 - Implement type variable unification (so type variables are resolved to concrete types when possible)
+- Refactor effect system to separate types from effects (expressions have (Type, Effects) pairs)
 - Add pattern matching and destructuring
 - Add FFI (foreign function interface) for JS/TS interop
-- Add more rigorous unit tests for the parser combinator library
 - Begin standard library bootstrapping (move built-ins to Noolang source files)
 - Continue improving error reporting and diagnostics
 
@@ -61,9 +61,9 @@ The migration to a tagged union runtime is complete. All evaluator and built-in 
 - **Binary Operators**: Arithmetic (`+`, `-`, `*`, `/`), comparison (`<`, `>`, `<=`, `>=`, `==`, `!=`)
 - **Pipeline Operator**: `|>` for function composition
 - **If Expressions**: `if condition then expr else expr`
-- **Lists**: Semicolon-separated elements `[1; 2; 3]`
-- **Records**: Semicolon-separated fields `{ @name "Alice"; @age 30 }`
-- **Tuples**: Semicolon-separated elements `{1; 2; 3}` (positional fields)
+- **Lists**: comma-separated elements `[1, 2, 3]`
+- **Records**: comma-separated fields `{ @name "Alice", @age 30 }`
+- **Tuples**: comma-separated elements `{1, 2, 3}` (positional fields)
 - **Accessors**: `@field` for getting/setting record fields
 - **Semicolon Sequencing**: `expr1; expr2` for sequencing expressions
 - **Parenthesized Expressions**: `(expr)` for explicit precedence
@@ -74,7 +74,6 @@ The migration to a tagged union runtime is complete. All evaluator and built-in 
 - **Precedence Hierarchy**: Proper operator precedence (application > multiplicative > additive > comparison > pipeline)
 - **Whitespace Handling**: Respects whitespace-significant design
 - **Error Handling**: Clear error messages with location information
-- **Unambiguous Data Structures**: Semicolon-separated syntax eliminates parsing ambiguity
 
 ### Testing
 - **Parser Tests**: All expression types and edge cases
@@ -136,10 +135,10 @@ The migration to a tagged union runtime is complete. All evaluator and built-in 
   - Left expression is evaluated and discarded
   - Right expression is evaluated and returned
   - Enables sequencing while returning only the final result
-- **Data Structure Consistency**: All data structures use semicolons as separators
-  - Records: `{ @field1 value1; @field2 value2 }`
-  - Lists: `[item1; item2; item3]`
-  - Tuples: `{item1; item2; item3}` (positional fields)
+- **Data Structure Consistency**: All data structures use commas as separators
+  - Records: `{ @field1 value1, @field2 value2 }`
+  - Lists: `[item1, item2, item3]`
+  - Tuples: `{item1, item2, item3}` (positional fields)
 - **Program Evaluation**: `evaluateProgram` returns only the final expression result
   - Multiple statements are evaluated in sequence
   - Only the result of the last statement is returned
@@ -439,6 +438,5 @@ Exports: { add: Function, multiply: Function, square: Function }
 This approach ensures correctness, extensibility, and a smooth transition to a robust type system.
 
 # Things the human is tracking
-* Need rigorous unit tests for parser library
 * I look forward to parametric polymorphism but that's a whole can of worms
 * Need to add a FFI of some kind, maybe just to js or TS

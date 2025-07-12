@@ -21,8 +21,10 @@ import {
   typeVariable,
   TypedExpression,
   ListExpression,
-  WhereExpression
-} from '../ast';
+  WhereExpression,
+  recordType,
+  tupleType,
+} from "../ast";
 import * as C from './combinators';
 
 // --- Basic Parsers ---
@@ -393,51 +395,282 @@ const parseImportExpression: C.Parser<ImportExpression> = C.map(
 );
 
 // --- Type Expression ---
-const parseTypeExpression: C.Parser<Type> = (tokens) => {
-  // Try primitive types first
-  const primitiveTypes = ['Number', 'String', 'Bool', 'Unit'];
+export const parseTypeExpression: C.Parser<Type> = (tokens) => {
+  // Try function type (right-associative): a -> b -> c FIRST
+  const funcType = (() => {
+    let leftResult = parseTypeAtom(tokens);
+    if (!leftResult.success) return leftResult;
+    let left = leftResult.value;
+    let rest = leftResult.remaining;
+
+    while (
+      rest &&
+      rest.length > 0 &&
+      rest[0].type === "OPERATOR" &&
+      rest[0].value === "->"
+    ) {
+      rest = rest.slice(1);
+      const rightResult = parseTypeExpression(rest);
+      if (!rightResult.success) return rightResult;
+      if (!rightResult.value)
+        return {
+          success: false,
+          error: "Expected type expression",
+          position: tokens[0]?.location.start.line || 0,
+        };
+      left = functionType([left], rightResult.value);
+      rest = rightResult.remaining;
+    }
+    return { success: true as const, value: left, remaining: rest };
+  })();
+
+  if (funcType.success && funcType.value) {
+    return funcType;
+  }
+
+  // Try primitive types
+  const primitiveTypes = ["Number", "String", "Bool", "Unit"];
   for (const typeName of primitiveTypes) {
     const result = C.keyword(typeName)(tokens);
     if (result.success) {
       switch (typeName) {
-        case 'Number': return { success: true, value: intType(), remaining: result.remaining };
-        case 'String': return { success: true, value: stringType(), remaining: result.remaining };
-        case 'Bool': return { success: true, value: boolType(), remaining: result.remaining };
-        case 'Unit': return { success: true, value: unitType(), remaining: result.remaining };
+        case "Number":
+          return {
+            success: true as const,
+            value: intType(),
+            remaining: result.remaining,
+          };
+        case "String":
+          return {
+            success: true as const,
+            value: stringType(),
+            remaining: result.remaining,
+          };
+        case "Bool":
+          return {
+            success: true as const,
+            value: boolType(),
+            remaining: result.remaining,
+          };
+        case "Unit":
+          return {
+            success: true as const,
+            value: unitType(),
+            remaining: result.remaining,
+          };
       }
     }
   }
-  
-  // Try List type
-  const listResult = C.seq(C.keyword('List'), C.lazy(() => parseTypeExpression))(tokens);
-  if (listResult.success) {
-    return { success: true, value: listTypeWithElement(listResult.value[1]), remaining: listResult.remaining };
-  }
-  
-  // Try function type (a -> b)
-  const arrowResult = C.seq(
-    C.lazy(() => parseTypeExpression),
-    C.operator('->'),
-    C.lazy(() => parseTypeExpression)
-  )(tokens);
-  if (arrowResult.success) {
-    return { 
-      success: true, 
-      value: functionType([arrowResult.value[0]], arrowResult.value[2]), 
-      remaining: arrowResult.remaining 
-    };
-  }
-  
+
   // Try type variable (lowercase identifier)
-  if (tokens.length > 0 && tokens[0].type === 'IDENTIFIER' && /^[a-z]/.test(tokens[0].value)) {
+  if (
+    tokens.length > 0 &&
+    tokens[0].type === "IDENTIFIER" &&
+    /^[a-z]/.test(tokens[0].value)
+  ) {
     const varResult = C.identifier()(tokens);
     if (varResult.success) {
-      return { success: true, value: typeVariable(varResult.value.value), remaining: varResult.remaining };
+      return {
+        success: true as const,
+        value: typeVariable(varResult.value.value),
+        remaining: varResult.remaining,
+      };
     }
   }
-  
-  return { success: false, error: 'Expected type expression', position: tokens[0]?.location.start.line || 0 };
+
+  // Try record type: { name: String, age: Number }
+  const recordResult = C.seq(
+    C.punctuation("{"),
+    C.optional(
+      C.sepBy(
+        C.map(
+          C.seq(
+            C.identifier(),
+            C.punctuation(":"),
+            C.lazy(() => parseTypeExpression)
+          ),
+          ([name, colon, type]) => [name.value, type] as [string, Type]
+        ),
+        C.punctuation(",")
+      )
+    ),
+    C.punctuation("}")
+  )(tokens);
+  if (recordResult.success) {
+    const fields: Array<[string, Type]> = recordResult.value[1] || [];
+    const fieldObj: Record<string, Type> = {};
+    for (const [name, type] of fields) {
+      fieldObj[name] = type;
+    }
+    return {
+      success: true as const,
+      value: recordType(fieldObj),
+      remaining: recordResult.remaining,
+    };
+  }
+
+  // Try tuple type: { Number, String }
+  const tupleResult = C.seq(
+    C.punctuation("{"),
+    C.optional(
+      C.sepBy(
+        C.lazy(() => parseTypeExpression),
+        C.punctuation(",")
+      )
+    ),
+    C.punctuation("}")
+  )(tokens);
+  if (tupleResult.success) {
+    const elements = tupleResult.value[1] || [];
+    return {
+      success: true as const,
+      value: tupleType(elements),
+      remaining: tupleResult.remaining,
+    };
+  }
+
+  // Try List type
+  const listResult = C.seq(
+    C.keyword("List"),
+    C.lazy(() => parseTypeExpression)
+  )(tokens);
+  if (listResult.success) {
+    return {
+      success: true as const,
+      value: listTypeWithElement(listResult.value[1]),
+      remaining: listResult.remaining,
+    };
+  }
+
+  return {
+    success: false,
+    error: "Expected type expression",
+    position: tokens[0]?.location.start.line || 0,
+  };
 };
+
+// Helper: parse a single type atom (primitive, variable, record, tuple, list)
+function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
+  // Try primitive types first
+  const primitiveTypes = ["Number", "String", "Bool", "Unit"];
+  for (const typeName of primitiveTypes) {
+    const result = C.keyword(typeName)(tokens);
+    if (result.success) {
+      switch (typeName) {
+        case "Number":
+          return {
+            success: true as const,
+            value: intType(),
+            remaining: result.remaining,
+          };
+        case "String":
+          return {
+            success: true as const,
+            value: stringType(),
+            remaining: result.remaining,
+          };
+        case "Bool":
+          return {
+            success: true as const,
+            value: boolType(),
+            remaining: result.remaining,
+          };
+        case "Unit":
+          return {
+            success: true as const,
+            value: unitType(),
+            remaining: result.remaining,
+          };
+      }
+    }
+  }
+
+  // Try type variable
+  if (
+    tokens.length > 0 &&
+    tokens[0].type === "IDENTIFIER" &&
+    /^[a-z]/.test(tokens[0].value)
+  ) {
+    const varResult = C.identifier()(tokens);
+    if (varResult.success) {
+      return {
+        success: true as const,
+        value: typeVariable(varResult.value.value),
+        remaining: varResult.remaining,
+      };
+    }
+  }
+
+  // Try record type
+  const recordResult = C.seq(
+    C.punctuation("{"),
+    C.optional(
+      C.sepBy(
+        C.map(
+          C.seq(
+            C.identifier(),
+            C.punctuation(":"),
+            C.lazy(() => parseTypeExpression)
+          ),
+          ([name, colon, type]) => [name.value, type] as [string, Type]
+        ),
+        C.punctuation(",")
+      )
+    ),
+    C.punctuation("}")
+  )(tokens);
+  if (recordResult.success) {
+    const fields: Array<[string, Type]> = recordResult.value[1] || [];
+    const fieldObj: Record<string, Type> = {};
+    for (const [name, type] of fields) {
+      fieldObj[name] = type;
+    }
+    return {
+      success: true as const,
+      value: recordType(fieldObj),
+      remaining: recordResult.remaining,
+    };
+  }
+
+  // Try tuple type
+  const tupleResult = C.seq(
+    C.punctuation("{"),
+    C.optional(
+      C.sepBy(
+        C.lazy(() => parseTypeExpression),
+        C.punctuation(",")
+      )
+    ),
+    C.punctuation("}")
+  )(tokens);
+  if (tupleResult.success) {
+    const elements = tupleResult.value[1] || [];
+    return {
+      success: true as const,
+      value: tupleType(elements),
+      remaining: tupleResult.remaining,
+    };
+  }
+
+  // Try List type
+  const listResult = C.seq(
+    C.keyword("List"),
+    C.lazy(() => parseTypeExpression)
+  )(tokens);
+  if (listResult.success) {
+    return {
+      success: true as const,
+      value: listTypeWithElement(listResult.value[1]),
+      remaining: listResult.remaining,
+    };
+  }
+
+  return {
+    success: false,
+    error: "Expected type atom",
+    position: tokens[0]?.location.start.line || 0,
+  };
+}
 
 // --- If Expression (special: do not allow semicolon in branches) ---
 const parseIfExpression: C.Parser<Expression> = C.map(
@@ -698,21 +931,6 @@ const parseTypedExpression: C.Parser<Expression> = C.map(
   })
 );
 
-// --- Typed Expression at top level ---
-const parseTypedExpressionTopLevel: C.Parser<Expression> = C.map(
-  C.seq(
-    parseThrush,
-    C.punctuation(':'),
-    C.lazy(() => parseTypeExpression)
-  ),
-  ([expr, colon, type]): TypedExpression => ({
-    kind: 'typed',
-    expression: expr,
-    type,
-    location: expr.location
-  })
-);
-
 // --- Definition ---
 const parseDefinition: C.Parser<DefinitionExpression> = C.map(
   C.seq(
@@ -826,9 +1044,10 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
 
 // --- Sequence term: everything else ---
 const parseSequenceTerm: C.Parser<Expression> = C.choice(
+  parseDefinitionWithType, // allow definitions with type annotations
+  parseDefinition, // fallback to regular definitions
   parseIfExpression,
   parseRecord,
-  parseDefinition,
   parseMutableDefinition,
   parseMutation,
   parseWhereExpression,
@@ -901,11 +1120,11 @@ const parseExprWithType: C.Parser<Expression> = C.choice(
 // Accepts a sequence of definitions and/or expressions, separated by semicolons
 const parseSequence: C.Parser<Expression> = C.map(
   C.seq(
-    C.lazy(() => C.choice(parseSequenceTermWithIf, parseTypedExpressionTopLevel)),
+    C.lazy(() => parseSequenceTermWithIf),
     C.many(
       C.seq(
-        C.punctuation(';'),
-        C.lazy(() => C.choice(parseSequenceTermWithIf, parseTypedExpressionTopLevel))
+        C.punctuation(";"),
+        C.lazy(() => parseSequenceTermWithIf)
       )
     )
   ),
@@ -913,11 +1132,11 @@ const parseSequence: C.Parser<Expression> = C.map(
     let result = left;
     for (const [op, right] of rest) {
       result = {
-        kind: 'binary',
-        operator: ';',
+        kind: "binary",
+        operator: ";",
         left: result,
         right,
-        location: result.location
+        location: result.location,
       };
     }
     return result;
@@ -925,10 +1144,7 @@ const parseSequence: C.Parser<Expression> = C.map(
 );
 
 // --- Expression (top-level) ---
-const parseExpr: C.Parser<Expression> = C.choice(
-  parseTypedExpression,
-  parseSequence
-);
+const parseExpr: C.Parser<Expression> = parseSequence;
 
 // --- Top-level Declarations ---
 const parseTopLevel: C.Parser<TopLevel> = parseExpr;
@@ -936,31 +1152,45 @@ const parseTopLevel: C.Parser<TopLevel> = parseExpr;
 // --- Main Parse Function ---
 export const parse = (tokens: Token[]): Program => {
   // Filter out EOF tokens for parsing
-  const nonEOFTokens = tokens.filter(t => t.type !== 'EOF');
-  
-  // Parse a single expression (which can include semicolon operators)
-  const result = parseTopLevel(nonEOFTokens);
+  const nonEOFTokens = tokens.filter((t) => t.type !== "EOF");
 
-  if (!result.success) {
-    throw new Error(`Parse error: ${result.error}`);
+  // Parse multiple top-level expressions separated by semicolons
+  let statements: Expression[] = [];
+  let rest = nonEOFTokens;
+  while (rest.length > 0) {
+    // Skip leading semicolons
+    while (
+      rest.length > 0 &&
+      rest[0].type === "PUNCTUATION" &&
+      rest[0].value === ";"
+    ) {
+      rest = rest.slice(1);
+    }
+    if (rest.length === 0) break;
+    const result = parseTopLevel(rest);
+    if (!result.success) {
+      throw new Error(`Parse error: ${result.error}`);
+    }
+    statements.push(result.value);
+    rest = result.remaining;
+    // Skip trailing semicolons after each statement
+    while (
+      rest.length > 0 &&
+      rest[0].type === "PUNCTUATION" &&
+      rest[0].value === ";"
+    ) {
+      rest = rest.slice(1);
+    }
   }
-
-  // Skip trailing semicolons and EOF tokens - these are valid ways to end a program
-  let remaining = result.remaining;
-  while (remaining.length > 0 && 
-         (remaining[0].type === 'PUNCTUATION' && remaining[0].value === ';' || 
-          remaining[0].type === 'EOF')) {
-    remaining = remaining.slice(1);
-  }
-
   // If there are still leftover tokens that aren't semicolons or EOF, throw an error
-  if (remaining.length > 0) {
-    const next = remaining[0];
-    throw new Error(`Unexpected token after expression: ${next.type} '${next.value}' at line ${next.location.start.line}, column ${next.location.start.column}`);
+  if (rest.length > 0) {
+    const next = rest[0];
+    throw new Error(
+      `Unexpected token after expression: ${next.type} '${next.value}' at line ${next.location.start.line}, column ${next.location.start.column}`
+    );
   }
-
   return {
-    statements: [result.value],
-    location: createLocation({ line: 1, column: 1 }, { line: 1, column: 1 })
+    statements,
+    location: createLocation({ line: 1, column: 1 }, { line: 1, column: 1 }),
   };
 }; 

@@ -100,27 +100,9 @@ export class REPL {
       case 'primitive':
         return type.name;
       case 'function':
-        const paramStr = type.params.map(this.typeToString.bind(this)).join(' ');
-        const effectStr = type.effects.length > 0 ? ` !${type.effects.join(' !')}` : '';
-        return `(${paramStr}) -> ${this.typeToString(type.return)}${effectStr}`;
+        return `${this.typeToString(type.params[0])} -> ${this.typeToString(type.return)}`;
       case 'variable':
         return type.name;
-      case 'list':
-        return `List ${this.typeToString(type.element)}`;
-      case 'tuple':
-        const elementStr = type.elements.map(this.typeToString.bind(this)).join(' ');
-        return `(${elementStr})`;
-      case 'record':
-        const fieldStr = Object.entries(type.fields)
-          .map(([name, fieldType]) => `${name}: ${this.typeToString(fieldType)}`)
-          .join(' ');
-        return `{ ${fieldStr} }`;
-      case 'result':
-        return `Result ${this.typeToString(type.success)} ${this.typeToString(type.error)}`;
-      case 'option':
-        return `Option ${this.typeToString(type.element)}`;
-      case 'unit':
-        return 'unit';
       case 'unknown':
         return '?';
       default:

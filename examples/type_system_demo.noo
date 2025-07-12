@@ -1,0 +1,32 @@
+# Type System Demo - Noolang Enhanced Type System
+
+# Pure functions (no effects)
+add = fn x y => x + y : Number -> Number -> Number;
+multiply = fn x y => x * y : Number -> Number -> Number;
+identity = fn x => x : a -> a;
+
+# Effectful functions (with explicit effects)
+#logMessage = fn msg => print msg : String -> Unit !log;
+#readInput = fn {} => "user input" : Unit -> String !io;  # Simulated IO
+
+# Parameterized types
+numbers = [1, 2, 3, 4, 5] : List Number;
+strings = ["hello", "world"] : List String;
+doubled = map (fn x => x * 2) numbers : List Number;
+
+# Tuples
+pair = { 42, "answer" } : { Number, String };
+triple = { 1, 2, 3 } : { Number, Number, Number };
+
+# Records with typed fields
+person = { @name "Alice", @age 30, @active true } : { name: String, age: Number, active: Bool };
+math = { @add add, @multiply multiply } : { add: Number -> Number -> Number, multiply: Number -> Number -> Number };
+
+# Function composition with effects
+addOne = fn x => x + 1 : Number -> Number;
+logResult = fn x => print x : Number -> Unit;
+pipeline = addOne |> logResult : Number -> Unit;
+
+# The final result of this file will be the pipeline function
+# which has type (Int) -> Int !log
+pipeline 

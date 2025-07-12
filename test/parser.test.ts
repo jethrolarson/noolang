@@ -404,3 +404,119 @@ describe('Top-level sequence parsing', () => {
     expect(seq.kind).toBe('binary');
   });
 }); 
+
+describe("Type annotation parsing", () => {
+  function parseType(typeSrc: string) {
+    const { Lexer } = require("../src/lexer");
+    const { parseTypeExpression } = require("../src/parser/parser");
+    const lexer = new Lexer(typeSrc);
+    const tokens = lexer.tokenize();
+    return parseTypeExpression(tokens);
+  }
+
+  test("parses record type annotation", () => {
+    const result = parseType("{ name: String, age: Number }");
+    expect(result.success).toBe(true);
+    expect(result.value.kind).toBe("record");
+    expect(result.value.fields).toHaveProperty("name");
+    expect(result.value.fields).toHaveProperty("age");
+    expect(result.value.fields.name.kind).toBe("primitive");
+    expect(result.value.fields.age.kind).toBe("primitive");
+  });
+
+  test("parses tuple type annotation", () => {
+    const result = parseType("{ Number, String }");
+    expect(result.success).toBe(true);
+    expect(result.value.kind).toBe("tuple");
+    expect(result.value.elements[0].kind).toBe("primitive");
+    expect(result.value.elements[1].kind).toBe("primitive");
+  });
+
+  test("parses list type annotation", () => {
+    const result = parseType("List Number");
+    expect(result.success).toBe(true);
+    expect(result.value.kind).toBe("list");
+    expect(result.value.element.kind).toBe("primitive");
+  });
+
+  test("parses function type annotation", () => {
+    const result = parseType("Number -> Number");
+    expect(result.success).toBe(true);
+    expect(result.value.kind).toBe("function");
+    expect(result.value.params[0].kind).toBe("primitive");
+    expect(result.value.return.kind).toBe("primitive");
+  });
+
+  test("parses type variable", () => {
+    const result = parseType("a");
+    expect(result.success).toBe(true);
+    expect(result.value.kind).toBe("variable");
+    expect(result.value.name).toBe("a");
+  });
+
+  test("parses nested record type", () => {
+    const result = parseType(
+      "{ person: { name: String, age: Number }, active: Bool }"
+    );
+    expect(result.success).toBe(true);
+    expect(result.value.kind).toBe("record");
+    expect(result.value.fields).toHaveProperty("person");
+    expect(result.value.fields).toHaveProperty("active");
+    expect(result.value.fields.person.kind).toBe("record");
+    expect(result.value.fields.active.kind).toBe("primitive");
+  });
+});
+
+describe("Top-level definitions with type annotations", () => {
+  function parseDefinition(defSrc: string) {
+    const { Lexer } = require("../src/lexer");
+    const { parse } = require("../src/parser/parser");
+    const lexer = new Lexer(defSrc);
+    const tokens = lexer.tokenize();
+    return parse(tokens);
+  }
+
+  test("parses definition with function type annotation", () => {
+    const result = parseDefinition(
+      "add = fn x y => x + y : Number -> Number -> Number;"
+    );
+    expect(result.statements).toHaveLength(1);
+    expect(result.statements[0].kind).toBe("definition");
+    expect(result.statements[0].name).toBe("add");
+    expect(result.statements[0].value.kind).toBe("typed");
+    expect(result.statements[0].value.expression.kind).toBe("function");
+    expect(result.statements[0].value.type.kind).toBe("function");
+  });
+
+  test("parses definition with primitive type annotation", () => {
+    const result = parseDefinition("answer = 42 : Number;");
+    expect(result.statements).toHaveLength(1);
+    expect(result.statements[0].kind).toBe("definition");
+    expect(result.statements[0].name).toBe("answer");
+    expect(result.statements[0].value.kind).toBe("typed");
+    expect(result.statements[0].value.expression.kind).toBe("literal");
+    expect(result.statements[0].value.type.kind).toBe("primitive");
+  });
+
+  test("parses definition with list type annotation", () => {
+    const result = parseDefinition("numbers = [1, 2, 3] : List Number;");
+    expect(result.statements).toHaveLength(1);
+    expect(result.statements[0].kind).toBe("definition");
+    expect(result.statements[0].name).toBe("numbers");
+    expect(result.statements[0].value.kind).toBe("typed");
+    expect(result.statements[0].value.expression.kind).toBe("list");
+    expect(result.statements[0].value.type.kind).toBe("list");
+  });
+
+  test("parses multiple definitions with type annotations", () => {
+    const result = parseDefinition(`
+      add = fn x y => x + y : Number -> Number -> Number;
+      answer = 42 : Number;
+      numbers = [1, 2, 3] : List Number;
+    `);
+    expect(result.statements).toHaveLength(1);
+    const seq = result.statements[0];
+    expect(seq.kind).toBe("binary"); // semicolon sequence
+    expect(seq.operator).toBe(";");
+  });
+}); 
