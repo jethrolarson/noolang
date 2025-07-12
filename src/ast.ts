@@ -29,11 +29,13 @@ export type Expression =
   | DefinitionExpression
   | ImportExpression
   | RecordExpression
+  | TupleExpression
+  | UnitExpression
   | AccessorExpression;
 
 export interface LiteralExpression {
   kind: 'literal';
-  value: number | string | boolean | Expression[];
+  value: number | string | boolean | Expression[] | null; // null represents unit
   type?: Type;
   location: Location;
 }
@@ -111,6 +113,19 @@ export interface RecordExpression {
 export interface AccessorExpression {
   kind: 'accessor';
   field: string;
+  type?: Type;
+  location: Location;
+}
+
+export interface TupleExpression {
+  kind: 'tuple';
+  elements: Expression[];
+  type?: Type;
+  location: Location;
+}
+
+export interface UnitExpression {
+  kind: 'unit';
   type?: Type;
   location: Location;
 }

@@ -1,0 +1,5 @@
+# Test the specific import pattern from PROGRESS.md
+# extract import "std/math"; max 1 2
+
+extract import "std/math";
+max 1 2 

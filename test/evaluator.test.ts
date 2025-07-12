@@ -1,6 +1,25 @@
 import { Lexer } from '../src/lexer';
 import { parse } from '../src/parser/parser';
 import { Evaluator } from '../src/evaluator';
+import { Value } from '../src/evaluator';
+
+function unwrapValue(val: Value): any {
+  if (val === null) return null;
+  if (typeof val !== 'object') return val;
+  switch (val.tag) {
+    case 'number': return val.value;
+    case 'string': return val.value;
+    case 'boolean': return val.value;
+    case 'list': return val.values.map(unwrapValue);
+    case 'tuple': return val.values.map(unwrapValue);
+    case 'record': {
+      const obj: any = {};
+      for (const k in val.fields) obj[k] = unwrapValue(val.fields[k]);
+      return obj;
+    }
+    default: return val;
+  }
+}
 
 describe('Evaluator', () => {
   let evaluator: Evaluator;
@@ -15,7 +34,7 @@ describe('Evaluator', () => {
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
     
-    expect(result.finalResult).toBe(42);
+    expect(unwrapValue(result.finalResult)).toBe(42);
     expect(result.executionTrace).toHaveLength(1);
   });
 
@@ -25,7 +44,7 @@ describe('Evaluator', () => {
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
     
-    expect(result.finalResult).toBe('hello');
+    expect(unwrapValue(result.finalResult)).toBe('hello');
     expect(result.executionTrace).toHaveLength(1);
   });
 
@@ -35,7 +54,7 @@ describe('Evaluator', () => {
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
     
-    expect(result.finalResult).toBe(true);
+    expect(unwrapValue(result.finalResult)).toBe(true);
     expect(result.executionTrace).toHaveLength(1);
   });
 
@@ -45,7 +64,7 @@ describe('Evaluator', () => {
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
     
-    expect(result.finalResult).toBe(5);
+    expect(unwrapValue(result.finalResult)).toBe(5);
     expect(result.executionTrace).toHaveLength(1);
   });
 
@@ -55,7 +74,7 @@ describe('Evaluator', () => {
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
     
-    expect(result.finalResult).toBe(3); // Only the final expression result is returned
+    expect(unwrapValue(result.finalResult)).toBe(3); // Only the final expression result is returned
     expect(result.executionTrace).toHaveLength(1); // Single statement with semicolon operator
   });
 
@@ -65,7 +84,7 @@ describe('Evaluator', () => {
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
     
-    expect(result.finalResult).toBe(1);
+    expect(unwrapValue(result.finalResult)).toBe(1);
     expect(result.executionTrace).toHaveLength(1);
   });
 
@@ -75,7 +94,7 @@ describe('Evaluator', () => {
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
     
-    expect(result.finalResult).toEqual([2, 4, 6]);
+    expect(unwrapValue(result.finalResult)).toEqual([2, 4, 6]);
     expect(result.executionTrace).toHaveLength(1);
   });
 
@@ -84,7 +103,7 @@ describe('Evaluator', () => {
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
-    expect(result.finalResult).toEqual([3, 4, 5]);
+    expect(unwrapValue(result.finalResult)).toEqual([3, 4, 5]);
     expect(result.executionTrace).toHaveLength(1);
   });
 
@@ -94,7 +113,7 @@ describe('Evaluator', () => {
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
     
-    expect(result.finalResult).toBe(5);
+    expect(unwrapValue(result.finalResult)).toBe(5);
     expect(result.executionTrace).toHaveLength(1);
   });
 
@@ -104,7 +123,7 @@ describe('Evaluator', () => {
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
     
-    expect(result.finalResult).toBe(false); // Only the final expression result is returned
+    expect(unwrapValue(result.finalResult)).toBe(false); // Only the final expression result is returned
     expect(result.executionTrace).toHaveLength(1); // Single statement with semicolon operator
   });
 
@@ -114,7 +133,7 @@ describe('Evaluator', () => {
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
     
-    expect(result.finalResult).toEqual([1, 2, 3, 4]);
+    expect(unwrapValue(result.finalResult)).toEqual([1, 2, 3, 4]);
     expect(result.executionTrace).toHaveLength(1);
   });
 
@@ -124,7 +143,7 @@ describe('Evaluator', () => {
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
     // Only the final expression result is returned: min 3 7 = 3
-    expect(result.finalResult).toBe(3);
+    expect(unwrapValue(result.finalResult)).toBe(3);
     expect(result.executionTrace).toHaveLength(1); // Single statement with semicolon operator
   });
 
@@ -134,7 +153,7 @@ describe('Evaluator', () => {
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
     
-    expect(result.finalResult).toBe('42'); // Only the final expression result is returned
+    expect(unwrapValue(result.finalResult)).toBe('42'); // Only the final expression result is returned
     expect(result.executionTrace).toHaveLength(1); // Single statement with semicolon operator
   });
 
@@ -144,7 +163,7 @@ describe('Evaluator', () => {
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
     
-    expect(result.finalResult).toBe(1);
+    expect(unwrapValue(result.finalResult)).toBe(1);
     expect(result.executionTrace).toHaveLength(1);
   });
 
@@ -154,7 +173,7 @@ describe('Evaluator', () => {
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
     
-    expect(result.finalResult).toBe(2);
+    expect(unwrapValue(result.finalResult)).toBe(2);
     expect(result.executionTrace).toHaveLength(1);
   });
 
@@ -164,7 +183,7 @@ describe('Evaluator', () => {
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
     
-    expect(result.finalResult).toBe(true);
+    expect(unwrapValue(result.finalResult)).toBe(true);
     expect(result.executionTrace).toHaveLength(1);
   });
 
@@ -193,7 +212,7 @@ describe('Evaluator', () => {
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
-    expect(result.finalResult).toBe(5);
+    expect(unwrapValue(result.finalResult)).toBe(5);
   });
 
   test('should evaluate basic import', () => {
@@ -201,7 +220,7 @@ describe('Evaluator', () => {
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
-    expect(result.finalResult).toBe(42);
+    expect(unwrapValue(result.finalResult)).toBe(42);
   });
 
   test('should evaluate single-field record', () => {
@@ -209,7 +228,7 @@ describe('Evaluator', () => {
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
-    expect(result.finalResult).toEqual({ name: 'Alice' });
+    expect(unwrapValue(result.finalResult)).toEqual({ name: 'Alice' });
   });
 
   test('should evaluate multi-field record (semicolon separated)', () => {
@@ -217,7 +236,7 @@ describe('Evaluator', () => {
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
-    expect(result.finalResult).toEqual({ name: 'Alice', age: 30 });
+    expect(unwrapValue(result.finalResult)).toEqual({ name: 'Alice', age: 30 });
   });
 
   test('should evaluate multi-field record (semicolon separated)', () => {
@@ -225,7 +244,7 @@ describe('Evaluator', () => {
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
-    expect(result.finalResult).toEqual({ name: 'Alice', age: 30 });
+    expect(unwrapValue(result.finalResult)).toEqual({ name: 'Alice', age: 30 });
   });
 
   test('should evaluate accessor on record', () => {
@@ -233,7 +252,7 @@ describe('Evaluator', () => {
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
-    expect(result.finalResult).toBe('Alice');
+    expect(unwrapValue(result.finalResult)).toBe('Alice');
   });
 
   test('definition with sequence on right side using parentheses', () => {
@@ -241,7 +260,7 @@ describe('Evaluator', () => {
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
-    expect(result.finalResult).toBe(2);
+    expect(unwrapValue(result.finalResult)).toBe(2);
   });
 
   test('multiple definitions sequenced', () => {
@@ -249,9 +268,47 @@ describe('Evaluator', () => {
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
-    expect(result.finalResult).toBe(2);
+    expect(unwrapValue(result.finalResult)).toBe(2);
     // foo should be defined as 1 in the environment
     // (not directly testable here, but no error should occur)
+  });
+
+  describe('Top-level sequence evaluation', () => {
+    test('multiple definitions and final expression', () => {
+      const lexer = new Lexer('a = 1; b = 2; a + b');
+      const tokens = lexer.tokenize();
+      const program = parse(tokens);
+      const result = evaluator.evaluateProgram(program);
+      expect(unwrapValue(result.finalResult)).toBe(3);
+    });
+
+    test('multiple definitions and final record', () => {
+      const code = `
+        add = fn x y => x + y;
+        sub = fn x y => x - y;
+        math = { @add add; @sub sub };
+        math
+      `;
+      const lexer = new Lexer(code);
+      const tokens = lexer.tokenize();
+      const program = parse(tokens);
+      const result = evaluator.evaluateProgram(program);
+      // Test that the record contains the expected fields
+      expect(unwrapValue(result.finalResult)).toHaveProperty('add');
+      expect(unwrapValue(result.finalResult)).toHaveProperty('sub');
+      // Test that the fields are functions (Noolang functions are now tagged objects)
+      const mathRecord = unwrapValue(result.finalResult) as any;
+      expect(mathRecord.add).toHaveProperty('tag', 'function');
+      expect(mathRecord.sub).toHaveProperty('tag', 'function');
+    });
+
+    test('sequence with trailing semicolon', () => {
+      const lexer = new Lexer('a = 1; b = 2; a + b;');
+      const tokens = lexer.tokenize();
+      const program = parse(tokens);
+      const result = evaluator.evaluateProgram(program);
+      expect(unwrapValue(result.finalResult)).toBe(3);
+    });
   });
 }); 
 
@@ -265,24 +322,50 @@ describe('Semicolon sequencing', () => {
   }
 
   test('returns only the rightmost value', () => {
-    expect(evalNoo('1; 2; 3')).toBe(3);
-    expect(evalNoo('42; "hello"')).toBe("hello");
+    expect(unwrapValue(evalNoo('1; 2; 3'))).toBe(3);
+    expect(unwrapValue(evalNoo('42; "hello"'))).toBe("hello");
   });
 
   test('if-expression in sequence', () => {
-    expect(evalNoo('1; if 2 < 3 then 4 else 5')).toBe(4);
-    expect(evalNoo('1; if 2 > 3 then 4 else 5')).toBe(5);
-    expect(evalNoo('1; if 2 < 3 then 4 else 5; 99')).toBe(99);
-    expect(evalNoo('if 2 < 3 then 4 else 5; 42')).toBe(42);
+    expect(unwrapValue(evalNoo('1; if 2 < 3 then 4 else 5'))).toBe(4);
+    expect(unwrapValue(evalNoo('1; if 2 > 3 then 4 else 5'))).toBe(5);
+    expect(unwrapValue(evalNoo('1; if 2 < 3 then 4 else 5; 99'))).toBe(99);
+    expect(unwrapValue(evalNoo('if 2 < 3 then 4 else 5; 42'))).toBe(42);
   });
 
   test('definitions in sequence', () => {
-    expect(evalNoo('x = 10; x + 5')).toBe(15);
-    expect(evalNoo('a = 1; b = 2; a + b')).toBe(3);
+    expect(unwrapValue(evalNoo('x = 10; x + 5'))).toBe(15);
+    expect(unwrapValue(evalNoo('a = 1; b = 2; a + b'))).toBe(3);
   });
 
   test('complex sequencing', () => {
-    expect(evalNoo('x = 1; if x == 1 then 100 else 200; x + 1')).toBe(2);
-    expect(evalNoo('x = 1; y = 2; if x < y then x else y; x + y')).toBe(3);
+    expect(unwrapValue(evalNoo('x = 1; if x == 1 then 100 else 200; x + 1'))).toBe(2);
+    expect(unwrapValue(evalNoo('x = 1; y = 2; if x < y then x else y; x + y'))).toBe(3);
   });
 }); 
+
+describe('If associativity and nesting', () => {
+  function evalIfChain(x: number) {
+    const src = `if ${x} == 0 then 0 else if ${x} == 1 then 1 else if ${x} == 2 then 2 else 99`;
+    const lexer = new Lexer(src);
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
+    const evaluator = new Evaluator();
+    return evaluator.evaluateProgram(program).finalResult;
+  }
+
+  test('returns 0 for x == 0', () => {
+    expect(unwrapValue(evalIfChain(0))).toBe(0);
+  });
+  test('returns 1 for x == 1', () => {
+    expect(unwrapValue(evalIfChain(1))).toBe(1);
+  });
+  test('returns 2 for x == 2', () => {
+    expect(unwrapValue(evalIfChain(2))).toBe(2);
+  });
+  test('returns 99 for x == 3', () => {
+    expect(unwrapValue(evalIfChain(3))).toBe(99);
+  });
+}); 
+
+ 

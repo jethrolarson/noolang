@@ -1,0 +1,9 @@
+{ @head fn list => if list == [] then [] else list[0];
+  @tail fn list => if list == [] then [] else list[1; 2; 3; 4; 5];
+  @cons fn x xs => [x; xs];
+  @length fn list => if list == [] then 0 else 1 + (length (tail list));
+  @isEmpty fn list => list == [];
+  @append fn xs ys => if isEmpty xs then ys else cons (head xs) (append (tail xs) ys);
+  @map fn f list => if isEmpty list then [] else cons (f (head list)) (map f (tail list));
+  @filter fn pred list => if isEmpty list then [] else if pred (head list) then cons (head list) (filter pred (tail list)) else filter pred (tail list);
+  @reduce fn f acc list => if isEmpty list then acc else reduce f (f acc (head list)) (tail list) } 

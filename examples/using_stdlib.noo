@@ -1,0 +1,20 @@
+# Import the standard library
+std = import "std/std";
+
+# Use math functions
+add = @add;
+result1 = add std.math 5 3;
+
+# Use list functions
+list = [1; 2; 3; 4; 5];
+head = @head;
+first = head std.list list;
+
+# Use string functions
+concat = @concat;
+greeting = concat std.string "Hello, " "Noolang!";
+
+# Create a record with results
+{ @math_result result1;
+  @list_result first;
+  @string_result greeting } 

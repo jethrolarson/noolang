@@ -1,0 +1,17 @@
+# Test that extract only affects local scope
+
+# Define a global function
+globalFunc = fn x => x * 2;
+
+# Extract math functions locally
+extract import "std/math";
+
+# Use both global and local functions
+result1 = globalFunc 5;  # Should work - global function
+result2 = max 10 20;     # Should work - local from extract
+result3 = min 5 15;      # Should work - local from extract
+
+# Verify results
+{ @result1 result1;
+  @result2 result2;
+  @result3 result3 } 

@@ -1,0 +1,54 @@
+# Test AST-native functions
+list1 = [1; 2; 3];
+list2 = [4; 5; 6];
+
+# Test list operations
+head_result = headAST list1;
+tail_result = tailAST list1;
+length_result = lengthAST list1;
+isEmpty_result = isEmptyAST list1;
+cons_result = consAST 0 list1;
+append_result = appendAST list1 list2;
+
+# Test tuple operations
+tuple1 = { 1; 2; 3 };
+tuple2 = { 4; 5 };
+
+tupleLength_result = tupleLengthAST tuple1;
+tupleIsEmpty_result = tupleIsEmptyAST tuple1;
+tupleNth_result = tupleNthAST 1 tuple1;
+tupleToList_result = tupleToListAST tuple1;
+tupleSet_result = tupleSetAST 1 tuple1 99;
+tupleConcat_result = tupleConcatAST tuple1 tuple2;
+
+# Test math operations
+abs_result = absAST -5;
+max_result = maxAST 3 7;
+min_result = minAST 3 7;
+
+# Test string operations
+concat_result = concatAST "hello" "world";
+
+# Test record operations
+record = { @a 1; @b 2; @c 3 };
+hasKey_result = hasKeyAST record "b";
+hasValue_result = hasValueAST record 2;
+
+{ @head_result head_result;
+  @tail_result tail_result;
+  @length_result length_result;
+  @isEmpty_result isEmpty_result;
+  @cons_result cons_result;
+  @append_result append_result;
+  @tupleLength_result tupleLength_result;
+  @tupleIsEmpty_result tupleIsEmpty_result;
+  @tupleNth_result tupleNth_result;
+  @tupleToList_result tupleToList_result;
+  @tupleSet_result tupleSet_result;
+  @tupleConcat_result tupleConcat_result;
+  @abs_result abs_result;
+  @max_result max_result;
+  @min_result min_result;
+  @concat_result concat_result;
+  @hasKey_result hasKey_result;
+  @hasValue_result hasValue_result } 

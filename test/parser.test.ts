@@ -227,3 +227,38 @@ describe('Parser', () => {
     expect(accessor.field).toBe('name');
   });
 }); 
+
+describe('Top-level sequence parsing', () => {
+  test('multiple definitions and final expression', () => {
+    const lexer = new Lexer('a = 1; b = 2; a + b');
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
+    expect(program.statements).toHaveLength(1);
+    const seq = program.statements[0];
+    expect(seq.kind).toBe('binary'); // semicolon sequence
+  });
+
+  test('multiple definitions and final record', () => {
+    const code = `
+      add = fn x y => x + y;
+      sub = fn x y => x - y;
+      math = { @add add; @sub sub };
+      math
+    `;
+    const lexer = new Lexer(code);
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
+    expect(program.statements).toHaveLength(1);
+    const seq = program.statements[0];
+    expect(seq.kind).toBe('binary');
+  });
+
+  test('sequence with trailing semicolon', () => {
+    const lexer = new Lexer('a = 1; b = 2; a + b;');
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
+    expect(program.statements).toHaveLength(1);
+    const seq = program.statements[0];
+    expect(seq.kind).toBe('binary');
+  });
+}); 

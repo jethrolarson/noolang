@@ -5,10 +5,6 @@ import {
   LiteralExpression,
   VariableExpression,
   FunctionExpression,
-  ApplicationExpression,
-  PipelineExpression,
-  BinaryExpression,
-  IfExpression,
   TopLevel,
   createLocation,
   DefinitionExpression,
@@ -90,7 +86,7 @@ const parseRecordFieldValue = (tokens: Token[]): C.ParseResult<Expression> => {
   }
   
   // Parse the collected tokens as a full expression
-  const result = parseComparison(expressionTokens);
+  const result = C.lazy(() => parseSequenceTermWithIfExceptRecord)(expressionTokens);
   if (!result.success) {
     return result;
   }
@@ -109,17 +105,47 @@ const parseRecordField = C.map(
   ),
   ([fieldName, value]) => ({
     name: fieldName,
-    value
+    value,
+    isNamed: true
   })
 );
 
+// Parse a single record field (named or positional)
+const parseRecordFieldOrPositional = (index: number): C.Parser<{ name: string; value: Expression; isNamed: boolean }> => (tokens) => {
+  // Try to parse as named field first (with accessor)
+  const namedFieldResult = parseRecordField(tokens);
+  if (namedFieldResult.success) {
+    return {
+      ...namedFieldResult,
+      value: { ...namedFieldResult.value, isNamed: true }
+    };
+  }
+  // If that fails, try to parse as positional field (expression without accessor)
+  const positionalFieldResult = parseRecordFieldValue(tokens);
+  if (positionalFieldResult.success) {
+    return {
+      success: true,
+      value: {
+        name: `@${index}`,
+        value: positionalFieldResult.value,
+        isNamed: false
+      },
+      remaining: positionalFieldResult.remaining
+    };
+  }
+  return {
+    success: false,
+    error: 'Expected record field (named or positional)',
+    position: tokens[0]?.location.start.line || 0
+  };
+};
+
 // Custom parser for a sequence of fields separated by semicolons
 const parseRecordFields: C.Parser<{ name: string; value: Expression }[]> = (tokens) => {
-  let fields: { name: string; value: Expression }[] = [];
+  let fields: { name: string; value: Expression; isNamed: boolean }[] = [];
   let rest = tokens;
-  
   // Parse first field
-  const firstFieldResult = parseRecordField(rest);
+  const firstFieldResult = parseRecordFieldOrPositional(0)(rest);
   if (!firstFieldResult.success) {
     return {
       success: false,
@@ -129,7 +155,7 @@ const parseRecordFields: C.Parser<{ name: string; value: Expression }[]> = (toke
   }
   fields.push(firstFieldResult.value);
   rest = firstFieldResult.remaining;
-  
+  const isNamed = firstFieldResult.value.isNamed;
   // Parse additional fields, each preceded by a semicolon
   while (rest.length > 0) {
     const semiResult = C.punctuation(';')(rest);
@@ -137,41 +163,78 @@ const parseRecordFields: C.Parser<{ name: string; value: Expression }[]> = (toke
       break; // No more semicolons, we're done
     }
     rest = semiResult.remaining;
-    
-    const fieldResult = parseRecordField(rest);
+    const fieldResult = parseRecordFieldOrPositional(fields.length)(rest);
     if (!fieldResult.success) {
+      // Check if this is a trailing semicolon (no more fields after semicolon)
+      // Look ahead to see if the next token is a closing brace
+      if (rest.length > 0 && rest[0].type === 'PUNCTUATION' && rest[0].value === '}') {
+        // This is a trailing semicolon, which is allowed
+        break;
+      }
       return {
         success: false,
         error: 'Expected field after semicolon',
         position: rest[0]?.location.start.line || 0
       };
     }
+    if (fieldResult.value.isNamed !== isNamed) {
+      return {
+        success: false,
+        error: 'Cannot mix named and positional fields in the same record/tuple',
+        position: rest[0]?.location.start.line || 0
+      };
+    }
     fields.push(fieldResult.value);
     rest = fieldResult.remaining;
   }
-  
+  // Remove isNamed before returning
   return {
     success: true,
-    value: fields,
+    value: fields.map(({ isNamed, ...rest }) => rest),
     remaining: rest
   };
 };
 
+// --- Record/Tuple Parsing ---
 const parseRecord = C.map(
   C.seq(
     C.punctuation('{'),
     C.optional(parseRecordFields),
     C.punctuation('}')
   ),
-  ([open, fields, close]): RecordExpression => {
+  ([open, fields, close]): Expression => {
     const fieldsList = fields || [];
-    return {
-      kind: 'record',
-      fields: fieldsList,
-      location: open.location
-    };
+    if (fieldsList.length === 0) {
+      // Empty braces: unit
+      return {
+        kind: 'unit',
+        location: open.location
+      } as import('../ast').UnitExpression;
+    }
+    const allNamed = fieldsList.every(f => f.name[0] !== '@');
+    const allPositional = fieldsList.every((f, i) => f.name === `@${i}`);
+    if (allNamed) {
+      // All named fields: record
+      return {
+        kind: 'record',
+        fields: fieldsList,
+        location: open.location
+      } as import('../ast').RecordExpression;
+    } else if (allPositional) {
+      // All positional fields: tuple
+      return {
+        kind: 'tuple',
+        elements: fieldsList.map(f => f.value),
+        location: open.location
+      } as import('../ast').TupleExpression;
+    } else {
+      // Mixed fields: error
+      throw new Error('Cannot mix named and positional fields in the same record/tuple');
+    }
   }
 );
+
+
 
 // --- Parenthesized Expressions ---
 const parseParenExpr: C.Parser<Expression> = C.map(
@@ -189,16 +252,31 @@ const parseParenExpr: C.Parser<Expression> = C.map(
 const parseLambdaExpression: C.Parser<FunctionExpression> = C.map(
   C.seq(
     C.keyword('fn'),
-    C.many(C.identifier()), // Support multiple parameters
+    C.choice(
+      C.many(C.identifier()), // Support multiple parameters
+      C.seq(C.punctuation('('), C.punctuation(')')) // Support zero parameters (unit)
+    ),
     C.operator('=>'),
-    C.lazy(() => parseThrush) // Allow full expressions as function bodies
+    C.lazy(() => parseSequenceTermWithIf) // Allow full expressions as function bodies
   ),
-  ([fn, params, _arrow, body]): FunctionExpression => ({
-    kind: 'function',
-    params: params.map(p => p.value),
-    body,
-    location: fn.location
-  })
+  ([fn, params, _arrow, body]): FunctionExpression => {
+    // Handle both parameter lists and unit parameter
+    let paramNames: string[] = [];
+    if (Array.isArray(params)) {
+      // Regular parameter list
+      paramNames = params.map(p => p.value);
+    } else {
+      // Unit parameter - empty array
+      paramNames = [];
+    }
+    
+    return {
+      kind: 'function',
+      params: paramNames,
+      body,
+      location: fn.location
+    };
+  }
 );
 
 // --- List Parsing ---
@@ -229,6 +307,12 @@ const parseListElements: C.Parser<Expression[]> = (tokens) => {
     
     const elementResult = C.lazy(() => parseThrush)(rest);
     if (!elementResult.success) {
+      // Check if this is a trailing semicolon (no more elements after semicolon)
+      // Look ahead to see if the next token is a closing bracket
+      if (rest.length > 0 && rest[0].type === 'PUNCTUATION' && rest[0].value === ']') {
+        // This is a trailing semicolon, which is allowed
+        break;
+      }
       return {
         success: false,
         error: 'Expected element after semicolon',
@@ -262,6 +346,19 @@ const parseList: C.Parser<LiteralExpression> = C.map(
   }
 );
 
+// --- Import Expression ---
+const parseImportExpression: C.Parser<ImportExpression> = C.map(
+  C.seq(
+    C.keyword('import'),
+    C.string()
+  ),
+  ([importKw, path]): ImportExpression => ({
+    kind: 'import',
+    path: path.value,
+    location: importKw.location
+  })
+);
+
 // Add parseList to parsePrimary after it's defined
 const parsePrimaryWithList: C.Parser<Expression> = C.choice(
   parseNumber,
@@ -272,7 +369,8 @@ const parsePrimaryWithList: C.Parser<Expression> = C.choice(
   parseRecord,
   parseAccessor,
   parseParenExpr,
-  parseLambdaExpression // <-- allow lambdas as arguments
+  parseLambdaExpression, // <-- allow lambdas as arguments
+  parseImportExpression // <-- allow import as a primary expression
 );
 
 // --- Simple Expression (no function applications) ---
@@ -349,11 +447,29 @@ const parseIfExpression: C.Parser<Expression> = C.map(
   }
 );
 
+// --- Unary Operators (negation) ---
+const parseUnary: C.Parser<Expression> = C.choice(
+  C.map(
+    C.seq(
+      C.operator('-'),
+      C.lazy(() => parsePrimaryWithList)
+    ),
+    ([minus, operand]) => ({
+      kind: 'binary',
+      operator: '*',
+      left: { kind: 'literal', value: -1, location: minus.location },
+      right: operand,
+      location: minus.location
+    })
+  ),
+  parsePrimaryWithList
+);
+
 // --- Function Application (left-associative, tightest binding) ---
 const parseApplication: C.Parser<Expression> = C.map(
   C.seq(
-    parsePrimaryWithList,
-    C.many(parsePrimaryWithList)
+    parseUnary,
+    C.many(parseUnary)
   ),
   ([func, args]) => {
     let result = func;
@@ -504,41 +620,47 @@ const parseThrush: C.Parser<Expression> = C.map(
   }
 );
 
-// --- Import Expression ---
-const parseImportExpression: C.Parser<ImportExpression> = C.map(
-  C.seq(
-    C.keyword('import'),
-    C.string()
-  ),
-  ([importKw, path]): ImportExpression => ({
-    kind: 'import',
-    path: path.value,
-    location: importKw.location
-  })
-);
-
 // --- Sequence term: everything else ---
 const parseSequenceTerm: C.Parser<Expression> = C.choice(
+  parseIfExpression,
+  parseRecord,
   parseDefinition,
   parseImportExpression,
   parseThrush,
   parseLambdaExpression,
-  // Do NOT include parseIfExpression here; instead, inline it below to ensure its branches do not parse semicolon sequences
   parseApplication,
   parseNumber,
   parseString,
   parseBoolean,
   parseIdentifier,
   parseList,
-  parseRecord,
   parseAccessor,
   parseParenExpr
 );
 
-// Add parseIfExpression to the top of parseSequenceTerm choices
-const parseSequenceTermWithIf: C.Parser<Expression> = C.choice(
-  parseIfExpression,
-  parseSequenceTerm
+// Version without records to avoid circular dependency
+const parseSequenceTermExceptRecord: C.Parser<Expression> = C.choice(
+  parseDefinition,
+  parseImportExpression,
+  parseThrush,
+  parseLambdaExpression,
+  parseApplication,
+  parseNumber,
+  parseString,
+  parseBoolean,
+  parseIdentifier,
+  parseList,
+  parseAccessor,
+  parseParenExpr
+);
+
+// parseSequenceTerm now includes parseIfExpression
+const parseSequenceTermWithIf: C.Parser<Expression> = parseSequenceTerm;
+
+// Version with if but without records to avoid circular dependency
+const parseSequenceTermWithIfExceptRecord: C.Parser<Expression> = C.choice(
+  parseSequenceTermExceptRecord,
+  parseIfExpression
 );
 
 // --- Sequence (semicolon) ---
@@ -585,9 +707,17 @@ export const parse = (tokens: Token[]): Program => {
     throw new Error(`Parse error: ${result.error}`);
   }
 
-  // If there are leftover tokens, throw an error
-  if (result.remaining.length > 0) {
-    const next = result.remaining[0];
+  // Skip trailing semicolons and EOF tokens - these are valid ways to end a program
+  let remaining = result.remaining;
+  while (remaining.length > 0 && 
+         (remaining[0].type === 'PUNCTUATION' && remaining[0].value === ';' || 
+          remaining[0].type === 'EOF')) {
+    remaining = remaining.slice(1);
+  }
+
+  // If there are still leftover tokens that aren't semicolons or EOF, throw an error
+  if (remaining.length > 0) {
+    const next = remaining[0];
     throw new Error(`Unexpected token after expression: ${next.type} '${next.value}' at line ${next.location.start.line}, column ${next.location.start.column}`);
   }
 

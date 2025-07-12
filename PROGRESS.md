@@ -1,7 +1,21 @@
 # Noolang Progress Tracker
 
 ## 🎯 Project Overview
-Noolang is a whitespace-significant, LLM-friendly programming language with explicit effects and strong type inference.
+We are writing a new language. Noolang is a whitespace-significant, LLM-friendly programming language with explicit effects and strong type inference.
+
+---
+
+## 🆕 Recent Progress (Current Session)
+- **Runtime Value Migration**: Migrated all runtime values to a consistent tagged union pattern (numbers, strings, booleans, lists, records, functions, native functions).
+- **Evaluator & Built-ins**: Updated all evaluator logic and built-in/native functions to use tagged values and type guards/constructors for type safety and extensibility.
+- **Debug File Cleanup**: Removed obsolete debug-*.ts and related cruft files from the codebase.
+- **Test Suite**: Removed obsolete AST morphism tests; all tests now pass (87/87).
+- **Codebase Health**: The codebase is now cleaner, more type-safe, and easier to extend.
+
+### Summary
+The migration to a tagged union runtime is complete. All evaluator and built-in logic now uses a robust, extensible, and type-safe value representation. Debug cruft has been removed, and the test suite is green after cleaning up obsolete tests. The codebase is ready for the next phase of language and tooling improvements.
+
+---
 
 ## ✅ Completed Features
 
@@ -57,7 +71,7 @@ Noolang is a whitespace-significant, LLM-friendly programming language with expl
    - Add module debugging capabilities (`.imports`, `.import-detail`, `.reload`)
 
 2. **Module System & Imports**
-   - File-based imports, namespaces, REPL support for loading modules
+   - Expand import capabilities, namespaces, and REPL support for loading modules
    - Enables bootstrapping the standard library in Noolang
 
 3. **Standard Library Bootstrapping**
@@ -368,3 +382,24 @@ Exports: { add: Function, multiply: Function, square: Function }
 
 ---
 *This debugging system will significantly improve the development experience and make Noolang more accessible for both development and learning.* 
+
+## 🔎 Guidance: Type Checks in the Evaluator and Built-ins
+
+- **Do not rely on JavaScript `typeof` or `Array.isArray` for Noolang type checks.**
+  - These only reflect JS runtime types, not Noolang types (e.g., tuple vs. list, record vs. object).
+- **For now, use `ast.kind` and AST structure for type checks in AST-native functions and the evaluator.**
+  - This is sufficient for distinguishing literals, records, tuples, etc., before the type system is implemented.
+- **When the type system is implemented, use the `type` field on AST nodes for all type-based dispatch and validation.**
+  - The type checker should annotate AST nodes with their Noolang types.
+  - The evaluator and built-ins should trust and use these annotations for type checks.
+- **Migration path:**
+  1. Finish migrating all built-ins to AST-native pattern, using `ast.kind` for now.
+  2. Add type annotations to AST nodes as the type system is developed.
+  3. Update the evaluator and built-ins to use `ast.type` for all type checks.
+
+This approach ensures correctness, extensibility, and a smooth transition to a robust type system.
+
+# Things the human is tracking
+* Need rigorous unit tests for parser library
+* I look forward to parametric polymorphism but that's a whole can of worms
+* Need to add a FFI of some kind, maybe just to js or TS

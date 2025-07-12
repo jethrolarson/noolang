@@ -8,9 +8,6 @@ export type TokenType =
   | 'OPERATOR'
   | 'PUNCTUATION'
   | 'KEYWORD'
-  | 'NEWLINE'
-  | 'INDENT'
-  | 'DEDENT'
   | 'COMMENT'
   | 'ACCESSOR'
   | 'EOF';
@@ -26,8 +23,6 @@ export class Lexer {
   private position: number = 0;
   private line: number = 1;
   private column: number = 1;
-  private indentStack: number[] = [0];
-  private pendingDedents: number = 0;
 
   constructor(input: string) {
     this.input = input;
@@ -58,8 +53,9 @@ export class Lexer {
     return char;
   }
 
+  // Skip any run of whitespace (spaces, tabs, newlines)
   private skipWhitespace(): void {
-    while (!this.isEOF() && /\s/.test(this.peek()) && this.peek() !== '\n') {
+    while (!this.isEOF() && /\s/.test(this.peek())) {
       this.advance();
     }
     // Also skip comments
@@ -197,7 +193,8 @@ export class Lexer {
     this.advance(); // consume @
     let field = '';
 
-    while (!this.isEOF() && /[a-zA-Z_][a-zA-Z0-9_]*/.test(this.peek())) {
+    // Read letters, digits, and underscores after @
+    while (!this.isEOF() && /[a-zA-Z0-9_]/.test(this.peek())) {
       field += this.advance();
     }
 
@@ -206,56 +203,6 @@ export class Lexer {
       value: field,
       location: this.createLocation(start),
     };
-  }
-
-  private handleIndentation(): Token | null {
-    if (this.peek() !== '\n') return null;
-
-    this.advance(); // consume newline
-    const start = this.createPosition();
-
-    // Count leading spaces
-    let indentLevel = 0;
-    while (!this.isEOF() && this.peek() === ' ') {
-      this.advance();
-      indentLevel++;
-    }
-
-    // If we hit a newline, this is a blank line - skip it
-    if (this.peek() === '\n') {
-      return this.handleIndentation();
-    }
-
-    const currentIndent = this.indentStack[this.indentStack.length - 1];
-
-    if (indentLevel > currentIndent) {
-      // Indent
-      this.indentStack.push(indentLevel);
-      return {
-        type: 'INDENT',
-        value: '',
-        location: this.createLocation(start),
-      };
-    } else if (indentLevel < currentIndent) {
-      // Dedent
-      while (this.indentStack.length > 1 && this.indentStack[this.indentStack.length - 1] > indentLevel) {
-        this.indentStack.pop();
-        this.pendingDedents++;
-      }
-      
-      if (this.pendingDedents > 0) {
-        this.pendingDedents--;
-        return {
-          type: 'DEDENT',
-          value: '',
-          location: this.createLocation(start),
-        };
-      }
-    }
-
-
-
-    return null;
   }
 
   private createPosition(): Position {
@@ -267,23 +214,8 @@ export class Lexer {
   }
 
   nextToken(): Token {
-    // Handle pending dedents
-    if (this.pendingDedents > 0) {
-      this.pendingDedents--;
-      const start = this.createPosition();
-      return {
-        type: 'DEDENT',
-        value: '',
-        location: this.createLocation(start),
-      };
-    }
-
-    // Skip whitespace (but not newlines)
+    // Skip any whitespace (spaces, tabs, newlines)
     this.skipWhitespace();
-
-    // Handle indentation
-    const indentToken = this.handleIndentation();
-    if (indentToken) return indentToken;
 
     if (this.isEOF()) {
       return {
@@ -294,6 +226,12 @@ export class Lexer {
     }
 
     const char = this.peek();
+
+    // If the next character is still whitespace, skip it and get the next token
+    if (/\s/.test(char)) {
+      this.advance();
+      return this.nextToken();
+    }
 
     if (char === '"' || char === "'") {
       return this.readString();
@@ -330,6 +268,10 @@ export class Lexer {
     // Unknown character
     const start = this.createPosition();
     const value = this.advance();
+    // If the unknown character is whitespace, skip it and get the next token
+    if (/\s/.test(value)) {
+      return this.nextToken();
+    }
     return {
       type: 'PUNCTUATION',
       value,

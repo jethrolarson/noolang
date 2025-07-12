@@ -1,0 +1,15 @@
+# Test that extract creates local variables that shadow global ones
+
+# Define a global variable
+globalVar = 42;
+
+# Extract a record with a variable that shadows the global one
+extract { @globalVar 100; @localVar 200 };
+
+# Use both variables
+result1 = globalVar;  # Should be 100 (local shadows global)
+result2 = localVar;   # Should be 200 (local only)
+
+# Verify results
+{ @result1 result1;
+  @result2 result2 } 
