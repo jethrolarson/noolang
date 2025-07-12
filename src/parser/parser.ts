@@ -8,6 +8,7 @@ import {
   TopLevel,
   createLocation,
   DefinitionExpression,
+  MutableDefinitionExpression,
   ImportExpression,
   AccessorExpression,
   Type,
@@ -19,7 +20,8 @@ import {
   functionType,
   typeVariable,
   TypedExpression,
-  ListExpression
+  ListExpression,
+  WhereExpression
 } from '../ast';
 import * as C from './combinators';
 
@@ -696,6 +698,21 @@ const parseTypedExpression: C.Parser<Expression> = C.map(
   })
 );
 
+// --- Typed Expression at top level ---
+const parseTypedExpressionTopLevel: C.Parser<Expression> = C.map(
+  C.seq(
+    parseThrush,
+    C.punctuation(':'),
+    C.lazy(() => parseTypeExpression)
+  ),
+  ([expr, colon, type]): TypedExpression => ({
+    kind: 'typed',
+    expression: expr,
+    type,
+    location: expr.location
+  })
+);
+
 // --- Definition ---
 const parseDefinition: C.Parser<DefinitionExpression> = C.map(
   C.seq(
@@ -730,11 +747,91 @@ const parseDefinitionWithType: C.Parser<DefinitionExpression> = C.map(
   }
 );
 
+// --- Mutable Definition ---
+const parseMutableDefinition: C.Parser<import('../ast').MutableDefinitionExpression> = C.map(
+  C.seq(
+    C.keyword('mut'),
+    C.identifier(),
+    C.operator('='),
+    C.lazy(() => parseSequenceTermWithIf)
+  ),
+  ([mut, name, equals, value]): import('../ast').MutableDefinitionExpression => {
+    return {
+      kind: 'mutable-definition',
+      name: name.value,
+      value,
+      location: mut.location
+    };
+  }
+);
+
+// --- Mutation ---
+const parseMutation: C.Parser<import('../ast').MutationExpression> = C.map(
+  C.seq(
+    C.keyword('mut!'),
+    C.identifier(),
+    C.operator('='),
+    C.lazy(() => parseSequenceTermWithIf)
+  ),
+  ([mut, name, equals, value]): import('../ast').MutationExpression => {
+    return {
+      kind: 'mutation',
+      target: name.value,
+      value,
+      location: mut.location
+    };
+  }
+);
+
+// Custom parser for where clause definitions (both regular and mutable)
+const parseWhereDefinition: C.Parser<DefinitionExpression | MutableDefinitionExpression> = (tokens) => {
+  // Try mutable definition first
+  const mutableResult = parseMutableDefinition(tokens);
+  if (mutableResult.success) {
+    return mutableResult;
+  }
+  // Try regular definition
+  const regularResult = parseDefinition(tokens);
+  if (regularResult.success) {
+    return regularResult;
+  }
+  return {
+    success: false,
+    error: 'Expected definition in where clause',
+    position: tokens[0]?.location.start.line || 0
+  };
+};
+
+// --- Where Expression ---
+const parseWhereExpression: C.Parser<WhereExpression> = C.map(
+  C.seq(
+    C.lazy(() => parseSequenceTermWithIfExceptRecord), // Main expression (no records to avoid circular dependency)
+    C.keyword('where'),
+    C.punctuation('('),
+    C.sepBy(
+      parseWhereDefinition,
+      C.punctuation(';')
+    ),
+    C.punctuation(')')
+  ),
+  ([main, where, openParen, definitions, closeParen]): WhereExpression => {
+    return {
+      kind: 'where',
+      main,
+      definitions,
+      location: main.location
+    };
+  }
+);
+
 // --- Sequence term: everything else ---
 const parseSequenceTerm: C.Parser<Expression> = C.choice(
   parseIfExpression,
   parseRecord,
   parseDefinition,
+  parseMutableDefinition,
+  parseMutation,
+  parseWhereExpression,
   parseImportExpression,
   parseThrush,
   parseLambdaExpression,
@@ -752,6 +849,8 @@ const parseSequenceTerm: C.Parser<Expression> = C.choice(
 // Version without records to avoid circular dependency
 const parseSequenceTermExceptRecord: C.Parser<Expression> = C.choice(
   parseDefinition,
+  parseMutableDefinition,
+  parseMutation,
   parseImportExpression,
   parseThrush,
   parseLambdaExpression,
@@ -802,11 +901,11 @@ const parseExprWithType: C.Parser<Expression> = C.choice(
 // Accepts a sequence of definitions and/or expressions, separated by semicolons
 const parseSequence: C.Parser<Expression> = C.map(
   C.seq(
-    C.lazy(() => parseSequenceTermWithIf),
+    C.lazy(() => C.choice(parseSequenceTermWithIf, parseTypedExpressionTopLevel)),
     C.many(
       C.seq(
         C.punctuation(';'),
-        C.lazy(() => parseSequenceTermWithIf)
+        C.lazy(() => C.choice(parseSequenceTermWithIf, parseTypedExpressionTopLevel))
       )
     )
   ),
@@ -826,7 +925,10 @@ const parseSequence: C.Parser<Expression> = C.map(
 );
 
 // --- Expression (top-level) ---
-const parseExpr: C.Parser<Expression> = parseSequence;
+const parseExpr: C.Parser<Expression> = C.choice(
+  parseTypedExpression,
+  parseSequence
+);
 
 // --- Top-level Declarations ---
 const parseTopLevel: C.Parser<TopLevel> = parseExpr;

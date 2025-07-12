@@ -176,7 +176,7 @@ export class Typer {
       
       case 'definition':
         this.typeDefinition(expr);
-        type = unitType(); // Return unit type for definitions
+        type = this.typeExpression(expr.value); // Return the type of the value
         break;
       
       case 'import':
@@ -201,6 +201,10 @@ export class Typer {
       
       case 'record':
         type = this.typeRecord(expr);
+        break;
+      
+      case 'where':
+        type = this.typeWhere(expr);
         break;
       
       case 'unit':
@@ -394,6 +398,33 @@ export class Typer {
       fields[field.name] = this.typeExpression(field.value);
     }
     return recordType(fields);
+  }
+
+  private typeWhere(expr: any): Type {
+    // Create a new type environment with the where-clause definitions
+    const whereEnv = new Map(this.environment);
+    
+    // Type all definitions in the where clause
+    for (const def of expr.definitions) {
+      if (def.kind === 'definition') {
+        const valueType = this.typeExpression(def.value);
+        whereEnv.set(def.name, valueType);
+      }
+    }
+    
+    // Save the current environment
+    const oldEnv = this.environment;
+    
+    // Switch to the where environment
+    this.environment = whereEnv;
+    
+    // Type the main expression
+    const resultType = this.typeExpression(expr.main);
+    
+    // Restore the original environment
+    this.environment = oldEnv;
+    
+    return resultType;
   }
 
   private typeAccessor(expr: any): Type {

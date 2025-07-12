@@ -1,3 +1,0 @@
-{ @add fn x y => x + y;
-  @subtract fn x y => x - y;
-  @abs fn x => if x < 0 then -x else x } 

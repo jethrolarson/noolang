@@ -376,4 +376,54 @@ describe('If associativity and nesting', () => {
   });
 }); 
 
+describe('Local Mutation (mut/mut!)', () => {
+  it('should allow defining and mutating a local variable', () => {
+    const code = `mut x = 1; mut! x = 42; x`;
+    const lexer = new Lexer(code);
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
+    const evaluator = new Evaluator();
+    const result = evaluator.evaluateProgram(program);
+    expect(result.finalResult.tag).toBe('number');
+    if (result.finalResult.tag === 'number') {
+      expect(result.finalResult.value).toBe(42);
+    }
+  });
+
+  it('should not affect other variables or outer scope', () => {
+    const code = `x = 5; mut y = 10; mut! y = 99; x + y`;
+    const lexer = new Lexer(code);
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
+    const evaluator = new Evaluator();
+    const result = evaluator.evaluateProgram(program);
+    expect(result.finalResult.tag).toBe('number');
+    if (result.finalResult.tag === 'number') {
+      expect(result.finalResult.value).toBe(5 + 99);
+    }
+  });
+
+  it('should throw if mut! is used on non-mutable variable', () => {
+    const code = `x = 1; mut! x = 2`;
+    const lexer = new Lexer(code);
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
+    const evaluator = new Evaluator();
+    expect(() => evaluator.evaluateProgram(program)).toThrow(/Cannot mutate non-mutable variable/);
+  });
+
+  it('should allow returning a mutable variable value (pass-by-value)', () => {
+    const code = `mut x = 7; mut! x = 8; x`;
+    const lexer = new Lexer(code);
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
+    const evaluator = new Evaluator();
+    const result = evaluator.evaluateProgram(program);
+    expect(result.finalResult.tag).toBe('number');
+    if (result.finalResult.tag === 'number') {
+      expect(result.finalResult.value).toBe(8);
+    }
+  });
+}); 
+
  

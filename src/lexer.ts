@@ -136,8 +136,13 @@ export class Lexer {
       value += this.advance();
     }
 
+    // Special case for mut! - check if we have "mut" followed by "!"
+    if (value === 'mut' && !this.isEOF() && this.peek() === '!') {
+      value += this.advance(); // consume the !
+    }
+
     // Check if it's a keyword
-    const keywords = ['if', 'then', 'else', 'let', 'in', 'true', 'false', 'fn', 'import', 'Number', 'String', 'Bool', 'Unit', 'List', 'Tuple', 'Record', 'Result', 'Option'];
+    const keywords = ['if', 'then', 'else', 'let', 'in', 'true', 'false', 'fn', 'import', 'mut', 'mut!', 'where', 'Number', 'String', 'Bool', 'Unit', 'List', 'Tuple', 'Record', 'Result', 'Option'];
     const type = keywords.includes(value) ? 'KEYWORD' : 'IDENTIFIER';
 
     return {

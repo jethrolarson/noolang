@@ -11,9 +11,11 @@ import {
   DefinitionExpression,
   ImportExpression,
   RecordExpression,
-  AccessorExpression
+  AccessorExpression,
+  WhereExpression
 } from './ast';
 import { createError, NoolangError } from './errors';
+import { formatValue } from './format';
 
 // Value types (Phase 6: functions and native functions as tagged union)
 export type Value =
@@ -26,6 +28,15 @@ export type Value =
   | { tag: 'function'; fn: (...args: Value[]) => Value }
   | { tag: 'native'; name: string; fn: any }
   | { tag: 'unit' };
+
+// --- Mutable Cell type ---
+export type Cell = { cell: true; value: Value };
+export function isCell(val: any): val is Cell {
+  return val && typeof val === 'object' && val.cell === true && 'value' in val;
+}
+export function createCell(value: Value): Cell {
+  return { cell: true, value };
+}
 
 export function isNumber(value: Value): value is { tag: 'number'; value: number } {
   return value.tag === 'number';
@@ -121,7 +132,7 @@ export type ProgramResult = {
   environment: Map<string, Value>;
 };
 
-export type Environment = Map<string, Value>;
+export type Environment = Map<string, Value | Cell>;
 
 
 export class Evaluator {
@@ -303,7 +314,7 @@ export class Evaluator {
 
     // Effectful functions
     this.environment.set('print', createNativeFunction('print', (value: Value) => {
-      console.log(this.valueToString(value));
+      console.log(formatValue(value));
       return value; // Return the value that was printed
     }));
 
@@ -422,7 +433,9 @@ export class Evaluator {
       return {
         finalResult: createList([]),
         executionTrace,
-        environment: new Map(this.environment)
+        environment: new Map(
+          Array.from(this.environment.entries()).map(([k, v]) => [k, isCell(v) ? v.value : v])
+        )
       };
     }
     
@@ -447,13 +460,36 @@ export class Evaluator {
     return {
       finalResult,
       executionTrace,
-      environment: new Map(this.environment)
+      environment: new Map(
+        Array.from(this.environment.entries()).map(([k, v]) => [k, isCell(v) ? v.value : v])
+      )
     };
   }
 
   private evaluateDefinition(def: DefinitionExpression): Value {
     const value = this.evaluateExpression(def.value);
     this.environment.set(def.name, value);
+    return value;
+  }
+
+  private evaluateMutableDefinition(expr: any): Value {
+    // Evaluate the right-hand side
+    const value = this.evaluateExpression(expr.value);
+    // Store a cell in the environment
+    this.environment.set(expr.name, createCell(value));
+    return value;
+  }
+
+  private evaluateMutation(expr: any): Value {
+    // Look up the variable in the environment
+    const cell = this.environment.get(expr.target);
+    if (!isCell(cell)) {
+      throw new Error(`Cannot mutate non-mutable variable: ${expr.target}`);
+    }
+    // Evaluate the new value
+    const value = this.evaluateExpression(expr.value);
+    // Update the cell's value
+    cell.value = value;
     return value;
   }
 
@@ -483,6 +519,12 @@ export class Evaluator {
       case 'definition':
         return this.evaluateDefinition(expr);
       
+      case 'mutable-definition':
+        return this.evaluateMutableDefinition(expr);
+      
+      case 'mutation':
+        return this.evaluateMutation(expr);
+      
       case 'import':
         return this.evaluateImport(expr);
       
@@ -494,8 +536,12 @@ export class Evaluator {
       
       case 'tuple': {
         // Evaluate all elements and return a tagged tuple value
-        const elements = expr.elements.map(e => this.evaluateExpression(e));
-        return { tag: 'tuple', values: elements };
+        const elements = expr.elements.map(e => {
+          let val = this.evaluateExpression(e);
+          if (isCell(val)) val = val.value;
+          return val;
+        });
+        return createTuple(elements);
       }
       case 'unit': {
         // Return unit value
@@ -503,19 +549,19 @@ export class Evaluator {
       }
       case 'list': {
         // Evaluate all elements and return a tagged list value
-        const elements = expr.elements.map(e => this.evaluateExpression(e));
+        const elements = expr.elements.map(e => {
+          let val = this.evaluateExpression(e);
+          if (isCell(val)) val = val.value;
+          return val;
+        });
         return createList(elements);
       }
-      case 'tuple': {
-        // Evaluate all elements and return a tagged tuple value
-        const elements = expr.elements.map(e => this.evaluateExpression(e));
-        return createTuple(elements);
+      case 'where': {
+        return this.evaluateWhere(expr);
       }
-      case 'record': {
-        return this.evaluateRecord(expr);
-      }
-      case 'if': {
-        return this.evaluateIf(expr);
+      case 'typed': {
+        // For typed expressions, just evaluate the inner expression
+        return this.evaluateExpression(expr.expression);
       }
       default:
         throw new Error(`Unknown expression kind: ${(expr as Expression).kind}`);
@@ -568,6 +614,10 @@ export class Evaluator {
       );
       throw error;
     }
+    // If it's a cell, return its value
+    if (isCell(value)) {
+      return value.value;
+    }
     return value;
   }
 
@@ -604,7 +654,8 @@ export class Evaluator {
       let result: any = func.fn;
       
       for (const argExpr of args) {
-        const arg = this.evaluateExpression(argExpr);
+        let arg = this.evaluateExpression(argExpr);
+        if (isCell(arg)) arg = arg.value;
         if (typeof result === 'function') {
           result = result(arg);
         } else {
@@ -618,7 +669,8 @@ export class Evaluator {
       let result: any = func.fn;
       
       for (const argExpr of args) {
-        const arg = this.evaluateExpression(argExpr);
+        let arg = this.evaluateExpression(argExpr);
+        if (isCell(arg)) arg = arg.value;
         if (typeof result === 'function') {
           result = result(arg);
         } else if (isFunction(result)) {
@@ -703,16 +755,19 @@ export class Evaluator {
 
     const left = this.evaluateExpression(expr.left);
     const right = this.evaluateExpression(expr.right);
+    const leftVal = isCell(left) ? left.value : left;
+    const rightVal = isCell(right) ? right.value : right;
 
     const operator = this.environment.get(expr.operator);
-    if (operator && isNativeFunction(operator)) {
-      const fn: any = operator.fn(left);
+    const operatorVal = isCell(operator) ? operator.value : operator;
+    if (operatorVal && isNativeFunction(operatorVal)) {
+      const fn: any = operatorVal.fn(leftVal);
       if (typeof fn === 'function') {
-        return fn(right);
+        return fn(rightVal);
       } else if (isFunction(fn)) {
-        return fn.fn(right);
+        return fn.fn(rightVal);
       } else if (isNativeFunction(fn)) {
-        return fn.fn(right);
+        return fn.fn(rightVal);
       }
       throw new Error(`Operator ${expr.operator} did not return a function`);
     }
@@ -792,7 +847,9 @@ export class Evaluator {
   private evaluateRecord(expr: RecordExpression): Value {
     const record: { [key: string]: Value } = {};
     for (const field of expr.fields) {
-      record[field.name] = this.evaluateExpression(field.value);
+      let val = this.evaluateExpression(field.value);
+      if (isCell(val)) val = val.value;
+      record[field.name] = val;
     }
     return createRecord(record);
   }
@@ -808,6 +865,36 @@ export class Evaluator {
       }
       throw new Error(`Field '${expr.field}' not found in record`);
     });
+  }
+
+  private evaluateWhere(expr: any): Value {
+    // Create a new environment with the where-clause definitions
+    const whereEnv = new Map(this.environment);
+    
+    // Evaluate all definitions in the where clause
+    for (const def of expr.definitions) {
+      if (def.kind === 'definition') {
+        const value = this.evaluateExpression(def.value);
+        whereEnv.set(def.name, value);
+      } else if (def.kind === 'mutable-definition') {
+        const value = this.evaluateExpression(def.value);
+        whereEnv.set(def.name, createCell(value));
+      }
+    }
+    
+    // Save the current environment
+    const oldEnv = this.environment;
+    
+    // Switch to the where environment
+    this.environment = whereEnv;
+    
+    // Evaluate the main expression
+    const result = this.evaluateExpression(expr.main);
+    
+    // Restore the original environment
+    this.environment = oldEnv;
+    
+    return result;
   }
 
 
@@ -826,8 +913,10 @@ export class Evaluator {
   }
 
   // Get the current environment (useful for debugging)
-  getEnvironment(): Environment {
-    return new Map(this.environment);
+  getEnvironment(): Map<string, Value> {
+    return new Map(
+      Array.from(this.environment.entries()).map(([k, v]) => [k, isCell(v) ? v.value : v])
+    );
   }
 
   private expressionToString(expr: Expression): string {
@@ -851,12 +940,18 @@ export class Evaluator {
         return `if ${this.expressionToString(expr.condition)} then ${this.expressionToString(expr.then)} else ${this.expressionToString(expr.else)}`;
       case 'definition':
         return `${expr.name} = ${this.expressionToString(expr.value)}`;
+      case 'mutable-definition':
+        return `${expr.name} = ${this.expressionToString(expr.value)}`;
+      case 'mutation':
+        return `mut ${expr.target} = ${this.expressionToString(expr.value)}`;
       case 'import':
         return `import "${expr.path}"`;
       case 'record':
         return `{ ${expr.fields.map(field => `${field.name} = ${this.expressionToString(field.value)}`).join(', ')} }`;
       case 'accessor':
         return `@${expr.field}`;
+      case 'where':
+        return `${this.expressionToString(expr.main)} where (${expr.definitions.map(d => this.expressionToString(d)).join('; ')})`;
       default:
         return 'unknown';
     }

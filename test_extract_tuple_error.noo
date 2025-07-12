@@ -1,4 +1,0 @@
-# Test that extract rejects non-records
-
-# This should fail - trying to extract from a tuple
-extract { 1; 2 } 

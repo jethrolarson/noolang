@@ -2,6 +2,15 @@
 
 An expression-based, LLM-friendly programming language designed for linear, declarative code with explicit effects and strong type inference.
 
+## Current Status (June 2024)
+- **All core features implemented:** parser, evaluator, type inference, REPL, CLI, and debugging tools
+- **All tests passing** (parser, evaluator, typer)
+- **Semicolon-separated data structures**: `[1; 2; 3]`, `{ @name "Alice"; @age 30 }`
+- **Explicit effects**: Effects are tracked in the type system (e.g., `print` is effectful)
+- **Strong type inference**: Type variables are supported, but type variable unification is not yet implemented (so you may see `t1 -> Int` instead of `Int -> Int`)
+- **REPL and CLI**: Feature colorized output and advanced debugging commands (tokens, AST, types, environment, etc.)
+- **Robust error handling and debugging**: All foundational issues resolved
+
 ## Features
 
 - **Whitespace-significant syntax** (like Python, but more rigorous)
@@ -13,6 +22,7 @@ An expression-based, LLM-friendly programming language designed for linear, decl
 - **Built-in primitives**: Int, String, Bool, List, Record
 - **REPL** for interactive development with comprehensive debugging tools
 - **Unambiguous syntax** - semicolon-separated data structures prevent parsing traps
+- **Explicit effects**: Effects are tracked in the type system and visible in function types
 
 ## Installation
 
@@ -73,13 +83,13 @@ add = fn x y => x + y
 add 2 3
 
 # Pipeline operator
-[1, 2, 3] |> head
+[1; 2; 3] |> head
 
 # Conditional expressions
 if true then 1 else 2
 
 # Records
-user = { @name "Alice", @age 30 }
+user = { @name "Alice"; @age 30 }
 
 # Accessors
 (@name user)
@@ -89,7 +99,7 @@ localAdd = fn x y => x + y;
 localAdd 1 2
 
 # List operations
-[1, 2, 3] |> tail |> head
+[1; 2; 3] |> tail |> head
 ```
 
 ## Language Syntax
@@ -108,8 +118,8 @@ localAdd 1 2
 # This evaluates to 15 (the result of the right side)
 x = 10; x + 5
 
-# This evaluates to [8, 10, 12] (the result of map)
-print "hello"; map fn x => x * 2 [4, 5, 6]
+# This evaluates to [8; 10; 12] (the result of map)
+print "hello"; map fn x => x * 2 [4; 5; 6]
 ```
 
 ### Literals
@@ -118,8 +128,8 @@ print "hello"; map fn x => x * 2 [4, 5, 6]
 42          # Integer
 "hello"     # String
 true        # Boolean
-[1, 2, 3]   # List (comma-separated)
-{ @name "Alice", @age 30 }  # Record (comma-separated fields)
+[1; 2; 3]   # List (semicolon-separated)
+{ @name "Alice"; @age 30 }  # Record (semicolon-separated fields)
 ```
 
 ### Function Definitions
@@ -146,7 +156,7 @@ add (multiply 2 3) 4
 
 ```noolang
 # Chain functions
-[1, 2, 3] |> head |> add 5
+[1; 2; 3] |> head |> add 5
 ```
 
 ### Conditional Expressions
@@ -159,7 +169,7 @@ if condition then value1 else value2
 
 ```noolang
 # Record creation
-user = { @name "Alice", @age 30, @city "NYC" }
+user = { @name "Alice"; @age 30; @city "NYC" }
 
 # Accessor usage (accessors are functions)
 (@name user)        # Returns "Alice"
@@ -186,23 +196,23 @@ localAdd 1 2
 
 ### Data Structure Syntax
 
-Noolang uses commas as separators for all data structures:
+Noolang uses semicolons as separators for all data structures:
 
 ```noolang
-# Lists - comma separated
-[1, 2, 3]
-[1,2,3,1 ,2 , 3]  # Flexible whitespace around commas
+# Lists - semicolon separated
+[1; 2; 3]
+[1;2;3;1 ;2 ; 3]  # Flexible whitespace around semicolons
 
 # Records - semicolon separated fields
-{ @name "Alice", @age 30 }
-{ @x 1, @y 2, @z 3 }
+{ @name "Alice"; @age 30 }
+{ @x 1; @y 2; @z 3 }
 
 # Future: Tuples (planned)
-# (1, 2, 3)
+# (1; 2; 3)
 ```
 
-**Why commas?** This eliminates ambiguity between multiple elements vs. function applications:
-- `[1, 2, 3]` = list with three elements
+**Why semicolons?** This eliminates ambiguity between multiple elements vs. function applications:
+- `[1; 2; 3]` = list with three elements
 - `[1 2 3]` = list with one element that's the function application `1(2)(3)` (fails with clear error)
 
 ### Built-in Functions
@@ -218,21 +228,21 @@ Noolang uses commas as separators for all data structures:
 
 ```
 src/
-├── ast.ts          # Abstract Syntax Tree definitions
-├── lexer.ts        # Tokenizer for whitespace-significant syntax
-├── parser/         # Parser implementation
-│   ├── parser.ts   # Main parser (combinator-based)
-│   └── combinators.ts # Parser combinator library
-├── evaluator.ts    # Interpreter for evaluating expressions
-├── typer.ts        # Type inference and checking
-├── repl.ts         # Interactive REPL
-├── effects.ts      # Placeholder for effect handling
-└── imports.ts      # Placeholder for file-based imports
+  ├── ast.ts          # Abstract Syntax Tree definitions
+  ├── lexer.ts        # Tokenizer for whitespace-significant syntax
+  ├── parser/         # Parser implementation
+  │   ├── parser.ts   # Main parser (combinator-based)
+  │   └── combinators.ts # Parser combinator library
+  ├── evaluator.ts    # Interpreter for evaluating expressions
+  ├── typer.ts        # Type inference and checking
+  ├── repl.ts         # Interactive REPL
+  ├── effects.ts      # Placeholder for effect handling
+  └── imports.ts      # Placeholder for file-based imports
 
 test/
-├── parser.test.ts    # Parser tests
-├── evaluator.test.ts # Evaluator tests
-└── typer.test.ts     # Type inference tests
+  ├── parser.test.ts    # Parser tests
+  ├── evaluator.test.ts # Evaluator tests
+  └── typer.test.ts     # Type inference tests
 ```
 
 ## Development
@@ -247,12 +257,6 @@ npm test
 
 ```bash
 npm run build
-```
-
-### Development Mode
-
-```bash
-npm run dev
 ```
 
 ## Language Design Decisions

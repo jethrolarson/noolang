@@ -5,45 +5,47 @@ import { Evaluator } from './evaluator';
 import { Typer } from './typer';
 import * as fs from 'fs';
 import * as path from 'path';
+import { formatValue } from './format';
+import { colorize } from './colors';
 
 function printUsage() {
-  console.log('Usage: noo <file.noo>');
-  console.log('       noo --eval <expr>');
-  console.log('       noo -e <expr>');
-  console.log('       noo --tokens <expr>');
-  console.log('       noo --ast <expr>');
-  console.log('       noo --tokens-file <file>');
-  console.log('       noo --ast-file <file>');
-  console.log('       noo --types <expr>');
-  console.log('       noo --types-file <file>');
-  console.log('       noo --types-detailed <expr>');
-  console.log('       noo --types-env <expr>');
-  console.log('       noo --types-ast <expr>');
+  console.log(colorize.section('Usage: noo <file.noo>'));
+  console.log(`       ${colorize.command('noo --eval <expr>')}`);
+  console.log(`       ${colorize.command('noo -e <expr>')}`);
+  console.log(`       ${colorize.command('noo --tokens <expr>')}`);
+  console.log(`       ${colorize.command('noo --ast <expr>')}`);
+  console.log(`       ${colorize.command('noo --tokens-file <file>')}`);
+  console.log(`       ${colorize.command('noo --ast-file <file>')}`);
+  console.log(`       ${colorize.command('noo --types <expr>')}`);
+  console.log(`       ${colorize.command('noo --types-file <file>')}`);
+  console.log(`       ${colorize.command('noo --types-detailed <expr>')}`);
+  console.log(`       ${colorize.command('noo --types-env <expr>')}`);
+  console.log(`       ${colorize.command('noo --types-ast <expr>')}`);
   console.log('');
-  console.log('Examples:');
-  console.log('  noo my_program.noo');
-  console.log('  noo examples/basic.noo');
-  console.log('  noo --eval "1 + 2 * 3"');
-  console.log('  noo -e "x = 10; x * 2"');
-  console.log('  noo --tokens "{ @add fn x y => x + y }"');
-  console.log('  noo --ast "if x > 0 then x else -x"');
-  console.log('  noo --tokens-file std/math.noo');
-  console.log('  noo --ast-file std/math.noo');
-  console.log('  noo --types "fn x => x + 1"');
-  console.log('  noo --types-file std/math.noo');
-  console.log('  noo --types-detailed "fn x => x + 1"');
-  console.log('  noo --types-env "fn x => x + 1"');
-  console.log('  noo --types-ast "fn x => x + 1"');
+  console.log(colorize.section('Examples:'));
+  console.log(`  ${colorize.identifier('noo my_program.noo')}`);
+  console.log(`  ${colorize.identifier('noo examples/basic.noo')}`);
+  console.log(`  ${colorize.identifier('noo --eval "1 + 2 * 3"')}`);
+  console.log(`  ${colorize.identifier('noo -e "x = 10; x * 2"')}`);
+  console.log(`  ${colorize.identifier('noo --tokens "{ @add fn x y => x + y }"')}`);
+  console.log(`  ${colorize.identifier('noo --ast "if x > 0 then x else -x"')}`);
+  console.log(`  ${colorize.identifier('noo --tokens-file std/math.noo')}`);
+  console.log(`  ${colorize.identifier('noo --ast-file std/math.noo')}`);
+  console.log(`  ${colorize.identifier('noo --types "fn x => x + 1"')}`);
+  console.log(`  ${colorize.identifier('noo --types-file std/math.noo')}`);
+  console.log(`  ${colorize.identifier('noo --types-detailed "fn x => x + 1"')}`);
+  console.log(`  ${colorize.identifier('noo --types-env "fn x => x + 1"')}`);
+  console.log(`  ${colorize.identifier('noo --types-ast "fn x => x + 1"')}`);
   console.log('');
-  console.log('Or use the REPL:');
-  console.log('  noo');
+  console.log(colorize.section('Or use the REPL:'));
+  console.log(`  ${colorize.identifier('noo')}`);
 }
 
 async function main() {
   const args = process.argv.slice(2);
   if (args.length === 0) {
     // No file provided, start REPL
-    console.log('Noolang REPL');
+    console.log(colorize.success('Noolang REPL'));
     console.log('Type ":exit" or ":quit" to quit');
     console.log('');
     // Import and start REPL
@@ -59,12 +61,12 @@ async function main() {
     try {
       const lexer = new Lexer(expr);
       const tokens = lexer.tokenize();
-      console.log('Tokens:');
+      console.log(colorize.section('Tokens:'));
       tokens.forEach((token, i) => {
-        console.log(`  ${i}: ${token.type}('${token.value}')`);
+        console.log(`  ${colorize.number(`${i}:`)} ${colorize.type(token.type)} ${colorize.string(`('${token.value}')`)}`);
       });
     } catch (err) {
-      console.error('Error:', (err as Error).message);
+      console.error(colorize.error(`Error: ${(err as Error).message}`));
       process.exit(1);
     }
     return;
@@ -78,12 +80,12 @@ async function main() {
       const code = fs.readFileSync(fullPath, 'utf8');
       const lexer = new Lexer(code);
       const tokens = lexer.tokenize();
-      console.log('Tokens:');
+      console.log(colorize.section('Tokens:'));
       tokens.forEach((token, i) => {
-        console.log(`  ${i}: ${token.type}('${token.value}')`);
+        console.log(`  ${colorize.number(`${i}:`)} ${colorize.type(token.type)} ${colorize.string(`('${token.value}')`)}`);
       });
     } catch (err) {
-      console.error('Error:', (err as Error).message);
+      console.error(colorize.error(`Error: ${(err as Error).message}`));
       process.exit(1);
     }
     return;
@@ -232,7 +234,19 @@ async function main() {
       const typedProgram = typer.typeAndDecorate(program);
       const evaluator = new Evaluator();
       const result = evaluator.evaluateProgram(typedProgram);
-      console.log(result.finalResult);
+      const valueStr = formatValue(result.finalResult);
+      // Get the type from the last statement in the typed AST
+      let typeStr = '';
+      if (typedProgram && Array.isArray(typedProgram.statements) && typedProgram.statements.length > 0) {
+        const lastType = typedProgram.statements[typedProgram.statements.length - 1].type;
+        if (lastType) typeStr = typer.typeToString(lastType);
+      }
+      // ANSI cyan for type
+      const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
+      console.log(valueStr);
+      if (typeStr) {
+        console.log(cyan('\t:\t') + cyan(typeStr));
+      }
     } catch (err) {
       console.error('Error:', (err as Error).message);
       process.exit(1);
@@ -257,7 +271,19 @@ async function main() {
     const typedProgram = typer.typeAndDecorate(program);
     const evaluator = new Evaluator();
     const result = evaluator.evaluateProgram(typedProgram);
-    console.log(result.finalResult);
+    const valueStr = formatValue(result.finalResult);
+    // Get the type from the last statement in the typed AST
+    let typeStr = '';
+    if (typedProgram && Array.isArray(typedProgram.statements) && typedProgram.statements.length > 0) {
+      const lastType = typedProgram.statements[typedProgram.statements.length - 1].type;
+      if (lastType) typeStr = typer.typeToString(lastType);
+    }
+    // ANSI cyan for type
+    const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
+    console.log(valueStr);
+    if (typeStr) {
+      console.log(cyan('Type: ') + cyan(typeStr));
+    }
   } catch (err) {
     console.error('Error:', (err as Error).message);
     process.exit(1);

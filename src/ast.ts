@@ -40,13 +40,16 @@ export type Expression =
   | BinaryExpression
   | IfExpression
   | DefinitionExpression
+  | MutableDefinitionExpression
+  | MutationExpression
   | ImportExpression
   | RecordExpression
   | TupleExpression
   | UnitExpression
   | AccessorExpression
   | TypedExpression
-  | ListExpression;
+  | ListExpression
+  | WhereExpression;
 
 export interface LiteralExpression {
   kind: 'literal';
@@ -111,6 +114,22 @@ export interface DefinitionExpression {
   location: Location;
 }
 
+export interface MutableDefinitionExpression {
+  kind: 'mutable-definition';
+  name: string;
+  value: Expression;
+  type?: Type;
+  location: Location;
+}
+
+export interface MutationExpression {
+  kind: 'mutation';
+  target: string;
+  value: Expression;
+  type?: Type;
+  location: Location;
+}
+
 export interface ImportExpression {
   kind: 'import';
   path: string;
@@ -155,6 +174,14 @@ export interface TypedExpression {
 export interface ListExpression {
   kind: 'list';
   elements: Expression[];
+  type?: Type;
+  location: Location;
+}
+
+export interface WhereExpression {
+  kind: 'where';
+  main: Expression;
+  definitions: (DefinitionExpression | MutableDefinitionExpression)[];
   type?: Type;
   location: Location;
 }
