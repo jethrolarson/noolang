@@ -1,4 +1,0 @@
-{ @concat fn s1 s2 => s1 + s2;
-  @toString fn x => if x == true then "true" else if x == false then "false" else if x == [] then "[]" else x;
-  @length fn s => 0;  # Placeholder - would need string length built-in
-  @isEmpty fn s => s == "" } 

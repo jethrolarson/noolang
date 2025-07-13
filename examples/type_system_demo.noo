@@ -22,11 +22,21 @@ triple = { 1, 2, 3 } : { Number, Number, Number };
 person = { @name "Alice", @age 30, @active true } : { name: String, age: Number, active: Bool };
 math = { @add add, @multiply multiply } : { add: Number -> Number -> Number, multiply: Number -> Number -> Number };
 
-# Function composition with effects
+# Function composition with pipelines (pure)
 addOne = fn x => x + 1 : Number -> Number;
-logResult = fn x => print x : Number -> Unit;
-pipeline = addOne |> logResult : Number -> Unit;
+square = fn x => x * x : Number -> Number;
 
-# The final result of this file will be the pipeline function
-# which has type (Int) -> Int !log
-pipeline 
+# Pipeline: apply addOne then square to a number
+pipeline_result = 3 |> addOne |> square : Number;
+
+# Pipeline with lists: map addOne over numbers, then map square
+mapped_pipeline = numbers |> map addOne |> map square : List Number;
+
+# Thrush operator: pass numbers through map addOne, then map square
+thrush_result = numbers | map addOne | map square : List Number;
+
+# Thrush with a single function (should be same as direct application)
+thrush_single = 10 | addOne : Number;
+
+# Final value for demo (can be any of the above)
+pipeline_result 

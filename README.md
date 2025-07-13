@@ -152,11 +152,46 @@ add 2 3
 add (multiply 2 3) 4
 ```
 
-### Pipeline Operator
+### Pipeline and Function Application Operators
 
+Noolang provides three operators for function composition and application:
+
+#### Pipeline Operator (`|>`) - Function Composition
+Composes functions from left to right (like Unix pipes):
 ```noolang
-# Chain functions
+# Chain functions: f |> g |> h means h(g(f(x)))
 [1; 2; 3] |> head |> add 5
+```
+
+#### Thrush Operator (`|`) - Function Application
+Applies the right function to the left value:
+```noolang
+# Apply function: x | f means f(x)
+[1; 2; 3] | map (fn x => x * 2)
+```
+
+#### Dollar Operator (`$`) - Low-Precedence Function Application
+Applies the left function to the right value with low precedence (avoids parentheses):
+```noolang
+# Without $ - lots of parentheses needed
+map (fn x => x * 2) (filter (fn x => x > 5) [1; 2; 3; 4; 5; 6; 7; 8; 9; 10])
+
+# With $ - much cleaner
+map (fn x => x * 2) $ filter (fn x => x > 5) $ [1; 2; 3; 4; 5; 6; 7; 8; 9; 10]
+
+# Method-chaining with accessors
+person = { @address { @street "123 Main St", @city "Anytown" } };
+street_value = person | @address | @street;  # Get the street value
+
+# Using $ to avoid parentheses in complex expressions
+# Without $ - nested parentheses
+result1 = map (fn x => x * 2) (filter (fn x => x > 3) (person | @scores));
+
+# With $ - cleaner chain
+result2 = map (fn x => x * 2) $ filter (fn x => x > 3) $ (person | @scores);
+
+# Complex nested function calls
+reduce (+) 0 $ map (fn x => x * x) $ filter (fn x => x % 2 == 0) $ [1; 2; 3; 4; 5; 6]
 ```
 
 ### Conditional Expressions
@@ -172,15 +207,20 @@ if condition then value1 else value2
 user = { @name "Alice"; @age 30; @city "NYC" }
 
 # Accessor usage (accessors are functions)
-(@name user)        # Returns "Alice"
-(@age user)         # Returns 30
+user | @name        # Returns "Alice"
+user | @age         # Returns 30
 
-# Nested accessors
-(@city user)        # Returns "NYC"
+# Accessor usage (accessors are functions)
+user | @name        # Returns "Alice"
+user | @age         # Returns 30
 
-# Accessors can be composed
+# Chained accessors (with extra fields)
+complex = { @bar { @baz fn x => { @qux x } } }
+(((complex | @bar) | @baz) $ 123) | @qux  # Returns 123
+
+# Accessors can be composed or used as functions
 getName = @name;
-getName user        # Same as (@name user)
+getName user        # Same as user | @name
 ```
 
 ### Local Bindings
@@ -220,9 +260,30 @@ Noolang uses semicolons as separators for all data structures:
 - **Arithmetic**: `+`, `-`, `*`, `/`
 - **Comparison**: `==`, `!=`, `<`, `>`, `<=`, `>=`
 - **List operations**: `head`, `tail`, `cons`, `map`, `filter`, `reduce`, `length`, `isEmpty`, `append`
+- **Record operations**: Accessors (`@field`) for getting record fields
 - **Math utilities**: `abs`, `max`, `min`
 - **String utilities**: `concat`, `toString`
 - **Utility**: `print`
+
+## Duck-Typed Records and Accessors (NEW!)
+
+Noolang records are now **duck-typed**: any record with the required field(s) can be used, regardless of extra fields. This makes accessors and record operations flexible and ergonomic, similar to JavaScript or Python objects.
+
+### Example
+
+```noolang
+# Record with extra fields
+duck_person = { @name "Bob", @age 42, @extra "ignored" }
+duck_name = duck_person | @name  # Returns "Bob"
+
+# Chained accessors with extra fields
+complex = { @bar { @baz fn x => { @qux x }, @extra 42 } }
+duck_chain = (((complex | @bar) | @baz) $ 123) | @qux  # Returns 123
+```
+
+- **Accessors** (`@field`) work with any record that has the required field, even if there are extra fields.
+- **Accessor chains** work as long as each step has the required field.
+- This enables ergonomic, method-chaining-like patterns and makes Noolang more LLM-friendly and expressive.
 
 ## Project Structure
 
@@ -261,13 +322,12 @@ npm run build
 
 ## Language Design Decisions
 
-### Whitespace Significance
+#### Duck-Typed Records (NEW)
 
-Noolang uses whitespace to indicate structure, similar to Python but with more rigorous rules:
-
-- Indentation is used for block structure
-- Semicolons are expression separators (not terminators)
-- Parentheses are used for grouping expressions
+- **Permissive record unification**: Any record with the required fields matches, regardless of extra fields
+- **Accessors**: Work with any record that has the field, enabling flexible and ergonomic code
+- **Chaining**: Accessor chains and method-chaining patterns are natural and concise
+- **LLM-friendly**: Less rigid type constraints, more natural code generation
 
 ### Expression-Based Design
 

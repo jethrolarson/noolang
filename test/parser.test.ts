@@ -169,12 +169,11 @@ describe('Parser', () => {
     const lexer = new Lexer('[1, 2, 3] |> map');
     const tokens = lexer.tokenize();
     const program = parse(tokens);
-    
     expect(program.statements).toHaveLength(1);
     const pipeline = program.statements[0] as any;
-    expect(pipeline.operator).toBe('|>');
-    expect(pipeline.left.kind).toBe('list');
-    expect(pipeline.right.kind).toBe('variable');
+    expect(pipeline.kind).toBe("pipeline");
+    expect(pipeline.steps[0].kind).toBe("list");
+    expect(pipeline.steps[1].kind).toBe("variable");
   });
 
   test('should parse single-field record', () => {
@@ -367,6 +366,36 @@ describe('Parser', () => {
     expect(list.elements[1].kind).toBe('record');
     expect(list.elements[1].fields[0].name).toBe('bar');
     expect(list.elements[1].fields[0].value.value).toBe(2);
+  });
+
+  test("should parse thrush operator", () => {
+    const lexer = new Lexer("10 | (fn x => x + 1)");
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
+    expect(program.statements).toHaveLength(1);
+    const thrush = program.statements[0] as any;
+    expect(thrush.kind).toBe("binary");
+    expect(thrush.operator).toBe("|");
+    expect(thrush.left.kind).toBe("literal");
+    expect(thrush.right.kind).toBe("function");
+  });
+
+  test("should parse chained thrush operators as left-associative", () => {
+    const lexer = new Lexer("a | b | c");
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
+    expect(program.statements).toHaveLength(1);
+    const chain = program.statements[0] as any;
+    expect(chain.kind).toBe("binary");
+    expect(chain.operator).toBe("|");
+    expect(chain.left.kind).toBe("binary");
+    expect(chain.left.operator).toBe("|");
+    expect(chain.left.left.kind).toBe("variable");
+    expect(chain.left.left.name).toBe("a");
+    expect(chain.left.right.kind).toBe("variable");
+    expect(chain.left.right.name).toBe("b");
+    expect(chain.right.kind).toBe("variable");
+    expect(chain.right.name).toBe("c");
   });
 }); 
 

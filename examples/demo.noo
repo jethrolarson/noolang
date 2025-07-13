@@ -1,39 +1,124 @@
-# Noolang Demo: Core Language Features
+# Noolang Comprehensive Demo: Core Language Features
 
-# Literals and simple expressions
-x = 42;
-y = 3.14;
-z = "hello, Noolang!";
+# ========================================
+# 1. LITERALS AND BASIC TYPES
+# ========================================
+number_literal = 42;
+string_literal = "Hello, Noolang!";
+boolean_literal = true;
+unit_literal = {};
 
-# Function definition and application
+# ========================================
+# 2. FUNCTIONS AND CURRYING
+# ========================================
+# Basic function
+identity = fn x => x;
+
+# Curried function (Haskell-style)
 add = fn a => fn b => a + b;
-sum = add 10 5;
+add_ten = add 10;
+result = add_ten 5;
 
-# Lists and records
-nums = [1, 2, 3, 4, 5];
-person = { @name "Alice", @age 30 };
+# Function with multiple parameters
+multiply = fn a b => a * b;
+product = multiply 6 7;
 
-# Sequence and variable shadowing
-result = (
-  a = 100;
-  b = a + 23;
-  b * 2
+# ========================================
+# 3. RECURSION (NEW FEATURE!)
+# ========================================
+# Factorial function
+factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1));
+fact_5 = factorial 5;
+
+# Fibonacci function
+fibonacci = fn n => if n <= 1 then n else (fibonacci (n - 1)) + (fibonacci (n - 2));
+fib_10 = fibonacci 10;
+
+# ========================================
+# 4. DATA STRUCTURES
+# ========================================
+# Lists
+empty_list = [];
+number_list = [1, 2, 3, 4, 5];
+
+# Records (named fields)
+person = { @name "Alice", @age 30, @city "Wonderland" };
+
+# Accessor usage
+person_name = @name person;    # Get the name field
+person_age = person | @age;    # Get the age field using pipe operator
+
+# Tuples (positional fields)
+point = {10, 20};
+
+# ========================================
+# 5. CONTROL FLOW
+# ========================================
+# If expressions
+is_even = fn n => if (n / 2) * 2 == n then true else false;
+even_check = is_even 10;
+
+# ========================================
+# 6. OPERATORS AND EXPRESSIONS
+# ========================================
+# Arithmetic operators
+arithmetic_result = 10 + 5 * 2;
+
+# Comparison operators
+comparison_result = 5 < 10;
+
+# ========================================
+# 7. PIPELINE, THRUSH, AND DOLLAR OPERATORS
+# ========================================
+# Thrush operator (|) - function application
+thrush_result = [1, 2, 3, 4, 5] | map (fn x => x * 2);
+
+# Pipeline operator (|>) - function composition
+add_one = fn x => x + 1;
+square = fn x => x * x;
+composed = add_one |> square;
+pipeline_result = 10 | composed;
+
+# Dollar operator ($) - low-precedence function application
+# Useful for avoiding parentheses in complex expressions
+# Without $ - lots of parentheses needed
+complex_without_dollar = map (fn x => x * 2) (filter (fn x => x > 5) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+# With $ - much cleaner and more readable
+complex_with_dollar = map (fn x => x * 2) $ filter (fn x => x > 5) $ [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+# ========================================
+# 8. MUTATION (LOCAL MUTATION)
+# ========================================
+# Mutable variables
+mutation_demo = (
+  mut counter = 0;
+  mut! counter = counter + 1;
+  counter
 );
 
-# If-expression (check if number is even using division)
-is_even = fn n => if (n / 2) * 2 == n then true else false;
-check = is_even 10;
+# ========================================
+# 9. BUILT-IN FUNCTIONS
+# ========================================
+# List operations
+head_result = head [1, 2, 3, 4, 5];
+length_result = length [1, 2, 3, 4, 5];
 
-# Where block (local definitions for an expression)
-square_plus_one = fn n => n * n + 1 where (n = 7);
+# Higher-order functions
+mapped = map (fn x => x * x) [1, 2, 3, 4, 5];
+filtered = filter (fn x => x > 10) mapped;
 
-# Nested data structures
-nested = { @data [ { @x 1, @y 2 }, { @x 3, @y 4 } ] };
+# ========================================
+# 10. FINAL DEMONSTRATION
+# ========================================
+# Showcase all features working together
+final_demo = {
+  @factorial factorial 5,
+  @fibonacci fibonacci 10,
+  @person person,
+  @mapped mapped,
+  @head head_result
+};
 
-# Final result (just for demo)
-final = (
-  sum;
-  check;
-  square_plus_one;
-  nested
-) 
+# Final expression to evaluate and return
+final_demo 

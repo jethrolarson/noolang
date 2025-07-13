@@ -79,7 +79,16 @@ export class REPL {
         });
       }
     } catch (error) {
-      console.error(colorize.error(`Error: ${(error as Error).message}`));
+      const errorMessage = (error as Error).message;
+      // Check if it's already a formatted type error
+      if (
+        errorMessage.includes("TypeError:") &&
+        errorMessage.includes("Expected:")
+      ) {
+        console.error(colorize.error(errorMessage));
+      } else {
+        console.error(colorize.error(`Error: ${errorMessage}`));
+      }
     }
   }
 
@@ -230,7 +239,11 @@ export class REPL {
       const type = typeEnv.get(name);
       console.log(`  ${colorize.identifier(name)}:`);
       console.log(`    ${colorize.section('Value:')} ${colorize.value(this.valueToString(value))}`);
-      console.log(`    ${colorize.section('Type:')} ${colorize.type(type ? this.typeToString(type) : 'unknown')}`);
+      console.log(
+        `    ${colorize.section("Type:")} ${colorize.type(
+          type ? this.typeToString(type.type) : "unknown"
+        )}`
+      );
     }
   }
 
@@ -243,7 +256,7 @@ export class REPL {
       const type = typeEnv.get(name);
       envObj[name] = {
         value: this.valueToString(value),
-        type: type ? this.typeToString(type) : 'unknown'
+        type: type ? this.typeToString(type.type) : "unknown",
       };
     }
     
@@ -477,7 +490,11 @@ export class REPL {
     const typeEnv = this.typer.getTypeEnvironment();
     console.log(colorize.section('Type Environment:'));
     for (const [name, type] of typeEnv) {
-      console.log(`  ${colorize.identifier(name)}: ${colorize.type(this.typeToString(type))}`);
+      console.log(
+        `  ${colorize.identifier(name)}: ${colorize.type(
+          this.typeToString(type.type)
+        )}`
+      );
     }
   }
 }

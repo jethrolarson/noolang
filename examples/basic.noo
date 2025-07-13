@@ -1,0 +1,22 @@
+# Basic Noolang Example
+
+# Simple arithmetic
+result = 2 + 3 * 4;
+
+# Function definition and application
+double = fn x => x * 2;
+doubled = double 10;
+
+# Recursion (factorial)
+factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1));
+fact_5 = factorial 5;
+
+# Lists and higher-order functions
+numbers = [1, 2, 3, 4, 5];
+squared = map (fn x => x * x) numbers;
+
+# Records
+person = { @name "Alice", @age 30 };
+
+# Final result
+{ @result result, @doubled doubled, @factorial fact_5, @squared squared, @person person } 

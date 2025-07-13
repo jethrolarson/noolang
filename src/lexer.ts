@@ -157,11 +157,31 @@ export class Lexer {
     let value = '';
 
     // Multi-character operators (must have spaces around them)
-    const operators = ['|>', '<|', '==', '!=', '<=', '>=', '=>', '->', '+', '-', '*', '/', '<', '>', '=', '|'];
-    
+    const operators = [
+      "|>",
+      "<|",
+      "==",
+      "!=",
+      "<=",
+      ">=",
+      "=>",
+      "->",
+      "+",
+      "-",
+      "*",
+      "/",
+      "<",
+      ">",
+      "=",
+      "|",
+      "$",
+    ];
+
     // Try to match multi-character operators first
     for (const op of operators) {
-      if (this.input.substring(this.position, this.position + op.length) === op) {
+      if (
+        this.input.substring(this.position, this.position + op.length) === op
+      ) {
         value = op;
         for (let i = 0; i < op.length; i++) {
           this.advance();
@@ -171,7 +191,7 @@ export class Lexer {
     }
 
     // If no multi-character operator matched, try single character
-    if (!value && /[+\-*/<>=!|]/.test(this.peek())) {
+    if (!value && /[+\-*/<>=!|$]/.test(this.peek())) {
       value = this.advance();
     }
 
@@ -250,7 +270,7 @@ export class Lexer {
       return this.readNumber();
     }
 
-    if (/[+\-*/<>=!|]/.test(char)) {
+    if (/[+\-*/<>=!|$]/.test(char)) {
       return this.readOperator();
     }
 

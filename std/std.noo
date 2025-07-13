@@ -1,13 +1,2 @@
-math = import "math";
-list = import "list";
-string = import "string";
-record = import "record";
-io = import "io";
-tuple = import "tuple";
-
-{ @math math;
-  @list list;
-  @string string;
-  @record record;
-  @io io;
-  @tuple tuple } 
+# placeholder for a self-hosted library
+{} 

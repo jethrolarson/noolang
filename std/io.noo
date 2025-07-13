@@ -1,3 +1,0 @@
-{ @print fn x => x;  # Placeholder - would need print built-in
-  @println fn x => x;  # Placeholder - would need println built-in
-  @readLine fn => "";  # Placeholder - would need readLine built-in } 

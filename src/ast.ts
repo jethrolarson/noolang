@@ -18,20 +18,21 @@ export type Effect =
   | 'rand'
   | 'err';
 
-export type Type = 
-  | { kind: 'primitive'; name: 'Int' | 'String' | 'Bool' | 'List' }
-  | { kind: 'function'; params: Type[]; return: Type; effects: Effect[] }
-  | { kind: 'variable'; name: string }
-  | { kind: 'list'; element: Type }
-  | { kind: 'tuple'; elements: Type[] }
-  | { kind: 'record'; fields: { [key: string]: Type } }
-  | { kind: 'result'; success: Type; error: Type }
-  | { kind: 'option'; element: Type }
-  | { kind: 'unit' }
-  | { kind: 'unknown' };
+export type Type =
+  | { kind: "primitive"; name: "Int" | "String" | "Bool" | "List" }
+  | { kind: "function"; params: Type[]; return: Type; effects: Effect[] }
+  | { kind: "variable"; name: string }
+  | { kind: "list"; element: Type }
+  | { kind: "tuple"; elements: Type[] }
+  | { kind: "record"; fields: { [key: string]: Type } }
+  | { kind: "result"; success: Type; error: Type }
+  | { kind: "option"; element: Type }
+  | { kind: "union"; types: Type[] }
+  | { kind: "unit" }
+  | { kind: "unknown" };
 
 // Expressions
-export type Expression = 
+export type Expression =
   | LiteralExpression
   | VariableExpression
   | FunctionExpression
@@ -52,21 +53,21 @@ export type Expression =
   | WhereExpression;
 
 export interface LiteralExpression {
-  kind: 'literal';
+  kind: "literal";
   value: number | string | boolean | Expression[] | null; // null represents unit
   type?: Type;
   location: Location;
 }
 
 export interface VariableExpression {
-  kind: 'variable';
+  kind: "variable";
   name: string;
   type?: Type;
   location: Location;
 }
 
 export interface FunctionExpression {
-  kind: 'function';
+  kind: "function";
   params: string[];
   body: Expression;
   type?: Type;
@@ -74,7 +75,7 @@ export interface FunctionExpression {
 }
 
 export interface ApplicationExpression {
-  kind: 'application';
+  kind: "application";
   func: Expression;
   args: Expression[];
   type?: Type;
@@ -82,15 +83,30 @@ export interface ApplicationExpression {
 }
 
 export interface PipelineExpression {
-  kind: 'pipeline';
+  kind: "pipeline";
   steps: Expression[];
   type?: Type;
   location: Location;
 }
 
 export interface BinaryExpression {
-  kind: 'binary';
-  operator: '+' | '-' | '*' | '/' | '==' | '!=' | '<' | '>' | '<=' | '>=' | '|' | '|>' | '<|' | ';';
+  kind: "binary";
+  operator:
+    | "+"
+    | "-"
+    | "*"
+    | "/"
+    | "=="
+    | "!="
+    | "<"
+    | ">"
+    | "<="
+    | ">="
+    | "|"
+    | "|>"
+    | "<|"
+    | ";"
+    | "$";
   left: Expression;
   right: Expression;
   type?: Type;
@@ -98,7 +114,7 @@ export interface BinaryExpression {
 }
 
 export interface IfExpression {
-  kind: 'if';
+  kind: "if";
   condition: Expression;
   then: Expression;
   else: Expression;
@@ -107,7 +123,7 @@ export interface IfExpression {
 }
 
 export interface DefinitionExpression {
-  kind: 'definition';
+  kind: "definition";
   name: string;
   value: Expression;
   type?: Type;
@@ -115,7 +131,7 @@ export interface DefinitionExpression {
 }
 
 export interface MutableDefinitionExpression {
-  kind: 'mutable-definition';
+  kind: "mutable-definition";
   name: string;
   value: Expression;
   type?: Type;
@@ -123,7 +139,7 @@ export interface MutableDefinitionExpression {
 }
 
 export interface MutationExpression {
-  kind: 'mutation';
+  kind: "mutation";
   target: string;
   value: Expression;
   type?: Type;
@@ -131,61 +147,60 @@ export interface MutationExpression {
 }
 
 export interface ImportExpression {
-  kind: 'import';
+  kind: "import";
   path: string;
   type?: Type;
   location: Location;
 }
 
 export interface RecordExpression {
-  kind: 'record';
+  kind: "record";
   fields: { name: string; value: Expression }[];
   type?: Type;
   location: Location;
 }
 
 export interface AccessorExpression {
-  kind: 'accessor';
+  kind: "accessor";
   field: string;
   type?: Type;
   location: Location;
 }
 
 export interface TupleExpression {
-  kind: 'tuple';
+  kind: "tuple";
   elements: Expression[];
   type?: Type;
   location: Location;
 }
 
 export interface UnitExpression {
-  kind: 'unit';
+  kind: "unit";
   type?: Type;
   location: Location;
 }
 
 export interface TypedExpression {
-  kind: 'typed';
+  kind: "typed";
   expression: Expression;
   type: Type;
   location: Location;
 }
 
 export interface ListExpression {
-  kind: 'list';
+  kind: "list";
   elements: Expression[];
   type?: Type;
   location: Location;
 }
 
 export interface WhereExpression {
-  kind: 'where';
+  kind: "where";
   main: Expression;
   definitions: (DefinitionExpression | MutableDefinitionExpression)[];
   type?: Type;
   location: Location;
 }
-
 
 // Top-level constructs
 export type TopLevel = Expression;
@@ -208,27 +223,58 @@ export const createPosition = (line: number, column: number): Position => ({
 });
 
 // Type constructors
-export const intType = (): Type => ({ kind: 'primitive', name: 'Int' });
-export const stringType = (): Type => ({ kind: 'primitive', name: 'String' });
-export const boolType = (): Type => ({ kind: 'primitive', name: 'Bool' });
-export const listType = (): Type => ({ kind: 'primitive', name: 'List' });
-export const functionType = (params: Type[], returnType: Type, effects: Effect[] = []): Type => ({
-  kind: 'function',
+export const intType = (): Type => ({ kind: "primitive", name: "Int" });
+export const stringType = (): Type => ({ kind: "primitive", name: "String" });
+export const boolType = (): Type => ({ kind: "primitive", name: "Bool" });
+export const listType = (): Type => ({ kind: "primitive", name: "List" });
+export const functionType = (
+  params: Type[],
+  returnType: Type,
+  effects: Effect[] = []
+): Type => ({
+  kind: "function",
   params,
   return: returnType,
   effects,
 });
-export const typeVariable = (name: string): Type => ({ kind: 'variable', name });
-export const unknownType = (): Type => ({ kind: 'unknown' });
+export const typeVariable = (name: string): Type => ({
+  kind: "variable",
+  name,
+});
+export const unknownType = (): Type => ({ kind: "unknown" });
 
 // New type constructors
-export const listTypeWithElement = (element: Type): Type => ({ kind: 'list', element });
-export const tupleType = (elements: Type[]): Type => ({ kind: 'tuple', elements });
-export const recordType = (fields: { [key: string]: Type }): Type => ({ kind: 'record', fields });
-export const resultType = (success: Type, error: Type): Type => ({ kind: 'result', success, error });
-export const optionType = (element: Type): Type => ({ kind: 'option', element });
+export const listTypeWithElement = (element: Type): Type => ({
+  kind: "list",
+  element,
+});
+export const tupleType = (elements: Type[]): Type => ({
+  kind: "tuple",
+  elements,
+});
+
+// Add tuple type constructor for Tuple T1 T2 syntax
+export const tupleTypeConstructor = (elementTypes: Type[]): Type => ({
+  kind: "tuple",
+  elements: elementTypes,
+});
+
+export const recordType = (fields: { [key: string]: Type }): Type => ({
+  kind: "record",
+  fields,
+});
+export const resultType = (success: Type, error: Type): Type => ({
+  kind: "result",
+  success,
+  error,
+});
+export const optionType = (element: Type): Type => ({
+  kind: "option",
+  element,
+});
 
 // Convenience functions for common types
-export const unitType = (): Type => ({ kind: 'unit' });
+export const unitType = (): Type => ({ kind: "unit" });
+export const unionType = (types: Type[]): Type => ({ kind: "union", types });
 export const optionInt = (): Type => optionType(intType());
 export const resultString = (error: Type): Type => resultType(stringType(), error); 

@@ -5,13 +5,17 @@
   "main": "dist/repl.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/repl.js",
+    "start": "npx ts-node src/cli.ts",
     "dev": "ts-node src/repl.ts",
     "cli": "node dist/cli.js",
     "test": "jest",
     "test:watch": "jest --watch"
   },
-  "keywords": ["programming-language", "interpreter", "typescript"],
+  "keywords": [
+    "programming-language",
+    "interpreter",
+    "typescript"
+  ],
   "author": "",
   "license": "MIT",
   "bin": {

@@ -1,6 +1,0 @@
-{ @hasKey fn record key => hasKey record key;
-  @hasValue fn record value => hasValue record value;
-  @set fn accessor record newValue => set accessor record newValue;
-  @keys fn record => keys record;
-  @values fn record => values record;
-  @extract fn record => extract record } 
