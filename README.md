@@ -5,11 +5,12 @@ An expression-based, LLM-friendly programming language designed for linear, decl
 ## Current Status (June 2024)
 - **All core features implemented:** parser, evaluator, type inference, REPL, CLI, and debugging tools
 - **All tests passing** (parser, evaluator, typer)
-- **Semicolon-separated data structures**: `[1; 2; 3]`, `{ @name "Alice"; @age 30 }`
+- **Comma-separated data structures**: `[1, 2, 3]`, `{ @name "Alice", @age 30 }`
 - **Explicit effects**: Effects are tracked in the type system (e.g., `print` is effectful)
 - **Strong type inference**: Powered by a functional Hindley-Milner type inference engine with let-polymorphism. Only the new functional typer is used; the old class-based typer has been removed.
 - **REPL and CLI**: Feature colorized output and advanced debugging commands (tokens, AST, types, environment, etc.)
 - **Robust error handling and debugging**: All foundational issues resolved
+- **VSCode syntax highlighting**: Full support for `.noo` files
 
 ## Features
 
@@ -19,10 +20,12 @@ An expression-based, LLM-friendly programming language designed for linear, decl
 - **Functional programming** idioms and patterns
 - **Pipeline operator** (`|>`) for function composition
 - **Records and accessors** for structured data
-- **Built-in primitives**: Int, String, Bool, List, Record
+- **Built-in primitives**: Int, String, Bool, List, Record, Unit
 - **REPL** for interactive development with comprehensive debugging tools
-- **Unambiguous syntax** - semicolon-separated data structures prevent parsing traps
+- **Unambiguous syntax** - comma-separated data structures prevent parsing traps
 - **Explicit effects**: Effects are tracked in the type system and visible in function types
+- **Recursion**: Full support for recursive functions with proper closure handling
+- **Mutation**: Local mutation with `mut` and `mut!` syntax
 
 ## Installation
 
@@ -83,23 +86,26 @@ add = fn x y => x + y
 add 2 3
 
 # Pipeline operator
-[1; 2; 3] |> head
+[1, 2, 3] |> head
 
 # Conditional expressions
 if true then 1 else 2
 
 # Records
-user = { @name "Alice"; @age 30 }
+user = { @name "Alice", @age 30 }
 
 # Accessors
 (@name user)
 
-# Local bindings (using function definitions)
-localAdd = fn x y => x + y;
-localAdd 1 2
+# Recursion
+factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1))
+
+# Mutation
+mut counter = 0;
+mut! counter = counter + 1
 
 # List operations
-[1; 2; 3] |> tail |> head
+[1, 2, 3] |> tail |> head
 ```
 
 ## Language Syntax
@@ -118,8 +124,8 @@ localAdd 1 2
 # This evaluates to 15 (the result of the right side)
 x = 10; x + 5
 
-# This evaluates to [8; 10; 12] (the result of map)
-print "hello"; map fn x => x * 2 [4; 5; 6]
+# This evaluates to [8, 10, 12] (the result of map)
+print "hello"; map (fn x => x * 2) [4, 5, 6]
 ```
 
 ### Literals
@@ -128,8 +134,10 @@ print "hello"; map fn x => x * 2 [4; 5; 6]
 42          # Integer
 "hello"     # String
 true        # Boolean
-[1; 2; 3]   # List (semicolon-separated)
-{ @name "Alice"; @age 30 }  # Record (semicolon-separated fields)
+{}          # Unit
+[1, 2, 3]   # List (comma-separated)
+{ @name "Alice", @age 30 }  # Record (comma-separated fields)
+{1, 2, 3}   # Tuple (comma-separated)
 ```
 
 ### Function Definitions
@@ -140,6 +148,9 @@ add = fn x y => x + y
 
 # Function with multiple parameters
 multiply = fn a b c => a * b * c
+
+# Curried function (Haskell-style)
+curried_add = fn a => fn b => a + b
 ```
 
 ### Function Application
@@ -150,6 +161,9 @@ add 2 3
 
 # Nested application
 add (multiply 2 3) 4
+
+# Curried application
+curried_add 2 3
 ```
 
 ### Pipeline and Function Application Operators
@@ -160,24 +174,24 @@ Noolang provides three operators for function composition and application:
 Composes functions from left to right (like Unix pipes):
 ```noolang
 # Chain functions: f |> g |> h means h(g(f(x)))
-[1; 2; 3] |> head |> add 5
+[1, 2, 3] |> head |> add 5
 ```
 
 #### Thrush Operator (`|`) - Function Application
 Applies the right function to the left value:
 ```noolang
 # Apply function: x | f means f(x)
-[1; 2; 3] | map (fn x => x * 2)
+[1, 2, 3] | map (fn x => x * 2)
 ```
 
 #### Dollar Operator (`$`) - Low-Precedence Function Application
 Applies the left function to the right value with low precedence (avoids parentheses):
 ```noolang
 # Without $ - lots of parentheses needed
-map (fn x => x * 2) (filter (fn x => x > 5) [1; 2; 3; 4; 5; 6; 7; 8; 9; 10])
+map (fn x => x * 2) (filter (fn x => x > 5) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
 
 # With $ - much cleaner
-map (fn x => x * 2) $ filter (fn x => x > 5) $ [1; 2; 3; 4; 5; 6; 7; 8; 9; 10]
+map (fn x => x * 2) $ filter (fn x => x > 5) $ [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 # Method-chaining with accessors
 person = { @address { @street "123 Main St", @city "Anytown" } };
@@ -191,7 +205,7 @@ result1 = map (fn x => x * 2) (filter (fn x => x > 3) (person | @scores));
 result2 = map (fn x => x * 2) $ filter (fn x => x > 3) $ (person | @scores);
 
 # Complex nested function calls
-reduce (+) 0 $ map (fn x => x * x) $ filter (fn x => x % 2 == 0) $ [1; 2; 3; 4; 5; 6]
+reduce (+) 0 $ map (fn x => x * x) $ filter (fn x => x % 2 == 0) $ [1, 2, 3, 4, 5, 6]
 ```
 
 ### Conditional Expressions
@@ -204,11 +218,7 @@ if condition then value1 else value2
 
 ```noolang
 # Record creation
-user = { @name "Alice"; @age 30; @city "NYC" }
-
-# Accessor usage (accessors are functions)
-user | @name        # Returns "Alice"
-user | @age         # Returns 30
+user = { @name "Alice", @age 30, @city "NYC" }
 
 # Accessor usage (accessors are functions)
 user | @name        # Returns "Alice"
@@ -223,37 +233,62 @@ getName = @name;
 getName user        # Same as user | @name
 ```
 
-### Local Bindings
+### Recursion
 
-Local bindings are created using function definitions:
+Noolang supports recursive functions with proper closure handling:
 
 ```noolang
-localAdd = fn x y => x + y;
-localAdd 1 2
+# Factorial function
+factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1))
+
+# Fibonacci function
+fibonacci = fn n => if n <= 1 then n else (fibonacci (n - 1)) + (fibonacci (n - 2))
+
+# List operations with recursion
+length = fn list => if (isEmpty list) then 0 else 1 + (length (tail list))
 ```
 
-**Note**: The semicolon after the definition is an expression separator. The definition is evaluated (creating the binding), then discarded, and the function application is evaluated and returned.
+### Mutation
+
+Noolang supports local mutation with explicit syntax:
+
+```noolang
+# Mutable variable declaration
+mut counter = 0
+
+# Mutation (updating the variable)
+mut! counter = counter + 1
+
+# Mutation in expressions
+mutation_demo = (
+  mut counter = 0;
+  mut! counter = counter + 1;
+  counter
+)
+```
 
 ### Data Structure Syntax
 
-Noolang uses semicolons as separators for all data structures:
+Noolang uses commas as separators for all data structures:
 
 ```noolang
-# Lists - semicolon separated
-[1; 2; 3]
-[1;2;3;1 ;2 ; 3]  # Flexible whitespace around semicolons
+# Lists - comma separated
+[1, 2, 3]
+[1,2,3,1,2,3]  # Flexible whitespace around commas
 
-# Records - semicolon separated fields
-{ @name "Alice"; @age 30 }
-{ @x 1; @y 2; @z 3 }
+# Records - comma separated fields
+{ @name "Alice", @age 30 }
+{ @x 1, @y 2, @z 3 }
 
-# Future: Tuples (planned)
-# (1; 2; 3)
+# Tuples - comma separated
+{1, 2, 3}
+{10, 20}
 ```
 
-**Why semicolons?** This eliminates ambiguity between multiple elements vs. function applications:
-- `[1; 2; 3]` = list with three elements
-- `[1 2 3]` = list with one element that's the function application `1(2)(3)` (fails with clear error)
+**Why commas?** This provides a familiar, consistent syntax across all data structures:
+- `[1, 2, 3]` = list with three elements
+- `{ @name "Alice", @age 30 }` = record with two fields
+- `{1, 2, 3}` = tuple with three elements
 
 ### Built-in Functions
 
@@ -265,9 +300,9 @@ Noolang uses semicolons as separators for all data structures:
 - **String utilities**: `concat`, `toString`
 - **Utility**: `print`
 
-## Duck-Typed Records and Accessors (NEW!)
+## Duck-Typed Records and Accessors
 
-Noolang records are now **duck-typed**: any record with the required field(s) can be used, regardless of extra fields. This makes accessors and record operations flexible and ergonomic, similar to JavaScript or Python objects.
+Noolang records are **duck-typed**: any record with the required field(s) can be used, regardless of extra fields. This makes accessors and record operations flexible and ergonomic, similar to JavaScript or Python objects.
 
 ### Example
 
@@ -285,6 +320,14 @@ duck_chain = (((complex | @bar) | @baz) $ 123) | @qux  # Returns 123
 - **Accessor chains** work as long as each step has the required field.
 - This enables ergonomic, method-chaining-like patterns and makes Noolang more LLM-friendly and expressive.
 
+## VSCode Support
+
+Noolang has full VSCode syntax highlighting support:
+
+1. **Install the extension**: Use the provided `noolang-0.1.0.vsix` file
+2. **Automatic activation**: `.noo` files will automatically use Noolang syntax highlighting
+3. **Features**: Keywords, operators, data structures, accessors, comments, and more are highlighted
+
 ## Project Structure
 
 ```
@@ -295,15 +338,18 @@ src/
   │   ├── parser.ts   # Main parser (combinator-based)
   │   └── combinators.ts # Parser combinator library
   ├── evaluator.ts    # Interpreter for evaluating expressions
-  ├── typer.ts        # Type inference and checking
+  ├── typer_functional.ts # Type inference and checking
   ├── repl.ts         # Interactive REPL
-  ├── effects.ts      # Placeholder for effect handling
-  └── imports.ts      # Placeholder for file-based imports
+  ├── cli.ts          # Command-line interface
+  └── format.ts       # Value formatting and output
 
 test/
   ├── parser.test.ts    # Parser tests
   ├── evaluator.test.ts # Evaluator tests
-  └── typer.test.ts     # Type inference tests
+  └── typer_functional.test.ts # Type inference tests
+
+syntaxes/
+  └── noolang.tmLanguage.json # VSCode syntax highlighting
 ```
 
 ## Development
@@ -314,7 +360,7 @@ test/
 npm test
 ```
 
-All tests use the new functional typer. The old class-based typer and its tests have been removed. Some advanced constraint-propagation tests are skipped until the constraint system is fully implemented.
+All tests use the functional typer. Some advanced constraint-propagation tests are skipped until the constraint system is fully implemented.
 
 ### Building
 
@@ -322,9 +368,15 @@ All tests use the new functional typer. The old class-based typer and its tests 
 npm run build
 ```
 
+### VSCode Extension
+
+```bash
+npm run vscode:package  # Create extension package
+```
+
 ## Language Design Decisions
 
-#### Duck-Typed Records (NEW)
+#### Duck-Typed Records
 
 - **Permissive record unification**: Any record with the required fields matches, regardless of extra fields
 - **Accessors**: Work with any record that has the field, enabling flexible and ergonomic code
@@ -337,24 +389,24 @@ Everything in Noolang is an expression, promoting a functional programming style
 
 - No statements, only expressions
 - Functions are first-class values
-- Immutable data structures
+- Immutable data structures by default
 - All functions are curried by default
 
-### Unambiguous Data Structures
+### Consistent Data Structures
 
-Noolang uses semicolons as separators for all data structures to prevent parsing ambiguity:
+Noolang uses commas as separators for all data structures for consistency and familiarity:
 
-- **Consistency**: Records, lists, and future tuples all use semicolons
-- **Clarity**: No confusion between multiple elements vs. function applications
-- **Flexibility**: Whitespace around semicolons is optional
-- **Error Prevention**: Clear error messages when users accidentally use space-separated syntax
+- **Consistency**: Records, lists, and tuples all use commas
+- **Familiarity**: Matches common programming language conventions
+- **Flexibility**: Whitespace around commas is optional
+- **Clarity**: Clear distinction between data structures and function applications
 
 ### Type System
 
 The type system provides:
 
 - **Type inference** for all expressions using a functional Hindley-Milner engine
-- **Primitive types**: Int, String, Bool, List, Record
+- **Primitive types**: Int, String, Bool, List, Record, Unit
 - **Function types**: `(Int Int) -> Int`
 - **Type constraints**: Early support for constraints (e.g., Collection, hasField) is present, but advanced constraint propagation is still in progress
 - **Type annotations** (planned for future versions)
@@ -373,7 +425,6 @@ Effects are planned to be explicit and tracked:
 - **Effect tracking**: Explicit IO and state effects
 - **File imports**: Module system for code organization
 - **Pattern matching**: Destructuring and pattern-based control flow
-- **Tuples**: Ordered collections with semicolon-separated syntax
 - **JavaScript compilation**: Compile to JavaScript for production use
 - **Standard library**: Comprehensive built-in functions for common operations
 
