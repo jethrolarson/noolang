@@ -12,6 +12,7 @@ import {
   ImportExpression,
   AccessorExpression,
   Type,
+  Constraint,
   intType,
   stringType,
   boolType,
@@ -20,11 +21,13 @@ import {
   functionType,
   typeVariable,
   TypedExpression,
+  ConstrainedExpression,
   ListExpression,
   WhereExpression,
   recordType,
   tupleType,
   tupleTypeConstructor,
+  ConstraintExpr,
 } from "../ast";
 import * as C from "./combinators";
 
@@ -729,86 +732,62 @@ const parseIfExpression: C.Parser<Expression> = C.map(
 );
 
 // --- Primary Expressions (no unary minus) ---
-const parsePrimary: C.Parser<Expression> = C.choice(
-  parseIfExpression,
-  parseNumber,
-  parseString,
-  parseBoolean,
-  parseIdentifier,
-  parseList,
-  parseRecord,
-  parseAccessor,
-  parseParenExpr,
-  parseLambdaExpression,
-  C.lazy(() => parseDefinitionWithType),
-  parseImportExpression
-);
-
-// Add parseList to parsePrimary after it's defined
-const parsePrimaryWithList: C.Parser<Expression> = C.choice(
-  parseIfExpression, // <-- allow if expressions
-  parseNumber,
-  parseString,
-  parseBoolean,
-  parseIdentifier,
-  parseList,
-  parseRecord,
-  parseAccessor,
-  parseParenExpr, // <-- try parenthesized expressions first
-  parseLambdaExpression, // <-- allow lambda expressions as primary expressions
-  C.lazy(() => parseDefinitionWithType), // <-- allow definitions as primary expressions
-  parseImportExpression // <-- allow import as a primary expression
-);
-
-// --- Simple Expression (no function applications) ---
-const parseSimpleExpression: C.Parser<Expression> = C.map(
-  C.seq(
-    parsePrimaryWithList,
-    C.many(
-      C.seq(
-        C.choice(
-          C.operator("+"),
-          C.operator("-"),
-          C.operator("*"),
-          C.operator("/"),
-          C.operator("<"),
-          C.operator(">"),
-          C.operator("<="),
-          C.operator(">="),
-          C.operator("=="),
-          C.operator("!=")
-        ),
-        parsePrimaryWithList
-      )
-    )
-  ),
-  ([left, rest]) => {
-    let result = left;
-    for (const [op, right] of rest) {
-      result = {
-        kind: "binary",
-        operator: op.value as
-          | "+"
-          | "-"
-          | "*"
-          | "/"
-          | "<"
-          | ">"
-          | "<="
-          | ">="
-          | "=="
-          | "!=",
-        left: result,
-        right,
-        location: result.location,
-      };
-    }
-    return result;
+const parsePrimary: C.Parser<Expression> = (tokens) => {
+  // DEBUG: Log tokens at entry
+  if (process.env.NOO_DEBUG_PARSE) {
+    console.log("parsePrimary tokens:", tokens.map((t) => t.value).join(" "));
   }
-);
+  const result = C.choice(
+    parseNumber,
+    parseString,
+    parseBoolean,
+    parseIdentifier,
+    parseList,
+    parseRecord,
+    parseAccessor,
+    parseParenExpr,
+    parseLambdaExpression,
+    C.lazy(() => parseDefinitionWithType),
+    parseImportExpression
+  )(tokens);
+  // DEBUG: Log result
+  if (process.env.NOO_DEBUG_PARSE) {
+    console.log(
+      "parsePrimary result:",
+      result.success ? result.value : result.error
+    );
+  }
+  return result;
+};
+
+// --- Primary with Postfix (type annotations) ---
+const parsePrimaryWithPostfix: C.Parser<Expression> = (tokens) => {
+  if (process.env.NOO_DEBUG_PARSE) {
+    console.log(
+      "parsePrimaryWithPostfix tokens:",
+      tokens.map((t) => t.value).join(" ")
+    );
+  }
+  const primaryResult = parsePrimary(tokens);
+  if (!primaryResult.success) return primaryResult;
+  const postfixResult = parsePostfixFromResult(
+    primaryResult.value,
+    primaryResult.remaining
+  );
+  if (process.env.NOO_DEBUG_PARSE) {
+    console.log(
+      "parsePrimaryWithPostfix result:",
+      postfixResult.success ? postfixResult.value : postfixResult.error
+    );
+  }
+  return postfixResult;
+};
 
 // --- Unary Operators (negation, only if '-' is adjacent to the next token) ---
 const parseUnary: C.Parser<Expression> = (tokens) => {
+  if (process.env.NOO_DEBUG_PARSE) {
+    console.log("parseUnary tokens:", tokens.map((t) => t.value).join(" "));
+  }
   if (
     tokens.length >= 2 &&
     tokens[0].type === "OPERATOR" &&
@@ -822,181 +801,321 @@ const parseUnary: C.Parser<Expression> = (tokens) => {
       minusToken.location.end.column === nextToken.location.start.column
     ) {
       // Parse as unary minus
-      const operandResult = parsePrimary(tokens.slice(1));
+      const operandResult = parsePrimaryWithPostfix(tokens.slice(1));
       if (!operandResult.success) return operandResult;
-      return {
-        success: true,
+      const result = {
+        success: true as const,
         value: {
-          kind: "binary",
-          operator: "*",
-          left: { kind: "literal", value: -1, location: minusToken.location },
+          kind: "binary" as const,
+          operator: "*" as const,
+          left: {
+            kind: "literal" as const,
+            value: -1,
+            location: minusToken.location,
+          },
           right: operandResult.value,
           location: minusToken.location,
         },
         remaining: operandResult.remaining,
       };
+      if (process.env.NOO_DEBUG_PARSE) {
+        console.log("parseUnary result (negation):", result.value);
+      }
+      return result;
     }
   }
-  // Otherwise, fall through to parsePrimary
-  return parsePrimary(tokens);
+  // Otherwise, fall through to parsePrimaryWithPostfix
+  const result = parsePrimaryWithPostfix(tokens);
+  if (process.env.NOO_DEBUG_PARSE) {
+    console.log(
+      "parseUnary result:",
+      result.success ? result.value : result.error
+    );
+  }
+  return result;
 };
 
 // --- Function Application (left-associative, tightest binding) ---
-const parseApplication: C.Parser<Expression> = C.map(
-  C.seq(parseUnary, C.many(parseUnary)),
-  ([func, args]) => {
-    let result = func;
-    for (const arg of args) {
-      result = {
-        kind: "application",
-        func: result,
-        args: [arg],
-        location: result.location,
-      };
+const parseApplication: C.Parser<Expression> = (tokens) => {
+  const appResult = C.map(
+    C.seq(parseUnary, C.many(parseUnary)),
+    ([func, args]) => {
+      let result = func;
+      for (const arg of args) {
+        result = {
+          kind: "application",
+          func: result,
+          args: [arg],
+          location: result.location,
+        };
+      }
+      return result;
     }
-    return result;
-  }
-);
+  )(tokens);
+
+  if (!appResult.success) return appResult;
+
+  // Apply postfix operators (type annotations) to the result
+  return parsePostfixFromResult(appResult.value, appResult.remaining);
+};
 
 // --- Multiplicative (*, /) ---
-const parseMultiplicative: C.Parser<Expression> = C.map(
-  C.seq(
-    parseApplication,
-    C.many(C.seq(C.choice(C.operator("*"), C.operator("/")), parseApplication))
-  ),
-  ([left, rest]) => {
-    let result = left;
-    for (const [op, right] of rest) {
-      result = {
-        kind: "binary",
-        operator: op.value as "*" | "/",
-        left: result,
-        right,
-        location: result.location,
-      };
+const parseMultiplicative: C.Parser<Expression> = (tokens) => {
+  const multResult = C.map(
+    C.seq(
+      parseApplication,
+      C.many(
+        C.seq(C.choice(C.operator("*"), C.operator("/")), parseApplication)
+      )
+    ),
+    ([left, rest]) => {
+      let result = left;
+      for (const [op, right] of rest) {
+        result = {
+          kind: "binary",
+          operator: op.value as "*" | "/",
+          left: result,
+          right,
+          location: result.location,
+        };
+      }
+      return result;
     }
-    return result;
-  }
-);
+  )(tokens);
+
+  if (!multResult.success) return multResult;
+
+  // Apply postfix operators (type annotations) to the result
+  return parsePostfixFromResult(multResult.value, multResult.remaining);
+};
 
 // --- Additive (+, -) ---
-const parseAdditive: C.Parser<Expression> = C.map(
-  C.seq(
-    parseMultiplicative,
-    C.many(
-      C.seq(C.choice(C.operator("+"), C.operator("-")), parseMultiplicative)
-    )
-  ),
-  ([left, rest]) => {
-    let result = left;
-    for (const [op, right] of rest) {
-      result = {
-        kind: "binary",
-        operator: op.value as "+" | "-",
-        left: result,
-        right,
-        location: result.location,
-      };
+const parseAdditive: C.Parser<Expression> = (tokens) => {
+  const addResult = C.map(
+    C.seq(
+      parseMultiplicative,
+      C.many(
+        C.seq(C.choice(C.operator("+"), C.operator("-")), parseMultiplicative)
+      )
+    ),
+    ([left, rest]) => {
+      let result = left;
+      for (const [op, right] of rest) {
+        result = {
+          kind: "binary",
+          operator: op.value as "+" | "-",
+          left: result,
+          right,
+          location: result.location,
+        };
+      }
+      return result;
     }
-    return result;
-  }
-);
+  )(tokens);
+
+  if (!addResult.success) return addResult;
+
+  // Apply postfix operators (type annotations) to the result
+  return parsePostfixFromResult(addResult.value, addResult.remaining);
+};
 
 // --- Comparison (<, >, <=, >=, ==, !=) ---
-const parseComparison: C.Parser<Expression> = C.map(
-  C.seq(
-    parseAdditive,
-    C.many(
-      C.seq(
-        C.choice(
-          C.operator("<"),
-          C.operator(">"),
-          C.operator("<="),
-          C.operator(">="),
-          C.operator("=="),
-          C.operator("!=")
-        ),
-        parseAdditive
+const parseComparison: C.Parser<Expression> = (tokens) => {
+  const compResult = C.map(
+    C.seq(
+      parseAdditive,
+      C.many(
+        C.seq(
+          C.choice(
+            C.operator("<"),
+            C.operator(">"),
+            C.operator("<="),
+            C.operator(">="),
+            C.operator("=="),
+            C.operator("!=")
+          ),
+          parseAdditive
+        )
       )
-    )
-  ),
-  ([left, rest]) => {
-    let result = left;
-    for (const [op, right] of rest) {
-      result = {
-        kind: "binary",
-        operator: op.value as "<" | ">" | "<=" | ">=" | "==" | "!=",
-        left: result,
-        right,
-        location: result.location,
-      };
+    ),
+    ([left, rest]) => {
+      let result = left;
+      for (const [op, right] of rest) {
+        result = {
+          kind: "binary",
+          operator: op.value as "<" | ">" | "<=" | ">=" | "==" | "!=",
+          left: result,
+          right,
+          location: result.location,
+        };
+      }
+      return result;
     }
-    return result;
-  }
-);
+  )(tokens);
+
+  if (!compResult.success) return compResult;
+
+  // Apply postfix operators (type annotations) to the result
+  return parsePostfixFromResult(compResult.value, compResult.remaining);
+};
 
 // --- Composition (|>, <|) ---
-const parseCompose: C.Parser<Expression> = C.map(
-  C.seq(
-    parseComparison,
-    C.many(C.seq(C.choice(C.operator("|>"), C.operator("<|")), parseComparison))
-  ),
-  ([left, rest]) => {
-    // Build steps array for pipeline expression
-    const steps = [left];
-    for (const [op, right] of rest) {
-      steps.push(right);
-    }
+const parseCompose: C.Parser<Expression> = (tokens) => {
+  const compResult = C.map(
+    C.seq(
+      parseComparison,
+      C.many(
+        C.seq(C.choice(C.operator("|>"), C.operator("<|")), parseComparison)
+      )
+    ),
+    ([left, rest]) => {
+      // Build steps array for pipeline expression
+      const steps = [left];
+      for (const [op, right] of rest) {
+        steps.push(right);
+      }
 
-    // If we have multiple steps, create a pipeline expression
-    if (steps.length > 1) {
-      return {
-        kind: "pipeline",
-        steps,
-        location: left.location,
-      } as import("../ast").PipelineExpression;
-    }
+      // If we have multiple steps, create a pipeline expression
+      if (steps.length > 1) {
+        return {
+          kind: "pipeline",
+          steps,
+          location: left.location,
+        } as import("../ast").PipelineExpression;
+      }
 
-    // Otherwise just return the single expression
-    return left;
-  }
-);
+      // Otherwise just return the single expression
+      return left;
+    }
+  )(tokens);
+
+  if (!compResult.success) return compResult;
+
+  // Apply postfix operators (type annotations) to the result
+  return parsePostfixFromResult(compResult.value, compResult.remaining);
+};
 
 // --- Thrush (|) ---
-const parseThrush: C.Parser<Expression> = C.map(
-  C.seq(parseCompose, C.many(C.seq(C.operator("|"), parseCompose))),
-  ([left, rest]) => {
-    let result = left;
-    for (const [op, right] of rest) {
-      result = {
-        kind: "binary",
-        operator: "|",
-        left: result,
-        right,
-        location: result.location,
-      };
+const parseThrush: C.Parser<Expression> = (tokens) => {
+  const thrushResult = C.map(
+    C.seq(parseCompose, C.many(C.seq(C.operator("|"), parseCompose))),
+    ([left, rest]) => {
+      let result = left;
+      for (const [op, right] of rest) {
+        result = {
+          kind: "binary",
+          operator: "|",
+          left: result,
+          right,
+          location: result.location,
+        };
+      }
+      return result;
     }
-    return result;
-  }
-);
+  )(tokens);
+
+  if (!thrushResult.success) return thrushResult;
+
+  // Apply postfix operators (type annotations) to the result
+  return parsePostfixFromResult(thrushResult.value, thrushResult.remaining);
+};
 
 // --- Dollar ($) - Low precedence function application ---
-const parseDollar: C.Parser<Expression> = C.map(
-  C.seq(parseThrush, C.many(C.seq(C.operator("$"), parseThrush))),
-  ([left, rest]) => {
-    let result = left;
-    for (const [op, right] of rest) {
-      result = {
-        kind: "binary",
-        operator: "$",
-        left: result,
-        right,
-        location: result.location,
-      };
+const parseDollar: C.Parser<Expression> = (tokens) => {
+  const dollarResult = C.map(
+    C.seq(parseThrush, C.many(C.seq(C.operator("$"), parseThrush))),
+    ([left, rest]) => {
+      let result = left;
+      for (const [op, right] of rest) {
+        result = {
+          kind: "binary",
+          operator: "$",
+          left: result,
+          right,
+          location: result.location,
+        };
+      }
+      return result;
     }
-    return result;
+  )(tokens);
+
+  if (!dollarResult.success) return dollarResult;
+
+  // Apply postfix operators (type annotations) to the result
+  return parsePostfixFromResult(dollarResult.value, dollarResult.remaining);
+};
+
+// --- If Expression (after dollar, before sequence) ---
+const parseIfAfterDollar: C.Parser<Expression> = (tokens) => {
+  const ifResult = parseIfExpression(tokens);
+  if (!ifResult.success) return ifResult;
+
+  // Apply postfix operators (type annotations) to the result
+  return parsePostfixFromResult(ifResult.value, ifResult.remaining);
+};
+
+// Helper function to apply postfix operators to an expression
+const parsePostfixFromResult = (
+  expr: Expression,
+  tokens: Token[]
+): C.ParseResult<Expression> => {
+  let result = expr;
+  let remaining = tokens;
+
+  // Try to parse postfix type annotations
+  while (remaining.length > 0) {
+    // Try to parse : type given constraint
+    if (
+      remaining.length >= 2 &&
+      remaining[0].type === "PUNCTUATION" &&
+      remaining[0].value === ":"
+    ) {
+      const typeResult = parseTypeExpression(remaining.slice(1));
+      if (!typeResult.success) break;
+
+      // Check if there's a "given" constraint after the type
+      if (
+        typeResult.remaining.length > 0 &&
+        typeResult.remaining[0].type === "KEYWORD" &&
+        typeResult.remaining[0].value === "given"
+      ) {
+        const constraintResult = parseConstraintExpr(
+          typeResult.remaining.slice(1)
+        );
+        if (!constraintResult.success) break;
+
+        result = {
+          kind: "constrained",
+          expression: result,
+          type: typeResult.value,
+          constraint: constraintResult.value,
+          location: result.location,
+        };
+        remaining = constraintResult.remaining;
+        continue;
+      } else {
+        // Just a type annotation without constraints
+        result = {
+          kind: "typed",
+          expression: result,
+          type: typeResult.value,
+          location: result.location,
+        };
+        remaining = typeResult.remaining;
+        continue;
+      }
+    }
+
+    // No more postfix operators
+    break;
   }
-);
+
+  return {
+    success: true,
+    value: result,
+    remaining,
+  };
+};
 
 // --- Typed Expression (expr : type) ---
 const parseTypedExpression: C.Parser<Expression> = C.map(
@@ -1030,22 +1149,8 @@ const parseDefinition: C.Parser<DefinitionExpression> = C.map(
   }
 );
 
-// --- Definition with typed expression ---
-const parseDefinitionWithType: C.Parser<DefinitionExpression> = C.map(
-  C.seq(
-    C.identifier(),
-    C.operator("="),
-    C.lazy(() => parseExprWithType)
-  ),
-  ([name, equals, value]): DefinitionExpression => {
-    return {
-      kind: "definition",
-      name: name.value,
-      value,
-      location: name.location,
-    };
-  }
-);
+// --- Definition with typed expression (now just a regular definition) ---
+const parseDefinitionWithType: C.Parser<DefinitionExpression> = parseDefinition;
 
 // --- Mutable Definition ---
 const parseMutableDefinition: C.Parser<
@@ -1134,23 +1239,15 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
 const parseSequenceTerm: C.Parser<Expression> = C.choice(
   parseDefinitionWithType, // allow definitions with type annotations
   parseDefinition, // fallback to regular definitions
-  parseIfExpression,
-  parseDollar,
-  parseThrush,
-  parseRecord,
   parseMutableDefinition,
   parseMutation,
   parseWhereExpression,
   parseImportExpression,
-  parseLambdaExpression,
-  parseNumber,
-  parseString,
-  parseBoolean,
-  parseIdentifier,
-  parseList,
-  parseAccessor,
-  parseParenExpr,
-  parseTypedExpression
+  parseIfAfterDollar, // if expressions with postfix support
+  parseDollar, // full expression hierarchy (includes all primaries and type annotations)
+  parseRecord,
+  parseThrush,
+  parseLambdaExpression
 );
 
 // Version without records to avoid circular dependency
@@ -1182,14 +1279,159 @@ const parseSequenceTermWithIfExceptRecord: C.Parser<Expression> = C.choice(
 // --- Sequence Term: definition or expression ---
 const parseSequenceTermNew: C.Parser<Expression> = C.choice(
   parseDefinitionWithType, // allow definitions
-  parseDollar // allow full expressions with precedence
+  parseDollar, // allow full expressions with precedence
+  parseIfExpression,
+  parseRecord,
+  parseMutableDefinition,
+  parseMutation,
+  parseWhereExpression,
+  parseImportExpression,
+  parseThrush,
+  parseLambdaExpression,
+  parseNumber,
+  parseString,
+  parseBoolean,
+  parseIdentifier,
+  parseList,
+  parseAccessor,
+  parseParenExpr
 );
+
+// --- Parse atomic constraint ---
+const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
+  // Parenthesized constraint
+  C.map(
+    C.seq(
+      C.punctuation("("),
+      C.lazy(() => parseConstraintExpr),
+      C.punctuation(")")
+    ),
+    ([open, expr, close]) => ({ kind: "paren", expr })
+  ),
+  // a is Collection
+  C.map(
+    C.seq(
+      C.identifier(),
+      C.keyword("is"),
+      C.choice(
+        C.identifier(),
+        C.keyword("String"),
+        C.keyword("Number"),
+        C.keyword("Bool"),
+        C.keyword("Collection"),
+        C.keyword("Show"),
+        C.keyword("Eq")
+      )
+    ),
+    ([typeVar, isKeyword, constraint]): ConstraintExpr => ({
+      kind: "is",
+      typeVar: typeVar.value,
+      constraint: constraint.value,
+    })
+  ),
+  // a has field "name" of type T
+  C.map(
+    C.seq(
+      C.identifier(),
+      C.keyword("has"),
+      C.keyword("field"),
+      C.string(),
+      C.keyword("of"),
+      C.keyword("type"),
+      C.lazy(() => parseTypeExpression)
+    ),
+    ([
+      typeVar,
+      has,
+      field,
+      fieldName,
+      of,
+      type,
+      fieldType,
+    ]): ConstraintExpr => ({
+      kind: "hasField",
+      typeVar: typeVar.value,
+      field: fieldName.value,
+      fieldType,
+    })
+  ),
+  // a implements Interface
+  C.map(
+    C.seq(C.identifier(), C.keyword("implements"), C.identifier()),
+    ([typeVar, implementsKeyword, interfaceName]): ConstraintExpr => ({
+      kind: "implements",
+      typeVar: typeVar.value,
+      interfaceName: interfaceName.value,
+    })
+  )
+);
+
+// --- Parse constraint expression with precedence: and > or ---
+const parseConstraintExpr: C.Parser<ConstraintExpr> = (tokens) => {
+  // Parse left side (and chains)
+  let leftResult = parseConstraintAnd(tokens);
+  if (!leftResult.success) return leftResult;
+  let left = leftResult.value;
+  let rest = leftResult.remaining;
+
+  // Parse or chains
+  while (
+    rest.length > 0 &&
+    rest[0].type === "KEYWORD" &&
+    rest[0].value === "or"
+  ) {
+    rest = rest.slice(1);
+    const rightResult = parseConstraintAnd(rest);
+    if (!rightResult.success) return rightResult;
+    left = { kind: "or", left, right: rightResult.value };
+    rest = rightResult.remaining;
+  }
+  return { success: true as const, value: left, remaining: rest };
+};
+
+const parseConstraintAnd: C.Parser<ConstraintExpr> = (tokens) => {
+  let leftResult = parseAtomicConstraint(tokens);
+  if (!leftResult.success) return leftResult;
+  let left = leftResult.value;
+  let rest = leftResult.remaining;
+
+  while (
+    rest.length > 0 &&
+    rest[0].type === "KEYWORD" &&
+    rest[0].value === "and"
+  ) {
+    rest = rest.slice(1);
+    const rightResult = parseAtomicConstraint(rest);
+    if (!rightResult.success) return rightResult;
+    left = { kind: "and", left, right: rightResult.value };
+    rest = rightResult.remaining;
+  }
+  return { success: true as const, value: left, remaining: rest };
+};
 
 // --- Expression with type annotation (just above semicolon) ---
 const parseExprWithType: C.Parser<Expression> = C.choice(
+  // Expression with type and constraints: expr : type given constraintExpr
   C.map(
     C.seq(
-      parseSequenceTermNew,
+      parseDollar, // Use parseDollar to support full expression hierarchy
+      C.punctuation(":"),
+      C.lazy(() => parseTypeExpression),
+      C.keyword("given"),
+      parseConstraintExpr
+    ),
+    ([expr, colon, type, given, constraint]): ConstrainedExpression => ({
+      kind: "constrained",
+      expression: expr,
+      type,
+      constraint,
+      location: expr.location,
+    })
+  ),
+  // Expression with just type: expr : type
+  C.map(
+    C.seq(
+      parseDollar, // Use parseDollar to support full expression hierarchy
       C.punctuation(":"),
       C.lazy(() => parseTypeExpression)
     ),
@@ -1200,7 +1442,7 @@ const parseExprWithType: C.Parser<Expression> = C.choice(
       location: expr.location,
     })
   ),
-  parseSequenceTermNew
+  parseDollar // Fallback to regular expressions
 );
 
 // --- Sequence (semicolon) ---

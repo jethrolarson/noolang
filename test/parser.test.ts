@@ -398,7 +398,6 @@ describe('Parser', () => {
     expect(chain.right.name).toBe("c");
   });
 
-  // TODO: Need to fix this parser issue
   test("should parse thrush operator after record", () => {
     const lexer = new Lexer("{@key 1, @key2 false} | @key");
     const tokens = lexer.tokenize();

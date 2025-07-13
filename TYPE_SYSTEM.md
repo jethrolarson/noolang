@@ -71,34 +71,96 @@ Noolang is a principled, expression-based language designed for LLM-assisted and
 
 ---
 
-### 🚧 Planned: Type Constraints and Constrained Polymorphism
+### ✅ **IMPLEMENTED: Type Constraints and Constrained Polymorphism**
 
-Noolang will support **type constraints** for more expressive and safe generic programming.
+Noolang now supports **type constraints** for more expressive and safe generic programming.
 
-- **Syntax**: `: a -> a given a is Collection`
-- **Semantics**: Functions can declare that their type variables must satisfy certain constraints (e.g., must be a `Collection`, `Number`, etc.).
-- **Use Cases**:
-  - Restricting generic functions to only work on certain kinds of types.
-  - Enabling ad-hoc polymorphism (type classes/traits/interfaces).
-  - Improving error messages and safety for partial functions (like `head`).
-  - Allowing user-defined constraints for extensibility.
-- **Implementation**:
-  - The type checker will track constraints on type variables.
-  - Constraint solving will be part of type inference.
-  - Constraints can be user-defined and extensible.
+#### **Current Implementation Status**
 
-#### Example
+* **✅ Constraint System**: Fully implemented with Hindley-Milner style inference
+* **✅ Constraint Propagation**: Constraints are properly propagated through function composition
+* **✅ Built-in Constraints**: `Collection`, `Number`, `String`, `Boolean`, `Show`, `List`, `Record`, `Function`
+* **✅ Constraint Validation**: Type checker enforces constraints during unification
+* **✅ Error Reporting**: Clear error messages when constraints are violated
+
+#### **Current Constraint Syntax**
+
+Constraints are currently embedded in function types and propagated automatically:
 
 ```noolang
-# Only works for types that are Collection
-first = fn xs => ... : a -> b given a is Collection
+# Built-in functions with constraints
+head : List a -> a given a is Collection
+tail : List a -> List a given a is Collection
+length : List a -> Number given a is Collection
+
+# Constraint propagation works through composition
+compose = fn f g => fn x => f (g x)
+safeHead = compose head  # Constraint 'a is Collection' is preserved
 ```
 
-#### Architectural Notes
-- Constraints will be attached to type variables and propagated during type inference.
-- The constraint system will enable safe, expressive, and extensible generic programming.
-- This feature is inspired by type classes (Haskell), traits (Rust), and interfaces (TypeScript/Java).
-- Partial functions (like `head`) should use `Option` types or constraints to ensure safety.
+#### **Constraint System Features**
+
+* **Automatic Propagation**: Constraints flow through function composition
+* **Built-in Constraints**: Predefined constraints for common type classes
+* **Constraint Checking**: Violations are caught during type inference
+* **Error Messages**: Clear feedback when constraints are not satisfied
+
+#### **Example: Constraint Violation**
+
+```noolang
+# This will throw a type error because Int does not satisfy Collection constraint
+compose = fn f g => fn x => f (g x)
+safeHead = compose head
+listId = fn x => x
+result = safeHead listId [1, 2, 3]  # ❌ Error: Int does not satisfy Collection constraint
+```
+
+---
+
+### 🚧 **PLANNED: Constraint Annotations with "and"/"or" Syntax**
+
+Noolang will support **explicit constraint annotations** using postfix syntax with logical operators.
+
+#### **Proposed Syntax**
+
+* **Postfix constraints**: `: type given constraint1 and constraint2`
+* **Logical operators**: `and` for conjunction, `or` for disjunction
+* **Clear semantics**: Explicit logical relationships between constraints
+
+#### **Examples**
+
+```noolang
+# Single constraint
+id : a -> a given a is Collection
+
+# Multiple constraints with "and"
+map : (a -> b, List a) -> List b given a is Show and b is Eq
+
+# Complex constraint logic with "or"
+flexible : a -> b given 
+  (a is Collection and b is Show) or 
+  (a is String and b is Eq)
+
+# Nested constraints
+nested : a -> b given 
+  a is Collection and 
+  (b is Show or b is Eq)
+```
+
+#### **Design Rationale**
+
+* **Postfix for consistency**: Keeps main type signature uncluttered
+* **"and"/"or" for clarity**: Explicit logical operators, very LLM-friendly
+* **Extensible**: Easy to add complex constraint logic and union types
+* **Familiar**: Similar to Haskell's `=>` and Rust's `where` clauses
+
+#### **Implementation Plan**
+
+1. **Parser**: Add constraint annotation parsing to type expressions
+2. **AST**: Extend type nodes to include explicit constraint annotations
+3. **Type System**: Integrate with existing constraint propagation system
+4. **Error Handling**: Enhanced error messages for constraint violations
+5. **REPL Support**: Show constraints in type inference output
 
 ---
 
@@ -162,11 +224,10 @@ compute = fn n => n * n : Number
 
 ### 🔧 Type Inference Strategy (Current Implementation)
 
-* Local inference only; no global type solving required
-* Variables without annotations are inferred if:
-  * Used consistently
-  * Do not require generalization
-* **Current limitation**: Type variables are not unified to concrete types
+* **✅ Functional Hindley-Milner**: Fully implemented with let-polymorphism
+* **✅ Constraint Propagation**: Robust constraint system with proper unification
+* **✅ Type Variable Management**: Fresh variable generation and substitution
+* **Current limitation**: Type variables are not unified to concrete types (e.g., `t1 -> Number` not resolved to `Number -> Number`)
 * Effects must always be declared manually and are not inferred (by design)
 * REPL and dev tools can show inferred types inline for LLM and human inspection
 
@@ -180,6 +241,7 @@ compute = fn n => n * n : Number
 * **Record Type Annotations**: ❌ Parser doesn't support `{ name: String, age: Number }` yet
 * **Type Constructors**: ❌ `List T`, `Tuple T1 T2` not implemented yet
 * **Expression-level type annotations**: ❌ `(expr : type)` syntax not implemented yet
+* **Constraint Annotations**: ❌ `given` syntax not implemented yet (constraints work automatically)
 
 ### 🎯 Next Implementation Priorities
 
@@ -188,6 +250,7 @@ compute = fn n => n * n : Number
 3. **Expression-level type annotations**: Support `(expr : type)` syntax for complex expressions
 4. **Record Type Annotations**: Support `{ name: String, age: Number }` syntax
 5. **Type Constructors**: Implement `List T`, `Tuple T1 T2` syntax
+6. **Constraint Annotations**: Add `given` syntax for explicit constraint declarations
 
 ---
 

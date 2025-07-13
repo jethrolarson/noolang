@@ -18,6 +18,8 @@ import {
   TupleExpression,
   WhereExpression,
   TypedExpression,
+  ConstrainedExpression,
+  ConstraintExpr,
   Type,
   Effect,
   Constraint,
@@ -89,6 +91,12 @@ export const freshTypeVariable = (state: TypeState): [Type, TypeState] => {
   const newCounter = state.counter + 1;
   const newType = typeVariable(`α${newCounter}`);
   return [newType, { ...state, counter: newCounter }];
+};
+
+// Helper function to count parameters in a function type
+const countFunctionParams = (type: Type): number => {
+  if (type.kind !== "function") return 0;
+  return type.params.length + countFunctionParams(type.return);
 };
 
 // Utility: mapObject for mapping over record fields
@@ -599,9 +607,6 @@ export const instantiate = (
   scheme: TypeScheme,
   state: TypeState
 ): [Type, TypeState] => {
-  if (scheme.type.kind === "function" && scheme.type.constraints) {
-  }
-
   const mapping = new Map<string, Type>();
   let currentState = state;
   for (const varName of scheme.quantifiedVars) {
@@ -1012,6 +1017,9 @@ export const typeExpression = (
     case "typed":
       return typeTyped(expr, state);
 
+    case "constrained":
+      return typeConstrained(expr, state);
+
     default:
       throw new Error(
         `Unsupported expression kind: ${(expr as Expression).kind}`
@@ -1064,10 +1072,48 @@ export const typeFunction = (
   // Restore the original environment for the outer scope
   currentState = { ...currentState, environment: state.environment };
 
-  // Build the function type
-  let funcType = bodyResult.type;
-  for (let i = paramTypes.length - 1; i >= 0; i--) {
-    funcType = functionType([paramTypes[i]], funcType);
+  // Special handling for constrained function bodies
+  let funcType: Type;
+  
+  if (expr.body.kind === "constrained") {
+    const constrainedBody = expr.body as ConstrainedExpression;
+    const constraints = flattenConstraintExpr(constrainedBody.constraint);
+    
+    // If the constrained body has an explicit function type, use it as the innermost type
+    if (constrainedBody.type.kind === "function") {
+      funcType = constrainedBody.type;
+      // Apply constraints to this function type
+      if (constraints.length > 0) {
+        funcType.constraints = constraints;
+        // Store the original constraint expression for display purposes
+        (funcType as any).originalConstraint = constrainedBody.constraint;
+      }
+      
+      // If we have more parameters than the explicit type accounts for, wrap it
+      const explicitParamCount = countFunctionParams(constrainedBody.type);
+      const actualParamCount = paramTypes.length;
+      if (actualParamCount > explicitParamCount) {
+        // Wrap the explicit function type with additional parameter layers
+        for (let i = actualParamCount - explicitParamCount - 1; i >= 0; i--) {
+          funcType = functionType([paramTypes[i]], funcType);
+        }
+      }
+    } else {
+      // Build function type normally and apply constraints
+      funcType = bodyResult.type;
+      for (let i = paramTypes.length - 1; i >= 0; i--) {
+        funcType = functionType([paramTypes[i]], funcType);
+      }
+      if (constraints.length > 0 && funcType.kind === "function") {
+        funcType.constraints = constraints;
+      }
+    }
+  } else {
+    // Build the function type normally
+    funcType = bodyResult.type;
+    for (let i = paramTypes.length - 1; i >= 0; i--) {
+      funcType = functionType([paramTypes[i]], funcType);
+    }
   }
 
   return { type: funcType, state: currentState };
@@ -1118,35 +1164,82 @@ export const typeApplication = (
         line: expr.location?.start.line || 1,
         column: expr.location?.start.column || 1,
       });
-      // After unification, solve constraints on the parameter
+
+      // After unification, validate constraints on the parameter
       const substitutedParam = substitute(
         funcType.params[i],
         currentState.substitution
       );
+
+      // Check if the parameter has constraints that need to be validated
       if (
         substitutedParam.kind === "variable" &&
         substitutedParam.constraints
       ) {
-        currentState = solveConstraints(
-          substitutedParam.constraints,
-          currentState,
-          {
-            line: expr.location?.start.line || 1,
-            column: expr.location?.start.column || 1,
+        // Validate each constraint
+        for (const constraint of substitutedParam.constraints) {
+          if (constraint.kind === "is") {
+            // Check if the type variable has been unified to a concrete type
+            const concreteType = currentState.substitution.get(
+              constraint.typeVar
+            );
+            if (concreteType && concreteType.kind !== "variable") {
+              // The type variable has been unified to a concrete type, validate the constraint
+              if (!satisfiesConstraint(concreteType, constraint.constraint)) {
+                throw new Error(
+                  formatTypeError(
+                    createTypeError(
+                      `Type ${typeToString(
+                        concreteType,
+                        currentState.substitution
+                      )} does not satisfy constraint '${
+                        constraint.constraint
+                      }'`,
+                      {},
+                      {
+                        line: expr.location?.start.line || 1,
+                        column: expr.location?.start.column || 1,
+                      }
+                    )
+                  )
+                );
+              }
+            }
           }
-        );
+        }
       }
-      // NEW: Validate constraints on the argument type (enforce constraints on composed results)
+
+      // Also validate constraints on the argument type
       const substitutedArg = substitute(argTypes[i], currentState.substitution);
       if (substitutedArg.kind === "variable" && substitutedArg.constraints) {
-        currentState = solveConstraints(
-          substitutedArg.constraints,
-          currentState,
-          {
-            line: expr.location?.start.line || 1,
-            column: expr.location?.start.column || 1,
+        for (const constraint of substitutedArg.constraints) {
+          if (constraint.kind === "is") {
+            const concreteType = currentState.substitution.get(
+              constraint.typeVar
+            );
+            if (concreteType && concreteType.kind !== "variable") {
+              if (!satisfiesConstraint(concreteType, constraint.constraint)) {
+                throw new Error(
+                  formatTypeError(
+                    createTypeError(
+                      `Type ${typeToString(
+                        concreteType,
+                        currentState.substitution
+                      )} does not satisfy constraint '${
+                        constraint.constraint
+                      }'`,
+                      {},
+                      {
+                        line: expr.location?.start.line || 1,
+                        column: expr.location?.start.column || 1,
+                      }
+                    )
+                  )
+                );
+              }
+            }
           }
-        );
+        }
       }
     }
 
@@ -1714,6 +1807,227 @@ export const typeTyped = (
   return { type: explicitType, state: newState }; // Use the explicit type
 };
 
+// Type inference for constrained expressions
+export const typeConstrained = (
+  expr: ConstrainedExpression,
+  state: TypeState
+): TypeResult => {
+  // For constrained expressions, validate that the explicit type matches the inferred type
+  const inferredResult = typeExpression(expr.expression, state);
+  const explicitType = expr.type;
+
+  let currentState = unify(
+    inferredResult.type,
+    explicitType,
+    inferredResult.state,
+    {
+      line: expr.location?.start.line || 1,
+      column: expr.location?.start.column || 1,
+    }
+  );
+
+  // Special case: if this constrained expression is inside a function body,
+  // the constraint should apply to the function type, not to this expression
+  // For now, we'll just return the explicit type without applying constraints here
+  // The constraint will be handled at the function level
+
+  // Return the explicit type without constraints applied
+  return { type: explicitType, state: currentState };
+};
+
+// Create a mapping from constraint variable names to actual type variable names
+const createConstraintVariableMapping = (type: Type): Map<string, string> => {
+  const mapping = new Map<string, string>();
+  const typeVars = freeTypeVars(type);
+
+  // For now, we'll use a simple heuristic: map constraint vars to type vars in order
+  // This assumes that constraint variables like 'a', 'b' correspond to type variables in order
+  const constraintVars = [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j",
+    "k",
+    "l",
+    "m",
+    "n",
+    "o",
+    "p",
+    "q",
+    "r",
+    "s",
+    "t",
+    "u",
+    "v",
+    "w",
+    "x",
+    "y",
+    "z",
+  ];
+  const typeVarArray = Array.from(typeVars);
+
+  for (
+    let i = 0;
+    i < Math.min(constraintVars.length, typeVarArray.length);
+    i++
+  ) {
+    mapping.set(constraintVars[i], typeVarArray[i]);
+  }
+
+  return mapping;
+};
+
+// Apply constraints to type variables in a type
+export const applyConstraintsToType = (
+  constraintExpr: ConstraintExpr,
+  type: Type,
+  state: TypeState,
+  mapping: Map<string, string>,
+  location?: { line: number; column: number }
+): TypeState => {
+  // Extract all type variables from the type
+  const typeVars = freeTypeVars(type);
+
+  // For each constraint in the expression, apply it to the relevant type variables
+  const constraints = flattenConstraintExpr(constraintExpr);
+
+  for (const constraint of constraints) {
+    if (constraint.kind === "is" && typeVars.has(constraint.typeVar)) {
+      // Find the actual type variable in the type and apply the constraint to it
+      applyConstraintToTypeVariable(type, constraint, state, mapping);
+    }
+  }
+
+  return state;
+};
+
+// Helper function to apply a constraint to a specific type variable within a type
+const applyConstraintToTypeVariable = (
+  type: Type,
+  constraint: Constraint,
+  state: TypeState,
+  mapping: Map<string, string>
+): void => {
+  switch (type.kind) {
+    case "variable":
+      // Apply constraint directly if the type variable name matches the constraint variable name
+      if (type.name === constraint.typeVar) {
+        // This is the type variable we want to constrain
+        if (!type.constraints) {
+          type.constraints = [];
+        }
+        // Check if this constraint is already present
+        const existingConstraint = type.constraints.find(
+          (c) => JSON.stringify(c) === JSON.stringify(constraint)
+        );
+        if (!existingConstraint) {
+          type.constraints.push(constraint);
+        }
+      }
+      break;
+    case "function":
+      // Apply to parameters and return type
+      for (const param of type.params) {
+        applyConstraintToTypeVariable(param, constraint, state, mapping);
+      }
+      applyConstraintToTypeVariable(type.return, constraint, state, mapping);
+      break;
+    case "list":
+      applyConstraintToTypeVariable(type.element, constraint, state, mapping);
+      break;
+    case "tuple":
+      for (const element of type.elements) {
+        applyConstraintToTypeVariable(element, constraint, state, mapping);
+      }
+      break;
+    case "record":
+      for (const fieldType of Object.values(type.fields)) {
+        applyConstraintToTypeVariable(fieldType, constraint, state, mapping);
+      }
+      break;
+    case "union":
+      for (const unionType of type.types) {
+        applyConstraintToTypeVariable(unionType, constraint, state, mapping);
+      }
+      break;
+    // For primitives, unit, unknown: do nothing
+  }
+};
+
+// Flatten a constraint expression into a list of atomic constraints
+const flattenConstraintExpr = (expr: ConstraintExpr): Constraint[] => {
+  switch (expr.kind) {
+    case "is":
+    case "hasField":
+    case "implements":
+    case "custom":
+      return [expr];
+    case "and":
+      return [
+        ...flattenConstraintExpr(expr.left),
+        ...flattenConstraintExpr(expr.right),
+      ];
+    case "or":
+      return [
+        ...flattenConstraintExpr(expr.left),
+        ...flattenConstraintExpr(expr.right),
+      ];
+    case "paren":
+      return flattenConstraintExpr(expr.expr);
+    default:
+      return [];
+  }
+};
+
+// Evaluate a constraint expression recursively
+export const evaluateConstraintExpr = (
+  constraintExpr: ConstraintExpr,
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState => {
+  switch (constraintExpr.kind) {
+    case "is":
+    case "hasField":
+    case "implements":
+    case "custom":
+      // Atomic constraint - apply directly
+      return solveConstraint(constraintExpr, state, location);
+
+    case "and":
+      // Both left and right must be satisfied
+      let leftState = evaluateConstraintExpr(
+        constraintExpr.left,
+        state,
+        location
+      );
+      return evaluateConstraintExpr(constraintExpr.right, leftState, location);
+
+    case "or":
+      // At least one must be satisfied - try left first, then right if left fails
+      try {
+        return evaluateConstraintExpr(constraintExpr.left, state, location);
+      } catch (error) {
+        // If left fails, try right
+        return evaluateConstraintExpr(constraintExpr.right, state, location);
+      }
+
+    case "paren":
+      // Parentheses just group - evaluate the inner expression
+      return evaluateConstraintExpr(constraintExpr.expr, state, location);
+
+    default:
+      throw new Error(
+        `Unknown constraint expression kind: ${(constraintExpr as any).kind}`
+      );
+  }
+};
+
 // Comprehensive constraint validation
 export const validateConstraints = (
   type: Type,
@@ -2053,7 +2367,8 @@ export const typeAndDecorate = (program: Program) => {
 // Utility function to convert type to string
 export const typeToString = (
   type: Type,
-  substitution: Map<string, Type> = new Map()
+  substitution: Map<string, Type> = new Map(),
+  showConstraints: boolean = true
 ): string => {
   const greek = [
     "α",
@@ -2093,27 +2408,38 @@ export const typeToString = (
         const effectStr =
           t.effects.length > 0 ? ` !${t.effects.join(" !")}` : "";
         const baseType = `(${paramStr}) -> ${norm(t.return)}${effectStr}`;
+
         const constraintStr =
-          t.constraints && t.constraints.length > 0
-            ? ` given ${t.constraints.map(formatConstraint).join(" ")}`
+          showConstraints && t.constraints && t.constraints.length > 0
+            ? ` given ${(t as any).originalConstraint 
+                ? formatConstraintExpr((t as any).originalConstraint)
+                : deduplicateConstraints(t.constraints)
+                    .map(formatConstraint)
+                    .join(" ")}`
             : "";
         return constraintStr
-          ? `${baseType} given ${t
-              .constraints!.map(formatConstraint)
-              .join(" ")}`
+          ? `${baseType}${constraintStr}`
           : baseType;
       }
       case "variable": {
         let varStr = "";
         if (!mapping.has(t.name)) {
-          mapping.set(t.name, greek[next] || `t${next}`);
-          next++;
+          // If the type variable name is a single letter, keep it as-is
+          // This preserves explicit type annotations like 'a -> a'
+          if (t.name.length === 1 && /^[a-z]$/.test(t.name)) {
+            mapping.set(t.name, t.name);
+          } else {
+            mapping.set(t.name, greek[next] || `t${next}`);
+            next++;
+          }
         }
         varStr = mapping.get(t.name)!;
 
-        // Add constraints if any
-        if (t.constraints && t.constraints.length > 0) {
-          varStr += ` given ${t.constraints.map(formatConstraint).join(" ")}`;
+        // Add constraints if any and if showing constraints
+        if (showConstraints && t.constraints && t.constraints.length > 0) {
+          varStr += ` given ${deduplicateConstraints(t.constraints)
+            .map(formatConstraint)
+            .join(" ")}`;
         }
 
         return varStr;
@@ -2157,6 +2483,40 @@ export const typeToString = (
       default:
         return "unknown constraint";
     }
+  }
+
+  function formatConstraintExpr(expr: ConstraintExpr): string {
+    switch (expr.kind) {
+      case "is":
+      case "hasField":
+      case "implements":
+      case "custom":
+        return formatConstraint(expr);
+      case "and":
+        return `${formatConstraintExpr(expr.left)} and ${formatConstraintExpr(expr.right)}`;
+      case "or":
+        return `${formatConstraintExpr(expr.left)} or ${formatConstraintExpr(expr.right)}`;
+      case "paren":
+        return `(${formatConstraintExpr(expr.expr)})`;
+      default:
+        return "unknown constraint";
+    }
+  }
+
+  // Helper function to deduplicate constraints
+  function deduplicateConstraints(constraints: Constraint[]): Constraint[] {
+    const seen = new Set<string>();
+    const result: Constraint[] = [];
+
+    for (const constraint of constraints) {
+      const key = JSON.stringify(constraint);
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(constraint);
+      }
+    }
+
+    return result;
   }
 
   // Apply substitution to the type before normalizing

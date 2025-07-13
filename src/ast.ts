@@ -25,6 +25,12 @@ export type Constraint =
   | { kind: "implements"; typeVar: string; interfaceName: string }  // a implements Show
   | { kind: "custom"; typeVar: string; constraint: string; args: Type[] };  // a satisfies MyConstraint T1 T2
 
+export type ConstraintExpr =
+  | Constraint
+  | { kind: "and"; left: ConstraintExpr; right: ConstraintExpr }
+  | { kind: "or"; left: ConstraintExpr; right: ConstraintExpr }
+  | { kind: "paren"; expr: ConstraintExpr };
+
 export type Type =
   | { kind: "primitive"; name: "Int" | "String" | "Bool" | "List" }
   | {
@@ -62,6 +68,7 @@ export type Expression =
   | UnitExpression
   | AccessorExpression
   | TypedExpression
+  | ConstrainedExpression
   | ListExpression
   | WhereExpression;
 
@@ -197,6 +204,14 @@ export interface TypedExpression {
   kind: "typed";
   expression: Expression;
   type: Type;
+  location: Location;
+}
+
+export interface ConstrainedExpression {
+  kind: "constrained";
+  expression: Expression;
+  type: Type;
+  constraint: ConstraintExpr;
   location: Location;
 }
 
