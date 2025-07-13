@@ -20,6 +20,7 @@ import {
   TypedExpression,
   Type,
   Effect,
+  Constraint,
   intType,
   stringType,
   boolType,
@@ -31,6 +32,12 @@ import {
   tupleType,
   recordType,
   unionType,
+  constrainedTypeVariable,
+  constrainedFunctionType,
+  isConstraint,
+  hasFieldConstraint,
+  implementsConstraint,
+  customConstraint,
 } from "./ast";
 import {
   functionApplicationError,
@@ -60,6 +67,7 @@ export type TypeState = {
   environment: TypeEnvironment;
   substitution: Map<string, Type>;
   counter: number;
+  constraints: Constraint[]; // Track constraints during inference
 };
 
 // Type inference result
@@ -73,6 +81,7 @@ export const createTypeState = (): TypeState => ({
   environment: new Map(),
   substitution: new Map(),
   counter: 0,
+  constraints: [],
 });
 
 // Fresh type variable generation
@@ -114,6 +123,178 @@ function isTypeKind<T extends Type["kind"]>(
   return t.kind === kind;
 }
 
+// Constraint solving functions
+export const solveConstraints = (
+  constraints: Constraint[],
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState => {
+  let currentState = state;
+
+  for (const constraint of constraints) {
+    currentState = solveConstraint(constraint, currentState, location);
+  }
+
+  return currentState;
+};
+
+export const solveConstraint = (
+  constraint: Constraint,
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState => {
+  switch (constraint.kind) {
+    case "is":
+      return solveIsConstraint(constraint, state, location);
+    case "hasField":
+      return solveHasFieldConstraint(constraint, state, location);
+    case "implements":
+      return solveImplementsConstraint(constraint, state, location);
+    case "custom":
+      return solveCustomConstraint(constraint, state, location);
+    default:
+      return state;
+  }
+};
+
+const solveIsConstraint = (
+  constraint: { kind: "is"; typeVar: string; constraint: string },
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState => {
+  // For now, we'll just track the constraint
+  // In a full implementation, we'd check if the type variable can satisfy the constraint
+  const typeVar = substitute(
+    typeVariable(constraint.typeVar),
+    state.substitution
+  );
+
+  // If the type variable has been unified to a concrete type, check if it satisfies the constraint
+  if (typeVar.kind !== "variable") {
+    // Check if the concrete type satisfies the constraint
+    if (!satisfiesConstraint(typeVar, constraint.constraint)) {
+      throw new Error(
+        formatTypeError(
+          createTypeError(
+            `Type ${typeToString(
+              typeVar,
+              state.substitution
+            )} does not satisfy constraint '${constraint.constraint}'`,
+            {},
+            location || { line: 1, column: 1 }
+          )
+        )
+      );
+    }
+  }
+
+  return state;
+};
+
+const solveHasFieldConstraint = (
+  constraint: {
+    kind: "hasField";
+    typeVar: string;
+    field: string;
+    fieldType: Type;
+  },
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState => {
+  const typeVar = substitute(
+    typeVariable(constraint.typeVar),
+    state.substitution
+  );
+
+  if (typeVar.kind === "record") {
+    // Check if the record has the required field with the right type
+    if (!(constraint.field in typeVar.fields)) {
+      throw new Error(
+        formatTypeError(
+          createTypeError(
+            `Record type missing required field '${constraint.field}'`,
+            {},
+            location || { line: 1, column: 1 }
+          )
+        )
+      );
+    }
+
+    // Unify the field type
+    let newState = state;
+    newState = unify(
+      typeVar.fields[constraint.field],
+      constraint.fieldType,
+      newState,
+      location
+    );
+
+    return newState;
+  } else if (typeVar.kind === "variable") {
+    // For type variables, we'll track the constraint for later solving
+    return state;
+  } else {
+    throw new Error(
+      formatTypeError(
+        createTypeError(
+          `Type ${typeToString(
+            typeVar,
+            state.substitution
+          )} cannot have fields`,
+          {},
+          location || { line: 1, column: 1 }
+        )
+      )
+    );
+  }
+};
+
+const solveImplementsConstraint = (
+  constraint: { kind: "implements"; typeVar: string; interfaceName: string },
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState => {
+  // For now, we'll just track the constraint
+  // In a full implementation, we'd check if the type implements the interface
+  return state;
+};
+
+const solveCustomConstraint = (
+  constraint: {
+    kind: "custom";
+    typeVar: string;
+    constraint: string;
+    args: Type[];
+  },
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState => {
+  // For now, we'll just track the constraint
+  // In a full implementation, we'd call the custom constraint solver
+  return state;
+};
+
+const satisfiesConstraint = (type: Type, constraint: string): boolean => {
+  switch (constraint) {
+    case "Collection":
+      return type.kind === "list" || type.kind === "record";
+    case "Number":
+      return type.kind === "primitive" && type.name === "Int";
+    case "String":
+      return type.kind === "primitive" && type.name === "String";
+    case "Boolean":
+      return type.kind === "primitive" && type.name === "Bool";
+    case "Show":
+      return (
+        type.kind === "primitive" ||
+        type.kind === "list" ||
+        type.kind === "record"
+      );
+    default:
+      return false;
+  }
+};
+
 // Apply substitution to a type
 export const substitute = (
   type: Type,
@@ -130,6 +311,9 @@ export const substitute = (
         ...type,
         params: type.params.map((param) => substitute(param, substitution)),
         return: substitute(type.return, substitution),
+        constraints: type.constraints?.map((c) =>
+          substituteConstraint(c, substitution)
+        ),
       };
     case "list":
       return { ...type, element: substitute(type.element, substitution) };
@@ -150,6 +334,31 @@ export const substitute = (
       };
     default:
       return type;
+  }
+};
+
+// Apply substitution to a constraint
+export const substituteConstraint = (
+  constraint: Constraint,
+  substitution: Map<string, Type>
+): Constraint => {
+  switch (constraint.kind) {
+    case "is":
+      return constraint; // No substitution needed for is constraints
+    case "hasField":
+      return {
+        ...constraint,
+        fieldType: substitute(constraint.fieldType, substitution),
+      };
+    case "implements":
+      return constraint; // No substitution needed for implements constraints
+    case "custom":
+      return {
+        ...constraint,
+        args: constraint.args.map((arg) => substitute(arg, substitution)),
+      };
+    default:
+      return constraint;
   }
 };
 
@@ -202,7 +411,51 @@ export const unify = (
           )
         )
       );
-    return { ...state, substitution: mapSet(state.substitution, s1.name, s2) };
+    let newState = {
+      ...state,
+      substitution: mapSet(state.substitution, s1.name, s2),
+    };
+    // Check constraints on s1 when unifying with concrete type s2
+    if (s1.constraints) {
+      for (const constraint of s1.constraints) {
+        if (constraint.kind === "hasField" && isTypeKind(s2, "record")) {
+          if (!(constraint.field in s2.fields)) {
+            throw new Error(
+              formatTypeError(
+                createTypeError(
+                  `Record type missing required field '${constraint.field}'`,
+                  {},
+                  location || { line: 1, column: 1 }
+                )
+              )
+            );
+          }
+          newState = unify(
+            s2.fields[constraint.field],
+            constraint.fieldType,
+            newState,
+            location
+          );
+        } else if (constraint.kind === "is") {
+          // Check if the concrete type satisfies the constraint
+          if (!satisfiesConstraint(s2, constraint.constraint)) {
+            throw new Error(
+              formatTypeError(
+                createTypeError(
+                  `Type ${typeToString(
+                    s2,
+                    state.substitution
+                  )} does not satisfy constraint '${constraint.constraint}'`,
+                  {},
+                  location || { line: 1, column: 1 }
+                )
+              )
+            );
+          }
+        }
+      }
+    }
+    return newState;
   }
   if (isTypeKind(s2, "variable")) {
     if (occursIn(s2.name, s1))
@@ -218,7 +471,51 @@ export const unify = (
           )
         )
       );
-    return { ...state, substitution: mapSet(state.substitution, s2.name, s1) };
+    let newState = {
+      ...state,
+      substitution: mapSet(state.substitution, s2.name, s1),
+    };
+    // Check constraints on s2 when unifying with concrete type s1
+    if (s2.constraints) {
+      for (const constraint of s2.constraints) {
+        if (constraint.kind === "hasField" && isTypeKind(s1, "record")) {
+          if (!(constraint.field in s1.fields)) {
+            throw new Error(
+              formatTypeError(
+                createTypeError(
+                  `Record type missing required field '${constraint.field}'`,
+                  {},
+                  location || { line: 1, column: 1 }
+                )
+              )
+            );
+          }
+          newState = unify(
+            s1.fields[constraint.field],
+            constraint.fieldType,
+            newState,
+            location
+          );
+        } else if (constraint.kind === "is") {
+          // Check if the concrete type satisfies the constraint
+          if (!satisfiesConstraint(s1, constraint.constraint)) {
+            throw new Error(
+              formatTypeError(
+                createTypeError(
+                  `Type ${typeToString(
+                    s1,
+                    state.substitution
+                  )} does not satisfy constraint '${constraint.constraint}'`,
+                  {},
+                  location || { line: 1, column: 1 }
+                )
+              )
+            );
+          }
+        }
+      }
+    }
+    return newState;
   }
   if (isTypeKind(s1, "function") && isTypeKind(s2, "function")) {
     if (s1.params.length !== s2.params.length)
@@ -237,7 +534,17 @@ export const unify = (
     for (let i = 0; i < s1.params.length; i++) {
       currentState = unify(s1.params[i], s2.params[i], currentState, location);
     }
-    return unify(s1.return, s2.return, currentState, location);
+    currentState = unify(s1.return, s2.return, currentState, location);
+
+    // Solve constraints from both function types
+    if (s1.constraints) {
+      currentState = solveConstraints(s1.constraints, currentState, location);
+    }
+    if (s2.constraints) {
+      currentState = solveConstraints(s2.constraints, currentState, location);
+    }
+
+    return currentState;
   }
   if (isTypeKind(s1, "list") && isTypeKind(s2, "list")) {
     return unify(s1.element, s2.element, state, location);
@@ -602,18 +909,22 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
     quantifiedVars: [],
   });
 
-  // List operations (pure)
+  // List operations (pure) - with constraints for safety
   newEnv.set("head", {
-    type: functionType(
+    type: constrainedFunctionType(
       [listTypeWithElement(typeVariable("a"))],
-      typeVariable("a")
+      typeVariable("a"),
+      [],
+      [isConstraint("a", "Collection")]
     ),
     quantifiedVars: [],
   });
   newEnv.set("tail", {
-    type: functionType(
+    type: constrainedFunctionType(
       [listTypeWithElement(typeVariable("a"))],
-      listTypeWithElement(typeVariable("a"))
+      listTypeWithElement(typeVariable("a")),
+      [],
+      [isConstraint("a", "Collection")]
     ),
     quantifiedVars: [],
   });
@@ -700,7 +1011,12 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
     quantifiedVars: [],
   });
   newEnv.set("length", {
-    type: functionType([listTypeWithElement(typeVariable("a"))], intType()),
+    type: constrainedFunctionType(
+      [listTypeWithElement(typeVariable("a"))],
+      intType(),
+      [],
+      [isConstraint("a", "Collection")]
+    ),
     quantifiedVars: [],
   });
   newEnv.set("isEmpty", {
@@ -942,6 +1258,21 @@ export const typeApplication = (
         line: expr.location?.start.line || 1,
         column: expr.location?.start.column || 1,
       });
+      // If the parameter is a constrained type variable, solve its constraints
+      if (
+        funcType.params[i].kind === "variable" &&
+        (funcType.params[i] as any).constraints &&
+        Array.isArray((funcType.params[i] as any).constraints)
+      ) {
+        currentState = solveConstraints(
+          (funcType.params[i] as any).constraints,
+          currentState,
+          {
+            line: expr.location?.start.line || 1,
+            column: expr.location?.start.column || 1,
+          }
+        );
+      }
     }
 
     // Apply substitution to get the return type
@@ -1360,10 +1691,22 @@ export const typeAccessor = (
   // Accessors return functions that take any record with the required field and return the field type
   // @bar should have type {bar: a, ...} -> a (allows extra fields)
   const fieldName = expr.field;
-  const fieldType = typeVariable("a");
-  // Create a more specific record type that includes the required field
-  const recordTypeValue = recordType({ [fieldName]: fieldType });
-  return { type: functionType([recordTypeValue], fieldType), state };
+  // Use a fresh type variable for the field type
+  const [fieldType, nextState] = freshTypeVariable(state);
+  // Create a simple type variable for the record (no constraints on the variable itself)
+  const [recordVar, finalState] = freshTypeVariable(nextState);
+  // Create a function type with constraints attached to the function type
+  const funcType = functionType([recordVar], fieldType);
+  // Add the constraint to the function type
+  if (funcType.kind === "function" && recordVar.kind === "variable") {
+    funcType.constraints = [
+      hasFieldConstraint(recordVar.name, fieldName, fieldType),
+    ];
+  }
+  return {
+    type: funcType,
+    state: finalState,
+  };
 };
 
 // Type inference for tuples
@@ -1751,14 +2094,31 @@ export const typeToString = (
         const paramStr = t.params.map(norm).join(" ");
         const effectStr =
           t.effects.length > 0 ? ` !${t.effects.join(" !")}` : "";
-        return `(${paramStr}) -> ${norm(t.return)}${effectStr}`;
+        const baseType = `(${paramStr}) -> ${norm(t.return)}${effectStr}`;
+        const constraintStr =
+          t.constraints && t.constraints.length > 0
+            ? ` given ${t.constraints.map(formatConstraint).join(" ")}`
+            : "";
+        return constraintStr
+          ? `${baseType} given ${t
+              .constraints!.map(formatConstraint)
+              .join(" ")}`
+          : baseType;
       }
       case "variable": {
+        let varStr = "";
         if (!mapping.has(t.name)) {
           mapping.set(t.name, greek[next] || `t${next}`);
           next++;
         }
-        return mapping.get(t.name)!;
+        varStr = mapping.get(t.name)!;
+
+        // Add constraints if any
+        if (t.constraints && t.constraints.length > 0) {
+          varStr += ` given ${t.constraints.map(formatConstraint).join(" ")}`;
+        }
+
+        return varStr;
       }
       case "list":
         return `List ${norm(t.element)}`;
@@ -1776,6 +2136,28 @@ export const typeToString = (
         return "?";
       default:
         return "unknown";
+    }
+  }
+
+  function formatConstraint(c: Constraint): string {
+    switch (c.kind) {
+      case "is":
+        return `${c.typeVar} is ${c.constraint}`;
+      case "hasField":
+        // For hasField constraints, we need to use the normalized variable name
+        // that matches the parameter it's constraining
+        const normalizedVarName = mapping.get(c.typeVar) || c.typeVar;
+        return `${normalizedVarName} has field "${c.field}" of type ${norm(
+          c.fieldType
+        )}`;
+      case "implements":
+        return `${c.typeVar} implements ${c.interfaceName}`;
+      case "custom":
+        return `${c.typeVar} satisfies ${c.constraint} ${c.args
+          .map(norm)
+          .join(" ")}`;
+      default:
+        return "unknown constraint";
     }
   }
 

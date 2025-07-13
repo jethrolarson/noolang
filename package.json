@@ -9,21 +9,58 @@
     "dev": "ts-node src/repl.ts",
     "cli": "node dist/cli.js",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "vscode:package": "vsce package",
+    "vscode:publish": "vsce publish"
   },
   "keywords": [
     "programming-language",
     "interpreter",
-    "typescript"
+    "typescript",
+    "vscode-extension"
   ],
   "author": "",
+  "publisher": "noolang",
   "license": "MIT",
   "bin": {
     "noo": "dist/cli.js"
   },
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:noolang"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "noolang",
+        "aliases": [
+          "Noolang",
+          "noolang"
+        ],
+        "extensions": [
+          ".noo"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "noolang",
+        "scopeName": "source.noolang",
+        "path": "./syntaxes/noolang.tmLanguage.json"
+      }
+    ]
+  },
   "devDependencies": {
     "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",
+    "@types/vscode": "^1.74.0",
+    "@vscode/vsce": "^2.15.0",
     "jest": "^29.5.0",
     "ts-jest": "^29.1.0",
     "ts-node": "^10.9.0",

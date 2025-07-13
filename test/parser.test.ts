@@ -60,113 +60,113 @@ function assertAccessorExpression(expr: Expression): AccessorExpression {
 }
 
 describe('Parser', () => {
-  test('should parse simple literals', () => {
-    const lexer = new Lexer('42');
+  test("should parse simple literals", () => {
+    const lexer = new Lexer("42");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
-    
+
     expect(program.statements).toHaveLength(1);
     const literal = assertLiteralExpression(program.statements[0]);
     expect(literal.value).toBe(42);
   });
 
-  test('should parse string literals', () => {
+  test("should parse string literals", () => {
     const lexer = new Lexer('"hello"');
     const tokens = lexer.tokenize();
     const program = parse(tokens);
-    
+
     expect(program.statements).toHaveLength(1);
     const literal = assertLiteralExpression(program.statements[0]);
-    expect(literal.value).toBe('hello');
+    expect(literal.value).toBe("hello");
   });
 
-  test('should parse boolean literals', () => {
-    const lexer = new Lexer('true');
+  test("should parse boolean literals", () => {
+    const lexer = new Lexer("true");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
-    
+
     expect(program.statements).toHaveLength(1);
-    expect(program.statements[0].kind).toBe('literal');
+    expect(program.statements[0].kind).toBe("literal");
     expect((program.statements[0] as any).value).toBe(true);
   });
 
-  test('should parse variable references', () => {
-    const lexer = new Lexer('x');
+  test("should parse variable references", () => {
+    const lexer = new Lexer("x");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
-    
+
     expect(program.statements).toHaveLength(1);
     const variable = assertVariableExpression(program.statements[0]);
-    expect(variable.name).toBe('x');
+    expect(variable.name).toBe("x");
   });
 
-  test('should parse function definitions', () => {
-    const lexer = new Lexer('fn x => x + 1');
+  test("should parse function definitions", () => {
+    const lexer = new Lexer("fn x => x + 1");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
-    
+
     expect(program.statements).toHaveLength(1);
     const func = assertFunctionExpression(program.statements[0]);
-    expect(func.params).toEqual(['x']);
-    expect(func.body.kind).toBe('binary');
+    expect(func.params).toEqual(["x"]);
+    expect(func.body.kind).toBe("binary");
   });
 
-  test('should parse function applications', () => {
-    const lexer = new Lexer('(fn x => x + 1) 2');
+  test("should parse function applications", () => {
+    const lexer = new Lexer("(fn x => x + 1) 2");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
-    
+
     expect(program.statements).toHaveLength(1);
     const app = assertApplicationExpression(program.statements[0]);
-    expect(app.func.kind).toBe('function');
+    expect(app.func.kind).toBe("function");
     expect(app.args).toHaveLength(1);
     const arg = assertLiteralExpression(app.args[0]);
     expect(arg.value).toBe(2);
   });
 
-  test('should parse binary expressions', () => {
-    const lexer = new Lexer('2 + 3');
+  test("should parse binary expressions", () => {
+    const lexer = new Lexer("2 + 3");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
-    
+
     expect(program.statements).toHaveLength(1);
     const binary = assertBinaryExpression(program.statements[0]);
-    expect(binary.operator).toBe('+');
+    expect(binary.operator).toBe("+");
   });
 
-  test('should parse lists', () => {
-    const lexer = new Lexer('[1, 2, 3]');
+  test("should parse lists", () => {
+    const lexer = new Lexer("[1, 2, 3]");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
-    
+
     expect(program.statements).toHaveLength(1);
-    expect(program.statements[0].kind).toBe('list');
+    expect(program.statements[0].kind).toBe("list");
     const elements = (program.statements[0] as any).elements;
     expect(Array.isArray(elements)).toBe(true);
     expect(elements).toHaveLength(3);
-    expect(elements[0].kind).toBe('literal');
+    expect(elements[0].kind).toBe("literal");
     expect(elements[0].value).toBe(1);
-    expect(elements[1].kind).toBe('literal');
+    expect(elements[1].kind).toBe("literal");
     expect(elements[1].value).toBe(2);
-    expect(elements[2].kind).toBe('literal');
+    expect(elements[2].kind).toBe("literal");
     expect(elements[2].value).toBe(3);
   });
 
-  test('should parse if expressions', () => {
-    const lexer = new Lexer('if true then 1 else 2');
+  test("should parse if expressions", () => {
+    const lexer = new Lexer("if true then 1 else 2");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
-    
+
     expect(program.statements).toHaveLength(1);
-    expect(program.statements[0].kind).toBe('if');
+    expect(program.statements[0].kind).toBe("if");
     const ifExpr = program.statements[0] as any;
     expect(ifExpr.condition.value).toBe(true);
     expect(ifExpr.then.value).toBe(1);
     expect(ifExpr.else.value).toBe(2);
   });
 
-  test('should parse pipeline expressions', () => {
-    const lexer = new Lexer('[1, 2, 3] |> map');
+  test("should parse pipeline expressions", () => {
+    const lexer = new Lexer("[1, 2, 3] |> map");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     expect(program.statements).toHaveLength(1);
@@ -176,195 +176,195 @@ describe('Parser', () => {
     expect(pipeline.steps[1].kind).toBe("variable");
   });
 
-  test('should parse single-field record', () => {
+  test("should parse single-field record", () => {
     const lexer = new Lexer('{ @name "Alice", @age 30 }');
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     expect(program.statements).toHaveLength(1);
-    expect(program.statements[0].kind).toBe('record');
+    expect(program.statements[0].kind).toBe("record");
     const record = program.statements[0] as any;
     expect(record.fields).toHaveLength(2);
-    expect(record.fields[0].name).toBe('name');
-    expect(record.fields[0].value.value).toBe('Alice');
-    expect(record.fields[1].name).toBe('age');
+    expect(record.fields[0].name).toBe("name");
+    expect(record.fields[0].value.value).toBe("Alice");
+    expect(record.fields[1].name).toBe("age");
     expect(record.fields[1].value.value).toBe(30);
   });
 
-  test('should parse multi-field record (semicolon separated)', () => {
+  test("should parse multi-field record (semicolon separated)", () => {
     const lexer = new Lexer('{ @name "Alice", @age 30 }');
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     expect(program.statements).toHaveLength(1);
-    expect(program.statements[0].kind).toBe('record');
+    expect(program.statements[0].kind).toBe("record");
     const record = program.statements[0] as any;
     expect(record.fields).toHaveLength(2);
-    expect(record.fields[0].name).toBe('name');
-    expect(record.fields[0].value.value).toBe('Alice');
-    expect(record.fields[1].name).toBe('age');
+    expect(record.fields[0].name).toBe("name");
+    expect(record.fields[0].value.value).toBe("Alice");
+    expect(record.fields[1].name).toBe("age");
     expect(record.fields[1].value.value).toBe(30);
   });
 
-  test('should parse multi-field record (semicolon separated)', () => {
+  test("should parse multi-field record (semicolon separated)", () => {
     const lexer = new Lexer('{ @name "Alice", @age 30 }');
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     expect(program.statements).toHaveLength(1);
-    expect(program.statements[0].kind).toBe('record');
+    expect(program.statements[0].kind).toBe("record");
     const record = program.statements[0] as any;
     expect(record.fields).toHaveLength(2);
-    expect(record.fields[0].name).toBe('name');
-    expect(record.fields[0].value.value).toBe('Alice');
-    expect(record.fields[1].name).toBe('age');
+    expect(record.fields[0].name).toBe("name");
+    expect(record.fields[0].value.value).toBe("Alice");
+    expect(record.fields[1].name).toBe("age");
     expect(record.fields[1].value.value).toBe(30);
   });
 
-  test('should parse accessor', () => {
-    const lexer = new Lexer('@name');
+  test("should parse accessor", () => {
+    const lexer = new Lexer("@name");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     expect(program.statements).toHaveLength(1);
-    expect(program.statements[0].kind).toBe('accessor');
+    expect(program.statements[0].kind).toBe("accessor");
     const accessor = program.statements[0] as any;
-    expect(accessor.field).toBe('name');
+    expect(accessor.field).toBe("name");
   });
 
-  test('should parse function with unit parameter', () => {
-    const lexer = new Lexer('fn {} => 42');
+  test("should parse function with unit parameter", () => {
+    const lexer = new Lexer("fn {} => 42");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     expect(program.statements).toHaveLength(1);
     const func = assertFunctionExpression(program.statements[0]);
-    expect(func.params).toEqual(['_unit']); // Unit parameter
-    expect(func.body.kind).toBe('literal');
+    expect(func.params).toEqual(["_unit"]); // Unit parameter
+    expect(func.body.kind).toBe("literal");
     expect((func.body as LiteralExpression).value).toBe(42);
   });
 
-  test('should parse deeply nested tuples in records', () => {
-    const lexer = new Lexer('{ @key [1, {{{1}}}] }');
+  test("should parse deeply nested tuples in records", () => {
+    const lexer = new Lexer("{ @key [1, {{{1}}}] }");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     // Check the outermost record
     expect(program.statements).toHaveLength(1);
     const outer = program.statements[0];
-    expect(outer.kind).toBe('record');
+    expect(outer.kind).toBe("record");
     const keyField = (outer as any).fields[0];
-    expect(keyField.name).toBe('key');
+    expect(keyField.name).toBe("key");
     // Check that keyField.value is a list with two elements
-    expect(keyField.value.kind).toBe('list');
+    expect(keyField.value.kind).toBe("list");
     expect(keyField.value.elements).toHaveLength(2);
     // First element should be a literal
-    expect(keyField.value.elements[0].kind).toBe('literal');
+    expect(keyField.value.elements[0].kind).toBe("literal");
     expect(keyField.value.elements[0].value).toBe(1);
     // Second element should be a nested tuple structure
     let nestedTuple = keyField.value.elements[1];
-    expect(nestedTuple.kind).toBe('tuple');
+    expect(nestedTuple.kind).toBe("tuple");
     // Check the nested structure: tuple -> tuple -> tuple -> literal
     for (let i = 0; i < 3; i++) {
-      expect(nestedTuple.kind).toBe('tuple');
+      expect(nestedTuple.kind).toBe("tuple");
       expect(nestedTuple.elements).toHaveLength(1);
       nestedTuple = nestedTuple.elements[0];
     }
-    expect(nestedTuple.kind).toBe('literal');
+    expect(nestedTuple.kind).toBe("literal");
     expect(nestedTuple.value).toBe(1);
   });
 
-  test('should parse records with nested lists and records', () => {
-    const lexer = new Lexer('{ @key [1, { @inner [2, 3] }] }');
+  test("should parse records with nested lists and records", () => {
+    const lexer = new Lexer("{ @key [1, { @inner [2, 3] }] }");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     expect(program.statements).toHaveLength(1);
     const outer = program.statements[0];
-    expect(outer.kind).toBe('record');
+    expect(outer.kind).toBe("record");
     const keyField = (outer as any).fields[0];
-    expect(keyField.name).toBe('key');
+    expect(keyField.name).toBe("key");
     const list = keyField.value as any;
-    expect(list.kind).toBe('list');
-    expect(list.elements[0].kind).toBe('literal');
+    expect(list.kind).toBe("list");
+    expect(list.elements[0].kind).toBe("literal");
     expect(list.elements[0].value).toBe(1);
     const nestedRecord = list.elements[1];
-    expect(nestedRecord.kind).toBe('record');
+    expect(nestedRecord.kind).toBe("record");
     const innerField = nestedRecord.fields[0];
-    expect(innerField.name).toBe('inner');
+    expect(innerField.name).toBe("inner");
     const innerList = innerField.value as any;
-    expect(innerList.kind).toBe('list');
+    expect(innerList.kind).toBe("list");
     expect(innerList.elements.map((e: any) => e.value)).toEqual([2, 3]);
   });
 
-  test('should parse lists of records', () => {
-    const lexer = new Lexer('[{ @a 1 }, { @b 2 }]');
+  test("should parse lists of records", () => {
+    const lexer = new Lexer("[{ @a 1 }, { @b 2 }]");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     expect(program.statements).toHaveLength(1);
     const list = program.statements[0] as any;
-    expect(list.kind).toBe('list');
-    expect(list.elements[0].kind).toBe('record');
-    expect(list.elements[1].kind).toBe('record');
-    expect(list.elements[0].fields[0].name).toBe('a');
+    expect(list.kind).toBe("list");
+    expect(list.elements[0].kind).toBe("record");
+    expect(list.elements[1].kind).toBe("record");
+    expect(list.elements[0].fields[0].name).toBe("a");
     expect(list.elements[0].fields[0].value.value).toBe(1);
-    expect(list.elements[1].fields[0].name).toBe('b');
+    expect(list.elements[1].fields[0].name).toBe("b");
     expect(list.elements[1].fields[0].value.value).toBe(2);
   });
 
-  test('should parse a single tuple', () => {
-    const lexer = new Lexer('{1}');
+  test("should parse a single tuple", () => {
+    const lexer = new Lexer("{1}");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     expect(program.statements).toHaveLength(1);
     const tuple = program.statements[0] as any;
-    expect(tuple.kind).toBe('tuple');
-    expect(tuple.elements[0].kind).toBe('literal');
+    expect(tuple.kind).toBe("tuple");
+    expect(tuple.elements[0].kind).toBe("literal");
     expect(tuple.elements[0].value).toBe(1);
   });
 
-  test('should parse a single record', () => {
-    const lexer = new Lexer('{ @foo 1 }');
+  test("should parse a single record", () => {
+    const lexer = new Lexer("{ @foo 1 }");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     expect(program.statements).toHaveLength(1);
     const record = program.statements[0] as any;
-    expect(record.kind).toBe('record');
-    expect(record.fields[0].name).toBe('foo');
+    expect(record.kind).toBe("record");
+    expect(record.fields[0].name).toBe("foo");
     expect(record.fields[0].value.value).toBe(1);
   });
 
-  test('should parse a list of literals', () => {
-    const lexer = new Lexer('[1, 2]');
+  test("should parse a list of literals", () => {
+    const lexer = new Lexer("[1, 2]");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     expect(program.statements).toHaveLength(1);
     const list = program.statements[0] as any;
-    expect(list.kind).toBe('list');
-    expect(list.elements[0].kind).toBe('literal');
+    expect(list.kind).toBe("list");
+    expect(list.elements[0].kind).toBe("literal");
     expect(list.elements[0].value).toBe(1);
-    expect(list.elements[1].kind).toBe('literal');
+    expect(list.elements[1].kind).toBe("literal");
     expect(list.elements[1].value).toBe(2);
   });
 
-  test('should parse a list of tuples', () => {
-    const lexer = new Lexer('[{1}, {2}]');
+  test("should parse a list of tuples", () => {
+    const lexer = new Lexer("[{1}, {2}]");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     expect(program.statements).toHaveLength(1);
     const list = program.statements[0] as any;
-    expect(list.kind).toBe('list');
-    expect(list.elements[0].kind).toBe('tuple');
+    expect(list.kind).toBe("list");
+    expect(list.elements[0].kind).toBe("tuple");
     expect(list.elements[0].elements[0].value).toBe(1);
-    expect(list.elements[1].kind).toBe('tuple');
+    expect(list.elements[1].kind).toBe("tuple");
     expect(list.elements[1].elements[0].value).toBe(2);
   });
 
-  test('should parse a list of records', () => {
-    const lexer = new Lexer('[{ @foo 1 }, { @bar 2 }]');
+  test("should parse a list of records", () => {
+    const lexer = new Lexer("[{ @foo 1 }, { @bar 2 }]");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     expect(program.statements).toHaveLength(1);
     const list = program.statements[0] as any;
-    expect(list.kind).toBe('list');
-    expect(list.elements[0].kind).toBe('record');
-    expect(list.elements[0].fields[0].name).toBe('foo');
+    expect(list.kind).toBe("list");
+    expect(list.elements[0].kind).toBe("record");
+    expect(list.elements[0].fields[0].name).toBe("foo");
     expect(list.elements[0].fields[0].value.value).toBe(1);
-    expect(list.elements[1].kind).toBe('record');
-    expect(list.elements[1].fields[0].name).toBe('bar');
+    expect(list.elements[1].kind).toBe("record");
+    expect(list.elements[1].fields[0].name).toBe("bar");
     expect(list.elements[1].fields[0].value.value).toBe(2);
   });
 
@@ -396,6 +396,21 @@ describe('Parser', () => {
     expect(chain.left.right.name).toBe("b");
     expect(chain.right.kind).toBe("variable");
     expect(chain.right.name).toBe("c");
+  });
+
+  // TODO: Need to fix this parser issue
+  test.skip("should parse thrush operator after record", () => {
+    const lexer = new Lexer("{@key 1, @key2 false} | @key");
+    const tokens = lexer.tokenize();
+    const program = parse(tokens);
+    expect(program.statements).toHaveLength(1);
+
+    // Verify it's a binary expression with thrush operator
+    const expr = program.statements[0] as BinaryExpression;
+    expect(expr.kind).toBe("binary");
+    expect(expr.operator).toBe("|");
+    expect(expr.left.kind).toBe("record");
+    expect(expr.right.kind).toBe("accessor");
   });
 }); 
 

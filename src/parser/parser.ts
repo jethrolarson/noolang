@@ -1141,6 +1141,7 @@ const parseSequenceTerm: C.Parser<Expression> = C.choice(
   parseWhereExpression,
   parseImportExpression,
   parseDollar,
+  parseThrush,
   parseLambdaExpression,
   parseNumber,
   parseString,

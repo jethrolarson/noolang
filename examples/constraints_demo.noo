@@ -1,0 +1,35 @@
+# Type Constraints Demo
+# This demonstrates the new type constraint system in Noolang
+
+# ========================================
+# 1. BASIC CONSTRAINT SYSTEM
+# ========================================
+
+# The head function now has a constraint: it only works on Collections
+# Type: (List a) -> a given a is Collection
+head_result = head [1, 2, 3, 4, 5];
+
+# The tail function also has the same constraint
+# Type: (List a) -> List a given a is Collection  
+tail_result = tail [1, 2, 3, 4, 5];
+
+# Length function works on any Collection
+# Type: (List a) -> Int given a is Collection
+length_result = length [1, 2, 3, 4, 5];
+
+# ========================================
+# 2. CONSTRAINT SOLVING
+# ========================================
+
+# When we use head on a list of numbers, the constraint is solved
+# and we get Int as the result type
+numbers = [1, 2, 3, 4, 5];
+first_number = head numbers;  # Type: Int
+
+# ========================================
+# 3. FINAL DEMONSTRATION
+# ========================================
+
+# Show that constraints are properly tracked and solved
+# Return the first number to demonstrate constraint solving
+first_number 

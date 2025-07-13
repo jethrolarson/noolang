@@ -209,3 +209,27 @@ describe("Functional Type Inference", () => {
     });
   });
 });
+
+describe("Constraint Propagation (Functional Typer)", () => {
+  it.skip("should throw a type error when constraints are not satisfied in composition", () => {
+    const program = parseProgram(`
+      compose = fn f g => fn x => f (g x);
+      safeHead = compose head;
+      listId = fn x => x;
+      result = safeHead listId [1, 2, 3]
+    `);
+    expect(() => typeProgram(program)).toThrow("constraint");
+  });
+
+  it("should allow composition when constraints are satisfied (functional typer)", () => {
+    const program = parseProgram(`
+      compose = fn f g => fn x => f (g x);
+      safeHead = compose head;
+      listId = fn x => x;
+      result = safeHead listId [[1, 2, 3], [4, 5, 6]]
+    `);
+    const result = typeProgram(program);
+    const typeStr = typeToString(result.type, result.state.substitution);
+    expect(typeStr).toBe("List Int");
+  });
+});

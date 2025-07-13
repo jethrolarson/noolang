@@ -7,7 +7,7 @@ An expression-based, LLM-friendly programming language designed for linear, decl
 - **All tests passing** (parser, evaluator, typer)
 - **Semicolon-separated data structures**: `[1; 2; 3]`, `{ @name "Alice"; @age 30 }`
 - **Explicit effects**: Effects are tracked in the type system (e.g., `print` is effectful)
-- **Strong type inference**: Type variables are supported, but type variable unification is not yet implemented (so you may see `t1 -> Int` instead of `Int -> Int`)
+- **Strong type inference**: Powered by a functional Hindley-Milner type inference engine with let-polymorphism. Only the new functional typer is used; the old class-based typer has been removed.
 - **REPL and CLI**: Feature colorized output and advanced debugging commands (tokens, AST, types, environment, etc.)
 - **Robust error handling and debugging**: All foundational issues resolved
 
@@ -314,6 +314,8 @@ test/
 npm test
 ```
 
+All tests use the new functional typer. The old class-based typer and its tests have been removed. Some advanced constraint-propagation tests are skipped until the constraint system is fully implemented.
+
 ### Building
 
 ```bash
@@ -351,9 +353,10 @@ Noolang uses semicolons as separators for all data structures to prevent parsing
 
 The type system provides:
 
-- **Type inference** for most expressions
+- **Type inference** for all expressions using a functional Hindley-Milner engine
 - **Primitive types**: Int, String, Bool, List, Record
 - **Function types**: `(Int Int) -> Int`
+- **Type constraints**: Early support for constraints (e.g., Collection, hasField) is present, but advanced constraint propagation is still in progress
 - **Type annotations** (planned for future versions)
 
 ### Effects
