@@ -162,8 +162,6 @@ const solveIsConstraint = (
   state: TypeState,
   location?: { line: number; column: number }
 ): TypeState => {
-  // For now, we'll just track the constraint
-  // In a full implementation, we'd check if the type variable can satisfy the constraint
   const typeVar = substitute(
     typeVariable(constraint.typeVar),
     state.substitution
@@ -185,6 +183,24 @@ const solveIsConstraint = (
           )
         )
       );
+    }
+  } else {
+    // For type variables, we need to track the constraint for later solving
+    // Add the constraint to the type variable if it doesn't already have it
+    if (!typeVar.constraints) {
+      typeVar.constraints = [];
+    }
+
+    // Check if this constraint is already present
+    const existingConstraint = typeVar.constraints.find(
+      (c) =>
+        c.kind === "is" &&
+        c.typeVar === constraint.typeVar &&
+        c.constraint === constraint.constraint
+    );
+
+    if (!existingConstraint) {
+      typeVar.constraints.push(constraint);
     }
   }
 
@@ -290,6 +306,12 @@ const satisfiesConstraint = (type: Type, constraint: string): boolean => {
         type.kind === "list" ||
         type.kind === "record"
       );
+    case "List":
+      return type.kind === "list";
+    case "Record":
+      return type.kind === "record";
+    case "Function":
+      return type.kind === "function";
     default:
       return false;
   }
@@ -303,7 +325,9 @@ export const substitute = (
   switch (type.kind) {
     case "variable": {
       const sub = substitution.get(type.name);
-      if (sub) return substitute(sub, substitution);
+      if (sub) {
+        return substitute(sub, substitution);
+      }
       return type;
     }
     case "function":
@@ -387,17 +411,47 @@ export const occursIn = (varName: string, type: Type): boolean => {
   }
 };
 
-// Unify two types and update substitution
-export const unify = (
+function originalUnify(
   t1: Type,
   t2: Type,
   state: TypeState,
   location?: { line: number; column: number }
-): TypeState => {
+): TypeState {
   const s1 = substitute(t1, state.substitution);
   const s2 = substitute(t2, state.substitution);
   if (typesEqual(s1, s2)) return state;
   if (isTypeKind(s1, "variable")) {
+    if (isTypeKind(s2, "variable")) {
+      // Merge constraints from s1 and s2 in both directions
+      const s1Var = s1 as Extract<Type, { kind: "variable" }>;
+      const s2Var = s2 as Extract<Type, { kind: "variable" }>;
+      s1Var.constraints = s1Var.constraints || [];
+      s2Var.constraints = s2Var.constraints || [];
+      // Merge s1's constraints into s2
+      for (const c of s1Var.constraints) {
+        if (
+          !s2Var.constraints.some(
+            (existing) =>
+              existing.kind === c.kind &&
+              JSON.stringify(existing) === JSON.stringify(c)
+          )
+        ) {
+          s2Var.constraints.push(c);
+        }
+      }
+      // Merge s2's constraints into s1
+      for (const c of s2Var.constraints) {
+        if (
+          !s1Var.constraints.some(
+            (existing) =>
+              existing.kind === c.kind &&
+              JSON.stringify(existing) === JSON.stringify(c)
+          )
+        ) {
+          s1Var.constraints.push(c);
+        }
+      }
+    }
     if (occursIn(s1.name, s2))
       throw new Error(
         formatTypeError(
@@ -415,11 +469,25 @@ export const unify = (
       ...state,
       substitution: mapSet(state.substitution, s1.name, s2),
     };
-    // Check constraints on s1 when unifying with concrete type s2
-    if (s1.constraints) {
-      for (const constraint of s1.constraints) {
-        if (constraint.kind === "hasField" && isTypeKind(s2, "record")) {
-          if (!(constraint.field in s2.fields)) {
+    // Recursively collect all constraints from the substitution chain
+    let constraintsToCheck: Constraint[] = [];
+    let currentVar: Type = s1;
+    while (isTypeKind(currentVar, "variable")) {
+      if (currentVar.constraints) {
+        constraintsToCheck.push(...currentVar.constraints);
+      }
+      const next = newState.substitution.get(currentVar.name);
+      if (!next) break;
+      currentVar = next;
+    }
+    // Check all collected constraints against the final concrete type
+    if (!isTypeKind(currentVar, "variable")) {
+      for (const constraint of constraintsToCheck) {
+        if (
+          constraint.kind === "hasField" &&
+          isTypeKind(currentVar, "record")
+        ) {
+          if (!(constraint.field in currentVar.fields)) {
             throw new Error(
               formatTypeError(
                 createTypeError(
@@ -431,19 +499,18 @@ export const unify = (
             );
           }
           newState = unify(
-            s2.fields[constraint.field],
+            currentVar.fields[constraint.field],
             constraint.fieldType,
             newState,
             location
           );
         } else if (constraint.kind === "is") {
-          // Check if the concrete type satisfies the constraint
-          if (!satisfiesConstraint(s2, constraint.constraint)) {
+          if (!satisfiesConstraint(currentVar, constraint.constraint)) {
             throw new Error(
               formatTypeError(
                 createTypeError(
                   `Type ${typeToString(
-                    s2,
+                    currentVar,
                     state.substitution
                   )} does not satisfy constraint '${constraint.constraint}'`,
                   {},
@@ -471,11 +538,14 @@ export const unify = (
           )
         )
       );
+
+    // s2 is a variable, s1 is a concrete type
+    // Check if s2 has constraints that s1 must satisfy
     let newState = {
       ...state,
       substitution: mapSet(state.substitution, s2.name, s1),
     };
-    // Check constraints on s2 when unifying with concrete type s1
+
     if (s2.constraints) {
       for (const constraint of s2.constraints) {
         if (constraint.kind === "hasField" && isTypeKind(s1, "record")) {
@@ -497,7 +567,6 @@ export const unify = (
             location
           );
         } else if (constraint.kind === "is") {
-          // Check if the concrete type satisfies the constraint
           if (!satisfiesConstraint(s1, constraint.constraint)) {
             throw new Error(
               formatTypeError(
@@ -515,6 +584,7 @@ export const unify = (
         }
       }
     }
+
     return newState;
   }
   if (isTypeKind(s1, "function") && isTypeKind(s2, "function")) {
@@ -533,6 +603,29 @@ export const unify = (
     let currentState = state;
     for (let i = 0; i < s1.params.length; i++) {
       currentState = unify(s1.params[i], s2.params[i], currentState, location);
+      // Propagate constraints from s1.params[i] to s2.return if both are variables
+      if (
+        isTypeKind(s1.params[i], "variable") &&
+        (s1.params[i] as Extract<Type, { kind: "variable" }>).constraints &&
+        (s1.params[i] as Extract<Type, { kind: "variable" }>).constraints!
+          .length > 0 &&
+        isTypeKind(s2.return, "variable")
+      ) {
+        const s2ReturnVar = s2.return as Extract<Type, { kind: "variable" }>;
+        const s1ParamVar = s1.params[i] as Extract<Type, { kind: "variable" }>;
+        s2ReturnVar.constraints = s2ReturnVar.constraints || [];
+        for (const c of s1ParamVar.constraints!) {
+          if (
+            !s2ReturnVar.constraints.some(
+              (existing) =>
+                existing.kind === c.kind &&
+                JSON.stringify(existing) === JSON.stringify(c)
+            )
+          ) {
+            s2ReturnVar.constraints.push(c);
+          }
+        }
+      }
     }
     currentState = unify(s1.return, s2.return, currentState, location);
 
@@ -542,6 +635,97 @@ export const unify = (
     }
     if (s2.constraints) {
       currentState = solveConstraints(s2.constraints, currentState, location);
+    }
+
+    // NEW: Propagate constraints from function parameters to return types
+    // This is crucial for function composition where constraints need to flow through
+    for (let i = 0; i < s1.params.length; i++) {
+      const s1Param = s1.params[i];
+      const s2Param = s2.params[i];
+
+      // If s1 has constraints on its parameter, propagate them to s2's parameter
+      if (isTypeKind(s1Param, "variable") && s1Param.constraints) {
+        if (isTypeKind(s2Param, "variable")) {
+          s2Param.constraints = s2Param.constraints || [];
+          for (const constraint of s1Param.constraints) {
+            if (
+              !s2Param.constraints.some(
+                (existing) =>
+                  existing.kind === constraint.kind &&
+                  JSON.stringify(existing) === JSON.stringify(constraint)
+              )
+            ) {
+              s2Param.constraints.push(constraint);
+            }
+          }
+        }
+      }
+
+      // If s2 has constraints on its parameter, propagate them to s1's parameter
+      if (isTypeKind(s2Param, "variable") && s2Param.constraints) {
+        if (isTypeKind(s1Param, "variable")) {
+          s1Param.constraints = s1Param.constraints || [];
+          for (const constraint of s2Param.constraints) {
+            if (
+              !s1Param.constraints.some(
+                (existing) =>
+                  existing.kind === constraint.kind &&
+                  JSON.stringify(existing) === JSON.stringify(constraint)
+              )
+            ) {
+              s1Param.constraints.push(constraint);
+            }
+          }
+        }
+      }
+    }
+
+    // NEW: Propagate constraints from function return types to parameter types
+    // This is crucial for function composition where constraints need to flow backwards
+    if (isTypeKind(s1.return, "variable") && s1.return.constraints) {
+      // For function composition, constraints on the return type of the inner function
+      // should be propagated to the parameter types of the outer function
+      for (const constraint of s1.return.constraints) {
+        // Find the corresponding parameter type variable and add the constraint
+        for (let i = 0; i < s2.params.length; i++) {
+          const s2Param = s2.params[i];
+          if (isTypeKind(s2Param, "variable")) {
+            s2Param.constraints = s2Param.constraints || [];
+            if (
+              !s2Param.constraints.some(
+                (existing) =>
+                  existing.kind === constraint.kind &&
+                  JSON.stringify(existing) === JSON.stringify(constraint)
+              )
+            ) {
+              s2Param.constraints.push(constraint);
+            }
+          }
+        }
+      }
+    }
+
+    if (isTypeKind(s2.return, "variable") && s2.return.constraints) {
+      // For function composition, constraints on the return type of the inner function
+      // should be propagated to the parameter types of the outer function
+      for (const constraint of s2.return.constraints) {
+        // Find the corresponding parameter type variable and add the constraint
+        for (let i = 0; i < s1.params.length; i++) {
+          const s1Param = s1.params[i];
+          if (isTypeKind(s1Param, "variable")) {
+            s1Param.constraints = s1Param.constraints || [];
+            if (
+              !s1Param.constraints.some(
+                (existing) =>
+                  existing.kind === constraint.kind &&
+                  JSON.stringify(existing) === JSON.stringify(constraint)
+              )
+            ) {
+              s1Param.constraints.push(constraint);
+            }
+          }
+        }
+      }
     }
 
     return currentState;
@@ -628,12 +812,62 @@ export const unify = (
         `Cannot unify ${typeToString(
           s1,
           state.substitution
-        )} with ${typeToString(s2, state.substitution)}`,
+        )} with ${typeToString(t2, state.substitution)}`,
         {},
         location || { line: 1, column: 1 }
       )
     )
   );
+}
+
+// --- Helper: Propagate constraints from one type to another (for function composition) ---
+function propagateConstraints(from: Type, to: Type): Type {
+  // Only propagate if both are variables
+  if (from.kind === "variable" && to.kind === "variable") {
+    if (from.constraints && from.constraints.length > 0) {
+      to.constraints = to.constraints || [];
+      for (const c of from.constraints) {
+        // Avoid duplicates
+        if (
+          !to.constraints.some(
+            (existing) =>
+              existing.kind === c.kind &&
+              JSON.stringify(existing) === JSON.stringify(c)
+          )
+        ) {
+          to.constraints.push(c);
+        }
+      }
+    }
+  }
+  return to;
+}
+
+// --- Patch unify to propagate constraints for function types ---
+const oldUnify = originalUnify;
+export const unify = (
+  t1: Type,
+  t2: Type,
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState => {
+  // Propagate constraints from t1 to t2 if both are variables
+  if (t1.kind === "variable" && t2.kind === "variable") {
+    propagateConstraints(t1, t2);
+    propagateConstraints(t2, t1);
+  }
+  // Propagate constraints for function types
+  if (t1.kind === "function" && t2.kind === "function") {
+    // Propagate parameter constraints
+    for (let i = 0; i < Math.min(t1.params.length, t2.params.length); i++) {
+      propagateConstraints(t1.params[i], t2.params[i]);
+      propagateConstraints(t2.params[i], t1.params[i]);
+    }
+    // Propagate constraints on return types
+    propagateConstraints(t1.return, t2.return);
+    propagateConstraints(t2.return, t1.return);
+  }
+  return oldUnify(t1, t2, state, location);
 };
 
 // Check if two types are structurally equal
@@ -1258,14 +1492,29 @@ export const typeApplication = (
         line: expr.location?.start.line || 1,
         column: expr.location?.start.column || 1,
       });
-      // If the parameter is a constrained type variable, solve its constraints
+      // After unification, solve constraints on the parameter
+      const substitutedParam = substitute(
+        funcType.params[i],
+        currentState.substitution
+      );
       if (
-        funcType.params[i].kind === "variable" &&
-        (funcType.params[i] as any).constraints &&
-        Array.isArray((funcType.params[i] as any).constraints)
+        substitutedParam.kind === "variable" &&
+        substitutedParam.constraints
       ) {
         currentState = solveConstraints(
-          (funcType.params[i] as any).constraints,
+          substitutedParam.constraints,
+          currentState,
+          {
+            line: expr.location?.start.line || 1,
+            column: expr.location?.start.column || 1,
+          }
+        );
+      }
+      // NEW: Validate constraints on the argument type (enforce constraints on composed results)
+      const substitutedArg = substitute(argTypes[i], currentState.substitution);
+      if (substitutedArg.kind === "variable" && substitutedArg.constraints) {
+        currentState = solveConstraints(
+          substitutedArg.constraints,
           currentState,
           {
             line: expr.location?.start.line || 1,
@@ -1277,6 +1526,12 @@ export const typeApplication = (
 
     // Apply substitution to get the return type
     const returnType = substitute(funcType.return, currentState.substitution);
+
+    // Validate constraints on the return type
+    currentState = validateConstraints(returnType, currentState, {
+      line: expr.location?.start.line || 1,
+      column: expr.location?.start.column || 1,
+    });
 
     if (argTypes.length === funcType.params.length) {
       // Full application - return the return type
@@ -1833,7 +2088,121 @@ export const typeTyped = (
   return { type: explicitType, state: newState }; // Use the explicit type
 };
 
-// Type a program
+// Comprehensive constraint validation
+export const validateConstraints = (
+  type: Type,
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState => {
+  let currentState = state;
+
+  // Apply substitution to get the concrete type
+  const substitutedType = substitute(type, state.substitution);
+
+  // If it's a type variable with constraints, check them
+  if (substitutedType.kind === "variable" && substitutedType.constraints) {
+    for (const constraint of substitutedType.constraints) {
+      currentState = solveConstraint(constraint, currentState, location);
+    }
+  }
+
+  // If it's a function type, check constraints on parameters and return type
+  if (substitutedType.kind === "function") {
+    // Check constraints on parameters
+    for (const param of substitutedType.params) {
+      currentState = validateConstraints(param, currentState, location);
+    }
+
+    // Check constraints on return type
+    currentState = validateConstraints(
+      substitutedType.return,
+      currentState,
+      location
+    );
+
+    // Check function-level constraints
+    if (substitutedType.constraints) {
+      currentState = solveConstraints(
+        substitutedType.constraints,
+        currentState,
+        location
+      );
+    }
+  }
+
+  // If it's a list type, check constraints on element type
+  if (substitutedType.kind === "list") {
+    currentState = validateConstraints(
+      substitutedType.element,
+      currentState,
+      location
+    );
+  }
+
+  // If it's a record type, check constraints on field types
+  if (substitutedType.kind === "record") {
+    for (const fieldType of Object.values(substitutedType.fields)) {
+      currentState = validateConstraints(fieldType, currentState, location);
+    }
+  }
+
+  return currentState;
+};
+
+// After type inference, validate all constraints in the substitution map
+function validateAllSubstitutionConstraints(state: TypeState) {
+  for (const [varName, concreteType] of state.substitution.entries()) {
+    // Only check if the concreteType is not a variable
+    if (concreteType.kind !== "variable") {
+      // Check if any type variable in the substitution map has constraints
+      // that reference this variable name
+      for (const [otherVarName, otherType] of state.substitution.entries()) {
+        if (otherType.kind === "variable" && otherType.constraints) {
+          for (const constraint of otherType.constraints) {
+            if (constraint.kind === "is" && constraint.typeVar === varName) {
+              if (!satisfiesConstraint(concreteType, constraint.constraint)) {
+                throw new Error(
+                  `Type variable '${varName}' was unified to ${typeToString(
+                    concreteType
+                  )} but does not satisfy constraint '${constraint.constraint}'`
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // NEW: Check constraints from functions that are actually used in the current program
+  // This ensures that constraints from built-in functions are enforced when they're used
+  for (const [varName, scheme] of state.environment.entries()) {
+    if (scheme.type.kind === "function" && scheme.type.constraints) {
+      for (const constraint of scheme.type.constraints) {
+        if (constraint.kind === "is") {
+          // Only check if this constraint is actually relevant to the current inference
+          // by checking if the type variable appears in the substitution map
+          if (state.substitution.has(constraint.typeVar)) {
+            const substitutedType = state.substitution.get(constraint.typeVar)!;
+            if (
+              substitutedType.kind !== "variable" &&
+              !satisfiesConstraint(substitutedType, constraint.constraint)
+            ) {
+              throw new Error(
+                `Type ${typeToString(
+                  substitutedType
+                )} does not satisfy constraint '${
+                  constraint.constraint
+                }' from function '${varName}'`
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 export const typeProgram = (program: Program): TypeResult => {
   let state = createTypeState();
   state = initializeBuiltins(state);
@@ -1848,6 +2217,28 @@ export const typeProgram = (program: Program): TypeResult => {
 
   if (!finalType) {
     finalType = unitType();
+  }
+
+  // FINAL CONSTRAINT VALIDATION
+  validateAllSubstitutionConstraints(state);
+
+  // NEW: Additional constraint validation for the final type
+  if (finalType.kind === "variable" && finalType.constraints) {
+    for (const constraint of finalType.constraints) {
+      if (constraint.kind === "is") {
+        const substitutedType = substitute(finalType, state.substitution);
+        if (
+          substitutedType.kind !== "variable" &&
+          !satisfiesConstraint(substitutedType, constraint.constraint)
+        ) {
+          throw new Error(
+            `Type ${typeToString(
+              substitutedType
+            )} does not satisfy constraint '${constraint.constraint}'`
+          );
+        }
+      }
+    }
   }
 
   return { type: finalType, state };

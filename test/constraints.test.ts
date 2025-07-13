@@ -104,7 +104,7 @@ describe("Type Constraints", () => {
   });
 
   describe("Constraint Propagation", () => {
-    it.skip("should propagate constraints through function composition", () => {
+    it("should propagate constraints through function composition", () => {
       const program = parseProgram(`
         compose = fn f g => fn x => f (g x);
         safeHead = compose head;
