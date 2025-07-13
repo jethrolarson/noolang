@@ -7,13 +7,6 @@ import {
   createTypeState,
   initializeBuiltins,
 } from "../src/typer_functional";
-import {
-  intType,
-  stringType,
-  boolType,
-  functionType,
-  typeVariable,
-} from "../src/ast";
 
 // Helper function to parse a string into a program
 const parseProgram = (source: string) => {
@@ -211,7 +204,7 @@ describe("Functional Type Inference", () => {
 });
 
 describe("Constraint Propagation (Functional Typer)", () => {
-  it.skip("should throw a type error when constraints are not satisfied in composition", () => {
+  it("should throw a type error when constraints are not satisfied in composition", () => {
     const program = parseProgram(`
       compose = fn f g => fn x => f (g x);
       safeHead = compose head;

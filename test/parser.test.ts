@@ -399,7 +399,7 @@ describe('Parser', () => {
   });
 
   // TODO: Need to fix this parser issue
-  test.skip("should parse thrush operator after record", () => {
+  test("should parse thrush operator after record", () => {
     const lexer = new Lexer("{@key 1, @key2 false} | @key");
     const tokens = lexer.tokenize();
     const program = parse(tokens);

@@ -411,401 +411,57 @@ export const occursIn = (varName: string, type: Type): boolean => {
   }
 };
 
-function originalUnify(
+export const unify = (
   t1: Type,
   t2: Type,
   state: TypeState,
   location?: { line: number; column: number }
-): TypeState {
+): TypeState => {
   const s1 = substitute(t1, state.substitution);
   const s2 = substitute(t2, state.substitution);
+
   if (typesEqual(s1, s2)) return state;
-  if (isTypeKind(s1, "variable")) {
-    if (isTypeKind(s2, "variable")) {
-      // Merge constraints from s1 and s2 in both directions
-      const s1Var = s1 as Extract<Type, { kind: "variable" }>;
-      const s2Var = s2 as Extract<Type, { kind: "variable" }>;
-      s1Var.constraints = s1Var.constraints || [];
-      s2Var.constraints = s2Var.constraints || [];
-      // Merge s1's constraints into s2
-      for (const c of s1Var.constraints) {
-        if (
-          !s2Var.constraints.some(
-            (existing) =>
-              existing.kind === c.kind &&
-              JSON.stringify(existing) === JSON.stringify(c)
-          )
-        ) {
-          s2Var.constraints.push(c);
-        }
-      }
-      // Merge s2's constraints into s1
-      for (const c of s2Var.constraints) {
-        if (
-          !s1Var.constraints.some(
-            (existing) =>
-              existing.kind === c.kind &&
-              JSON.stringify(existing) === JSON.stringify(c)
-          )
-        ) {
-          s1Var.constraints.push(c);
-        }
-      }
-    }
-    if (occursIn(s1.name, s2))
-      throw new Error(
-        formatTypeError(
-          createTypeError(
-            `Occurs check failed: ${s1.name} occurs in ${typeToString(
-              s2,
-              state.substitution
-            )}`,
-            {},
-            location || { line: 1, column: 1 }
-          )
-        )
-      );
-    let newState = {
-      ...state,
-      substitution: mapSet(state.substitution, s1.name, s2),
-    };
-    // Recursively collect all constraints from the substitution chain
-    let constraintsToCheck: Constraint[] = [];
-    let currentVar: Type = s1;
-    while (isTypeKind(currentVar, "variable")) {
-      if (currentVar.constraints) {
-        constraintsToCheck.push(...currentVar.constraints);
-      }
-      const next = newState.substitution.get(currentVar.name);
-      if (!next) break;
-      currentVar = next;
-    }
-    // Check all collected constraints against the final concrete type
-    if (!isTypeKind(currentVar, "variable")) {
-      for (const constraint of constraintsToCheck) {
-        if (
-          constraint.kind === "hasField" &&
-          isTypeKind(currentVar, "record")
-        ) {
-          if (!(constraint.field in currentVar.fields)) {
-            throw new Error(
-              formatTypeError(
-                createTypeError(
-                  `Record type missing required field '${constraint.field}'`,
-                  {},
-                  location || { line: 1, column: 1 }
-                )
-              )
-            );
-          }
-          newState = unify(
-            currentVar.fields[constraint.field],
-            constraint.fieldType,
-            newState,
-            location
-          );
-        } else if (constraint.kind === "is") {
-          if (!satisfiesConstraint(currentVar, constraint.constraint)) {
-            throw new Error(
-              formatTypeError(
-                createTypeError(
-                  `Type ${typeToString(
-                    currentVar,
-                    state.substitution
-                  )} does not satisfy constraint '${constraint.constraint}'`,
-                  {},
-                  location || { line: 1, column: 1 }
-                )
-              )
-            );
-          }
-        }
-      }
-    }
-    return newState;
-  }
-  if (isTypeKind(s2, "variable")) {
-    if (occursIn(s2.name, s1))
-      throw new Error(
-        formatTypeError(
-          createTypeError(
-            `Occurs check failed: ${s2.name} occurs in ${typeToString(
-              s1,
-              state.substitution
-            )}`,
-            {},
-            location || { line: 1, column: 1 }
-          )
-        )
-      );
 
-    // s2 is a variable, s1 is a concrete type
-    // Check if s2 has constraints that s1 must satisfy
-    let newState = {
-      ...state,
-      substitution: mapSet(state.substitution, s2.name, s1),
-    };
+  // Handle variables (either order)
+  if (isTypeKind(s1, "variable")) return unifyVariable(s1, s2, state, location);
+  if (isTypeKind(s2, "variable")) return unifyVariable(s2, s1, state, location);
 
-    if (s2.constraints) {
-      for (const constraint of s2.constraints) {
-        if (constraint.kind === "hasField" && isTypeKind(s1, "record")) {
-          if (!(constraint.field in s1.fields)) {
-            throw new Error(
-              formatTypeError(
-                createTypeError(
-                  `Record type missing required field '${constraint.field}'`,
-                  {},
-                  location || { line: 1, column: 1 }
-                )
-              )
-            );
-          }
-          newState = unify(
-            s1.fields[constraint.field],
-            constraint.fieldType,
-            newState,
-            location
-          );
-        } else if (constraint.kind === "is") {
-          if (!satisfiesConstraint(s1, constraint.constraint)) {
-            throw new Error(
-              formatTypeError(
-                createTypeError(
-                  `Type ${typeToString(
-                    s1,
-                    state.substitution
-                  )} does not satisfy constraint '${constraint.constraint}'`,
-                  {},
-                  location || { line: 1, column: 1 }
-                )
-              )
-            );
-          }
-        }
-      }
-    }
-
-    return newState;
-  }
+  // Handle function types
   if (isTypeKind(s1, "function") && isTypeKind(s2, "function")) {
-    if (s1.params.length !== s2.params.length)
-      throw new Error(
-        formatTypeError(
-          functionApplicationError(
-            s1,
-            s2,
-            0,
-            undefined,
-            location || { line: 1, column: 1 }
-          )
-        )
-      );
-    let currentState = state;
-    for (let i = 0; i < s1.params.length; i++) {
-      currentState = unify(s1.params[i], s2.params[i], currentState, location);
-      // Propagate constraints from s1.params[i] to s2.return if both are variables
-      if (
-        isTypeKind(s1.params[i], "variable") &&
-        (s1.params[i] as Extract<Type, { kind: "variable" }>).constraints &&
-        (s1.params[i] as Extract<Type, { kind: "variable" }>).constraints!
-          .length > 0 &&
-        isTypeKind(s2.return, "variable")
-      ) {
-        const s2ReturnVar = s2.return as Extract<Type, { kind: "variable" }>;
-        const s1ParamVar = s1.params[i] as Extract<Type, { kind: "variable" }>;
-        s2ReturnVar.constraints = s2ReturnVar.constraints || [];
-        for (const c of s1ParamVar.constraints!) {
-          if (
-            !s2ReturnVar.constraints.some(
-              (existing) =>
-                existing.kind === c.kind &&
-                JSON.stringify(existing) === JSON.stringify(c)
-            )
-          ) {
-            s2ReturnVar.constraints.push(c);
-          }
-        }
-      }
-    }
-    currentState = unify(s1.return, s2.return, currentState, location);
-
-    // Solve constraints from both function types
-    if (s1.constraints) {
-      currentState = solveConstraints(s1.constraints, currentState, location);
-    }
-    if (s2.constraints) {
-      currentState = solveConstraints(s2.constraints, currentState, location);
-    }
-
-    // NEW: Propagate constraints from function parameters to return types
-    // This is crucial for function composition where constraints need to flow through
-    for (let i = 0; i < s1.params.length; i++) {
-      const s1Param = s1.params[i];
-      const s2Param = s2.params[i];
-
-      // If s1 has constraints on its parameter, propagate them to s2's parameter
-      if (isTypeKind(s1Param, "variable") && s1Param.constraints) {
-        if (isTypeKind(s2Param, "variable")) {
-          s2Param.constraints = s2Param.constraints || [];
-          for (const constraint of s1Param.constraints) {
-            if (
-              !s2Param.constraints.some(
-                (existing) =>
-                  existing.kind === constraint.kind &&
-                  JSON.stringify(existing) === JSON.stringify(constraint)
-              )
-            ) {
-              s2Param.constraints.push(constraint);
-            }
-          }
-        }
-      }
-
-      // If s2 has constraints on its parameter, propagate them to s1's parameter
-      if (isTypeKind(s2Param, "variable") && s2Param.constraints) {
-        if (isTypeKind(s1Param, "variable")) {
-          s1Param.constraints = s1Param.constraints || [];
-          for (const constraint of s2Param.constraints) {
-            if (
-              !s1Param.constraints.some(
-                (existing) =>
-                  existing.kind === constraint.kind &&
-                  JSON.stringify(existing) === JSON.stringify(constraint)
-              )
-            ) {
-              s1Param.constraints.push(constraint);
-            }
-          }
-        }
-      }
-    }
-
-    // NEW: Propagate constraints from function return types to parameter types
-    // This is crucial for function composition where constraints need to flow backwards
-    if (isTypeKind(s1.return, "variable") && s1.return.constraints) {
-      // For function composition, constraints on the return type of the inner function
-      // should be propagated to the parameter types of the outer function
-      for (const constraint of s1.return.constraints) {
-        // Find the corresponding parameter type variable and add the constraint
-        for (let i = 0; i < s2.params.length; i++) {
-          const s2Param = s2.params[i];
-          if (isTypeKind(s2Param, "variable")) {
-            s2Param.constraints = s2Param.constraints || [];
-            if (
-              !s2Param.constraints.some(
-                (existing) =>
-                  existing.kind === constraint.kind &&
-                  JSON.stringify(existing) === JSON.stringify(constraint)
-              )
-            ) {
-              s2Param.constraints.push(constraint);
-            }
-          }
-        }
-      }
-    }
-
-    if (isTypeKind(s2.return, "variable") && s2.return.constraints) {
-      // For function composition, constraints on the return type of the inner function
-      // should be propagated to the parameter types of the outer function
-      for (const constraint of s2.return.constraints) {
-        // Find the corresponding parameter type variable and add the constraint
-        for (let i = 0; i < s1.params.length; i++) {
-          const s1Param = s1.params[i];
-          if (isTypeKind(s1Param, "variable")) {
-            s1Param.constraints = s1Param.constraints || [];
-            if (
-              !s1Param.constraints.some(
-                (existing) =>
-                  existing.kind === constraint.kind &&
-                  JSON.stringify(existing) === JSON.stringify(constraint)
-              )
-            ) {
-              s1Param.constraints.push(constraint);
-            }
-          }
-        }
-      }
-    }
-
-    return currentState;
+    return unifyFunction(s1, s2, state, location);
   }
+
+  // Handle list types
   if (isTypeKind(s1, "list") && isTypeKind(s2, "list")) {
-    return unify(s1.element, s2.element, state, location);
+    return unifyList(s1, s2, state, location);
   }
+
+  // Handle tuple types
   if (isTypeKind(s1, "tuple") && isTypeKind(s2, "tuple")) {
-    if (s1.elements.length !== s2.elements.length)
-      throw new Error(
-        formatTypeError(
-          createTypeError(
-            `Tuple length mismatch: ${s1.elements.length} vs ${s2.elements.length}`,
-            {},
-            location || { line: 1, column: 1 }
-          )
-        )
-      );
-    let currentState = state;
-    for (let i = 0; i < s1.elements.length; i++) {
-      currentState = unify(
-        s1.elements[i],
-        s2.elements[i],
-        currentState,
-        location
-      );
-    }
-    return currentState;
+    return unifyTuple(s1, s2, state, location);
   }
+
+  // Handle record types
   if (isTypeKind(s1, "record") && isTypeKind(s2, "record")) {
-    const keys1 = Object.keys(s1.fields);
-    let currentState = state;
-    for (const key of keys1) {
-      if (!(key in s2.fields))
-        throw new Error(
-          formatTypeError(
-            createTypeError(
-              `Required field missing: ${key}`,
-              {},
-              location || { line: 1, column: 1 }
-            )
-          )
-        );
-      currentState = unify(
-        s1.fields[key],
-        s2.fields[key],
-        currentState,
-        location
-      );
-    }
-    return currentState;
+    return unifyRecord(s1, s2, state, location);
   }
+
+  // Handle union types
   if (isTypeKind(s1, "union") && isTypeKind(s2, "union")) {
-    // For now, require exact match of union types
-    if (s1.types.length !== s2.types.length)
-      throw new Error(
-        formatTypeError(
-          createTypeError(
-            `Union type mismatch: ${s1.types.length} vs ${s2.types.length} types`,
-            {},
-            location || { line: 1, column: 1 }
-          )
-        )
-      );
-    let currentState = state;
-    for (let i = 0; i < s1.types.length; i++) {
-      currentState = unify(s1.types[i], s2.types[i], currentState, location);
-    }
-    return currentState;
+    return unifyUnion(s1, s2, state, location);
   }
+
+  // Handle primitive types
   if (isTypeKind(s1, "primitive") && isTypeKind(s2, "primitive")) {
-    if (s1.name !== s2.name)
-      throw new Error(
-        formatTypeError(
-          operatorTypeError("", s1, s2, location || { line: 1, column: 1 })
-        )
-      );
-    return state;
+    return unifyPrimitive(s1, s2, state, location);
   }
-  if (isTypeKind(s1, "unit") && isTypeKind(s2, "unit")) return state;
+
+  // Handle unit types
+  if (isTypeKind(s1, "unit") && isTypeKind(s2, "unit")) {
+    return unifyUnit(s1, s2, state, location);
+  }
+
+  // If we get here, the types cannot be unified
   throw new Error(
     formatTypeError(
       createTypeError(
@@ -818,56 +474,6 @@ function originalUnify(
       )
     )
   );
-}
-
-// --- Helper: Propagate constraints from one type to another (for function composition) ---
-function propagateConstraints(from: Type, to: Type): Type {
-  // Only propagate if both are variables
-  if (from.kind === "variable" && to.kind === "variable") {
-    if (from.constraints && from.constraints.length > 0) {
-      to.constraints = to.constraints || [];
-      for (const c of from.constraints) {
-        // Avoid duplicates
-        if (
-          !to.constraints.some(
-            (existing) =>
-              existing.kind === c.kind &&
-              JSON.stringify(existing) === JSON.stringify(c)
-          )
-        ) {
-          to.constraints.push(c);
-        }
-      }
-    }
-  }
-  return to;
-}
-
-// --- Patch unify to propagate constraints for function types ---
-const oldUnify = originalUnify;
-export const unify = (
-  t1: Type,
-  t2: Type,
-  state: TypeState,
-  location?: { line: number; column: number }
-): TypeState => {
-  // Propagate constraints from t1 to t2 if both are variables
-  if (t1.kind === "variable" && t2.kind === "variable") {
-    propagateConstraints(t1, t2);
-    propagateConstraints(t2, t1);
-  }
-  // Propagate constraints for function types
-  if (t1.kind === "function" && t2.kind === "function") {
-    // Propagate parameter constraints
-    for (let i = 0; i < Math.min(t1.params.length, t2.params.length); i++) {
-      propagateConstraints(t1.params[i], t2.params[i]);
-      propagateConstraints(t2.params[i], t1.params[i]);
-    }
-    // Propagate constraints on return types
-    propagateConstraints(t1.return, t2.return);
-    propagateConstraints(t2.return, t1.return);
-  }
-  return oldUnify(t1, t2, state, location);
 };
 
 // Check if two types are structurally equal
@@ -993,6 +599,9 @@ export const instantiate = (
   scheme: TypeScheme,
   state: TypeState
 ): [Type, TypeState] => {
+  if (scheme.type.kind === "function" && scheme.type.constraints) {
+  }
+
   const mapping = new Map<string, Type>();
   let currentState = state;
   for (const varName of scheme.quantifiedVars) {
@@ -1006,6 +615,7 @@ export const instantiate = (
     mapping,
     currentState
   );
+
   return [instantiatedType, finalState];
 };
 
@@ -1018,7 +628,23 @@ export const freshenTypeVariables = (
   switch (type.kind) {
     case "variable":
       if (mapping.has(type.name)) {
-        return [mapping.get(type.name)!, state];
+        // Copy constraints from the original variable to the fresh one
+        const freshVar = mapping.get(type.name)!;
+        if (isTypeKind(freshVar, "variable")) {
+          freshVar.constraints = freshVar.constraints || [];
+          if (type.constraints) {
+            for (const c of type.constraints) {
+              if (
+                !freshVar.constraints.some(
+                  (existing) => JSON.stringify(existing) === JSON.stringify(c)
+                )
+              ) {
+                freshVar.constraints.push(c);
+              }
+            }
+          }
+        }
+        return [freshVar, state];
       }
       return [type, state];
     case "function": {
@@ -1952,9 +1578,9 @@ export const typeAccessor = (
   const [recordVar, finalState] = freshTypeVariable(nextState);
   // Create a function type with constraints attached to the function type
   const funcType = functionType([recordVar], fieldType);
-  // Add the constraint to the function type
-  if (funcType.kind === "function" && recordVar.kind === "variable") {
-    funcType.constraints = [
+  // Add the constraint directly to the parameter variable
+  if (recordVar.kind === "variable") {
+    recordVar.constraints = [
       hasFieldConstraint(recordVar.name, fieldName, fieldType),
     ];
   }
@@ -2154,48 +1780,29 @@ function validateAllSubstitutionConstraints(state: TypeState) {
   for (const [varName, concreteType] of state.substitution.entries()) {
     // Only check if the concreteType is not a variable
     if (concreteType.kind !== "variable") {
-      // Check if any type variable in the substitution map has constraints
-      // that reference this variable name
-      for (const [otherVarName, otherType] of state.substitution.entries()) {
-        if (otherType.kind === "variable" && otherType.constraints) {
-          for (const constraint of otherType.constraints) {
-            if (constraint.kind === "is" && constraint.typeVar === varName) {
-              if (!satisfiesConstraint(concreteType, constraint.constraint)) {
-                throw new Error(
-                  `Type variable '${varName}' was unified to ${typeToString(
-                    concreteType
-                  )} but does not satisfy constraint '${constraint.constraint}'`
-                );
-              }
-            }
+      // Collect all constraints from the substitution chain
+      const constraintsToCheck = collectAllConstraintsForVar(
+        varName,
+        state.substitution
+      );
+      for (const constraint of constraintsToCheck) {
+        if (
+          constraint.kind === "hasField" &&
+          isTypeKind(concreteType, "record")
+        ) {
+          if (!(constraint.field in concreteType.fields)) {
+            throw new Error(
+              `Record type missing required field '${constraint.field}'`
+            );
           }
-        }
-      }
-    }
-  }
-
-  // NEW: Check constraints from functions that are actually used in the current program
-  // This ensures that constraints from built-in functions are enforced when they're used
-  for (const [varName, scheme] of state.environment.entries()) {
-    if (scheme.type.kind === "function" && scheme.type.constraints) {
-      for (const constraint of scheme.type.constraints) {
-        if (constraint.kind === "is") {
-          // Only check if this constraint is actually relevant to the current inference
-          // by checking if the type variable appears in the substitution map
-          if (state.substitution.has(constraint.typeVar)) {
-            const substitutedType = state.substitution.get(constraint.typeVar)!;
-            if (
-              substitutedType.kind !== "variable" &&
-              !satisfiesConstraint(substitutedType, constraint.constraint)
-            ) {
-              throw new Error(
-                `Type ${typeToString(
-                  substitutedType
-                )} does not satisfy constraint '${
-                  constraint.constraint
-                }' from function '${varName}'`
-              );
-            }
+          // Optionally, unify field types here if needed
+        } else if (constraint.kind === "is") {
+          if (!satisfiesConstraint(concreteType, constraint.constraint)) {
+            throw new Error(
+              `Type variable '${varName}' was unified to ${typeToString(
+                concreteType
+              )} but does not satisfy constraint '${constraint.constraint}'`
+            );
           }
         }
       }
@@ -2556,3 +2163,380 @@ export const typeToString = (
   const substitutedType = substitute(type, substitution);
   return norm(substitutedType);
 };
+
+// --- Unification helpers ---
+function unifyVariable(
+  s1: Type,
+  s2: Type,
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState {
+  if (!isTypeKind(s1, "variable")) {
+    throw new Error("unifyVariable called with non-variable s1");
+  }
+  // Recursively collect all constraints from the substitution chain for s1
+  let constraintsToCheck: Constraint[] = [];
+  let seenVars = new Set<string>();
+  let currentVar: Type = s1;
+  while (isTypeKind(currentVar, "variable")) {
+    if (seenVars.has(currentVar.name)) break;
+    seenVars.add(currentVar.name);
+    if (currentVar.constraints) {
+      constraintsToCheck.push(...currentVar.constraints);
+    }
+    const next = state.substitution.get(currentVar.name);
+    if (!next) break;
+    currentVar = next;
+  }
+  // If s2 is a variable, merge all constraints into it
+  if (isTypeKind(s2, "variable")) {
+    s2.constraints = s2.constraints || [];
+    for (const c of constraintsToCheck) {
+      if (
+        !s2.constraints.some(
+          (existing) => JSON.stringify(existing) === JSON.stringify(c)
+        )
+      ) {
+        s2.constraints.push(c);
+      }
+    }
+  }
+  // Occurs check
+  if (occursIn(s1.name, s2))
+    throw new Error(
+      formatTypeError(
+        createTypeError(
+          `Occurs check failed: ${s1.name} occurs in ${typeToString(
+            s2,
+            state.substitution
+          )}`,
+          {},
+          location || { line: 1, column: 1 }
+        )
+      )
+    );
+  let newState = {
+    ...state,
+    substitution: mapSet(state.substitution, s1.name, s2),
+  };
+  // If s2 is not a variable, propagate or check constraints
+  if (!isTypeKind(s2, "variable")) {
+    for (const constraint of constraintsToCheck) {
+      if (constraint.kind === "hasField" && isTypeKind(s2, "record")) {
+        newState = unify(
+          s2.fields[constraint.field],
+          constraint.fieldType,
+          newState,
+          location
+        );
+      } else if (constraint.kind === "is") {
+        if (isTypeKind(s2, "primitive")) {
+          if (!satisfiesConstraint(s2, constraint.constraint)) {
+            throw new Error(
+              formatTypeError(
+                createTypeError(
+                  `Type ${typeToString(
+                    s2,
+                    state.substitution
+                  )} does not satisfy constraint '${constraint.constraint}'`,
+                  {},
+                  location || { line: 1, column: 1 }
+                )
+              )
+            );
+          }
+        } else {
+          // Propagate the constraint recursively to all type variables inside s2
+          propagateConstraintToType(s2, constraint);
+        }
+      } else {
+        // For other constraint kinds, propagate recursively
+        propagateConstraintToType(s2, constraint);
+      }
+    }
+  }
+  return newState;
+}
+
+// Helper: Recursively push a constraint to all type variables inside a type
+function propagateConstraintToType(type: Type, constraint: Constraint) {
+  switch (type.kind) {
+    case "variable":
+      type.constraints = type.constraints || [];
+      if (
+        !type.constraints.some(
+          (c) => JSON.stringify(c) === JSON.stringify(constraint)
+        )
+      ) {
+        type.constraints.push(constraint);
+      } else {
+      }
+      break;
+    case "function":
+      for (const param of type.params) {
+        propagateConstraintToType(param, constraint);
+      }
+      propagateConstraintToType(type.return, constraint);
+      break;
+    case "list":
+      propagateConstraintToType(type.element, constraint);
+      break;
+    case "tuple":
+      for (const el of type.elements) {
+        propagateConstraintToType(el, constraint);
+      }
+      break;
+    case "record":
+      for (const fieldType of Object.values(type.fields)) {
+        propagateConstraintToType(fieldType, constraint);
+      }
+      break;
+    case "union":
+      for (const t of type.types) {
+        propagateConstraintToType(t, constraint);
+      }
+      break;
+    // For primitives, unit, unknown: do nothing
+  }
+}
+
+function unifyFunction(
+  s1: Type,
+  s2: Type,
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState {
+  if (!isTypeKind(s1, "function") || !isTypeKind(s2, "function")) {
+    throw new Error("unifyFunction called with non-function types");
+  }
+
+  if (s1.params.length !== s2.params.length)
+    throw new Error(
+      formatTypeError(
+        functionApplicationError(
+          s1,
+          s2,
+          0,
+          undefined,
+          location || { line: 1, column: 1 }
+        )
+      )
+    );
+
+  let currentState = state;
+
+  // First, propagate function-level constraints to the relevant type variables
+  if (s1.constraints) {
+    for (const constraint of s1.constraints) {
+      // Propagate to all type variables in s1
+      propagateConstraintToType(s1, constraint);
+    }
+  }
+
+  if (s2.constraints) {
+    for (const constraint of s2.constraints) {
+      // Propagate to all type variables in s2
+      propagateConstraintToType(s2, constraint);
+    }
+  }
+
+  // Then unify parameters and return types
+  for (let i = 0; i < s1.params.length; i++) {
+    // Only propagate constraints if both are variables
+    const s1var = s1.params[i];
+    const s2var = s2.params[i];
+    if (isTypeKind(s1var, "variable") && isTypeKind(s2var, "variable")) {
+      s1var.constraints = s1var.constraints || [];
+      s2var.constraints = s2var.constraints || [];
+      // Propagate s1 -> s2
+      for (const c of s1var.constraints) {
+        if (
+          !s2var.constraints.some(
+            (existing: any) => JSON.stringify(existing) === JSON.stringify(c)
+          )
+        ) {
+          s2var.constraints.push(c);
+        }
+      }
+      // Propagate s2 -> s1
+      for (const c of s2var.constraints) {
+        if (
+          !s1var.constraints.some(
+            (existing: any) => JSON.stringify(existing) === JSON.stringify(c)
+          )
+        ) {
+          s1var.constraints.push(c);
+        }
+      }
+    }
+    currentState = unify(s1.params[i], s2.params[i], currentState, location);
+  }
+  currentState = unify(s1.return, s2.return, currentState, location);
+
+  return currentState;
+}
+
+function unifyList(
+  s1: Type,
+  s2: Type,
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState {
+  if (!isTypeKind(s1, "list") || !isTypeKind(s2, "list")) {
+    throw new Error("unifyList called with non-list types");
+  }
+  return unify(s1.element, s2.element, state, location);
+}
+
+function unifyTuple(
+  s1: Type,
+  s2: Type,
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState {
+  if (!isTypeKind(s1, "tuple") || !isTypeKind(s2, "tuple")) {
+    throw new Error("unifyTuple called with non-tuple types");
+  }
+  if (s1.elements.length !== s2.elements.length)
+    throw new Error(
+      formatTypeError(
+        createTypeError(
+          `Tuple length mismatch: ${s1.elements.length} vs ${s2.elements.length}`,
+          {},
+          location || { line: 1, column: 1 }
+        )
+      )
+    );
+  let currentState = state;
+  for (let i = 0; i < s1.elements.length; i++) {
+    currentState = unify(
+      s1.elements[i],
+      s2.elements[i],
+      currentState,
+      location
+    );
+  }
+  return currentState;
+}
+
+function unifyRecord(
+  s1: Type,
+  s2: Type,
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState {
+  if (!isTypeKind(s1, "record") || !isTypeKind(s2, "record")) {
+    throw new Error("unifyRecord called with non-record types");
+  }
+  const keys1 = Object.keys(s1.fields);
+  let currentState = state;
+  for (const key of keys1) {
+    if (!(key in s2.fields))
+      throw new Error(
+        formatTypeError(
+          createTypeError(
+            `Required field missing: ${key}`,
+            {},
+            location || { line: 1, column: 1 }
+          )
+        )
+      );
+    currentState = unify(
+      s1.fields[key],
+      s2.fields[key],
+      currentState,
+      location
+    );
+  }
+  return currentState;
+}
+
+function unifyUnion(
+  s1: Type,
+  s2: Type,
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState {
+  if (!isTypeKind(s1, "union") || !isTypeKind(s2, "union")) {
+    throw new Error("unifyUnion called with non-union types");
+  }
+  // For now, require exact match of union types
+  if (s1.types.length !== s2.types.length)
+    throw new Error(
+      formatTypeError(
+        createTypeError(
+          `Union type mismatch: ${s1.types.length} vs ${s2.types.length} types`,
+          {},
+          location || { line: 1, column: 1 }
+        )
+      )
+    );
+  let currentState = state;
+  for (let i = 0; i < s1.types.length; i++) {
+    currentState = unify(s1.types[i], s2.types[i], currentState, location);
+  }
+  return currentState;
+}
+
+function unifyPrimitive(
+  s1: Type,
+  s2: Type,
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState {
+  if (!isTypeKind(s1, "primitive") || !isTypeKind(s2, "primitive")) {
+    throw new Error("unifyPrimitive called with non-primitive types");
+  }
+  if (s1.name !== s2.name)
+    throw new Error(
+      formatTypeError(
+        operatorTypeError("", s1, s2, location || { line: 1, column: 1 })
+      )
+    );
+  return state;
+}
+
+function unifyUnit(
+  s1: Type,
+  s2: Type,
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState {
+  if (!isTypeKind(s1, "unit") || !isTypeKind(s2, "unit")) {
+    throw new Error("unifyUnit called with non-unit types");
+  }
+  return state;
+}
+
+// Collect all constraints for a variable, following the substitution chain
+function collectAllConstraintsForVar(
+  varName: string,
+  substitution: Map<string, Type>
+): Constraint[] {
+  const seen = new Set<string>();
+  let constraints: Constraint[] = [];
+  let currentVarName = varName;
+  let currentType = substitution.get(currentVarName);
+
+  while (currentType && isTypeKind(currentType, "variable")) {
+    if (seen.has(currentVarName)) {
+      break; // Prevent cycles
+    }
+    seen.add(currentVarName);
+
+    if (currentType.constraints) {
+      constraints = constraints.concat(currentType.constraints);
+    }
+
+    currentVarName = currentType.name;
+    currentType = substitution.get(currentVarName);
+  }
+
+  // Also check the original variable
+  const origType = substitution.get(varName);
+  if (origType && isTypeKind(origType, "variable") && origType.constraints) {
+    constraints = constraints.concat(origType.constraints);
+  }
+
+  return constraints;
+}

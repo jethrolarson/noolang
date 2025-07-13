@@ -1135,13 +1135,13 @@ const parseSequenceTerm: C.Parser<Expression> = C.choice(
   parseDefinitionWithType, // allow definitions with type annotations
   parseDefinition, // fallback to regular definitions
   parseIfExpression,
+  parseDollar,
+  parseThrush,
   parseRecord,
   parseMutableDefinition,
   parseMutation,
   parseWhereExpression,
   parseImportExpression,
-  parseDollar,
-  parseThrush,
   parseLambdaExpression,
   parseNumber,
   parseString,
