@@ -1,2 +1,0 @@
-safe_divide = fn a b => if b == 0 then None else Some (a / b);
-safe_divide 10 2

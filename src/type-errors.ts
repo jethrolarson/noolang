@@ -150,10 +150,14 @@ export function conditionTypeError(
   location?: ErrorLocation
 ): NoolangError {
   const message = `Condition must be boolean`;
-  return createTypeError(message, {
-    actualType,
-    suggestion: `Use a boolean expression (true/false) or a comparison that returns a boolean.`
-  }, location);
+  return createTypeError(
+    message,
+    {
+      actualType,
+      suggestion: `Use a boolean expression (True/False) or a comparison that returns a boolean.`,
+    },
+    location
+  );
 }
 
 export function ifBranchTypeError(

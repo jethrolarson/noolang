@@ -5,7 +5,7 @@
 # ========================================
 number_literal = 42;
 string_literal = "Hello, Noolang!";
-boolean_literal = true;
+boolean_literal = True;
 unit_literal = {};
 
 # ========================================
@@ -55,7 +55,7 @@ point = {10, 20};
 # 5. CONTROL FLOW
 # ========================================
 # If expressions
-is_even = fn n => if (n / 2) * 2 == n then true else false;
+is_even = fn n => if (n / 2) * 2 == n then True else False;
 even_check = is_even 10;
 
 # ========================================

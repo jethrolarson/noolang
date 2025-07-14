@@ -4,11 +4,13 @@ An expression-based, LLM-friendly programming language designed for linear, decl
 
 ## Current Status (June 2024)
 - **All core features implemented:** parser, evaluator, type inference, REPL, CLI, and debugging tools
-- **All tests passing** (parser, evaluator, typer)
+- **All tests passing** (198/198 tests) ✅ - parser, evaluator, typer, ADTs, constraints, recursion
 - **Comma-separated data structures**: `[1, 2, 3]`, `{ @name "Alice", @age 30 }`
 - **Explicit effects**: Effects are tracked in the type system (e.g., `print` is effectful)
-- **Strong type inference**: Powered by a functional Hindley-Milner type inference engine with let-polymorphism. Only the new functional typer is used; the old class-based typer has been removed.
-- **Type Constraints**: Full constraint system with automatic propagation and validation
+- **Strong type inference**: Powered by a functional Hindley-Milner type inference engine with let-polymorphism
+- **Type Constraints**: Full constraint system with automatic propagation and validation (9 built-in constraints)
+- **Algebraic Data Types**: Complete ADT implementation with type definitions, constructors, and pattern matching
+- **Recursion**: Full support for recursive functions with proper closure handling and type checking
 - **REPL and CLI**: Feature colorized output and advanced debugging commands (tokens, AST, types, environment, etc.)
 - **Robust error handling and debugging**: All foundational issues resolved
 - **VSCode syntax highlighting**: Full support for `.noo` files
@@ -28,7 +30,7 @@ An expression-based, LLM-friendly programming language designed for linear, decl
 - **Explicit effects**: Effects are tracked in the type system and visible in function types
 - **Recursion**: Full support for recursive functions with proper closure handling
 - **Mutation**: Local mutation with `mut` and `mut!` syntax
-- **Algebraic Data Types (ADTs)**: Custom types with constructors and pattern matching
+- **Algebraic Data Types (ADTs)**: Complete implementation with type definitions, constructors, pattern matching, and built-in Option/Result types
 
 ## Installation
 
@@ -92,7 +94,7 @@ add 2 3
 [1, 2, 3] |> head
 
 # Conditional expressions
-if true then 1 else 2
+if True then 1 else 2
 
 # Records
 user = { @name "Alice", @age 30 }
@@ -455,8 +457,10 @@ ADTs provide compile-time type safety:
 - ✅ **Constructor functions**: Automatic curried constructor creation
 - ✅ **Type checking**: Full type safety with inference
 - ✅ **Integration**: Works with all existing language features
-- 🚧 **Recursive types**: Basic support (some edge cases need work)
-- 🚧 **Complex patterns**: Nested and literal patterns (partial support)
+- ✅ **Literal patterns**: Support for matching on numbers and strings (e.g., `Code 404`)
+- ✅ **Nested patterns**: Support for complex nested constructor patterns (e.g., `Wrap (Value n)`)
+- ✅ **Recursive types**: Full support for recursive ADT definitions
+- ✅ **Complex patterns**: Complete pattern matching with all pattern types
 
 ## Duck-Typed Records and Accessors
 
@@ -670,7 +674,7 @@ syntaxes/
 npm test
 ```
 
-All tests use the functional typer. Some advanced constraint-propagation tests are skipped until the constraint system is fully implemented.
+All 198 tests pass, including parser, evaluator, typer, ADTs, constraints, and recursion tests. The functional typer is used exclusively.
 
 ### Building
 

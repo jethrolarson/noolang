@@ -17,7 +17,7 @@
 
 # bad_head_int = head 42;                    # ❌ Int does not satisfy Collection
 # bad_head_string = head "hello";            # ❌ String does not satisfy Collection (only List and Record do)  
-# bad_head_boolean = head true;              # ❌ Boolean does not satisfy Collection
+# bad_head_boolean = head True;              # ❌ Boolean does not satisfy Collection
 # bad_head_function = head (fn x => x);      # ❌ Function does not satisfy Collection
 
 # tail function has same Collection constraint

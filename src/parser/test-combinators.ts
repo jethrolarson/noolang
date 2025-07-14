@@ -6,14 +6,14 @@ export function testCombinatorParser() {
   console.log('Testing combinator parser...\n');
   
   const testCases = [
-    '42',
+    "42",
     '"hello"',
-    'x',
-    'fn x => x + 1',
-    '1 + 2 * 3',
-    '[1, 2, 3]',
-    'if true then 1 else 2',
-    'x |> f |> g'
+    "x",
+    "fn x => x + 1",
+    "1 + 2 * 3",
+    "[1, 2, 3]",
+    "if True then 1 else 2",
+    "x |> f |> g",
   ];
   
   for (const testCase of testCases) {
