@@ -1,0 +1,128 @@
+# Constraint Error Examples Demo
+# This demonstrates what happens when constraints are violated
+
+# ========================================
+# 1. CONSTRAINT VIOLATION EXAMPLES
+# ========================================
+
+# The following examples show constraint violations that would cause type errors.
+# In a real program, these would be caught by the type checker.
+
+# ========================================
+# 2. COLLECTION CONSTRAINT VIOLATIONS
+# ========================================
+
+# head function requires Collection constraint
+# These would cause errors:
+
+# bad_head_int = head 42;                    # ❌ Int does not satisfy Collection
+# bad_head_string = head "hello";            # ❌ String does not satisfy Collection (only List and Record do)  
+# bad_head_boolean = head true;              # ❌ Boolean does not satisfy Collection
+# bad_head_function = head (fn x => x);      # ❌ Function does not satisfy Collection
+
+# tail function has same Collection constraint
+# These would cause errors:
+
+# bad_tail_int = tail 42;                    # ❌ Int does not satisfy Collection
+# bad_tail_string = tail "hello";            # ❌ String does not satisfy Collection (only List and Record do)
+# bad_tail_boolean = tail true;              # ❌ Boolean does not satisfy Collection
+
+# length function also requires Collection constraint
+# These would cause errors:
+
+# bad_length_int = length 42;                # ❌ Int does not satisfy Collection
+# bad_length_string = length "hello";        # ❌ String does not satisfy Collection (only List and Record do)
+# bad_length_boolean = length true;          # ❌ Boolean does not satisfy Collection
+
+# ========================================
+# 3. FUNCTION COMPOSITION CONSTRAINT VIOLATIONS
+# ========================================
+
+# When composing functions, constraints are preserved
+compose = fn f g => fn x => f (g x);
+
+# head has constraint: a is Collection
+safeHead = compose head;
+
+# These would cause constraint violations:
+
+# bad_compose_head = safeHead 42;            # ❌ Int does not satisfy Collection
+# bad_compose_head_string = safeHead "hello"; # ❌ String does not satisfy Collection (only List and Record do)
+# bad_compose_head_boolean = safeHead true;   # ❌ Boolean does not satisfy Collection
+
+# ========================================
+# 4. ACCESSOR CONSTRAINT VIOLATIONS
+# ========================================
+
+# Accessors require records with specific fields
+person = { @name "Alice", @age 30 };
+
+# These would cause errors if the fields don't exist:
+
+# bad_accessor = @nonexistent person;        # ❌ Field 'nonexistent' does not exist
+# bad_accessor_int = @name 42;               # ❌ Int does not have fields
+# bad_accessor_string = @name "hello";       # ❌ String does not have fields
+
+# ========================================
+# 5. WORKING EXAMPLES FOR COMPARISON
+# ========================================
+
+# These work correctly because constraints are satisfied:
+
+# Collection constraint satisfied
+working_head = head [1, 2, 3];               # ✅ List satisfies Collection
+working_tail = tail [1, 2, 3];               # ✅ List satisfies Collection
+working_length = length [1, 2, 3];           # ✅ List satisfies Collection
+
+# Record satisfies Collection constraint
+working_record = { @name "Alice", @age 30 }; # ✅ Record satisfies Collection
+
+# Accessor works with valid field
+working_accessor = @name working_record;     # ✅ Field exists
+
+# Function composition preserves constraints
+working_compose = compose head;
+working_composed = working_compose [1, 2, 3]; # ✅ List satisfies Collection
+
+# ========================================
+# 6. CONSTRAINT ERROR MESSAGES
+# ========================================
+
+# When constraints are violated, Noolang provides clear error messages like:
+# "Type Int does not satisfy constraint 'Collection'"
+# "Record type missing required field 'nonexistent'"
+# "Cannot unify Int with List a given a is Collection"
+
+# ========================================
+# 7. BENEFITS OF CONSTRAINT SYSTEM
+# ========================================
+
+# The constraint system provides:
+# 1. Type Safety: Prevents invalid operations at compile time
+# 2. Clear Error Messages: Specific feedback about what went wrong
+# 3. Generic Programming: Safe polymorphic functions with requirements
+# 4. Automatic Propagation: Constraints flow through function composition
+# 5. LLM-Friendly: Clear, predictable semantics for code generation
+
+# ========================================
+# 8. FINAL DEMONSTRATION
+# ========================================
+
+# Show working examples that satisfy all constraints
+working_demo = {
+  @collection_examples {
+    @working_head working_head,
+    @working_tail working_tail,
+    @working_length working_length
+  },
+  @record_examples {
+    @working_record working_record,
+    @working_accessor working_accessor
+  },
+  @composition_examples {
+    @working_composed working_composed
+  }
+};
+
+# Return the working examples
+working_demo 

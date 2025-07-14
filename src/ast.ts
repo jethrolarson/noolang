@@ -47,6 +47,7 @@ export type Type =
   | { kind: "result"; success: Type; error: Type }
   | { kind: "option"; element: Type }
   | { kind: "union"; types: Type[] }
+  | { kind: "variant"; name: string; args: Type[] } // ADT instance like Option Int
   | { kind: "unit" }
   | { kind: "unknown" };
 

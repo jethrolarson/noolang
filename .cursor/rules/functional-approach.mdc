@@ -1,0 +1,7 @@
+---
+description: Use functional programming best practices
+globs:
+alwaysApply: true
+---
+
+Try to use terse functional style in code to create well-factored programs. Create utilities as needed to keep code readable. Prefer expressions to statements where reasonable.

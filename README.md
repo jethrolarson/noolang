@@ -8,6 +8,7 @@ An expression-based, LLM-friendly programming language designed for linear, decl
 - **Comma-separated data structures**: `[1, 2, 3]`, `{ @name "Alice", @age 30 }`
 - **Explicit effects**: Effects are tracked in the type system (e.g., `print` is effectful)
 - **Strong type inference**: Powered by a functional Hindley-Milner type inference engine with let-polymorphism. Only the new functional typer is used; the old class-based typer has been removed.
+- **Type Constraints**: Full constraint system with automatic propagation and validation
 - **REPL and CLI**: Feature colorized output and advanced debugging commands (tokens, AST, types, environment, etc.)
 - **Robust error handling and debugging**: All foundational issues resolved
 - **VSCode syntax highlighting**: Full support for `.noo` files
@@ -17,6 +18,7 @@ An expression-based, LLM-friendly programming language designed for linear, decl
 - **Whitespace-significant syntax** (like Python, but more rigorous)
 - **Expression-based** - everything is an expression
 - **Strong type inference** with support for primitive types and function types
+- **Type Constraints** - expressive constraint system for safe generic programming
 - **Functional programming** idioms and patterns
 - **Pipeline operator** (`|>`) for function composition
 - **Records and accessors** for structured data
@@ -225,8 +227,8 @@ user | @name        # Returns "Alice"
 user | @age         # Returns 30
 
 # Chained accessors (with extra fields)
-complex = { @bar { @baz fn x => { @qux x } } }
-(((complex | @bar) | @baz) $ 123) | @qux  # Returns 123
+complex = { @bar { @baz fn x => { @qux x }, @extra 42 } }
+duck_chain = (((complex | @bar) | @baz) $ 123) | @qux  # Returns 123
 
 # Accessors can be composed or used as functions
 getName = @name;
@@ -327,6 +329,158 @@ Noolang has full VSCode syntax highlighting support:
 1. **Install the extension**: Use the provided `noolang-0.1.0.vsix` file
 2. **Automatic activation**: `.noo` files will automatically use Noolang syntax highlighting
 3. **Features**: Keywords, operators, data structures, accessors, comments, and more are highlighted
+
+## Type Constraints System
+
+Noolang features a comprehensive **type constraint system** that enables safe and expressive generic programming. Constraints allow you to specify requirements that type variables must satisfy, similar to type classes in Haskell or traits in Rust.
+
+### Built-in Constraints
+
+Noolang provides several built-in constraints:
+
+- **`Collection`** - Lists and records (not primitive types like String, Int, Bool)
+- **`Number`** - Numeric types (Int)
+- **`String`** - String types
+- **`Boolean`** - Boolean types
+- **`Show`** - Types that can be converted to strings
+- **`List`** - List types specifically
+- **`Record`** - Record types specifically
+- **`Function`** - Function types
+- **`Eq`** - Types that support equality comparison
+
+### Constraint Syntax
+
+#### Automatic Constraints (Current Implementation)
+
+Many built-in functions automatically carry constraints that are enforced during type checking:
+
+```noolang
+# head function has constraint: (List a) -> a given a is Collection
+first = head [1, 2, 3];  # ✅ Works - Int satisfies Collection
+first_bad = head 42;     # ❌ Error - Int does not satisfy Collection
+
+# tail function has same constraint
+rest = tail [1, 2, 3];   # ✅ Works
+rest_bad = tail "hello"; # ❌ Error - String does not satisfy Collection
+
+# length function works on any Collection
+count = length [1, 2, 3]; # ✅ Works
+```
+
+#### Explicit Constraint Annotations (Planned)
+
+Future versions will support explicit constraint annotations:
+
+```noolang
+# Single constraint
+id = fn x => x : a -> a given a is Collection
+
+# Multiple constraints with "and"
+map = fn f list => map f list : (a -> b, List a) -> List b given a is Show and b is Eq
+
+# Complex constraint logic with "or"
+flexible = fn x => x : a -> a given a is Collection or a is String
+```
+
+### Constraint Propagation
+
+Constraints automatically propagate through function composition:
+
+```noolang
+# Compose functions while preserving constraints
+compose = fn f g => fn x => f (g x)
+
+# head has constraint: a is Collection
+# compose preserves this constraint
+safeHead = compose head
+
+# This works because list satisfies Collection constraint
+result = safeHead [1, 2, 3];  # ✅ Type: Int
+
+# This fails because Int doesn't satisfy Collection constraint
+bad_result = safeHead 42;     # ❌ Type error
+```
+
+### Constraint Validation
+
+The type system validates constraints during unification:
+
+```noolang
+# Function that requires Collection constraint
+processList = fn x => head x : a -> b given a is Collection
+
+# Valid usage
+result1 = processList [1, 2, 3];  # ✅ Works
+
+# Invalid usage - constraint violation
+result2 = processList 42;         # ❌ Error: Int does not satisfy Collection constraint
+```
+
+### Constraint Examples
+
+#### List Operations with Constraints
+
+```noolang
+# All list operations require Collection constraint
+numbers = [1, 2, 3, 4, 5];
+
+first = head numbers;     # Type: Int
+rest = tail numbers;      # Type: List Int
+count = length numbers;   # Type: Int
+
+# Constraint propagation through composition
+getFirst = compose head;
+result = getFirst numbers;  # Type: Int
+```
+
+#### Record Operations with Constraints
+
+```noolang
+# Records also satisfy Collection constraint
+person = { @name "Alice", @age 30 };
+
+# Accessors work with any record having the required field
+name = @name person;      # Type: String
+age = @age person;        # Type: Int
+
+# Constraint validation ensures type safety
+bad_access = @nonexistent person;  # ❌ Error if field doesn't exist
+```
+
+#### Function Composition with Constraints
+
+```noolang
+# Compose functions while maintaining constraint safety
+compose = fn f g => fn x => f (g x)
+
+# Create safe list operations
+safeHead = compose head;
+safeTail = compose tail;
+
+# These work because constraints are preserved
+first = safeHead [1, 2, 3];  # ✅ Type: Int
+rest = safeTail [1, 2, 3];   # ✅ Type: List Int
+
+# These fail because constraints are enforced
+bad_first = safeHead 42;     # ❌ Error: Int does not satisfy Collection
+```
+
+### Current Implementation Status
+
+- **✅ Constraint System**: Fully implemented with Hindley-Milner style inference
+- **✅ Constraint Propagation**: Constraints are properly propagated through function composition
+- **✅ Built-in Constraints**: All 9 constraint types are implemented and validated
+- **✅ Constraint Validation**: Type checker enforces constraints during unification
+- **✅ Error Reporting**: Clear error messages when constraints are violated
+- **🚧 Explicit Annotations**: `given` syntax is parsed but constraint evaluation uses AND semantics for OR constraints
+
+### Constraint System Benefits
+
+1. **Type Safety**: Prevents invalid operations on incompatible types
+2. **Generic Programming**: Enables safe polymorphic functions with requirements
+3. **Clear Error Messages**: Specific feedback about constraint violations
+4. **Automatic Propagation**: Constraints flow naturally through function composition
+5. **LLM-Friendly**: Clear, predictable constraint semantics
 
 ## Project Structure
 

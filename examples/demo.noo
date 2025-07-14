@@ -109,7 +109,93 @@ mapped = map (fn x => x * x) [1, 2, 3, 4, 5];
 filtered = filter (fn x => x > 10) mapped;
 
 # ========================================
-# 10. FINAL DEMONSTRATION
+# 10. TYPE CONSTRAINT SYSTEM (NEW FEATURE!)
+# ========================================
+
+# ========================================
+# 10.1 BASIC CONSTRAINT SYSTEM
+# ========================================
+
+# Built-in functions carry automatic constraints
+# head function: (List a) -> a given a is Collection
+head_with_constraint = head [1, 2, 3, 4, 5];
+
+# tail function: (List a) -> List a given a is Collection
+tail_with_constraint = tail [1, 2, 3, 4, 5];
+
+# length function: (List a) -> Int given a is Collection
+length_with_constraint = length [1, 2, 3, 4, 5];
+
+# ========================================
+# 10.2 CONSTRAINT PROPAGATION
+# ========================================
+
+# Function composition preserves constraints
+compose = fn f g => fn x => f (g x);
+
+# head has constraint: a is Collection
+# compose preserves this constraint automatically
+safeHead = compose head;
+
+# This works because list satisfies Collection constraint
+safe_head_result = safeHead [1, 2, 3, 4, 5];
+
+# ========================================
+# 10.3 CONSTRAINT VALIDATION
+# ========================================
+
+# Records also satisfy Collection constraint
+record_person = { @name "Bob", @age 25, @city "Metropolis" };
+
+# Accessors work with any record having the required field
+record_name = @name record_person;
+record_age = record_person | @age;
+
+# ========================================
+# 10.4 LIST OPERATIONS WITH CONSTRAINTS
+# ========================================
+
+# All list operations require Collection constraint
+numbers_for_constraints = [10, 20, 30, 40, 50];
+
+# These work because Int satisfies Collection constraint
+first_number = head numbers_for_constraints;
+rest_numbers = tail numbers_for_constraints;
+count_numbers = length numbers_for_constraints;
+
+# ========================================
+# 10.5 FUNCTION COMPOSITION WITH CONSTRAINTS
+# ========================================
+
+# Create safe list operations that preserve constraints
+safeTail = compose tail;
+safeLength = compose length;
+
+# These work because constraints are preserved through composition
+composed_first = safeHead numbers_for_constraints;
+composed_rest = safeTail numbers_for_constraints;
+composed_count = safeLength numbers_for_constraints;
+
+# ========================================
+# 10.6 CONSTRAINT EXAMPLES WITH DIFFERENT TYPES
+# ========================================
+
+# String lists work (List String satisfies Collection constraint)
+string_list = ["hello", "world", "noolang"];
+first_string = head string_list;
+string_count = length string_list;
+
+# Record lists work too (Record satisfies Collection)
+record_list = [
+  { @name "Alice", @age 30 },
+  { @name "Bob", @age 25 },
+  { @name "Charlie", @age 35 }
+];
+first_record = head record_list;
+record_count = length record_list;
+
+# ========================================
+# 11. FINAL DEMONSTRATION
 # ========================================
 # Showcase all features working together
 final_demo = {
@@ -117,7 +203,14 @@ final_demo = {
   @fibonacci fibonacci 10,
   @person person,
   @mapped mapped,
-  @head head_result
+  @head head_result,
+  @constraint_demo {
+    @head_with_constraint head_with_constraint,
+    @safe_head_result safe_head_result,
+    @record_name record_name,
+    @first_string first_string,
+    @first_record first_record
+  }
 };
 
 # Final expression to evaluate and return
