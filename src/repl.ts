@@ -2,7 +2,7 @@ import * as readline from 'readline';
 import { Lexer } from './lexer';
 import { parse } from './parser/parser';
 import { Evaluator, Value, isNativeFunction } from './evaluator';
-import { typeAndDecorate, typeToString } from "./typer_functional";
+import { typeAndDecorate, typeToString, TypeState, createTypeState, initializeBuiltins } from "./typer_functional";
 import { Type } from "./ast";
 import { formatValue } from "./format";
 import { colorize, supportsColors } from "./colors";
@@ -10,9 +10,12 @@ import { colorize, supportsColors } from "./colors";
 export class REPL {
   private evaluator: Evaluator;
   private rl: readline.Interface;
+  private typeState: TypeState;
 
   constructor() {
     this.evaluator = new Evaluator();
+    this.typeState = createTypeState();
+    this.typeState = initializeBuiltins(this.typeState);
     this.rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
@@ -59,14 +62,20 @@ export class REPL {
       const tokens = lexer.tokenize();
       const program = parse(tokens);
 
-      // Type check the program using functional typer
-      const { program: decoratedProgram, state } = typeAndDecorate(program);
+      // Type check the program using functional typer with persistent state
+      const { program: decoratedProgram, state } = typeAndDecorate(program, this.typeState);
+      
+      // Update the persistent type state for next REPL input
+      this.typeState = state;
       const finalType =
         decoratedProgram.statements[decoratedProgram.statements.length - 1]
           ?.type;
 
-      // Evaluate the program
-      const programResult = this.evaluator.evaluateProgram(program);
+      // Evaluate the decorated program (with type information)
+      const programResult = this.evaluator.evaluateProgram(decoratedProgram);
+      
+      // Note: The evaluator's environment should already be updated by evaluateProgram
+      // No need to manually copy the environment back
 
       // Print final result prominently
       console.log(

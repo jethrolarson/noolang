@@ -1287,15 +1287,43 @@ const parseTypeDefinition: C.Parser<TypeDefinitionExpression> = C.map(
 );
 
 // --- Pattern Parsing ---
+// Basic pattern parsing for constructor arguments (no nested constructors with args)
+const parseBasicPattern: C.Parser<Pattern> = C.choice(
+  // Wildcard pattern: _
+  C.map(C.punctuation("_"), (underscore): Pattern => ({
+    kind: "wildcard",
+    location: underscore.location,
+  })),
+  // Constructor or variable pattern: identifier (decide based on capitalization)
+  C.map(C.identifier(), (name): Pattern => {
+    // If identifier starts with uppercase, treat as constructor pattern (zero args)
+    if (name.value.length > 0 && name.value[0] >= 'A' && name.value[0] <= 'Z') {
+      return {
+        kind: "constructor",
+        name: name.value,
+        args: [],
+        location: name.location,
+      };
+    } else {
+      // Otherwise, treat as variable pattern
+      return {
+        kind: "variable", 
+        name: name.value,
+        location: name.location,
+      };
+    }
+  })
+);
+
 const parsePattern: C.Parser<Pattern> = C.choice(
   // Wildcard pattern: _
   C.map(C.punctuation("_"), (underscore): Pattern => ({
     kind: "wildcard",
     location: underscore.location,
   })),
-  // Constructor pattern: Some x (identifier followed by patterns)
+  // Constructor pattern with arguments: Some x y
   C.map(
-    C.seq(C.identifier(), C.many1(C.lazy(() => parsePattern))),
+    C.seq(C.identifier(), C.many1(parseBasicPattern)),
     ([name, args]): Pattern => ({
       kind: "constructor",
       name: name.value,
@@ -1303,12 +1331,25 @@ const parsePattern: C.Parser<Pattern> = C.choice(
       location: createLocation(name.location.start, args[args.length - 1].location.end),
     })
   ),
-  // Variable pattern: x (single identifier)
-  C.map(C.identifier(), (name): Pattern => ({
-    kind: "variable",
-    name: name.value,
-    location: name.location,
-  }))
+  // Constructor or variable pattern: identifier (decide based on capitalization)
+  C.map(C.identifier(), (name): Pattern => {
+    // If identifier starts with uppercase, treat as constructor pattern
+    if (name.value.length > 0 && name.value[0] >= 'A' && name.value[0] <= 'Z') {
+      return {
+        kind: "constructor",
+        name: name.value,
+        args: [],
+        location: name.location,
+      };
+    } else {
+      // Otherwise, treat as variable pattern
+      return {
+        kind: "variable", 
+        name: name.value,
+        location: name.location,
+      };
+    }
+  })
 );
 
 // --- Match Case ---

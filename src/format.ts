@@ -11,6 +11,7 @@ import {
   isFunction,
   isNativeFunction,
   isUnit,
+  isConstructor,
   Value
 } from './evaluator';
 
@@ -44,6 +45,13 @@ export function formatValue(value: Value): string {
   }
   if (isUnit(value)) {
     return '()';
+  }
+  if (isConstructor(value)) {
+    if (value.args.length === 0) {
+      return value.name;
+    } else {
+      return value.name + ' ' + value.args.map(formatValue).join(' ');
+    }
   }
   return '<unknown>';
 }

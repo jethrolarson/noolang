@@ -158,7 +158,6 @@ export class Lexer {
       "type",
       "match",
       "with",
-      "Int",
       "given",
       "is",
       "and",

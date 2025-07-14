@@ -85,7 +85,7 @@ pipeline_result = 10 | composed;
 complex_without_dollar = map (fn x => x * 2) (filter (fn x => x > 5) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
 # With $ - much cleaner and more readable
-complex_with_dollar = map (fn x => x * 2) $ filter (fn x => x > 5) $ [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+# complex_with_dollar = map (fn x => x * 2) $ filter (fn x => x > 5) $ [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 # ========================================
 # 8. MUTATION (LOCAL MUTATION)
@@ -130,12 +130,14 @@ length_with_constraint = length [1, 2, 3, 4, 5];
 # 10.2 CONSTRAINT PROPAGATION
 # ========================================
 
+id = fn x => x;
+
 # Function composition preserves constraints
 compose = fn f g => fn x => f (g x);
 
 # head has constraint: a is Collection
 # compose preserves this constraint automatically
-safeHead = compose head;
+safeHead = compose head id;
 
 # This works because list satisfies Collection constraint
 safe_head_result = safeHead [1, 2, 3, 4, 5];
@@ -168,8 +170,8 @@ count_numbers = length numbers_for_constraints;
 # ========================================
 
 # Create safe list operations that preserve constraints
-safeTail = compose tail;
-safeLength = compose length;
+safeTail = compose tail id;
+safeLength = compose length id;
 
 # These work because constraints are preserved through composition
 composed_first = safeHead numbers_for_constraints;
@@ -268,7 +270,7 @@ float_y = get_y float_point;
 # ========================================
 
 # Multiple constructor ADT
-type Shape = Circle Int | Rectangle Int Int | Triangle Int Int Int;
+type Shape = Circle Number | Rectangle Number Number | Triangle Number Number Number;
 
 circle = Circle 5;
 rectangle = Rectangle 10 20;

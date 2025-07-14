@@ -149,7 +149,7 @@ export type Environment = Map<string, Value | Cell>;
 
 
 export class Evaluator {
-  private environment: Environment;
+  public environment: Environment;
   private currentFileDir?: string; // Track the directory of the current file being evaluated
 
   constructor() {
@@ -752,12 +752,12 @@ export class Evaluator {
         // Constraint annotations are erased at runtime; just evaluate the inner expression
         return this.evaluateExpression(expr.expression);
       case "type-definition":
-        return this.evaluateTypeDefinition(expr);
+        return this.evaluateTypeDefinition(expr as TypeDefinitionExpression);
       case "match":
-        return this.evaluateMatch(expr);
+        return this.evaluateMatch(expr as MatchExpression);
       default:
         throw new Error(
-          `Unknown expression kind: ${(expr as Expression).kind}`
+          `Unknown expression kind: ${(expr as any).kind}`
         );
     }
   }

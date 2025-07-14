@@ -600,22 +600,7 @@ Exports: { add: Function, multiply: Function, square: Function }
 ---
 *This debugging system will significantly improve the development experience and make Noolang more accessible for both development and learning.* 
 
-## 🔎 Guidance: Type Checks in the Evaluator and Built-ins
-
-- **Do not rely on JavaScript `typeof` or `Array.isArray` for Noolang type checks.**
-  - These only reflect JS runtime types, not Noolang types (e.g., tuple vs. list, record vs. object).
-- **For now, use `ast.kind` and AST structure for type checks in AST-native functions and the evaluator.**
-  - This is sufficient for distinguishing literals, records, tuples, etc., before the type system is implemented.
-- **When the type system is implemented, use the `type` field on AST nodes for all type-based dispatch and validation.**
-  - The type checker should annotate AST nodes with their Noolang types.
-  - The evaluator and built-ins should trust and use these annotations for type checks.
-- **Migration path:**
-  1. Finish migrating all built-ins to AST-native pattern, using `ast.kind` for now.
-  2. Add type annotations to AST nodes as the type system is developed.
-  3. Update the evaluator and built-ins to use `ast.type` for all type checks.
-
-This approach ensures correctness, extensibility, and a smooth transition to a robust type system.
 
 # Things the human is tracking
-* I look forward to parametric polymorphism but that's a whole can of worms
+* Type and parser errors should show the source code line and the line above and below
 * Need to add a FFI of some kind, maybe just to js or TS

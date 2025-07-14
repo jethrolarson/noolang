@@ -434,6 +434,11 @@ export const substitute = (
         ...type,
         types: type.types.map((t) => substitute(t, substitution)),
       };
+    case "variant":
+      return {
+        ...type,
+        args: type.args.map((arg) => substitute(arg, substitution)),
+      };
     default:
       return type;
   }
@@ -484,6 +489,8 @@ export const occursIn = (varName: string, type: Type): boolean => {
       );
     case "union":
       return type.types.some((t) => occursIn(varName, t));
+    case "variant":
+      return type.args.some((arg) => occursIn(varName, arg));
     default:
       return false;
   }
@@ -537,6 +544,11 @@ export const unify = (
   // Handle unit types
   if (isTypeKind(s1, "unit") && isTypeKind(s2, "unit")) {
     return unifyUnit(s1, s2, state, location);
+  }
+
+  // Handle variant types (ADTs like Option, Result, etc.)
+  if (isTypeKind(s1, "variant") && isTypeKind(s2, "variant")) {
+    return unifyVariant(s1, s2, state, location);
   }
 
   // If we get here, the types cannot be unified
@@ -610,6 +622,16 @@ export const typesEqual = (t1: Type, t2: Type): boolean => {
     case "unit":
       return true;
 
+    case "variant":
+      const t2_variant = t2 as any;
+      if (t1.name !== t2_variant.name) {
+        return false;
+      }
+      if (t1.args.length !== t2_variant.args.length) {
+        return false;
+      }
+      return t1.args.every((arg, i) => typesEqual(arg, t2_variant.args[i]));
+
     default:
       return false;
   }
@@ -639,6 +661,9 @@ export const freeTypeVars = (
       break;
     case "union":
       type.types.forEach((t) => freeTypeVars(t, acc));
+      break;
+    case "variant":
+      type.args.forEach((arg) => freeTypeVars(arg, acc));
       break;
   }
   return acc;
@@ -793,6 +818,20 @@ export const freshenTypeVariables = (
       }
       return [{ ...type, types: newTypes }, currentState];
     }
+    case "variant": {
+      let currentState = state;
+      const newArgs: Type[] = [];
+      for (const arg of type.args) {
+        const [newArg, nextState] = freshenTypeVariables(
+          arg,
+          mapping,
+          currentState
+        );
+        newArgs.push(newArg);
+        currentState = nextState;
+      }
+      return [{ ...type, args: newArgs }, currentState];
+    }
     default:
       return [type, state];
   }
@@ -823,11 +862,11 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
   // Comparison operators
   newEnv.set("==", {
     type: functionType([typeVariable("a"), typeVariable("a")], boolType()),
-    quantifiedVars: [],
+    quantifiedVars: ["a"],
   });
   newEnv.set("!=", {
     type: functionType([typeVariable("a"), typeVariable("a")], boolType()),
-    quantifiedVars: [],
+    quantifiedVars: ["a"],
   });
   newEnv.set("<", {
     type: functionType([intType(), intType()], boolType()),
@@ -848,22 +887,12 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 
   // List operations (pure) - with constraints for safety
   newEnv.set("head", {
-    type: constrainedFunctionType(
-      [listTypeWithElement(typeVariable("a"))],
-      typeVariable("a"),
-      [],
-      [isConstraint("a", "Collection")]
-    ),
-    quantifiedVars: [],
+    type: functionType([listTypeWithElement(typeVariable("a"))], typeVariable("a")),
+    quantifiedVars: ["a"],
   });
   newEnv.set("tail", {
-    type: constrainedFunctionType(
-      [listTypeWithElement(typeVariable("a"))],
-      listTypeWithElement(typeVariable("a")),
-      [],
-      [isConstraint("a", "Collection")]
-    ),
-    quantifiedVars: [],
+    type: functionType([listTypeWithElement(typeVariable("a"))], listTypeWithElement(typeVariable("a"))),
+    quantifiedVars: ["a"],
   });
   newEnv.set("cons", {
     type: functionType(
@@ -948,13 +977,8 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
     quantifiedVars: [],
   });
   newEnv.set("length", {
-    type: constrainedFunctionType(
-      [listTypeWithElement(typeVariable("a"))],
-      intType(),
-      [],
-      [isConstraint("a", "Collection")]
-    ),
-    quantifiedVars: [],
+    type: functionType([listTypeWithElement(typeVariable("a"))], intType()),
+    quantifiedVars: ["a"],
   });
   newEnv.set("isEmpty", {
     type: functionType([listTypeWithElement(typeVariable("a"))], boolType()),
@@ -2331,9 +2355,11 @@ export const typeProgram = (program: Program): TypeResult => {
 };
 
 // Decorate AST nodes with inferred types (like the class-based typeAndDecorate)
-export const typeAndDecorate = (program: Program) => {
-  let state = createTypeState();
-  state = initializeBuiltins(state);
+export const typeAndDecorate = (program: Program, initialState?: TypeState) => {
+  let state = initialState || createTypeState();
+  if (!initialState) {
+    state = initializeBuiltins(state);
+  }
 
   // Helper to recursively decorate expressions
   function decorate(
@@ -2504,6 +2530,23 @@ export const typeAndDecorate = (program: Program) => {
         expr.type = result.type;
         return [expr, result.state];
       }
+      case "type-definition": {
+        const result = typeTypeDefinition(expr, state);
+        expr.type = result.type;
+        return [expr, result.state];
+      }
+      case "match": {
+        const result = typeMatch(expr, state);
+        expr.type = result.type;
+        return [expr, result.state];
+      }
+      case "constrained": {
+        const [decoratedExpr, exprState] = decorate(expr.expression, state);
+        expr.expression = decoratedExpr;
+        const result = typeConstrained(expr, exprState);
+        expr.type = result.type;
+        return [expr, result.state];
+      }
       default:
         throw new Error(
           `Unknown expression kind: ${(expr as Expression).kind}`
@@ -2620,6 +2663,12 @@ export const typeToString = (
           .join(" ")} }`;
       case "union":
         return `(${t.types.map(norm).join(" | ")})`;
+      case "variant":
+        if (t.args.length === 0) {
+          return t.name;
+        } else {
+          return `${t.name} ${t.args.map(norm).join(" ")}`;
+        }
       case "unit":
         return "unit";
       case "unknown":
@@ -2945,6 +2994,50 @@ function unifyTuple(
   return currentState;
 }
 
+function unifyVariant(
+  s1: Type,
+  s2: Type,
+  state: TypeState,
+  location?: { line: number; column: number }
+): TypeState {
+  if (!isTypeKind(s1, "variant") || !isTypeKind(s2, "variant")) {
+    throw new Error("unifyVariant called with non-variant types");
+  }
+  
+  // Variant types must have the same name (e.g., both "Option")
+  if (s1.name !== s2.name) {
+    throw new Error(
+      formatTypeError(
+        createTypeError(
+          `Variant name mismatch: ${s1.name} vs ${s2.name}`,
+          {},
+          location || { line: 1, column: 1 }
+        )
+      )
+    );
+  }
+  
+  // Variant types must have the same number of type arguments
+  if (s1.args.length !== s2.args.length) {
+    throw new Error(
+      formatTypeError(
+        createTypeError(
+          `Variant arity mismatch: ${s1.name} has ${s1.args.length} vs ${s2.args.length} type arguments`,
+          {},
+          location || { line: 1, column: 1 }
+        )
+      )
+    );
+  }
+  
+  // Unify corresponding type arguments
+  let currentState = state;
+  for (let i = 0; i < s1.args.length; i++) {
+    currentState = unify(s1.args[i], s2.args[i], currentState, location);
+  }
+  return currentState;
+}
+
 function unifyRecord(
   s1: Type,
   s2: Type,
@@ -3217,20 +3310,53 @@ const typePattern = (
       return { state, bindings };
       
     case "constructor": {
-      // Constructor pattern must match an ADT variant
-      if (!isTypeKind(expectedType, "variant")) {
+      // Constructor pattern matching with type variable handling
+      let actualType = expectedType;
+      let currentState = state;
+      
+      // If expected type is a type variable, we need to find the ADT from the constructor
+      if (isTypeKind(expectedType, "variable")) {
+        // Find which ADT this constructor belongs to
+        let foundAdt: string | null = null;
+        for (const [adtName, adtInfo] of state.adtRegistry) {
+          if (adtInfo.constructors.has(pattern.name)) {
+            foundAdt = adtName;
+            break;
+          }
+        }
+        
+        if (!foundAdt) {
+          throw new Error(`Unknown constructor: ${pattern.name}`);
+        }
+        
+        // Create the ADT type with fresh type variables for type parameters
+        const adtInfo = state.adtRegistry.get(foundAdt)!;
+        const typeArgs: Type[] = [];
+        for (let i = 0; i < adtInfo.typeParams.length; i++) {
+          const [freshVar, nextState] = freshTypeVariable(currentState);
+          typeArgs.push(freshVar);
+          currentState = nextState;
+        }
+        actualType = { kind: "variant", name: foundAdt, args: typeArgs };
+        
+        // Unify the type variable with the ADT type
+        currentState = unify(expectedType, actualType, currentState, undefined);
+      } else if (!isTypeKind(expectedType, "variant")) {
         throw new Error(`Pattern expects constructor but got ${typeToString(expectedType, state.substitution)}`);
       }
       
       // Look up constructor in ADT registry
-      const adtInfo = state.adtRegistry.get(expectedType.name);
+      if (!isTypeKind(actualType, "variant")) {
+        throw new Error(`Internal error: actualType should be variant but got ${actualType.kind}`);
+      }
+      const adtInfo = state.adtRegistry.get(actualType.name);
       if (!adtInfo) {
-        throw new Error(`Unknown ADT: ${expectedType.name}`);
+        throw new Error(`Unknown ADT: ${actualType.name}`);
       }
       
       const constructorArgs = adtInfo.constructors.get(pattern.name);
       if (!constructorArgs) {
-        throw new Error(`Unknown constructor: ${pattern.name} for ADT ${expectedType.name}`);
+        throw new Error(`Unknown constructor: ${pattern.name} for ADT ${actualType.name}`);
       }
       
       // Check argument count
@@ -3239,7 +3365,6 @@ const typePattern = (
       }
       
       // Type each argument pattern
-      let currentState = state;
       for (let i = 0; i < pattern.args.length; i++) {
         const argResult = typePattern(pattern.args[i], constructorArgs[i], currentState);
         currentState = argResult.state;
