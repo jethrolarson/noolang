@@ -298,7 +298,7 @@ export const createPosition = (line: number, column: number): Position => ({
 // Type constructors
 export const intType = (): Type => ({ kind: "primitive", name: "Int" });
 export const stringType = (): Type => ({ kind: "primitive", name: "String" });
-export const boolType = (): Type => ({ kind: "primitive", name: "Bool" });
+export const boolType = (): Type => ({ kind: "variant", name: "Bool", args: [] });
 export const listType = (): Type => ({ kind: "primitive", name: "List" });
 export const functionType = (
   params: Type[],

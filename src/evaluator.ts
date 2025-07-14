@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   Expression,
   Program,
@@ -20,12 +22,13 @@ import {
 } from './ast';
 import { createError, NoolangError } from './errors';
 import { formatValue } from './format';
+import { Lexer } from './lexer';
+import { parse } from './parser/parser';
 
 // Value types (Phase 6: functions and native functions as tagged union)
 export type Value =
   | { tag: 'number'; value: number }
   | { tag: 'string'; value: string }
-  | { tag: 'boolean'; value: boolean }
   | { tag: 'tuple'; values: Value[] }
   | { tag: 'list'; values: Value[] }
   | { tag: 'record'; fields: { [key: string]: Value } }
@@ -59,12 +62,27 @@ export function createString(value: string): Value {
   return { tag: 'string', value };
 }
 
-export function isBoolean(value: Value): value is { tag: 'boolean'; value: boolean } {
-  return value.tag === 'boolean';
+// Helper functions for Bool ADT constructors
+export function createTrue(): Value {
+  return { tag: 'constructor', name: 'True', args: [] };
 }
 
-export function createBoolean(value: boolean): Value {
-  return { tag: 'boolean', value };
+export function createFalse(): Value {
+  return { tag: 'constructor', name: 'False', args: [] };
+}
+
+export function createBool(value: boolean): Value {
+  return value ? createTrue() : createFalse();
+}
+
+export function isBool(value: Value): value is { tag: 'constructor'; name: 'True' | 'False'; args: [] } {
+  return value.tag === 'constructor' && (value.name === 'True' || value.name === 'False');
+}
+
+export function boolValue(value: Value): boolean {
+  if (value.tag === 'constructor' && value.name === 'True') return true;
+  if (value.tag === 'constructor' && value.name === 'False') return false;
+  throw new Error(`Expected Bool constructor, got ${value.tag}`);
 }
 
 export function isList(value: Value): value is { tag: 'list'; values: Value[] } {
@@ -148,6 +166,14 @@ export type ProgramResult = {
 export type Environment = Map<string, Value | Cell>;
 
 
+// Helper to flatten semicolon-separated binary expressions into individual statements
+const flattenStatements = (expr: Expression): Expression[] => {
+  if (expr.kind === "binary" && expr.operator === ";") {
+    return [...flattenStatements(expr.left), ...flattenStatements(expr.right)];
+  }
+  return [expr];
+};
+
 export class Evaluator {
   public environment: Environment;
   private currentFileDir?: string; // Track the directory of the current file being evaluated
@@ -155,6 +181,7 @@ export class Evaluator {
   constructor() {
     this.environment = new Map();
     this.initializeBuiltins();
+    this.loadStdlib();
   }
 
   private initializeBuiltins(): void {
@@ -213,47 +240,47 @@ export class Evaluator {
       "==",
       createNativeFunction("==", (a: Value) => (b: Value) => {
         if (isNumber(a) && isNumber(b)) {
-          return createBoolean(a.value === b.value);
+          return createBool(a.value === b.value);
         } else if (isString(a) && isString(b)) {
-          return createBoolean(a.value === b.value);
-        } else if (isBoolean(a) && isBoolean(b)) {
-          return createBoolean(a.value === b.value);
+          return createBool(a.value === b.value);
+        } else if (isBool(a) && isBool(b)) {
+          return createBool(boolValue(a) === boolValue(b));
         } else if (isUnit(a) && isUnit(b)) {
-          return createBoolean(true);
+          return createTrue();
         } else if (isUnit(a) || isUnit(b)) {
-          return createBoolean(false);
+          return createFalse();
         }
-        return createBoolean(false);
+        return createFalse();
       })
     );
     this.environment.set(
       "!=",
       createNativeFunction("!=", (a: Value) => (b: Value) => {
         if (isNumber(a) && isNumber(b)) {
-          return createBoolean(a.value !== b.value);
+          return createBool(a.value !== b.value);
         } else if (isString(a) && isString(b)) {
-          return createBoolean(a.value !== b.value);
-        } else if (isBoolean(a) && isBoolean(b)) {
-          return createBoolean(a.value !== b.value);
+          return createBool(a.value !== b.value);
+        } else if (isBool(a) && isBool(b)) {
+          return createBool(boolValue(a) !== boolValue(b));
         } else if (isUnit(a) && isUnit(b)) {
-          return createBoolean(false);
+          return createFalse();
         } else if (isUnit(a) || isUnit(b)) {
-          return createBoolean(true);
+          return createTrue();
         }
-        return createBoolean(true);
+        return createTrue();
       })
     );
     this.environment.set(
       "<",
       createNativeFunction("<", (a: Value) => (b: Value) => {
-        if (isNumber(a) && isNumber(b)) return createBoolean(a.value < b.value);
+        if (isNumber(a) && isNumber(b)) return createBool(a.value < b.value);
         throw new Error(`Cannot compare ${typeof a} and ${typeof b}`);
       })
     );
     this.environment.set(
       ">",
       createNativeFunction(">", (a: Value) => (b: Value) => {
-        if (isNumber(a) && isNumber(b)) return createBoolean(a.value > b.value);
+        if (isNumber(a) && isNumber(b)) return createBool(a.value > b.value);
         throw new Error(`Cannot compare ${typeof a} and ${typeof b}`);
       })
     );
@@ -261,7 +288,7 @@ export class Evaluator {
       "<=",
       createNativeFunction("<=", (a: Value) => (b: Value) => {
         if (isNumber(a) && isNumber(b))
-          return createBoolean(a.value <= b.value);
+          return createBool(a.value <= b.value);
         throw new Error(`Cannot compare ${typeof a} and ${typeof b}`);
       })
     );
@@ -269,7 +296,7 @@ export class Evaluator {
       ">=",
       createNativeFunction(">=", (a: Value) => (b: Value) => {
         if (isNumber(a) && isNumber(b))
-          return createBoolean(a.value >= b.value);
+          return createBool(a.value >= b.value);
         throw new Error(`Cannot compare ${typeof a} and ${typeof b}`);
       })
     );
@@ -374,8 +401,8 @@ export class Evaluator {
           return createList(
             list.values.filter((item: Value) => {
               const result = pred.fn(item);
-              if (isBoolean(result)) {
-                return result.value;
+              if (isBool(result)) {
+                return boolValue(result);
               }
               // For non-boolean results, treat as truthy/falsy
               return !isUnit(result);
@@ -412,7 +439,7 @@ export class Evaluator {
     this.environment.set(
       "isEmpty",
       createNativeFunction("isEmpty", (list: Value) => {
-        if (isList(list)) return createBoolean(list.values.length === 0);
+        if (isList(list)) return createBool(list.values.length === 0);
         throw new Error("isEmpty requires a list");
       })
     );
@@ -479,7 +506,7 @@ export class Evaluator {
       "hasKey",
       createNativeFunction("hasKey", (record: Value) => (key: Value) => {
         if (isRecord(record) && isString(key)) {
-          return createBoolean(key.value in record.fields);
+          return createBool(key.value in record.fields);
         }
         throw new Error("hasKey requires a record and a string key");
       })
@@ -488,7 +515,7 @@ export class Evaluator {
       "hasValue",
       createNativeFunction("hasValue", (record: Value) => (value: Value) => {
         if (isRecord(record)) {
-          return createBoolean(Object.values(record.fields).includes(value));
+          return createBool(Object.values(record.fields).includes(value));
         }
         throw new Error("hasValue requires a record");
       })
@@ -524,7 +551,7 @@ export class Evaluator {
       "tupleIsEmpty",
       createNativeFunction("tupleIsEmpty", (tuple: Value) => {
         if (isTuple(tuple)) {
-          return createBoolean(tuple.values.length === 0);
+          return createBool(tuple.values.length === 0);
         }
         throw new Error("tupleIsEmpty requires a tuple");
       })
@@ -542,18 +569,18 @@ export class Evaluator {
     // Option utility functions
     this.environment.set("isSome", createNativeFunction("isSome", (option: Value) => {
       if (isConstructor(option) && option.name === "Some") {
-        return createBoolean(true);
+        return createTrue();
       } else if (isConstructor(option) && option.name === "None") {
-        return createBoolean(false);
+        return createFalse();
       }
       throw new Error("isSome requires an Option value");
     }));
 
     this.environment.set("isNone", createNativeFunction("isNone", (option: Value) => {
       if (isConstructor(option) && option.name === "None") {
-        return createBoolean(true);
+        return createTrue();
       } else if (isConstructor(option) && option.name === "Some") {
-        return createBoolean(false);
+        return createFalse();
       }
       throw new Error("isNone requires an Option value");
     }));
@@ -570,21 +597,51 @@ export class Evaluator {
     // Result utility functions
     this.environment.set("isOk", createNativeFunction("isOk", (result: Value) => {
       if (isConstructor(result) && result.name === "Ok") {
-        return createBoolean(true);
+        return createTrue();
       } else if (isConstructor(result) && result.name === "Err") {
-        return createBoolean(false);
+        return createFalse();
       }
       throw new Error("isOk requires a Result value");
     }));
 
     this.environment.set("isErr", createNativeFunction("isErr", (result: Value) => {
       if (isConstructor(result) && result.name === "Err") {
-        return createBoolean(true);
+        return createTrue();
       } else if (isConstructor(result) && result.name === "Ok") {
-        return createBoolean(false);
+        return createFalse();
       }
       throw new Error("isErr requires a Result value");
     }));
+  }
+
+  private loadStdlib(): void {
+    try {
+      // Find stdlib.noo relative to this file
+      const stdlibPath = path.join(__dirname, '..', 'stdlib.noo');
+      
+      if (!fs.existsSync(stdlibPath)) {
+        console.warn(`Warning: stdlib.noo not found at ${stdlibPath}`);
+        return;
+      }
+
+      const stdlibContent = fs.readFileSync(stdlibPath, 'utf-8');
+      const lexer = new Lexer(stdlibContent);
+      const tokens = lexer.tokenize();
+      const stdlibProgram = parse(tokens);
+      
+      // Flatten any semicolon-separated statements
+      const allStatements: Expression[] = [];
+      for (const statement of stdlibProgram.statements) {
+        allStatements.push(...flattenStatements(statement));
+      }
+      
+      // Evaluate stdlib statements to populate the runtime environment
+      for (const statement of allStatements) {
+        this.evaluateExpression(statement);
+      }
+    } catch (error) {
+      console.warn(`Warning: Failed to load stdlib.noo:`, error);
+    }
   }
 
   evaluateProgram(program: Program, filePath?: string): ProgramResult {
@@ -783,14 +840,13 @@ export class Evaluator {
       return createNumber(expr.value);
     } else if (typeof expr.value === "string") {
       return createString(expr.value);
-    } else if (typeof expr.value === "boolean") {
-      return createBoolean(expr.value);
     } else if (expr.value === null) {
       // Handle unit literals (null in AST represents unit)
       return createUnit();
     }
 
-    return expr.value;
+    // Should not reach here anymore since we removed boolean literals
+    throw new Error(`Unsupported literal value: ${expr.value}`);
   }
 
   private evaluateVariable(expr: VariableExpression): Value {
@@ -1119,8 +1175,8 @@ export class Evaluator {
 
     // Check if condition is truthy - handle tagged boolean values
     let isTruthy = false;
-    if (isBoolean(condition)) {
-      isTruthy = condition.value;
+    if (isBool(condition)) {
+      isTruthy = boolValue(condition);
     } else if (isNumber(condition)) {
       isTruthy = condition.value !== 0;
     } else if (isString(condition)) {
@@ -1531,8 +1587,6 @@ export class Evaluator {
           matches = pattern.value === value.value;
         } else if (typeof pattern.value === "string" && isString(value)) {
           matches = pattern.value === value.value;
-        } else if (typeof pattern.value === "boolean" && isBoolean(value)) {
-          matches = pattern.value === value.value;
         }
         
         return { matched: matches, bindings };
@@ -1550,8 +1604,8 @@ function valueToString(value: Value): string {
     return String(value.value);
   } else if (isString(value)) {
     return '"' + value.value + '"';
-  } else if (isBoolean(value)) {
-    return String(value.value);
+  } else if (isBool(value)) {
+    return boolValue(value) ? 'True' : 'False';
   } else if (isList(value)) {
     return `[${value.values.map(valueToString).join("; ")}]`;
   } else if (isTuple(value)) {

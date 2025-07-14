@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   Expression,
   Program,
@@ -57,9 +59,12 @@ import {
   listElementTypeError,
   pipelineCompositionError,
   mutationTypeError,
+  unificationError,
   formatTypeError,
   createTypeError,
 } from "./type-errors";
+import { parse } from "./parser/parser";
+import { Lexer } from "./lexer";
 
 // Type scheme for let-polymorphism
 export type TypeScheme = {
@@ -500,7 +505,12 @@ export const unify = (
   t1: Type,
   t2: Type,
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
+  context?: {
+    reason?: string;
+    operation?: string;
+    hint?: string;
+  }
 ): TypeState => {
   const s1 = substitute(t1, state.substitution);
   const s2 = substitute(t2, state.substitution);
@@ -552,14 +562,19 @@ export const unify = (
   }
 
   // If we get here, the types cannot be unified
+  // Add debug info for difficult cases
+  const debugContext = context || {};
+  if (s1.kind === s2.kind && s1.kind === 'primitive' && (s1 as any).name === (s2 as any).name) {
+    debugContext.reason = 'concrete_vs_variable';
+    debugContext.hint = `Both types appear to be ${(s1 as any).name} but they are not unifying. This suggests the type equality check is failing. Type 1: ${JSON.stringify(s1)}, Type 2: ${JSON.stringify(s2)}. Check if there are extra properties or constraints causing inequality.`;
+  }
+  
   throw new Error(
     formatTypeError(
-      createTypeError(
-        `Cannot unify ${typeToString(
-          s1,
-          state.substitution
-        )} with ${typeToString(t2, state.substitution)}`,
-        {},
+      unificationError(
+        s1,
+        s2,
+        debugContext,
         location || { line: 1, column: 1 }
       )
     )
@@ -834,6 +849,49 @@ export const freshenTypeVariables = (
     }
     default:
       return [type, state];
+  }
+};
+
+// Helper to flatten semicolon-separated binary expressions into individual statements
+const flattenStatements = (expr: Expression): Expression[] => {
+  if (expr.kind === "binary" && expr.operator === ";") {
+    return [...flattenStatements(expr.left), ...flattenStatements(expr.right)];
+  }
+  return [expr];
+};
+
+// Load standard library from stdlib.noo
+export const loadStdlib = (state: TypeState): TypeState => {
+  try {
+    // Find stdlib.noo relative to this file
+    const stdlibPath = path.join(__dirname, '..', 'stdlib.noo');
+    
+    if (!fs.existsSync(stdlibPath)) {
+      console.warn(`Warning: stdlib.noo not found at ${stdlibPath}`);
+      return state;
+    }
+
+    const stdlibContent = fs.readFileSync(stdlibPath, 'utf-8');
+    const lexer = new Lexer(stdlibContent);
+    const tokens = lexer.tokenize();
+    const stdlibProgram = parse(tokens);
+    
+    // Flatten any semicolon-separated statements
+    const allStatements: Expression[] = [];
+    for (const statement of stdlibProgram.statements) {
+      allStatements.push(...flattenStatements(statement));
+    }
+    
+    let currentState = state;
+    for (const statement of allStatements) {
+      const result = typeExpression(statement, currentState);
+      currentState = result.state;
+    }
+    
+    return currentState;
+  } catch (error) {
+    console.warn(`Warning: Failed to load stdlib.noo:`, error);
+    return state;
   }
 };
 
@@ -1214,8 +1272,6 @@ export const typeLiteral = (
     return { type: intType(), state };
   } else if (typeof value === "string") {
     return { type: stringType(), state };
-  } else if (typeof value === "boolean") {
-    return { type: boolType(), state };
   } else {
     return { type: unknownType(), state };
   }
@@ -1348,6 +1404,10 @@ export const typeApplication = (
       currentState = unify(funcType.params[i], argTypes[i], currentState, {
         line: expr.location?.start.line || 1,
         column: expr.location?.start.column || 1,
+      }, {
+        reason: 'function_application',
+        operation: `applying argument ${i + 1}`,
+        hint: `Argument ${i + 1} has type ${typeToString(argTypes[i], currentState.substitution)} but the function parameter expects ${typeToString(funcType.params[i], currentState.substitution)}.`
       });
 
       // After unification, validate constraints on the parameter
@@ -1568,6 +1628,10 @@ export const typeBinary = (
   currentState = unify(operatorType, expectedType, currentState, {
     line: expr.location?.start.line || 1,
     column: expr.location?.start.column || 1,
+  }, {
+    reason: 'operator_application',
+    operation: `applying operator ${expr.operator}`,
+    hint: `The ${expr.operator} operator expects compatible operand types. Left operand: ${typeToString(leftResult.type, currentState.substitution)}, Right operand: ${typeToString(rightResult.type, currentState.substitution)}.`
   });
 
   // Apply substitution to get final result type
@@ -2316,6 +2380,7 @@ function validateAllSubstitutionConstraints(state: TypeState) {
 export const typeProgram = (program: Program): TypeResult => {
   let state = createTypeState();
   state = initializeBuiltins(state);
+  state = loadStdlib(state);
 
   let finalType: Type | null = null;
 
@@ -2359,6 +2424,7 @@ export const typeAndDecorate = (program: Program, initialState?: TypeState) => {
   let state = initialState || createTypeState();
   if (!initialState) {
     state = initializeBuiltins(state);
+    state = loadStdlib(state);
   }
 
   // Helper to recursively decorate expressions
@@ -3385,8 +3451,6 @@ const typePattern = (
         literalType = intType();
       } else if (typeof pattern.value === "string") {
         literalType = stringType();
-      } else if (typeof pattern.value === "boolean") {
-        literalType = boolType();
       } else {
         throw new Error(`Unsupported literal pattern: ${pattern.value}`);
       }

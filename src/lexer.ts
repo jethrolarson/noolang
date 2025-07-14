@@ -148,8 +148,6 @@ export class Lexer {
       "else",
       "let",
       "in",
-      "true",
-      "false",
       "fn",
       "import",
       "mut",
@@ -163,6 +161,12 @@ export class Lexer {
       "and",
       "or",
       "implements",
+      // Primitive type names
+      "Int",
+      "Number",
+      "String",
+      "Unit",
+      "List",
     ];
     const type = keywords.includes(value) ? 'KEYWORD' : 'IDENTIFIER';
 

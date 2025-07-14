@@ -1,0 +1,34 @@
+# Simple ADT Demo - Core Working Features
+
+# Define a simple ADT
+type Color = Red | Green | Blue;
+
+# Create values
+red = Red;
+green = Green;
+blue = Blue;
+
+# Simple pattern matching
+color_value = match Red with (
+  Red => 42;
+  Green => 0;
+  Blue => 0
+);
+
+# Built-in Option
+some_val = Some 123;
+none_val = None;
+
+# Option pattern matching
+option_result = match some_val with (
+  Some x => x;
+  None => 0
+);
+
+# Final result
+{
+  @red red,
+  @color_value color_value,
+  @some_val some_val,
+  @option_result option_result
+}

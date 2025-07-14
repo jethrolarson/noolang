@@ -1,0 +1,39 @@
+# Test defining Option and Result as user ADTs
+
+# Define Option type (like the built-in)
+type Option a = Some a | None;
+
+# Define Result type (like the built-in)  
+type Result a b = Ok a | Err b;
+
+# Test Option usage
+my_some = Some 42;
+my_none = None;
+
+# Test pattern matching on user-defined Option
+handle_my_option = fn opt => match opt with (
+  Some value => value * 2;
+  None => 0
+);
+
+result1 = handle_my_option my_some;
+result2 = handle_my_option my_none;
+
+# Test Result usage
+my_ok = Ok "success";
+my_err = Err "failure";
+
+# Test pattern matching on user-defined Result
+handle_my_result = fn res => match res with (
+  Ok value => value;
+  Err msg => "error"
+);
+
+result3 = handle_my_result my_ok;
+result4 = handle_my_result my_err;
+
+# Final result
+{
+  @option_tests { @some_result result1, @none_result result2 },
+  @result_tests { @ok_result result3, @err_result result4 }
+}

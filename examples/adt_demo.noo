@@ -1,0 +1,46 @@
+# Simple ADT Demo without type conflicts
+
+# Built-in Option type
+safe_value = Some 42;
+no_value = None;
+
+# Pattern matching on Option
+handle_option = fn opt => match opt with (
+  Some value => value * 2;
+  None => 0
+);
+
+result1 = handle_option safe_value;
+result2 = handle_option no_value;
+
+# Built-in Result type  
+success = Ok "hello";
+failure = Err "error";
+
+# Pattern matching on Result
+handle_result = fn res => match res with (
+  Ok value => value;
+  Err msg => "failed"
+);
+
+result3 = handle_result success;
+result4 = handle_result failure;
+
+# Custom ADT
+type Color = Red | Green | Blue;
+my_color = Red;
+
+color_to_num = fn color => match color with (
+  Red => 1;
+  Green => 2;
+  Blue => 3
+);
+
+color_value = color_to_num my_color;
+
+# Final result
+{ 
+  @option_results { @some result1, @none result2 },
+  @result_results { @ok result3, @err result4 },
+  @color_value color_value
+}

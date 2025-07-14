@@ -270,7 +270,7 @@ float_y = get_y float_point;
 # ========================================
 
 # Multiple constructor ADT
-type Shape = Circle Number | Rectangle Number Number | Triangle Number Number Number;
+type Shape a = Circle a | Rectangle a a | Triangle a a a;
 
 circle = Circle 5;
 rectangle = Rectangle 10 20;

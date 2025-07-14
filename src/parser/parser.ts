@@ -36,14 +36,44 @@ import {
 } from "../ast";
 import * as C from "./combinators";
 
+// --- Helper: parse type name (IDENTIFIER or type-related KEYWORD) ---
+const parseTypeName: C.Parser<Token> = (tokens: Token[]) => {
+  if (tokens.length === 0) {
+    return {
+      success: false,
+      error: "Expected type name, but got end of input",
+      position: 0,
+    };
+  }
+
+  const [first, ...rest] = tokens;
+  const typeKeywords = ["Int", "Number", "String", "Unit", "List"];
+  
+  if (first.type === "IDENTIFIER" || 
+      (first.type === "KEYWORD" && typeKeywords.includes(first.value))) {
+    return {
+      success: true,
+      value: first,
+      remaining: rest,
+    };
+  }
+
+  return {
+    success: false,
+    error: `Expected type name, but got ${first.type} '${first.value}'`,
+    position: first.location.start.line,
+  };
+};
+
 // --- Helper: parse a single type atom (primitive, variable, record, tuple, list) ---
 function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
   // Try primitive types first
-  const primitiveTypes = ["Number", "String", "Bool", "Unit"];
+  const primitiveTypes = ["Int", "Number", "String", "Unit"];
   for (const typeName of primitiveTypes) {
     const result = C.keyword(typeName)(tokens);
     if (result.success) {
       switch (typeName) {
+        case "Int":
         case "Number":
           return {
             success: true as const,
@@ -54,12 +84,6 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
           return {
             success: true as const,
             value: stringType(),
-            remaining: result.remaining,
-          };
-        case "Bool":
-          return {
-            success: true as const,
-            value: boolType(),
             remaining: result.remaining,
           };
         case "Unit":
@@ -241,39 +265,6 @@ export const parseTypeExpression: C.Parser<Type> = (tokens) => {
     return funcType;
   }
 
-  // Try primitive types
-  const primitiveTypes = ["Number", "String", "Bool", "Unit"];
-  for (const typeName of primitiveTypes) {
-    const result = C.keyword(typeName)(tokens);
-    if (result.success) {
-      switch (typeName) {
-        case "Number":
-          return {
-            success: true as const,
-            value: intType(),
-            remaining: result.remaining,
-          };
-        case "String":
-          return {
-            success: true as const,
-            value: stringType(),
-            remaining: result.remaining,
-          };
-        case "Bool":
-          return {
-            success: true as const,
-            value: boolType(),
-            remaining: result.remaining,
-          };
-        case "Unit":
-          return {
-            success: true as const,
-            value: unitType(),
-            remaining: result.remaining,
-          };
-      }
-    }
-  }
 
   // Try type variable (lowercase identifier)
   if (
@@ -385,15 +376,6 @@ const parseString = C.map(
   (token): LiteralExpression => ({
     kind: "literal",
     value: token.value,
-    location: token.location,
-  })
-);
-
-const parseBoolean = C.map(
-  C.choice(C.keyword("true"), C.keyword("false")),
-  (token): LiteralExpression => ({
-    kind: "literal",
-    value: token.value === "true",
     location: token.location,
   })
 );
@@ -779,7 +761,6 @@ const parsePrimary: C.Parser<Expression> = (tokens) => {
   const result = C.choice(
     parseNumber,
     parseString,
-    parseBoolean,
     parseIdentifier,
     parseList,
     parseRecord,
@@ -1258,7 +1239,7 @@ const parseWhereDefinition: C.Parser<
 // --- ADT Constructor ---
 const parseConstructor: C.Parser<ConstructorDefinition> = C.map(
   C.seq(
-    C.identifier(),
+    parseTypeName,
     C.many(parseTypeAtom)
   ),
   ([name, args]): ConstructorDefinition => ({
@@ -1272,7 +1253,7 @@ const parseConstructor: C.Parser<ConstructorDefinition> = C.map(
 const parseTypeDefinition: C.Parser<TypeDefinitionExpression> = C.map(
   C.seq(
     C.keyword("type"),
-    C.identifier(),
+    parseTypeName,
     C.many(C.identifier()),
     C.operator("="),
     C.sepBy(parseConstructor, C.operator("|"))
@@ -1433,7 +1414,6 @@ const parseSequenceTermExceptRecord: C.Parser<Expression> = C.choice(
   parseLambdaExpression,
   parseNumber,
   parseString,
-  parseBoolean,
   parseIdentifier,
   parseList,
   parseAccessor,
@@ -1465,7 +1445,6 @@ const parseSequenceTermNew: C.Parser<Expression> = C.choice(
   parseLambdaExpression,
   parseNumber,
   parseString,
-  parseBoolean,
   parseIdentifier,
   parseList,
   parseAccessor,

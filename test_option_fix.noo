@@ -1,0 +1,2 @@
+result = if true then Some 42 else None;
+result

@@ -1,0 +1,80 @@
+# Noolang Standard Library
+# This file defines the global default environment that's automatically loaded
+
+# ========================================
+# CORE ALGEBRAIC DATA TYPES
+# ========================================
+
+# Boolean type - replaces primitive Bool
+type Bool = True | False;
+
+# Option type for handling nullable values
+type Option a = Some a | None;
+
+# Result type for error handling  
+type Result a b = Ok a | Err b;
+
+# ========================================
+# LIST OPERATIONS (built-in functions)
+# ========================================
+# These are implemented in TypeScript but exposed through the environment
+# head : (List a) -> a given a is Collection
+# tail : (List a) -> List a given a is Collection  
+# length : (List a) -> Int given a is Collection
+# map : (a -> b) -> List a -> List b given a is Collection, b is Collection
+# filter : (a -> Bool) -> List a -> List a given a is Collection
+
+# ========================================
+# UTILITY FUNCTIONS
+# ========================================
+
+# Identity function
+id = fn x => x;
+
+# Function composition
+compose = fn f g => fn x => f (g x);
+
+# ========================================
+# BOOLEAN OPERATIONS
+# ========================================
+
+# Boolean negation
+not = fn b => match b with (True => False; False => True);
+
+# Boolean AND
+bool_and = fn a b => match a with (True => b; False => False);
+
+# Boolean OR  
+bool_or = fn a b => match a with (True => True; False => b);
+
+# ========================================
+# OPTION UTILITIES
+# ========================================
+
+# Extract value from Option with default
+option_get_or = fn default opt => match opt with (
+  Some value => value;
+  None => default
+);
+
+# Map over Option
+option_map = fn f opt => match opt with (
+  Some value => Some (f value);
+  None => None
+);
+
+# ========================================
+# RESULT UTILITIES
+# ========================================
+
+# Extract value from Result with default for errors
+result_get_or = fn default res => match res with (
+  Ok value => value;
+  Err error => default
+);
+
+# Map over Result value
+result_map = fn f res => match res with (
+  Ok value => Ok (f value);
+  Err error => Err error
+);

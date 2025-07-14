@@ -4,7 +4,7 @@
 import {
   isNumber,
   isString,
-  isBoolean,
+  isBool,
   isList,
   isRecord,
   isTuple,
@@ -12,7 +12,8 @@ import {
   isNativeFunction,
   isUnit,
   isConstructor,
-  Value
+  Value,
+  boolValue
 } from './evaluator';
 
 export function formatValue(value: Value): string {
@@ -23,8 +24,8 @@ export function formatValue(value: Value): string {
     // Escape quotes and backslashes
     return '"' + value.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
   }
-  if (isBoolean(value)) {
-    return value.value ? 'true' : 'false';
+  if (isBool(value)) {
+    return boolValue(value) ? 'True' : 'False';
   }
   if (isList(value)) {
     return '[' + value.values.map(formatValue).join('; ') + ']';

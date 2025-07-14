@@ -1,0 +1,15 @@
+# Minimal ADT demo
+safe_divide = fn a b => if b == 0 then None else Some (a / b);
+division_result = safe_divide 10 2;
+
+# Pattern matching on Option
+handle_option = fn opt => match opt with (
+  Some value => value * 2;
+  None => 0
+);
+
+safe_result = handle_option division_result;
+
+# Result type for error handling
+parse_number = fn str => if str == "42" then Ok 42 else Err "Invalid number";
+parse_number

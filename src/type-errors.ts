@@ -223,6 +223,65 @@ export function mutationTypeError(
   }, location);
 }
 
+export function unificationError(
+  type1: Type,
+  type2: Type,
+  context: {
+    reason?: string;
+    operation?: string;
+    expression?: Expression;
+    hint?: string;
+  },
+  location?: ErrorLocation
+): NoolangError {
+  let message = `Cannot unify types`;
+  let suggestion = `Review the expression and ensure all types are compatible.`;
+
+  // Add specific context based on the reason
+  if (context.reason) {
+    switch (context.reason) {
+      case 'constructor_application':
+        message = `Constructor type mismatch`;
+        suggestion = `This constructor expects different argument types. Check the ADT definition.`;
+        break;
+      case 'function_application':
+        message = `Function application type mismatch`;
+        suggestion = `The function parameters don't match the provided arguments.`;
+        break;
+      case 'operator_application':
+        message = `Operator type mismatch`;
+        suggestion = `The operator expects specific types. Check that both operands are compatible.`;
+        break;
+      case 'if_branches':
+        message = `If branch type mismatch`;
+        suggestion = `Both branches of an if expression must return the same type.`;
+        break;
+      case 'pattern_matching':
+        message = `Pattern matching type mismatch`;
+        suggestion = `The pattern doesn't match the expected type. Check the pattern structure.`;
+        break;
+      case 'concrete_vs_variable':
+        message = `Concrete type vs type variable conflict`;
+        suggestion = `Trying to unify a concrete type with a type variable that's already constrained. This often happens with ADT constructors - check if you're using concrete types where type variables are expected.`;
+        break;
+    }
+  }
+
+  if (context.operation) {
+    message += ` in ${context.operation}`;
+  }
+
+  if (context.hint) {
+    suggestion = context.hint;
+  }
+
+  return createTypeError(message, {
+    expectedType: type1,
+    actualType: type2,
+    suggestion
+  }, location);
+}
+
 // Helper function to convert types to strings (simplified version)
 function typeToString(type: Type): string {
   switch (type.kind) {
@@ -240,6 +299,12 @@ function typeToString(type: Type): string {
       return `(${type.elements.map(typeToString).join(' ')})`;
     case 'record':
       return `{ ${Object.entries(type.fields).map(([name, fieldType]) => `${name}: ${typeToString(fieldType)}`).join(' ')} }`;
+    case 'variant':
+      if (type.args.length === 0) {
+        return type.name;
+      } else {
+        return `${type.name} ${type.args.map(typeToString).join(' ')}`;
+      }
     case 'result':
       return `Result ${typeToString(type.success)} ${typeToString(type.error)}`;
     case 'option':
