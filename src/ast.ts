@@ -48,6 +48,7 @@ export type Type =
   | { kind: "option"; element: Type }
   | { kind: "union"; types: Type[] }
   | { kind: "variant"; name: string; args: Type[] } // ADT instance like Option Int
+  | { kind: "adt"; name: string; typeParams: string[]; constructors: ConstructorDefinition[] } // ADT definition
   | { kind: "unit" }
   | { kind: "unknown" };
 
@@ -71,7 +72,9 @@ export type Expression =
   | TypedExpression
   | ConstrainedExpression
   | ListExpression
-  | WhereExpression;
+  | WhereExpression
+  | TypeDefinitionExpression
+  | MatchExpression;
 
 export interface LiteralExpression {
   kind: "literal";
@@ -230,6 +233,47 @@ export interface WhereExpression {
   type?: Type;
   location: Location;
 }
+
+// ADT Constructor definition
+export interface ConstructorDefinition {
+  name: string;
+  args: Type[];
+  location: Location;
+}
+
+// ADT Type definition
+export interface TypeDefinitionExpression {
+  kind: "type-definition";
+  name: string;
+  typeParams: string[]; // Type parameters like 'a' in Option a
+  constructors: ConstructorDefinition[];
+  type?: Type;
+  location: Location;
+}
+
+// Pattern in pattern matching
+export type Pattern =
+  | { kind: "constructor"; name: string; args: Pattern[]; location: Location }
+  | { kind: "variable"; name: string; location: Location }
+  | { kind: "literal"; value: number | string | boolean; location: Location }
+  | { kind: "wildcard"; location: Location };
+
+// Pattern matching case
+export interface MatchCase {
+  pattern: Pattern;
+  expression: Expression;
+  location: Location;
+}
+
+// Match expression
+export interface MatchExpression {
+  kind: "match";
+  expression: Expression;
+  cases: MatchCase[];
+  type?: Type;
+  location: Location;
+}
+
 
 // Top-level constructs
 export type TopLevel = Expression;

@@ -20,6 +20,11 @@ import {
   TypedExpression,
   ConstrainedExpression,
   ConstraintExpr,
+  TypeDefinitionExpression,
+  MatchExpression,
+  ConstructorDefinition,
+  Pattern,
+  MatchCase,
   Type,
   Effect,
   Constraint,
@@ -64,12 +69,19 @@ export type TypeScheme = {
 
 export type TypeEnvironment = Map<string, TypeScheme>;
 
+// ADT registry for tracking defined algebraic data types
+export type ADTRegistry = Map<string, {
+  typeParams: string[];
+  constructors: Map<string, Type[]>; // constructor name -> arg types
+}>;
+
 // Functional state for type inference
 export type TypeState = {
   environment: TypeEnvironment;
   substitution: Map<string, Type>;
   counter: number;
   constraints: Constraint[]; // Track constraints during inference
+  adtRegistry: ADTRegistry; // Track ADT definitions
 };
 
 // Type inference result
@@ -84,6 +96,7 @@ export const createTypeState = (): TypeState => ({
   substitution: new Map(),
   counter: 0,
   constraints: [],
+  adtRegistry: new Map(),
 });
 
 // Fresh type variable generation
@@ -1013,7 +1026,81 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
     { type: functionType([tupleType([])], boolType()), quantifiedVars: [] } // Any tuple -> Bool
   );
 
-  return { ...state, environment: newEnv };
+  // Built-in ADT constructors
+  // Option type constructors
+  const optionType = (elementType: Type): Type => ({ kind: "variant", name: "Option", args: [elementType] });
+  
+  newEnv.set("Some", {
+    type: functionType([typeVariable("a")], optionType(typeVariable("a"))),
+    quantifiedVars: ["a"]
+  });
+  
+  newEnv.set("None", {
+    type: optionType(typeVariable("a")),
+    quantifiedVars: ["a"]
+  });
+
+  // Result type constructors  
+  const resultType = (successType: Type, errorType: Type): Type => ({ kind: "variant", name: "Result", args: [successType, errorType] });
+  
+  newEnv.set("Ok", {
+    type: functionType([typeVariable("a")], resultType(typeVariable("a"), typeVariable("b"))),
+    quantifiedVars: ["a", "b"]
+  });
+  
+  newEnv.set("Err", {
+    type: functionType([typeVariable("b")], resultType(typeVariable("a"), typeVariable("b"))),
+    quantifiedVars: ["a", "b"]
+  });
+
+  // Register ADTs in the registry
+  const newRegistry = new Map(state.adtRegistry);
+  
+  newRegistry.set("Option", {
+    typeParams: ["a"],
+    constructors: new Map([
+      ["Some", [typeVariable("a")]],
+      ["None", []]
+    ])
+  });
+  
+  newRegistry.set("Result", {
+    typeParams: ["a", "b"], 
+    constructors: new Map([
+      ["Ok", [typeVariable("a")]],
+      ["Err", [typeVariable("b")]]
+    ])
+  });
+
+  // Utility functions for Option and Result
+  // Option utilities
+  newEnv.set("isSome", {
+    type: functionType([optionType(typeVariable("a"))], boolType()),
+    quantifiedVars: ["a"]
+  });
+  
+  newEnv.set("isNone", {
+    type: functionType([optionType(typeVariable("a"))], boolType()),
+    quantifiedVars: ["a"]
+  });
+  
+  newEnv.set("unwrap", {
+    type: functionType([optionType(typeVariable("a"))], typeVariable("a")),
+    quantifiedVars: ["a"]
+  });
+
+  // Result utilities
+  newEnv.set("isOk", {
+    type: functionType([resultType(typeVariable("a"), typeVariable("b"))], boolType()),
+    quantifiedVars: ["a", "b"]
+  });
+  
+  newEnv.set("isErr", {
+    type: functionType([resultType(typeVariable("a"), typeVariable("b"))], boolType()),
+    quantifiedVars: ["a", "b"]
+  });
+
+  return { ...state, environment: newEnv, adtRegistry: newRegistry };
 };
 
 // Type inference for expressions
@@ -1078,6 +1165,12 @@ export const typeExpression = (
 
     case "constrained":
       return typeConstrained(expr, state);
+
+    case "type-definition":
+      return typeTypeDefinition(expr, state);
+
+    case "match":
+      return typeMatch(expr, state);
 
     default:
       throw new Error(
@@ -2973,3 +3066,210 @@ function collectAllConstraintsForVar(
 
   return constraints;
 }
+
+// Type inference for ADT type definitions
+export const typeTypeDefinition = (
+  expr: TypeDefinitionExpression,
+  state: TypeState
+): TypeResult => {
+  // Register the ADT in the registry first to enable recursive references
+  const constructorMap = new Map<string, Type[]>();
+  
+  // Pre-register the ADT so recursive references work
+  const newRegistry = new Map(state.adtRegistry);
+  newRegistry.set(expr.name, {
+    typeParams: expr.typeParams,
+    constructors: constructorMap // Will be filled
+  });
+  
+  // Also add the ADT type constructor to the environment
+  const adtType = {
+    kind: "variant" as const,
+    name: expr.name,
+    args: expr.typeParams.map(param => typeVariable(param))
+  };
+  const envWithType = new Map(state.environment);
+  envWithType.set(expr.name, {
+    type: adtType,
+    quantifiedVars: expr.typeParams
+  });
+  
+  state = { ...state, adtRegistry: newRegistry, environment: envWithType };
+  
+  // Process each constructor
+  for (const constructor of expr.constructors) {
+    constructorMap.set(constructor.name, constructor.args);
+    
+    // Add constructor to environment as a function
+    // Constructor type: arg1 -> arg2 -> ... -> ADTType typeParams
+    const adtType: Type = {
+      kind: "variant",
+      name: expr.name,
+      args: expr.typeParams.map(param => typeVariable(param))
+    };
+    
+    let constructorType: Type;
+    if (constructor.args.length === 0) {
+      // Nullary constructor: just the ADT type
+      constructorType = adtType;
+    } else {
+      // N-ary constructor: function from args to ADT type
+      constructorType = functionType(constructor.args, adtType);
+    }
+    
+    // Add constructor to environment
+    const newEnv = new Map(state.environment);
+    newEnv.set(constructor.name, {
+      type: constructorType,
+      quantifiedVars: expr.typeParams
+    });
+    state = { ...state, environment: newEnv };
+  }
+  
+  // Update ADT registry with completed constructor map
+  const finalRegistry = new Map(state.adtRegistry);
+  finalRegistry.set(expr.name, {
+    typeParams: expr.typeParams,
+    constructors: constructorMap
+  });
+  
+  // Type definitions return unit and update state
+  return {
+    type: unitType(),
+    state: { ...state, adtRegistry: finalRegistry }
+  };
+};
+
+// Type inference for match expressions
+export const typeMatch = (
+  expr: MatchExpression,
+  state: TypeState
+): TypeResult => {
+  // Type the expression being matched
+  const exprResult = typeExpression(expr.expression, state);
+  let currentState = exprResult.state;
+  
+  // Type each case and ensure they all return the same type
+  if (expr.cases.length === 0) {
+    throw new Error("Match expression must have at least one case");
+  }
+  
+  // Type first case to get result type
+  const firstCaseResult = typeMatchCase(expr.cases[0], exprResult.type, currentState);
+  currentState = firstCaseResult.state;
+  let resultType = firstCaseResult.type;
+  
+  // Type remaining cases and unify with result type
+  for (let i = 1; i < expr.cases.length; i++) {
+    const caseResult = typeMatchCase(expr.cases[i], exprResult.type, currentState);
+    currentState = caseResult.state;
+    
+    // Unify case result type with overall result type
+    currentState = unify(
+      resultType,
+      caseResult.type,
+      currentState,
+      expr.cases[i].location.start
+    );
+    resultType = substitute(resultType, currentState.substitution);
+  }
+  
+  return { type: resultType, state: currentState };
+};
+
+// Type a single match case
+const typeMatchCase = (
+  matchCase: MatchCase,
+  matchedType: Type,
+  state: TypeState
+): TypeResult => {
+  // Type the pattern and get bindings
+  const patternResult = typePattern(matchCase.pattern, matchedType, state);
+  
+  // Create new environment with pattern bindings
+  const newEnv = new Map(patternResult.state.environment);
+  for (const [name, type] of patternResult.bindings) {
+    newEnv.set(name, { type, quantifiedVars: [] });
+  }
+  
+  const envState = { ...patternResult.state, environment: newEnv };
+  
+  // Type the expression with pattern bindings in scope
+  return typeExpression(matchCase.expression, envState);
+};
+
+// Type a pattern and return bindings
+const typePattern = (
+  pattern: Pattern,
+  expectedType: Type,
+  state: TypeState
+): { state: TypeState; bindings: Map<string, Type> } => {
+  const bindings = new Map<string, Type>();
+  
+  switch (pattern.kind) {
+    case "wildcard":
+      // Wildcard matches anything, no bindings
+      return { state, bindings };
+      
+    case "variable":
+      // Variable binds to the expected type
+      bindings.set(pattern.name, expectedType);
+      return { state, bindings };
+      
+    case "constructor": {
+      // Constructor pattern must match an ADT variant
+      if (!isTypeKind(expectedType, "variant")) {
+        throw new Error(`Pattern expects constructor but got ${typeToString(expectedType, state.substitution)}`);
+      }
+      
+      // Look up constructor in ADT registry
+      const adtInfo = state.adtRegistry.get(expectedType.name);
+      if (!adtInfo) {
+        throw new Error(`Unknown ADT: ${expectedType.name}`);
+      }
+      
+      const constructorArgs = adtInfo.constructors.get(pattern.name);
+      if (!constructorArgs) {
+        throw new Error(`Unknown constructor: ${pattern.name} for ADT ${expectedType.name}`);
+      }
+      
+      // Check argument count
+      if (pattern.args.length !== constructorArgs.length) {
+        throw new Error(`Constructor ${pattern.name} expects ${constructorArgs.length} arguments but got ${pattern.args.length}`);
+      }
+      
+      // Type each argument pattern
+      let currentState = state;
+      for (let i = 0; i < pattern.args.length; i++) {
+        const argResult = typePattern(pattern.args[i], constructorArgs[i], currentState);
+        currentState = argResult.state;
+        
+        // Merge bindings
+        for (const [name, type] of argResult.bindings) {
+          bindings.set(name, type);
+        }
+      }
+      
+      return { state: currentState, bindings };
+    }
+      
+    case "literal":
+      // Literal patterns need to match the expected type
+      let literalType: Type;
+      if (typeof pattern.value === "number") {
+        literalType = intType();
+      } else if (typeof pattern.value === "string") {
+        literalType = stringType();
+      } else if (typeof pattern.value === "boolean") {
+        literalType = boolType();
+      } else {
+        throw new Error(`Unsupported literal pattern: ${pattern.value}`);
+      }
+      
+      const unifiedState = unify(expectedType, literalType, state, pattern.location.start);
+      return { state: unifiedState, bindings };
+      
+    default:
+      throw new Error(`Unsupported pattern kind: ${(pattern as Pattern).kind}`);
+  }
+};

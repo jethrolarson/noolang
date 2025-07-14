@@ -12,7 +12,11 @@ import {
   ImportExpression,
   RecordExpression,
   AccessorExpression,
-  WhereExpression
+  WhereExpression,
+  TypeDefinitionExpression,
+  MatchExpression,
+  Pattern,
+  MatchCase
 } from './ast';
 import { createError, NoolangError } from './errors';
 import { formatValue } from './format';
@@ -27,6 +31,7 @@ export type Value =
   | { tag: 'record'; fields: { [key: string]: Value } }
   | { tag: 'function'; fn: (...args: Value[]) => Value }
   | { tag: 'native'; name: string; fn: any }
+  | { tag: 'constructor'; name: string; args: Value[] }
   | { tag: 'unit' };
 
 // --- Mutable Cell type ---
@@ -117,6 +122,14 @@ export function isUnit(value: Value): value is { tag: 'unit' } {
 
 export function createUnit(): Value {
   return { tag: 'unit' };
+}
+
+export function isConstructor(value: Value): value is { tag: 'constructor'; name: string; args: Value[] } {
+  return value.tag === 'constructor';
+}
+
+export function createConstructor(name: string, args: Value[]): Value {
+  return { tag: 'constructor', name, args };
 }
 
 export type ExecutionStep = {
@@ -516,6 +529,62 @@ export class Evaluator {
         throw new Error("tupleIsEmpty requires a tuple");
       })
     );
+
+    // Built-in ADT constructors
+    // Option constructors
+    this.environment.set("Some", createFunction((value: Value) => createConstructor("Some", [value])));
+    this.environment.set("None", createConstructor("None", []));
+
+    // Result constructors  
+    this.environment.set("Ok", createFunction((value: Value) => createConstructor("Ok", [value])));
+    this.environment.set("Err", createFunction((error: Value) => createConstructor("Err", [error])));
+
+    // Option utility functions
+    this.environment.set("isSome", createNativeFunction("isSome", (option: Value) => {
+      if (isConstructor(option) && option.name === "Some") {
+        return createBoolean(true);
+      } else if (isConstructor(option) && option.name === "None") {
+        return createBoolean(false);
+      }
+      throw new Error("isSome requires an Option value");
+    }));
+
+    this.environment.set("isNone", createNativeFunction("isNone", (option: Value) => {
+      if (isConstructor(option) && option.name === "None") {
+        return createBoolean(true);
+      } else if (isConstructor(option) && option.name === "Some") {
+        return createBoolean(false);
+      }
+      throw new Error("isNone requires an Option value");
+    }));
+
+    this.environment.set("unwrap", createNativeFunction("unwrap", (option: Value) => {
+      if (isConstructor(option) && option.name === "Some" && option.args.length === 1) {
+        return option.args[0];
+      } else if (isConstructor(option) && option.name === "None") {
+        throw new Error("Cannot unwrap None value");
+      }
+      throw new Error("unwrap requires a Some value");
+    }));
+
+    // Result utility functions
+    this.environment.set("isOk", createNativeFunction("isOk", (result: Value) => {
+      if (isConstructor(result) && result.name === "Ok") {
+        return createBoolean(true);
+      } else if (isConstructor(result) && result.name === "Err") {
+        return createBoolean(false);
+      }
+      throw new Error("isOk requires a Result value");
+    }));
+
+    this.environment.set("isErr", createNativeFunction("isErr", (result: Value) => {
+      if (isConstructor(result) && result.name === "Err") {
+        return createBoolean(true);
+      } else if (isConstructor(result) && result.name === "Ok") {
+        return createBoolean(false);
+      }
+      throw new Error("isErr requires a Result value");
+    }));
   }
 
   evaluateProgram(program: Program, filePath?: string): ProgramResult {
@@ -682,6 +751,10 @@ export class Evaluator {
       case "constrained":
         // Constraint annotations are erased at runtime; just evaluate the inner expression
         return this.evaluateExpression(expr.expression);
+      case "type-definition":
+        return this.evaluateTypeDefinition(expr);
+      case "match":
+        return this.evaluateMatch(expr);
       default:
         throw new Error(
           `Unknown expression kind: ${(expr as Expression).kind}`
@@ -1335,6 +1408,140 @@ export class Evaluator {
         return "unknown";
     }
   }
+
+  private evaluateTypeDefinition(expr: TypeDefinitionExpression): Value {
+    // Type definitions add constructors to the environment
+    for (const constructor of expr.constructors) {
+      if (constructor.args.length === 0) {
+        // Nullary constructor: just create the constructor value
+        const constructorValue = { tag: 'constructor', name: constructor.name, args: [] } as Value;
+        this.environment.set(constructor.name, constructorValue);
+      } else {
+        // N-ary constructor: create a function that builds the constructor
+        const constructorFunction = (...args: Value[]): Value => {
+          if (args.length !== constructor.args.length) {
+            throw new Error(`Constructor ${constructor.name} expects ${constructor.args.length} arguments but got ${args.length}`);
+          }
+          return { tag: 'constructor', name: constructor.name, args } as Value;
+        };
+        
+        // Create a simple constructor function that collects all arguments
+        const createCurriedConstructor = (arity: number, name: string) => {
+          const collectArgs = (collectedArgs: Value[] = []): Value => {
+            return createFunction((nextArg: Value) => {
+              const newArgs = [...collectedArgs, nextArg];
+              if (newArgs.length === arity) {
+                return { tag: 'constructor', name, args: newArgs } as Value;
+              } else {
+                return collectArgs(newArgs);
+              }
+            });
+          };
+          return collectArgs();
+        };
+        
+        this.environment.set(constructor.name, createCurriedConstructor(constructor.args.length, constructor.name));
+      }
+    }
+    
+    // Type definitions evaluate to unit
+    return createUnit();
+  }
+
+  private evaluateMatch(expr: MatchExpression): Value {
+    // Evaluate the expression being matched
+    const value = this.evaluateExpression(expr.expression);
+    
+    // Try each case until one matches
+    for (const matchCase of expr.cases) {
+      const matchResult = this.tryMatchPattern(matchCase.pattern, value);
+      if (matchResult.matched) {
+        // Create new environment with pattern bindings
+        const savedEnv = new Map(this.environment);
+        
+        // Add bindings to environment
+        for (const [name, boundValue] of matchResult.bindings) {
+          this.environment.set(name, boundValue);
+        }
+        
+        try {
+          // Evaluate the case expression
+          const result = this.evaluateExpression(matchCase.expression);
+          return result;
+        } finally {
+          // Restore environment
+          this.environment = savedEnv;
+        }
+      }
+    }
+    
+    throw new Error("No pattern matched in match expression");
+  }
+
+  private tryMatchPattern(pattern: Pattern, value: Value): { matched: boolean; bindings: Map<string, Value> } {
+    const bindings = new Map<string, Value>();
+    
+    switch (pattern.kind) {
+      case "wildcard":
+        // Wildcard always matches
+        return { matched: true, bindings };
+        
+      case "variable":
+        // Variable always matches and binds the value
+        bindings.set(pattern.name, value);
+        return { matched: true, bindings };
+        
+      case "constructor": {
+        // Constructor pattern only matches constructor values
+        if (value.tag !== 'constructor') {
+          return { matched: false, bindings };
+        }
+        
+        // Check constructor name
+        if (value.name !== pattern.name) {
+          return { matched: false, bindings };
+        }
+        
+        // Check argument count
+        if (pattern.args.length !== value.args.length) {
+          return { matched: false, bindings };
+        }
+        
+        // Match each argument
+        for (let i = 0; i < pattern.args.length; i++) {
+          const argMatch = this.tryMatchPattern(pattern.args[i], value.args[i]);
+          if (!argMatch.matched) {
+            return { matched: false, bindings };
+          }
+          
+          // Merge bindings
+          for (const [name, boundValue] of argMatch.bindings) {
+            bindings.set(name, boundValue);
+          }
+        }
+        
+        return { matched: true, bindings };
+      }
+      
+      case "literal": {
+        // Literal pattern matches if values are equal
+        let matches = false;
+        
+        if (typeof pattern.value === "number" && isNumber(value)) {
+          matches = pattern.value === value.value;
+        } else if (typeof pattern.value === "string" && isString(value)) {
+          matches = pattern.value === value.value;
+        } else if (typeof pattern.value === "boolean" && isBoolean(value)) {
+          matches = pattern.value === value.value;
+        }
+        
+        return { matched: matches, bindings };
+      }
+      
+      default:
+        throw new Error(`Unsupported pattern kind: ${(pattern as Pattern).kind}`);
+    }
+  }
 }
 
 // Move valueToString to a standalone function
@@ -1358,6 +1565,12 @@ function valueToString(value: Value): string {
     return "<function>";
   } else if (isNativeFunction(value)) {
     return `<native:${value.name}>`;
+  } else if (isConstructor(value)) {
+    if (value.args.length === 0) {
+      return value.name;
+    } else {
+      return `${value.name} ${value.args.map(valueToString).join(" ")}`;
+    }
   } else if (isUnit(value)) {
     return "unit";
   }

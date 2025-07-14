@@ -195,7 +195,115 @@ first_record = head record_list;
 record_count = length record_list;
 
 # ========================================
-# 11. FINAL DEMONSTRATION
+# 11. ALGEBRAIC DATA TYPES (ADTs) - NEW FEATURE!
+# ========================================
+
+# ========================================
+# 11.1 BUILT-IN OPTION TYPE
+# ========================================
+
+# Option type for handling nullable values safely
+safe_divide = fn a b => if b == 0 then None else Some (a / b);
+division_result = safe_divide 10 2;
+zero_division = safe_divide 10 0;
+
+# Pattern matching on Option
+handle_option = fn opt => match opt with (
+  Some value => value * 2;
+  None => 0
+);
+
+safe_result = handle_option division_result;
+zero_result = handle_option zero_division;
+
+# ========================================
+# 11.2 BUILT-IN RESULT TYPE
+# ========================================
+
+# Result type for error handling
+parse_number = fn str => if str == "42" then Ok 42 else Err "Invalid number";
+valid_parse = parse_number "42";
+invalid_parse = parse_number "abc";
+
+# Pattern matching on Result
+handle_result = fn res => match res with (
+  Ok value => value + 10;
+  Err msg => 0
+);
+
+valid_result = handle_result valid_parse;
+invalid_result = handle_result invalid_parse;
+
+# ========================================
+# 11.3 CUSTOM ADT DEFINITIONS
+# ========================================
+
+# Simple enum-like ADT
+type Color = Red | Green | Blue;
+favorite_color = Red;
+
+# Pattern matching on custom ADT
+color_to_number = fn color => match color with (
+  Red => 1;
+  Green => 2;
+  Blue => 3
+);
+
+color_value = color_to_number favorite_color;
+
+# ADT with parameters
+type Point a = Point a a;
+origin = Point 0 0;
+float_point = Point 1.5 2.7;
+
+# Pattern matching with parameter extraction
+get_x = fn point => match point with (Point x y => x);
+get_y = fn point => match point with (Point x y => y);
+
+origin_x = get_x origin;
+float_y = get_y float_point;
+
+# ========================================
+# 11.4 ADT PATTERN MATCHING FEATURES
+# ========================================
+
+# Multiple constructor ADT
+type Shape = Circle Int | Rectangle Int Int | Triangle Int Int Int;
+
+circle = Circle 5;
+rectangle = Rectangle 10 20;
+triangle = Triangle 3 4 5;
+
+# Pattern matching with multiple patterns
+calculate_area = fn shape => match shape with (
+  Circle radius => radius * radius * 3;
+  Rectangle width height => width * height;
+  Triangle a b c => (a * b) / 2
+);
+
+circle_area = calculate_area circle;
+rectangle_area = calculate_area rectangle;
+triangle_area = calculate_area triangle;
+
+# ========================================
+# 11.5 ADT INTEGRATION WITH EXISTING FEATURES
+# ========================================
+
+# Using ADTs with higher-order functions
+shapes = [Circle 3, Rectangle 5 4, Triangle 2 3 4];
+areas = map calculate_area shapes;
+
+# Using ADTs with constraint system
+colors = [Red, Green, Blue, Red];
+color_numbers = map color_to_number colors;
+
+# Combining Option with other features
+options = [Some 1, None, Some 3, Some 4];
+extract_or_zero = fn opt => match opt with (Some x => x; None => 0);
+values = map extract_or_zero options;
+
+# ========================================
+# 12. FINAL DEMONSTRATION
 # ========================================
 # Showcase all features working together
 final_demo = {
@@ -214,4 +322,32 @@ final_demo = {
 };
 
 # Final expression to evaluate and return
-final_demo 
+final_demo_with_adts = {
+  @factorial factorial 5,
+  @fibonacci fibonacci 10,
+  @person person,
+  @mapped mapped,
+  @head head_result,
+  @constraint_demo {
+    @head_with_constraint head_with_constraint,
+    @safe_head_result safe_head_result,
+    @record_name record_name,
+    @first_string first_string,
+    @first_record first_record
+  },
+  @adt_demo {
+    @option_safe_result safe_result,
+    @option_zero_result zero_result,
+    @result_valid valid_result,
+    @result_invalid invalid_result,
+    @color_value color_value,
+    @point_coordinates { @x origin_x, @y float_y },
+    @shape_areas { @circle circle_area, @rectangle rectangle_area, @triangle triangle_area },
+    @computed_areas areas,
+    @color_mappings color_numbers,
+    @option_values values
+  }
+};
+
+# Final expression to evaluate and return  
+final_demo_with_adts 

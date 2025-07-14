@@ -28,6 +28,11 @@ import {
   tupleType,
   tupleTypeConstructor,
   ConstraintExpr,
+  TypeDefinitionExpression,
+  MatchExpression,
+  ConstructorDefinition,
+  Pattern,
+  MatchCase,
 } from "../ast";
 import * as C from "./combinators";
 
@@ -159,6 +164,40 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
       value: tupleTypeConstructor(elementTypes),
       remaining: tupleConstructorResult.remaining,
     };
+  }
+
+  // Try parenthesized type: (Type)
+  const parenResult = C.seq(
+    C.punctuation("("),
+    C.lazy(() => parseTypeExpression),
+    C.punctuation(")")
+  )(tokens);
+  if (parenResult.success) {
+    return {
+      success: true as const,
+      value: parenResult.value[1],
+      remaining: parenResult.remaining,
+    };
+  }
+
+  // Try user-defined type constructor: TypeName arg1 arg2 ...
+  if (tokens.length > 0 && tokens[0].type === "IDENTIFIER" && /^[A-Z]/.test(tokens[0].value)) {
+    const typeNameResult = C.identifier()(tokens);
+    if (typeNameResult.success) {
+      // Try to parse type arguments
+      const argsResult = C.many(C.lazy(() => parseTypeAtom))(typeNameResult.remaining);
+      if (argsResult.success) {
+        return {
+          success: true as const,
+          value: {
+            kind: "variant",
+            name: typeNameResult.value.value,
+            args: argsResult.value
+          } as Type,
+          remaining: argsResult.remaining,
+        };
+      }
+    }
   }
 
   return {
@@ -1216,6 +1255,94 @@ const parseWhereDefinition: C.Parser<
   };
 };
 
+// --- ADT Constructor ---
+const parseConstructor: C.Parser<ConstructorDefinition> = C.map(
+  C.seq(
+    C.identifier(),
+    C.many(parseTypeAtom)
+  ),
+  ([name, args]): ConstructorDefinition => ({
+    name: name.value,
+    args,
+    location: createLocation(name.location.start, name.location.end),
+  })
+);
+
+// --- Type Definition ---
+const parseTypeDefinition: C.Parser<TypeDefinitionExpression> = C.map(
+  C.seq(
+    C.keyword("type"),
+    C.identifier(),
+    C.many(C.identifier()),
+    C.operator("="),
+    C.sepBy(parseConstructor, C.operator("|"))
+  ),
+  ([type, name, typeParams, equals, constructors]): TypeDefinitionExpression => ({
+    kind: "type-definition",
+    name: name.value,
+    typeParams: typeParams.map((p: any) => p.value),
+    constructors,
+    location: createLocation(type.location.start, constructors[constructors.length - 1]?.location.end || equals.location.end),
+  })
+);
+
+// --- Pattern Parsing ---
+const parsePattern: C.Parser<Pattern> = C.choice(
+  // Wildcard pattern: _
+  C.map(C.punctuation("_"), (underscore): Pattern => ({
+    kind: "wildcard",
+    location: underscore.location,
+  })),
+  // Constructor pattern: Some x (identifier followed by patterns)
+  C.map(
+    C.seq(C.identifier(), C.many1(C.lazy(() => parsePattern))),
+    ([name, args]): Pattern => ({
+      kind: "constructor",
+      name: name.value,
+      args,
+      location: createLocation(name.location.start, args[args.length - 1].location.end),
+    })
+  ),
+  // Variable pattern: x (single identifier)
+  C.map(C.identifier(), (name): Pattern => ({
+    kind: "variable",
+    name: name.value,
+    location: name.location,
+  }))
+);
+
+// --- Match Case ---
+const parseMatchCase: C.Parser<MatchCase> = C.map(
+  C.seq(
+    parsePattern,
+    C.operator("=>"),
+    C.lazy(() => parseSequenceTermWithIfExceptRecord)
+  ),
+  ([pattern, arrow, expression]): MatchCase => ({
+    pattern,
+    expression,
+    location: createLocation(pattern.location.start, expression.location.end),
+  })
+);
+
+// --- Match Expression ---
+const parseMatchExpression: C.Parser<MatchExpression> = C.map(
+  C.seq(
+    C.keyword("match"),
+    C.lazy(() => parseSequenceTermWithIfExceptRecord),
+    C.keyword("with"),
+    C.punctuation("("),
+    C.sepBy(parseMatchCase, C.punctuation(";")),
+    C.punctuation(")")
+  ),
+  ([match, expression, with_, openParen, cases, closeParen]): MatchExpression => ({
+    kind: "match",
+    expression,
+    cases,
+    location: createLocation(match.location.start, closeParen.location.end),
+  })
+);
+
 // --- Where Expression ---
 const parseWhereExpression: C.Parser<WhereExpression> = C.map(
   C.seq(
@@ -1235,8 +1362,11 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
   }
 );
 
+
 // --- Sequence term: everything else ---
 const parseSequenceTerm: C.Parser<Expression> = C.choice(
+  parseTypeDefinition, // ADT type definitions
+  parseMatchExpression, // ADT pattern matching
   parseDefinitionWithType, // allow definitions with type annotations
   parseDefinition, // fallback to regular definitions
   parseMutableDefinition,
@@ -1252,6 +1382,8 @@ const parseSequenceTerm: C.Parser<Expression> = C.choice(
 
 // Version without records to avoid circular dependency
 const parseSequenceTermExceptRecord: C.Parser<Expression> = C.choice(
+  parseTypeDefinition, // ADT type definitions
+  parseMatchExpression, // ADT pattern matching
   parseDefinition,
   parseMutableDefinition,
   parseMutation,
@@ -1278,6 +1410,8 @@ const parseSequenceTermWithIfExceptRecord: C.Parser<Expression> = C.choice(
 
 // --- Sequence Term: definition or expression ---
 const parseSequenceTermNew: C.Parser<Expression> = C.choice(
+  parseTypeDefinition, // ADT type definitions
+  parseMatchExpression, // ADT pattern matching
   parseDefinitionWithType, // allow definitions
   parseDollar, // allow full expressions with precedence
   parseIfExpression,

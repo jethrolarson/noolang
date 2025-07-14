@@ -28,6 +28,7 @@ An expression-based, LLM-friendly programming language designed for linear, decl
 - **Explicit effects**: Effects are tracked in the type system and visible in function types
 - **Recursion**: Full support for recursive functions with proper closure handling
 - **Mutation**: Local mutation with `mut` and `mut!` syntax
+- **Algebraic Data Types (ADTs)**: Custom types with constructors and pattern matching
 
 ## Installation
 
@@ -108,6 +109,18 @@ mut! counter = counter + 1
 
 # List operations
 [1, 2, 3] |> tail |> head
+
+# Algebraic Data Types
+type Color = Red | Green | Blue;
+favorite = Red;
+
+type Option a = Some a | None;
+result = match (Some 42) with (Some x => x; None => 0)
+
+# Pattern matching
+type Point = Point Int Int;
+point = Point 10 20;
+x = match point with (Point x y => x)
 ```
 
 ## Language Syntax
@@ -301,6 +314,149 @@ Noolang uses commas as separators for all data structures:
 - **Math utilities**: `abs`, `max`, `min`
 - **String utilities**: `concat`, `toString`
 - **Utility**: `print`
+
+## Algebraic Data Types (ADTs)
+
+Noolang supports **Algebraic Data Types** for creating custom types with constructors and pattern matching. This enables type-safe modeling of complex data structures and provides powerful pattern-based control flow.
+
+### Type Definitions
+
+Define custom types with multiple constructors:
+
+```noolang
+# Simple enum-like types
+type Color = Red | Green | Blue;
+
+# Types with parameters
+type Option a = Some a | None;
+type Result a b = Ok a | Err b;
+
+# Types with multiple parameters
+type Point a = Point a a;
+type Shape = Circle Int | Rectangle Int Int;
+```
+
+### Built-in ADTs
+
+Noolang provides two essential ADTs out of the box:
+
+#### Option Type
+For handling nullable values safely:
+
+```noolang
+# Creating Option values
+some_value = Some 42;
+no_value = None;
+
+# Safe division function
+safe_divide = fn a b => if b == 0 then None else Some (a / b);
+result = safe_divide 10 2;  # Some 5
+```
+
+#### Result Type  
+For error handling:
+
+```noolang
+# Creating Result values
+success = Ok "Operation succeeded";
+failure = Err "Something went wrong";
+
+# Function that may fail
+parse_number = fn str => if str == "42" then Ok 42 else Err "Invalid";
+valid = parse_number "42";    # Ok 42
+invalid = parse_number "abc"; # Err "Invalid"
+```
+
+### Pattern Matching
+
+Use `match` expressions to destructure ADTs and handle different cases:
+
+```noolang
+# Basic pattern matching
+handle_option = fn opt => match opt with (
+  Some value => value * 2;
+  None => 0
+);
+
+# Pattern matching with multiple constructors
+area = fn shape => match shape with (
+  Circle radius => radius * radius * 3;
+  Rectangle width height => width * height;
+  Triangle a b c => (a * b) / 2
+);
+
+# Extracting values from constructors
+get_coordinate = fn point => match point with (
+  Point x y => { @x x, @y y }
+);
+```
+
+### Constructor Functions
+
+ADT constructors are automatically created as curried functions:
+
+```noolang
+type Point a = Point a a;
+
+# Constructors work as functions
+origin = Point 0 0;
+make_point = Point;        # Partially applied constructor
+point_10 = make_point 10;  # Function waiting for second argument
+complete = point_10 20;    # Point 10 20
+```
+
+### Integration with Existing Features
+
+ADTs work seamlessly with Noolang's existing features:
+
+```noolang
+# With higher-order functions
+options = [Some 1, None, Some 3];
+extract = fn opt => match opt with (Some x => x; None => 0);
+values = map extract options;  # [1, 0, 3]
+
+# With type constraints (automatic)
+shapes = [Circle 5, Rectangle 10 20];
+areas = map area shapes;       # Areas of all shapes
+
+# With pipeline operators
+result = Some 42 | match (Some x => x * 2; None => 0);  # 84
+```
+
+### Pattern Syntax
+
+Pattern matching supports various pattern types:
+
+```noolang
+# Constructor patterns with variables
+match value with (Some x => x; None => 0)
+
+# Nested patterns (for complex ADTs)
+match nested with (Some (Point x y) => x + y; _ => 0)
+
+# Wildcard patterns
+match color with (Red => 1; _ => 0)
+```
+
+### Type Safety
+
+ADTs provide compile-time type safety:
+
+- **Constructor validation**: Wrong number of arguments to constructors is caught
+- **Pattern completeness**: Missing pattern cases are detected  
+- **Type inference**: ADT types are inferred correctly
+- **Constraint propagation**: Type constraints work with custom ADTs
+
+### Current Implementation Status
+
+- ✅ **Type definitions**: `type Name = Constructor1 | Constructor2`
+- ✅ **Pattern matching**: `match expr with (pattern => expr; ...)`  
+- ✅ **Built-in types**: Option and Result types with utility functions
+- ✅ **Constructor functions**: Automatic curried constructor creation
+- ✅ **Type checking**: Full type safety with inference
+- ✅ **Integration**: Works with all existing language features
+- 🚧 **Recursive types**: Basic support (some edge cases need work)
+- 🚧 **Complex patterns**: Nested and literal patterns (partial support)
 
 ## Duck-Typed Records and Accessors
 
