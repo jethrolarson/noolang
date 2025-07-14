@@ -305,10 +305,6 @@ function typeToString(type: Type): string {
       } else {
         return `${type.name} ${type.args.map(typeToString).join(' ')}`;
       }
-    case 'result':
-      return `Result ${typeToString(type.success)} ${typeToString(type.error)}`;
-    case 'option':
-      return `Option ${typeToString(type.element)}`;
     case 'unit':
       return 'unit';
     case 'unknown':

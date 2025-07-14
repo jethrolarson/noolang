@@ -59,7 +59,7 @@ function assertAccessorExpression(expr: Expression): AccessorExpression {
   return expr;
 }
 
-describe('Parser', () => {
+describe("Parser", () => {
   test("should parse simple literals", () => {
     const lexer = new Lexer("42");
     const tokens = lexer.tokenize();
@@ -81,13 +81,13 @@ describe('Parser', () => {
   });
 
   test("should parse boolean literals", () => {
-    const lexer = new Lexer("true");
+    const lexer = new Lexer("True");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
 
     expect(program.statements).toHaveLength(1);
-    expect(program.statements[0].kind).toBe("literal");
-    expect((program.statements[0] as any).value).toBe(true);
+    expect(program.statements[0].kind).toBe("variable");
+    expect((program.statements[0] as any).name).toBe("True");
   });
 
   test("should parse variable references", () => {
@@ -153,14 +153,14 @@ describe('Parser', () => {
   });
 
   test("should parse if expressions", () => {
-    const lexer = new Lexer("if true then 1 else 2");
+    const lexer = new Lexer("if True then 1 else 2");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
 
     expect(program.statements).toHaveLength(1);
     expect(program.statements[0].kind).toBe("if");
     const ifExpr = program.statements[0] as any;
-    expect(ifExpr.condition.value).toBe(true);
+    expect(ifExpr.condition.name).toBe("True");
     expect(ifExpr.then.value).toBe(1);
     expect(ifExpr.else.value).toBe(2);
   });
@@ -399,7 +399,7 @@ describe('Parser', () => {
   });
 
   test("should parse thrush operator after record", () => {
-    const lexer = new Lexer("{@key 1, @key2 false} | @key");
+    const lexer = new Lexer("{@key 1, @key2 False} | @key");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     expect(program.statements).toHaveLength(1);
@@ -411,19 +411,19 @@ describe('Parser', () => {
     expect(expr.left.kind).toBe("record");
     expect(expr.right.kind).toBe("accessor");
   });
-}); 
+});
 
-describe('Top-level sequence parsing', () => {
-  test('multiple definitions and final expression', () => {
-    const lexer = new Lexer('a = 1; b = 2; a + b');
+describe("Top-level sequence parsing", () => {
+  test("multiple definitions and final expression", () => {
+    const lexer = new Lexer("a = 1; b = 2; a + b");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     expect(program.statements).toHaveLength(1);
     const seq = program.statements[0];
-    expect(seq.kind).toBe('binary'); // semicolon sequence
+    expect(seq.kind).toBe("binary"); // semicolon sequence
   });
 
-  test('multiple definitions and final record', () => {
+  test("multiple definitions and final record", () => {
     const code = `
       add = fn x y => x + y;
       sub = fn x y => x - y;
@@ -435,18 +435,18 @@ describe('Top-level sequence parsing', () => {
     const program = parse(tokens);
     expect(program.statements).toHaveLength(1);
     const seq = program.statements[0];
-    expect(seq.kind).toBe('binary');
+    expect(seq.kind).toBe("binary");
   });
 
-  test('sequence with trailing semicolon', () => {
-    const lexer = new Lexer('a = 1; b = 2; a + b;');
+  test("sequence with trailing semicolon", () => {
+    const lexer = new Lexer("a = 1; b = 2; a + b;");
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     expect(program.statements).toHaveLength(1);
     const seq = program.statements[0];
-    expect(seq.kind).toBe('binary');
+    expect(seq.kind).toBe("binary");
   });
-}); 
+});
 
 describe("Type annotation parsing", () => {
   function parseType(typeSrc: string) {
@@ -506,7 +506,7 @@ describe("Type annotation parsing", () => {
     expect(result.value.fields).toHaveProperty("person");
     expect(result.value.fields).toHaveProperty("active");
     expect(result.value.fields.person.kind).toBe("record");
-    expect(result.value.fields.active.kind).toBe("primitive");
+    expect(result.value.fields.active.kind).toBe("variant");
   });
 });
 

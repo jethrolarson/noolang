@@ -604,3 +604,4 @@ Exports: { add: Function, multiply: Function, square: Function }
 # Things the human is tracking
 * Type and parser errors should show the source code line and the line above and below
 * Need to add a FFI of some kind, maybe just to js or TS
+* Need to add support for Float

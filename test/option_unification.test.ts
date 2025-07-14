@@ -5,20 +5,27 @@ import { Evaluator, Value } from "../src/evaluator";
 
 function unwrapValue(val: Value): any {
   if (val === null) return null;
-  if (typeof val !== 'object') return val;
+  if (typeof val !== "object") return val;
   switch (val.tag) {
-    case 'number': return val.value;
-    case 'string': return val.value;
-    case 'boolean': return val.value;
-    case 'list': return val.values.map(unwrapValue);
-    case 'tuple': return val.values.map(unwrapValue);
-    case 'record': {
+    case "number":
+      return val.value;
+    case "string":
+      return val.value;
+    case "constructor":
+      if (val.name === "True") return true;
+      if (val.name === "False") return false;
+      return { name: val.name, args: val.args.map(unwrapValue) };
+    case "list":
+      return val.values.map(unwrapValue);
+    case "tuple":
+      return val.values.map(unwrapValue);
+    case "record": {
       const obj: any = {};
       for (const k in val.fields) obj[k] = unwrapValue(val.fields[k]);
       return obj;
     }
-    case 'constructor': return { name: val.name, args: val.args.map(unwrapValue) };
-    default: return val;
+    default:
+      return val;
   }
 }
 
@@ -56,7 +63,7 @@ describe("Option Type Unification Tests", () => {
   test.skip("should handle Option in conditional expressions", () => {
     // FIXME: Currently fails with "Cannot unify Option a with Option a"
     const code = `
-      result = if true then Some 42 else None;
+      result = if True then Some 42 else None;
       result
     `;
     const result = runCode(code);

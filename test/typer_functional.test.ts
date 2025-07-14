@@ -32,7 +32,7 @@ describe("Functional Type Inference", () => {
     });
 
     it("should infer boolean literal", () => {
-      const program = parseProgram("true");
+      const program = parseProgram("True");
       const result = typeProgram(program);
       expect(typeToString(result.type, result.state.substitution)).toBe("Bool");
     });
@@ -132,13 +132,13 @@ describe("Functional Type Inference", () => {
 
   describe("If Expressions", () => {
     it("should infer if expression with same types", () => {
-      const program = parseProgram("if true then 1 else 2");
+      const program = parseProgram("if True then 1 else 2");
       const result = typeProgram(program);
       expect(typeToString(result.type, result.state.substitution)).toBe("Int");
     });
 
     it("should handle if expression with different types", () => {
-      const program = parseProgram('if true then 1 else "hello"');
+      const program = parseProgram('if True then 1 else "hello"');
       expect(() => typeProgram(program)).toThrow();
     });
   });

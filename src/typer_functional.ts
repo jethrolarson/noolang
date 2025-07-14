@@ -863,31 +863,42 @@ const flattenStatements = (expr: Expression): Expression[] => {
 // Load standard library from stdlib.noo
 export const loadStdlib = (state: TypeState): TypeState => {
   try {
+    // Check if fs functions are available (they might not be in test environments)
+    if (
+      typeof fs.existsSync !== "function" ||
+      typeof fs.readFileSync !== "function"
+    ) {
+      console.warn(
+        `Warning: File system functions not available, skipping stdlib loading`
+      );
+      return state;
+    }
+
     // Find stdlib.noo relative to this file
-    const stdlibPath = path.join(__dirname, '..', 'stdlib.noo');
-    
+    const stdlibPath = path.join(__dirname, "..", "stdlib.noo");
+
     if (!fs.existsSync(stdlibPath)) {
       console.warn(`Warning: stdlib.noo not found at ${stdlibPath}`);
       return state;
     }
 
-    const stdlibContent = fs.readFileSync(stdlibPath, 'utf-8');
+    const stdlibContent = fs.readFileSync(stdlibPath, "utf-8");
     const lexer = new Lexer(stdlibContent);
     const tokens = lexer.tokenize();
     const stdlibProgram = parse(tokens);
-    
+
     // Flatten any semicolon-separated statements
     const allStatements: Expression[] = [];
     for (const statement of stdlibProgram.statements) {
       allStatements.push(...flattenStatements(statement));
     }
-    
+
     let currentState = state;
     for (const statement of allStatements) {
       const result = typeExpression(statement, currentState);
       currentState = result.state;
     }
-    
+
     return currentState;
   } catch (error) {
     console.warn(`Warning: Failed to load stdlib.noo:`, error);
@@ -944,12 +955,25 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
   });
 
   // List operations (pure) - with constraints for safety
+  const headType = functionType(
+    [listTypeWithElement(typeVariable("a"))],
+    typeVariable("a")
+  ) as Type & { constraints: Constraint[] };
+  // Add constraint that the parameter must be a Collection
+  headType.constraints = [isConstraint("a", "Collection")];
   newEnv.set("head", {
-    type: functionType([listTypeWithElement(typeVariable("a"))], typeVariable("a")),
+    type: headType,
     quantifiedVars: ["a"],
   });
+
+  const tailType = functionType(
+    [listTypeWithElement(typeVariable("a"))],
+    listTypeWithElement(typeVariable("a"))
+  ) as Type & { constraints: Constraint[] };
+  // Add constraint that the parameter must be a Collection
+  tailType.constraints = [isConstraint("a", "Collection")];
   newEnv.set("tail", {
-    type: functionType([listTypeWithElement(typeVariable("a"))], listTypeWithElement(typeVariable("a"))),
+    type: tailType,
     quantifiedVars: ["a"],
   });
   newEnv.set("cons", {
@@ -1034,8 +1058,14 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
     ),
     quantifiedVars: [],
   });
+  const lengthType = functionType(
+    [listTypeWithElement(typeVariable("a"))],
+    intType()
+  ) as Type & { constraints: Constraint[] };
+  // Add constraint that the parameter must be a Collection
+  lengthType.constraints = [isConstraint("a", "Collection")];
   newEnv.set("length", {
-    type: functionType([listTypeWithElement(typeVariable("a"))], intType()),
+    type: lengthType,
     quantifiedVars: ["a"],
   });
   newEnv.set("isEmpty", {
@@ -1110,76 +1140,96 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 
   // Built-in ADT constructors
   // Option type constructors
-  const optionType = (elementType: Type): Type => ({ kind: "variant", name: "Option", args: [elementType] });
-  
-  newEnv.set("Some", {
-    type: functionType([typeVariable("a")], optionType(typeVariable("a"))),
-    quantifiedVars: ["a"]
-  });
-  
-  newEnv.set("None", {
-    type: optionType(typeVariable("a")),
-    quantifiedVars: ["a"]
+  const optionType = (elementType: Type): Type => ({
+    kind: "variant",
+    name: "Option",
+    args: [elementType],
   });
 
-  // Result type constructors  
-  const resultType = (successType: Type, errorType: Type): Type => ({ kind: "variant", name: "Result", args: [successType, errorType] });
-  
-  newEnv.set("Ok", {
-    type: functionType([typeVariable("a")], resultType(typeVariable("a"), typeVariable("b"))),
-    quantifiedVars: ["a", "b"]
+  newEnv.set("Some", {
+    type: functionType([typeVariable("a")], optionType(typeVariable("a"))),
+    quantifiedVars: ["a"],
   });
-  
+
+  newEnv.set("None", {
+    type: optionType(typeVariable("a")),
+    quantifiedVars: ["a"],
+  });
+
+  // Result type constructors
+  const resultType = (successType: Type, errorType: Type): Type => ({
+    kind: "variant",
+    name: "Result",
+    args: [successType, errorType],
+  });
+
+  newEnv.set("Ok", {
+    type: functionType(
+      [typeVariable("a")],
+      resultType(typeVariable("a"), typeVariable("b"))
+    ),
+    quantifiedVars: ["a", "b"],
+  });
+
   newEnv.set("Err", {
-    type: functionType([typeVariable("b")], resultType(typeVariable("a"), typeVariable("b"))),
-    quantifiedVars: ["a", "b"]
+    type: functionType(
+      [typeVariable("b")],
+      resultType(typeVariable("a"), typeVariable("b"))
+    ),
+    quantifiedVars: ["a", "b"],
   });
 
   // Register ADTs in the registry
   const newRegistry = new Map(state.adtRegistry);
-  
+
   newRegistry.set("Option", {
     typeParams: ["a"],
     constructors: new Map([
       ["Some", [typeVariable("a")]],
-      ["None", []]
-    ])
+      ["None", []],
+    ]),
   });
-  
+
   newRegistry.set("Result", {
-    typeParams: ["a", "b"], 
+    typeParams: ["a", "b"],
     constructors: new Map([
       ["Ok", [typeVariable("a")]],
-      ["Err", [typeVariable("b")]]
-    ])
+      ["Err", [typeVariable("b")]],
+    ]),
   });
 
   // Utility functions for Option and Result
   // Option utilities
   newEnv.set("isSome", {
     type: functionType([optionType(typeVariable("a"))], boolType()),
-    quantifiedVars: ["a"]
+    quantifiedVars: ["a"],
   });
-  
+
   newEnv.set("isNone", {
     type: functionType([optionType(typeVariable("a"))], boolType()),
-    quantifiedVars: ["a"]
+    quantifiedVars: ["a"],
   });
-  
+
   newEnv.set("unwrap", {
     type: functionType([optionType(typeVariable("a"))], typeVariable("a")),
-    quantifiedVars: ["a"]
+    quantifiedVars: ["a"],
   });
 
   // Result utilities
   newEnv.set("isOk", {
-    type: functionType([resultType(typeVariable("a"), typeVariable("b"))], boolType()),
-    quantifiedVars: ["a", "b"]
+    type: functionType(
+      [resultType(typeVariable("a"), typeVariable("b"))],
+      boolType()
+    ),
+    quantifiedVars: ["a", "b"],
   });
-  
+
   newEnv.set("isErr", {
-    type: functionType([resultType(typeVariable("a"), typeVariable("b"))], boolType()),
-    quantifiedVars: ["a", "b"]
+    type: functionType(
+      [resultType(typeVariable("a"), typeVariable("b"))],
+      boolType()
+    ),
+    quantifiedVars: ["a", "b"],
   });
 
   return { ...state, environment: newEnv, adtRegistry: newRegistry };
@@ -1306,21 +1356,21 @@ export const typeFunction = (
 
   // Special handling for constrained function bodies
   let funcType: Type;
-  
+
   if (expr.body.kind === "constrained") {
     const constrainedBody = expr.body as ConstrainedExpression;
     const constraints = flattenConstraintExpr(constrainedBody.constraint);
-    
+
     // If the constrained body has an explicit function type, use it as the innermost type
     if (constrainedBody.type.kind === "function") {
       funcType = constrainedBody.type;
-      
+
       // Apply constraints to this function type
       if (constraints.length > 0) {
         funcType.constraints = constraints;
         // Store the original constraint expression for display purposes
         (funcType as any).originalConstraint = constrainedBody.constraint;
-        
+
         // CRITICAL: Also propagate constraints to type variables in parameters
         // This ensures constraint validation works during function application
         for (const constraint of constraints) {
@@ -1329,7 +1379,7 @@ export const typeFunction = (
           }
         }
       }
-      
+
       // If we have more parameters than the explicit type accounts for, wrap it
       const explicitParamCount = countFunctionParams(constrainedBody.type);
       const actualParamCount = paramTypes.length;
@@ -1401,14 +1451,26 @@ export const typeApplication = (
 
     // Unify each argument with the corresponding parameter type
     for (let i = 0; i < argTypes.length; i++) {
-      currentState = unify(funcType.params[i], argTypes[i], currentState, {
-        line: expr.location?.start.line || 1,
-        column: expr.location?.start.column || 1,
-      }, {
-        reason: 'function_application',
-        operation: `applying argument ${i + 1}`,
-        hint: `Argument ${i + 1} has type ${typeToString(argTypes[i], currentState.substitution)} but the function parameter expects ${typeToString(funcType.params[i], currentState.substitution)}.`
-      });
+      currentState = unify(
+        funcType.params[i],
+        argTypes[i],
+        currentState,
+        {
+          line: expr.location?.start.line || 1,
+          column: expr.location?.start.column || 1,
+        },
+        {
+          reason: "function_application",
+          operation: `applying argument ${i + 1}`,
+          hint: `Argument ${i + 1} has type ${typeToString(
+            argTypes[i],
+            currentState.substitution
+          )} but the function parameter expects ${typeToString(
+            funcType.params[i],
+            currentState.substitution
+          )}.`,
+        }
+      );
 
       // After unification, validate constraints on the parameter
       const substitutedParam = substitute(
@@ -1469,6 +1531,40 @@ export const typeApplication = (
                     createTypeError(
                       `Type ${typeToString(
                         concreteType,
+                        currentState.substitution
+                      )} does not satisfy constraint '${
+                        constraint.constraint
+                      }'`,
+                      {},
+                      {
+                        line: expr.location?.start.line || 1,
+                        column: expr.location?.start.column || 1,
+                      }
+                    )
+                  )
+                );
+              }
+            }
+          }
+        }
+      }
+
+      // CRITICAL: Also check if the argument type itself satisfies constraints
+      // This is needed for cases where the argument is a concrete type that should satisfy constraints
+      if (substitutedArg.kind !== "variable") {
+        // Check if the parameter has constraints that the argument should satisfy
+        if (
+          substitutedParam.kind === "variable" &&
+          substitutedParam.constraints
+        ) {
+          for (const constraint of substitutedParam.constraints) {
+            if (constraint.kind === "is") {
+              if (!satisfiesConstraint(substitutedArg, constraint.constraint)) {
+                throw new Error(
+                  formatTypeError(
+                    createTypeError(
+                      `Type ${typeToString(
+                        substitutedArg,
                         currentState.substitution
                       )} does not satisfy constraint '${
                         constraint.constraint
@@ -1625,14 +1721,28 @@ export const typeBinary = (
   );
 
   // Unify operator type with expected type
-  currentState = unify(operatorType, expectedType, currentState, {
-    line: expr.location?.start.line || 1,
-    column: expr.location?.start.column || 1,
-  }, {
-    reason: 'operator_application',
-    operation: `applying operator ${expr.operator}`,
-    hint: `The ${expr.operator} operator expects compatible operand types. Left operand: ${typeToString(leftResult.type, currentState.substitution)}, Right operand: ${typeToString(rightResult.type, currentState.substitution)}.`
-  });
+  currentState = unify(
+    operatorType,
+    expectedType,
+    currentState,
+    {
+      line: expr.location?.start.line || 1,
+      column: expr.location?.start.column || 1,
+    },
+    {
+      reason: "operator_application",
+      operation: `applying operator ${expr.operator}`,
+      hint: `The ${
+        expr.operator
+      } operator expects compatible operand types. Left operand: ${typeToString(
+        leftResult.type,
+        currentState.substitution
+      )}, Right operand: ${typeToString(
+        rightResult.type,
+        currentState.substitution
+      )}.`,
+    }
+  );
 
   // Apply substitution to get final result type
   const [finalResultType, finalResultState] = freshenTypeVariables(
@@ -2209,7 +2319,6 @@ const applyConstraintToTypeVariable = (
   }
 };
 
-
 // Flatten a constraint expression into a list of atomic constraints
 const flattenConstraintExpr = (expr: ConstraintExpr): Constraint[] => {
   switch (expr.kind) {
@@ -2685,15 +2794,15 @@ export const typeToString = (
 
         const constraintStr =
           showConstraints && t.constraints && t.constraints.length > 0
-            ? ` given ${(t as any).originalConstraint 
-                ? formatConstraintExpr((t as any).originalConstraint)
-                : deduplicateConstraints(t.constraints)
-                    .map(formatConstraint)
-                    .join(" ")}`
+            ? ` given ${
+                (t as any).originalConstraint
+                  ? formatConstraintExpr((t as any).originalConstraint)
+                  : deduplicateConstraints(t.constraints)
+                      .map(formatConstraint)
+                      .join(" ")
+              }`
             : "";
-        return constraintStr
-          ? `${baseType}${constraintStr}`
-          : baseType;
+        return constraintStr ? `${baseType}${constraintStr}` : baseType;
       }
       case "variable": {
         let varStr = "";
@@ -2747,18 +2856,22 @@ export const typeToString = (
   function formatConstraint(c: Constraint): string {
     switch (c.kind) {
       case "is":
-        return `${c.typeVar} is ${c.constraint}`;
+        // Use the normalized variable name for consistency
+        const normalizedVarName = mapping.get(c.typeVar) || c.typeVar;
+        return `${normalizedVarName} is ${c.constraint}`;
       case "hasField":
         // For hasField constraints, we need to use the normalized variable name
         // that matches the parameter it's constraining
-        const normalizedVarName = mapping.get(c.typeVar) || c.typeVar;
-        return `${normalizedVarName} has field "${c.field}" of type ${norm(
+        const normalizedVarName2 = mapping.get(c.typeVar) || c.typeVar;
+        return `${normalizedVarName2} has field "${c.field}" of type ${norm(
           c.fieldType
         )}`;
       case "implements":
-        return `${c.typeVar} implements ${c.interfaceName}`;
+        const normalizedVarName3 = mapping.get(c.typeVar) || c.typeVar;
+        return `${normalizedVarName3} implements ${c.interfaceName}`;
       case "custom":
-        return `${c.typeVar} satisfies ${c.constraint} ${c.args
+        const normalizedVarName4 = mapping.get(c.typeVar) || c.typeVar;
+        return `${normalizedVarName4} satisfies ${c.constraint} ${c.args
           .map(norm)
           .join(" ")}`;
       default:
@@ -2774,9 +2887,13 @@ export const typeToString = (
       case "custom":
         return formatConstraint(expr);
       case "and":
-        return `${formatConstraintExpr(expr.left)} and ${formatConstraintExpr(expr.right)}`;
+        return `${formatConstraintExpr(expr.left)} and ${formatConstraintExpr(
+          expr.right
+        )}`;
       case "or":
-        return `${formatConstraintExpr(expr.left)} or ${formatConstraintExpr(expr.right)}`;
+        return `${formatConstraintExpr(expr.left)} or ${formatConstraintExpr(
+          expr.right
+        )}`;
       case "paren":
         return `(${formatConstraintExpr(expr.expr)})`;
       default:
@@ -3069,7 +3186,7 @@ function unifyVariant(
   if (!isTypeKind(s1, "variant") || !isTypeKind(s2, "variant")) {
     throw new Error("unifyVariant called with non-variant types");
   }
-  
+
   // Variant types must have the same name (e.g., both "Option")
   if (s1.name !== s2.name) {
     throw new Error(
@@ -3082,7 +3199,7 @@ function unifyVariant(
       )
     );
   }
-  
+
   // Variant types must have the same number of type arguments
   if (s1.args.length !== s2.args.length) {
     throw new Error(
@@ -3095,7 +3212,7 @@ function unifyVariant(
       )
     );
   }
-  
+
   // Unify corresponding type arguments
   let currentState = state;
   for (let i = 0; i < s1.args.length; i++) {
@@ -3233,40 +3350,40 @@ export const typeTypeDefinition = (
 ): TypeResult => {
   // Register the ADT in the registry first to enable recursive references
   const constructorMap = new Map<string, Type[]>();
-  
+
   // Pre-register the ADT so recursive references work
   const newRegistry = new Map(state.adtRegistry);
   newRegistry.set(expr.name, {
     typeParams: expr.typeParams,
-    constructors: constructorMap // Will be filled
+    constructors: constructorMap, // Will be filled
   });
-  
+
   // Also add the ADT type constructor to the environment
   const adtType = {
     kind: "variant" as const,
     name: expr.name,
-    args: expr.typeParams.map(param => typeVariable(param))
+    args: expr.typeParams.map((param) => typeVariable(param)),
   };
   const envWithType = new Map(state.environment);
   envWithType.set(expr.name, {
     type: adtType,
-    quantifiedVars: expr.typeParams
+    quantifiedVars: expr.typeParams,
   });
-  
+
   state = { ...state, adtRegistry: newRegistry, environment: envWithType };
-  
+
   // Process each constructor
   for (const constructor of expr.constructors) {
     constructorMap.set(constructor.name, constructor.args);
-    
+
     // Add constructor to environment as a function
     // Constructor type: arg1 -> arg2 -> ... -> ADTType typeParams
     const adtType: Type = {
       kind: "variant",
       name: expr.name,
-      args: expr.typeParams.map(param => typeVariable(param))
+      args: expr.typeParams.map((param) => typeVariable(param)),
     };
-    
+
     let constructorType: Type;
     if (constructor.args.length === 0) {
       // Nullary constructor: just the ADT type
@@ -3275,27 +3392,27 @@ export const typeTypeDefinition = (
       // N-ary constructor: function from args to ADT type
       constructorType = functionType(constructor.args, adtType);
     }
-    
+
     // Add constructor to environment
     const newEnv = new Map(state.environment);
     newEnv.set(constructor.name, {
       type: constructorType,
-      quantifiedVars: expr.typeParams
+      quantifiedVars: expr.typeParams,
     });
     state = { ...state, environment: newEnv };
   }
-  
+
   // Update ADT registry with completed constructor map
   const finalRegistry = new Map(state.adtRegistry);
   finalRegistry.set(expr.name, {
     typeParams: expr.typeParams,
-    constructors: constructorMap
+    constructors: constructorMap,
   });
-  
+
   // Type definitions return unit and update state
   return {
     type: unitType(),
-    state: { ...state, adtRegistry: finalRegistry }
+    state: { ...state, adtRegistry: finalRegistry },
   };
 };
 
@@ -3307,22 +3424,30 @@ export const typeMatch = (
   // Type the expression being matched
   const exprResult = typeExpression(expr.expression, state);
   let currentState = exprResult.state;
-  
+
   // Type each case and ensure they all return the same type
   if (expr.cases.length === 0) {
     throw new Error("Match expression must have at least one case");
   }
-  
+
   // Type first case to get result type
-  const firstCaseResult = typeMatchCase(expr.cases[0], exprResult.type, currentState);
+  const firstCaseResult = typeMatchCase(
+    expr.cases[0],
+    exprResult.type,
+    currentState
+  );
   currentState = firstCaseResult.state;
   let resultType = firstCaseResult.type;
-  
+
   // Type remaining cases and unify with result type
   for (let i = 1; i < expr.cases.length; i++) {
-    const caseResult = typeMatchCase(expr.cases[i], exprResult.type, currentState);
+    const caseResult = typeMatchCase(
+      expr.cases[i],
+      exprResult.type,
+      currentState
+    );
     currentState = caseResult.state;
-    
+
     // Unify case result type with overall result type
     currentState = unify(
       resultType,
@@ -3332,7 +3457,7 @@ export const typeMatch = (
     );
     resultType = substitute(resultType, currentState.substitution);
   }
-  
+
   return { type: resultType, state: currentState };
 };
 
@@ -3344,15 +3469,15 @@ const typeMatchCase = (
 ): TypeResult => {
   // Type the pattern and get bindings
   const patternResult = typePattern(matchCase.pattern, matchedType, state);
-  
+
   // Create new environment with pattern bindings
   const newEnv = new Map(patternResult.state.environment);
   for (const [name, type] of patternResult.bindings) {
     newEnv.set(name, { type, quantifiedVars: [] });
   }
-  
+
   const envState = { ...patternResult.state, environment: newEnv };
-  
+
   // Type the expression with pattern bindings in scope
   return typeExpression(matchCase.expression, envState);
 };
@@ -3364,22 +3489,22 @@ const typePattern = (
   state: TypeState
 ): { state: TypeState; bindings: Map<string, Type> } => {
   const bindings = new Map<string, Type>();
-  
+
   switch (pattern.kind) {
     case "wildcard":
       // Wildcard matches anything, no bindings
       return { state, bindings };
-      
+
     case "variable":
       // Variable binds to the expected type
       bindings.set(pattern.name, expectedType);
       return { state, bindings };
-      
+
     case "constructor": {
       // Constructor pattern matching with type variable handling
       let actualType = expectedType;
       let currentState = state;
-      
+
       // If expected type is a type variable, we need to find the ADT from the constructor
       if (isTypeKind(expectedType, "variable")) {
         // Find which ADT this constructor belongs to
@@ -3390,60 +3515,88 @@ const typePattern = (
             break;
           }
         }
-        
+
         if (!foundAdt) {
           throw new Error(`Unknown constructor: ${pattern.name}`);
         }
-        
+
         // Create the ADT type with fresh type variables for type parameters
         const adtInfo = state.adtRegistry.get(foundAdt)!;
         const typeArgs: Type[] = [];
+        const substitution = new Map<string, Type>();
         for (let i = 0; i < adtInfo.typeParams.length; i++) {
           const [freshVar, nextState] = freshTypeVariable(currentState);
           typeArgs.push(freshVar);
+          substitution.set(adtInfo.typeParams[i], freshVar);
           currentState = nextState;
         }
         actualType = { kind: "variant", name: foundAdt, args: typeArgs };
-        
+
         // Unify the type variable with the ADT type
         currentState = unify(expectedType, actualType, currentState, undefined);
       } else if (!isTypeKind(expectedType, "variant")) {
-        throw new Error(`Pattern expects constructor but got ${typeToString(expectedType, state.substitution)}`);
+        throw new Error(
+          `Pattern expects constructor but got ${typeToString(
+            expectedType,
+            state.substitution
+          )}`
+        );
       }
-      
+
       // Look up constructor in ADT registry
       if (!isTypeKind(actualType, "variant")) {
-        throw new Error(`Internal error: actualType should be variant but got ${actualType.kind}`);
+        throw new Error(
+          `Internal error: actualType should be variant but got ${actualType.kind}`
+        );
       }
       const adtInfo = state.adtRegistry.get(actualType.name);
       if (!adtInfo) {
         throw new Error(`Unknown ADT: ${actualType.name}`);
       }
-      
+
       const constructorArgs = adtInfo.constructors.get(pattern.name);
       if (!constructorArgs) {
-        throw new Error(`Unknown constructor: ${pattern.name} for ADT ${actualType.name}`);
+        throw new Error(
+          `Unknown constructor: ${pattern.name} for ADT ${actualType.name}`
+        );
       }
-      
+
+      // Create a substitution from type parameters to actual type arguments
+      const paramSubstitution = new Map<string, Type>();
+      for (let i = 0; i < adtInfo.typeParams.length; i++) {
+        paramSubstitution.set(adtInfo.typeParams[i], actualType.args[i]);
+      }
+
+      // Substitute type parameters with actual type arguments
+      const substitutedArgs = constructorArgs.map((arg) =>
+        substitute(arg, paramSubstitution)
+      );
+
       // Check argument count
-      if (pattern.args.length !== constructorArgs.length) {
-        throw new Error(`Constructor ${pattern.name} expects ${constructorArgs.length} arguments but got ${pattern.args.length}`);
+      if (pattern.args.length !== substitutedArgs.length) {
+        throw new Error(
+          `Constructor ${pattern.name} expects ${substitutedArgs.length} arguments but got ${pattern.args.length}`
+        );
       }
-      
+
       // Type each argument pattern
       for (let i = 0; i < pattern.args.length; i++) {
-        const argResult = typePattern(pattern.args[i], constructorArgs[i], currentState);
+        const argResult = typePattern(
+          pattern.args[i],
+          substitutedArgs[i],
+          currentState
+        );
         currentState = argResult.state;
-        
+
         // Merge bindings
         for (const [name, type] of argResult.bindings) {
           bindings.set(name, type);
         }
       }
-      
+
       return { state: currentState, bindings };
     }
-      
+
     case "literal":
       // Literal patterns need to match the expected type
       let literalType: Type;
@@ -3454,10 +3607,15 @@ const typePattern = (
       } else {
         throw new Error(`Unsupported literal pattern: ${pattern.value}`);
       }
-      
-      const unifiedState = unify(expectedType, literalType, state, pattern.location.start);
+
+      const unifiedState = unify(
+        expectedType,
+        literalType,
+        state,
+        pattern.location.start
+      );
       return { state: unifiedState, bindings };
-      
+
     default:
       throw new Error(`Unsupported pattern kind: ${(pattern as Pattern).kind}`);
   }

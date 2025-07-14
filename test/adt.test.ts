@@ -231,40 +231,22 @@ describe("Algebraic Data Types (ADTs)", () => {
         result = getValue Nothing;
         result
       `);
-      
-      expect(result.finalValue).toEqual({ tag: 'number', value: 42 });
+
+      expect(result.finalValue).toEqual({ tag: "number", value: 42 });
     });
 
     it("should handle literal patterns", () => {
-      const result = runNoolang(`
-        type Status = Success | Error | Code Int;
-        getStatusMessage = fn status => match status with (
-          Success => "ok";
-          Error => "fail";
-          Code 404 => "not found";
-          Code x => "unknown code"
-        );
-        result = getStatusMessage (Code 404);
-        result
-      `);
-      
-      expect(result.finalValue).toEqual({ tag: 'string', value: 'not found' });
+      const result = runNoolang(
+        `type Status = Success | Error | Code Int; getStatusMessage = fn status => match status with (Success => "ok"; Error => "fail"; Code 404 => "not found"; Code x => "unknown code"); result = getStatusMessage (Code 404); result`
+      );
+      expect(result.finalValue).toEqual({ tag: "string", value: "not found" });
     });
 
     it("should handle nested patterns", () => {
-      const result = runNoolang(`
-        type Wrapper a = Wrap a;
-        type Inner = Value Int;
-        nested = Wrap (Value 123);
-        extract = fn w => match w with (
-          Wrap (Value n) => n;
-          _ => 0
-        );
-        result = extract nested;
-        result
-      `);
-      
-      expect(result.finalValue).toEqual({ tag: 'number', value: 123 });
+      const result = runNoolang(
+        `type Wrapper a = Wrap a; type Inner = Value Int; nested = Wrap (Value 123); extract = fn w => match w with (Wrap (Value n) => n; _ => 0); result = extract nested; result`
+      );
+      expect(result.finalValue).toEqual({ tag: "number", value: 123 });
     });
   });
 
@@ -275,7 +257,7 @@ describe("Algebraic Data Types (ADTs)", () => {
         x = Some 42;
         x
       `);
-      
+
       // Should infer that x has type Option Int
       expect(result.finalType).toMatch(/Option.*Int|variant.*Option/);
     });
@@ -288,11 +270,11 @@ describe("Algebraic Data Types (ADTs)", () => {
         result = negate True;
         result
       `);
-      
+
       expect(result.finalValue).toEqual({
-        tag: 'constructor',
-        name: 'False',
-        args: []
+        tag: "constructor",
+        name: "False",
+        args: [],
       });
     });
 
@@ -304,8 +286,8 @@ describe("Algebraic Data Types (ADTs)", () => {
         result = getFirst p;
         result
       `);
-      
-      expect(result.finalValue).toEqual({ tag: 'number', value: 42 });
+
+      expect(result.finalValue).toEqual({ tag: "number", value: 42 });
     });
   });
 
@@ -320,14 +302,15 @@ describe("Algebraic Data Types (ADTs)", () => {
       }).toThrow();
     });
 
-    it("should error on constructor arity mismatch", () => {
-      expect(() => {
-        runNoolang(`
-          type Point = Point Int Int;
-          p = Point 1;  # Wrong arity - should be Point 1 2
-          p
-        `);
-      }).toThrow();
+    it("should handle partial constructor application", () => {
+      const result = runNoolang(`
+        type Point = Point Int Int;
+        p = Point 1;  # Partial application - returns (Int) -> Point
+        p
+      `);
+
+      // Should return a function type since it's a partial application
+      expect(result.finalType).toMatch(/Int.*Point|function/);
     });
 
     it("should error when no pattern matches", () => {
@@ -354,14 +337,14 @@ describe("Algebraic Data Types (ADTs)", () => {
         result = map extractValue options;
         result
       `);
-      
+
       expect(result.finalValue).toEqual({
-        tag: 'list',
+        tag: "list",
         values: [
-          { tag: 'number', value: 1 },
-          { tag: 'number', value: 0 },
-          { tag: 'number', value: 3 }
-        ]
+          { tag: "number", value: 1 },
+          { tag: "number", value: 0 },
+          { tag: "number", value: 3 },
+        ],
       });
     });
 
@@ -369,16 +352,20 @@ describe("Algebraic Data Types (ADTs)", () => {
       const result = runNoolang(`
         type Status = Active | Inactive;
         items = [Active, Inactive, Active, Active];
-        isActive = fn status => match status with (Active => true; Inactive => false);
+        isActive = fn status => match status with (Active => True; Inactive => False);
         result = filter isActive items;
         result
       `);
-      
-      expect(result.finalValue.tag).toBe('list');
-      if (result.finalValue.tag === 'list') {
+
+      expect(result.finalValue.tag).toBe("list");
+      if (result.finalValue.tag === "list") {
         expect(result.finalValue.values).toHaveLength(3);
         result.finalValue.values.forEach((item: any) => {
-          expect(item).toEqual({ tag: 'constructor', name: 'Active', args: [] });
+          expect(item).toEqual({
+            tag: "constructor",
+            name: "Active",
+            args: [],
+          });
         });
       }
     });

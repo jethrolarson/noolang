@@ -8,7 +8,10 @@ function unwrapValue(val: Value): any {
   switch (val.tag) {
     case 'number': return val.value;
     case 'string': return val.value;
-    case 'boolean': return val.value;
+    case 'constructor': 
+      if (val.name === 'True') return true;
+      if (val.name === 'False') return false;
+      return val;
     case 'list': return val.values.map(unwrapValue);
     case 'tuple': return val.values.map(unwrapValue);
     case 'record': {

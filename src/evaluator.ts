@@ -72,7 +72,7 @@ export function createFalse(): Value {
 }
 
 export function createBool(value: boolean): Value {
-  return value ? createTrue() : createFalse();
+  return createConstructor(value ? "True" : "False", []);
 }
 
 export function isBool(value: Value): value is { tag: 'constructor'; name: 'True' | 'False'; args: [] } {
@@ -616,25 +616,36 @@ export class Evaluator {
 
   private loadStdlib(): void {
     try {
+      // Check if fs functions are available (they might not be in test environments)
+      if (
+        typeof fs.existsSync !== "function" ||
+        typeof fs.readFileSync !== "function"
+      ) {
+        console.warn(
+          `Warning: File system functions not available, skipping stdlib loading`
+        );
+        return;
+      }
+
       // Find stdlib.noo relative to this file
-      const stdlibPath = path.join(__dirname, '..', 'stdlib.noo');
-      
+      const stdlibPath = path.join(__dirname, "..", "stdlib.noo");
+
       if (!fs.existsSync(stdlibPath)) {
         console.warn(`Warning: stdlib.noo not found at ${stdlibPath}`);
         return;
       }
 
-      const stdlibContent = fs.readFileSync(stdlibPath, 'utf-8');
+      const stdlibContent = fs.readFileSync(stdlibPath, "utf-8");
       const lexer = new Lexer(stdlibContent);
       const tokens = lexer.tokenize();
       const stdlibProgram = parse(tokens);
-      
+
       // Flatten any semicolon-separated statements
       const allStatements: Expression[] = [];
       for (const statement of stdlibProgram.statements) {
         allStatements.push(...flattenStatements(statement));
       }
-      
+
       // Evaluate stdlib statements to populate the runtime environment
       for (const statement of allStatements) {
         this.evaluateExpression(statement);

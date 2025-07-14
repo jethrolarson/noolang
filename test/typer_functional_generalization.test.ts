@@ -20,7 +20,9 @@ describe("Functional Typer - Let-Polymorphism", () => {
     it("should generalize polymorphic identity function", () => {
       const program = parseProgram("id = fn x => x");
       const result = typeProgram(program);
-      expect(typeToString(result.type, result.state.substitution)).toBe("(α) -> α");
+      expect(typeToString(result.type, result.state.substitution)).toBe(
+        "(α) -> α"
+      );
     });
 
     it("should allow polymorphic function to be used with different types", () => {
@@ -28,7 +30,7 @@ describe("Functional Typer - Let-Polymorphism", () => {
         id = fn x => x;
         num = id 42;
         str = id "hello";
-        bool = id true
+        bool = id True
       `);
       const result = typeProgram(program);
       // The sequence returns the type of the rightmost expression
@@ -57,7 +59,9 @@ describe("Functional Typer - Let-Polymorphism", () => {
       `);
       const result = typeProgram(program);
       // This should work with proper generalization
-      expect(typeToString(result.type, result.state.substitution)).toBe("(α) -> α");
+      expect(typeToString(result.type, result.state.substitution)).toBe(
+        "(α) -> α"
+      );
     });
 
     it("should handle curried polymorphic functions", () => {
@@ -76,7 +80,7 @@ describe("Functional Typer - Let-Polymorphism", () => {
         const = fn x y => x;
         result1 = id 42;
         result2 = const "hello" 123;
-        result3 = id true
+        result3 = id True
       `);
       const result = typeProgram(program);
       expect(typeToString(result.type, result.state.substitution)).toBe("Bool");
@@ -89,7 +93,7 @@ describe("Functional Typer - Let-Polymorphism", () => {
         id = fn x => x;
         numResult = id 42;
         strResult = id "hello";
-        boolResult = id true;
+        boolResult = id True;
         numResult
       `);
       const result = typeProgram(program);
@@ -101,7 +105,7 @@ describe("Functional Typer - Let-Polymorphism", () => {
         id = fn x => x;
         id 42;
         id "hello";
-        id true
+        id True
       `);
       const result = typeProgram(program);
       expect(typeToString(result.type, result.state.substitution)).toBe("Bool");

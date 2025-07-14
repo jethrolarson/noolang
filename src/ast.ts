@@ -44,10 +44,8 @@ export type Type =
   | { kind: "list"; element: Type }
   | { kind: "tuple"; elements: Type[] }
   | { kind: "record"; fields: { [key: string]: Type } }
-  | { kind: "result"; success: Type; error: Type }
-  | { kind: "option"; element: Type }
   | { kind: "union"; types: Type[] }
-  | { kind: "variant"; name: string; args: Type[] } // ADT instance like Option Int
+  | { kind: "variant"; name: string; args: Type[] } // ADT instance like Option Int or Result String Int
   | { kind: "adt"; name: string; typeParams: string[]; constructors: ConstructorDefinition[] } // ADT definition
   | { kind: "unit" }
   | { kind: "unknown" };
@@ -336,14 +334,18 @@ export const recordType = (fields: { [key: string]: Type }): Type => ({
   kind: "record",
   fields,
 });
-export const resultType = (success: Type, error: Type): Type => ({
-  kind: "result",
-  success,
-  error,
-});
+
+// Helper functions to create ADT variant types
 export const optionType = (element: Type): Type => ({
-  kind: "option",
-  element,
+  kind: "variant",
+  name: "Option",
+  args: [element]
+});
+
+export const resultType = (success: Type, error: Type): Type => ({
+  kind: "variant", 
+  name: "Result",
+  args: [success, error]
 });
 
 // Convenience functions for common types

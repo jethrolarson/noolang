@@ -559,7 +559,7 @@ const parseRecord = C.map(
 const parseParenExpr: C.Parser<Expression> = C.map(
   C.seq(
     C.punctuation("("),
-    C.lazy(() => parseSequence), // Use lazy evaluation to handle circular dependency
+    C.lazy(() => parseSequence), // Use parseSequence to allow full semicolon-separated sequences
     C.punctuation(")")
   ),
   ([open, expr, close]) => expr
@@ -1238,10 +1238,7 @@ const parseWhereDefinition: C.Parser<
 
 // --- ADT Constructor ---
 const parseConstructor: C.Parser<ConstructorDefinition> = C.map(
-  C.seq(
-    parseTypeName,
-    C.many(parseTypeAtom)
-  ),
+  C.seq(parseTypeName, C.many(C.lazy(() => parseTypeExpression))),
   ([name, args]): ConstructorDefinition => ({
     name: name.value,
     args,
@@ -1258,12 +1255,21 @@ const parseTypeDefinition: C.Parser<TypeDefinitionExpression> = C.map(
     C.operator("="),
     C.sepBy(parseConstructor, C.operator("|"))
   ),
-  ([type, name, typeParams, equals, constructors]): TypeDefinitionExpression => ({
+  ([
+    type,
+    name,
+    typeParams,
+    equals,
+    constructors,
+  ]): TypeDefinitionExpression => ({
     kind: "type-definition",
     name: name.value,
     typeParams: typeParams.map((p: any) => p.value),
     constructors,
-    location: createLocation(type.location.start, constructors[constructors.length - 1]?.location.end || equals.location.end),
+    location: createLocation(
+      type.location.start,
+      constructors[constructors.length - 1]?.location.end || equals.location.end
+    ),
   })
 );
 
@@ -1271,14 +1277,34 @@ const parseTypeDefinition: C.Parser<TypeDefinitionExpression> = C.map(
 // Basic pattern parsing for constructor arguments (no nested constructors with args)
 const parseBasicPattern: C.Parser<Pattern> = C.choice(
   // Wildcard pattern: _
-  C.map(C.punctuation("_"), (underscore): Pattern => ({
-    kind: "wildcard",
-    location: underscore.location,
-  })),
+  C.map(
+    C.punctuation("_"),
+    (underscore): Pattern => ({
+      kind: "wildcard",
+      location: underscore.location,
+    })
+  ),
+  // Literal pattern: number or string
+  C.map(
+    C.number(),
+    (num): Pattern => ({
+      kind: "literal",
+      value: parseInt(num.value),
+      location: num.location,
+    })
+  ),
+  C.map(
+    C.string(),
+    (str): Pattern => ({
+      kind: "literal",
+      value: str.value,
+      location: str.location,
+    })
+  ),
   // Constructor or variable pattern: identifier (decide based on capitalization)
   C.map(C.identifier(), (name): Pattern => {
     // If identifier starts with uppercase, treat as constructor pattern (zero args)
-    if (name.value.length > 0 && name.value[0] >= 'A' && name.value[0] <= 'Z') {
+    if (name.value.length > 0 && name.value[0] >= "A" && name.value[0] <= "Z") {
       return {
         kind: "constructor",
         name: name.value,
@@ -1288,7 +1314,7 @@ const parseBasicPattern: C.Parser<Pattern> = C.choice(
     } else {
       // Otherwise, treat as variable pattern
       return {
-        kind: "variable", 
+        kind: "variable",
         name: name.value,
         location: name.location,
       };
@@ -1298,10 +1324,13 @@ const parseBasicPattern: C.Parser<Pattern> = C.choice(
 
 const parsePattern: C.Parser<Pattern> = C.choice(
   // Wildcard pattern: _
-  C.map(C.punctuation("_"), (underscore): Pattern => ({
-    kind: "wildcard",
-    location: underscore.location,
-  })),
+  C.map(
+    C.punctuation("_"),
+    (underscore): Pattern => ({
+      kind: "wildcard",
+      location: underscore.location,
+    })
+  ),
   // Constructor pattern with arguments: Some x y
   C.map(
     C.seq(C.identifier(), C.many1(parseBasicPattern)),
@@ -1309,13 +1338,31 @@ const parsePattern: C.Parser<Pattern> = C.choice(
       kind: "constructor",
       name: name.value,
       args,
-      location: createLocation(name.location.start, args[args.length - 1].location.end),
+      location: createLocation(
+        name.location.start,
+        args[args.length - 1].location.end
+      ),
+    })
+  ),
+  // Constructor pattern with parenthesized arguments: Wrap (Value n)
+  C.map(
+    C.seq(
+      C.identifier(),
+      C.punctuation("("),
+      C.lazy(() => parsePattern),
+      C.punctuation(")")
+    ),
+    ([name, openParen, arg, closeParen]): Pattern => ({
+      kind: "constructor",
+      name: name.value,
+      args: [arg],
+      location: createLocation(name.location.start, closeParen.location.end),
     })
   ),
   // Constructor or variable pattern: identifier (decide based on capitalization)
   C.map(C.identifier(), (name): Pattern => {
     // If identifier starts with uppercase, treat as constructor pattern
-    if (name.value.length > 0 && name.value[0] >= 'A' && name.value[0] <= 'Z') {
+    if (name.value.length > 0 && name.value[0] >= "A" && name.value[0] <= "Z") {
       return {
         kind: "constructor",
         name: name.value,
@@ -1325,7 +1372,7 @@ const parsePattern: C.Parser<Pattern> = C.choice(
     } else {
       // Otherwise, treat as variable pattern
       return {
-        kind: "variable", 
+        kind: "variable",
         name: name.value,
         location: name.location,
       };
@@ -1357,7 +1404,14 @@ const parseMatchExpression: C.Parser<MatchExpression> = C.map(
     C.sepBy(parseMatchCase, C.punctuation(";")),
     C.punctuation(")")
   ),
-  ([match, expression, with_, openParen, cases, closeParen]): MatchExpression => ({
+  ([
+    match,
+    expression,
+    with_,
+    openParen,
+    cases,
+    closeParen,
+  ]): MatchExpression => ({
     kind: "match",
     expression,
     cases,
@@ -1383,7 +1437,6 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
     };
   }
 );
-
 
 // --- Sequence term: everything else ---
 const parseSequenceTerm: C.Parser<Expression> = C.choice(
