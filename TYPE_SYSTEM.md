@@ -352,4 +352,106 @@ List destructuring is intentionally excluded because:
 
 ---
 
-*This document reflects the current state as of the latest implementation session.*
+## 🔄 Import System and Typeclass Design (Current Planning)
+
+### Import System Evolution
+
+Based on ongoing design discussions, we're evaluating how to evolve from the current CommonJS-style import system to better support named imports and typeclass/constraint integration.
+
+#### Current Implementation
+```noolang
+# Current: import returns a single value (usually a record)
+math = import "math.noo"
+result = (@add math) 2 3
+```
+
+#### Proposed Import Syntax Options
+
+**Option 1: Destructuring-based (Preferred)**
+```noolang
+# Dependency→Value flow: module path first, then specificity
+import "module.noo" {@foo, @bar}  # Named destructuring
+import "module.noo" *             # Import everything
+import "module.noo" @single_thing # Single import
+
+# Alternative destructuring syntax
+{@foo, @bar} = import "module.noo"
+```
+
+**Option 2: From-style (Traditional)**
+```noolang
+import {foo, bar} from "module.noo"
+import * from "module.noo"  
+import "module.noo" as mod
+```
+
+#### Design Principles
+- **Lexical Scoping**: Imports apply to current expression scope, not globally
+- **Dependency→Value Flow**: Left-to-right reading with increasing specificity
+- **Tooling Support**: Module path first enables better autocomplete
+- **Consistent Syntax**: Should feel natural within noo's existing patterns
+
+#### Constraint Import Challenge
+
+Key architectural question: How do constraints become available in the type environment?
+
+**The Problem**: If constraints are just regular values, then `{@MyConstraint} = import "module.noo"` should only put a constraint value in scope, not automatically register it with the type checker.
+
+**Possible Solutions**:
+1. **Special Import Syntax**: Different syntax for type-level constructs vs values
+2. **Explicit Activation**: `use @MyConstraint` after importing 
+3. **Magic Destructuring**: Destructuring automatically activates constraints (inconsistent)
+4. **Constraints as Non-Values**: Constraints work differently than regular values
+
+### Typeclass Architecture Vision
+
+#### Learning from Other Languages
+- **Haskell**: Automatic instance resolution, coherence guarantees
+- **Rust**: Explicit trait bounds, orphan rules
+- **Swift**: Protocol conformance, extensions
+- **Scala**: Implicit parameters, type class encoding
+
+#### Open Design Questions
+
+1. **User-Defined Constraints**: How do users define their own typeclasses?
+   ```noolang
+   # Possible syntax?
+   constraint Numeric a where
+     add : a -> a -> a
+     multiply : a -> a -> a
+   ```
+
+2. **Instance Definition**: How are constraint implementations provided?
+   ```noolang
+   # Possible syntax?
+   instance Numeric Int where
+     add = intAdd
+     multiply = intMultiply
+   ```
+
+3. **Import Integration**: How do constraints and instances flow through modules?
+   ```noolang
+   # How would this work?
+   import "numeric.noo" {Numeric}
+   use Numeric  # Activate for type checking?
+   ```
+
+4. **Resolution Strategy**: Automatic instance resolution vs explicit passing?
+
+#### Current Constraint System Status
+- ✅ **hasField constraints**: Working well for record field access
+- ✅ **Constraint propagation**: Automatic through function composition  
+- ❌ **User-defined constraints**: Not yet supported
+- ❌ **Constraint import/export**: Architecture unclear
+- 🧹 **Cleanup complete**: Removed meaningless built-in constraints
+
+#### Next Steps for Typeclass System
+1. **Design constraint definition syntax**
+2. **Plan instance resolution mechanism** 
+3. **Integrate with import system design**
+4. **Consider effect system interactions**
+5. **Prototype user-defined constraint support**
+
+---
+
+*This document reflects the current state as of the latest implementation session, including ongoing architectural planning for imports and typeclasses.*

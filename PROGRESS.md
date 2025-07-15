@@ -474,7 +474,67 @@ noolang> .ast-file test_import_record.noo
 4. **Pattern Matching**: Add match/case expressions
 
 ---
-*Current focus: Enhanced REPL Phase 2 debugging system to add advanced debugging capabilities.* 
+*Current focus: Import system design and typeclass architecture planning.*
+
+## 🔄 Import System and Typeclass Architecture (Current Planning)
+
+### Import System Evolution
+Based on recent discussions, we're planning to move away from the current CommonJS-style import system (`import "path"` returns a value) to a more structured approach that better handles named imports and constraints.
+
+#### Current System
+```noolang
+# Current: import returns a single value (usually a record)
+math = import "math.noo"
+result = (@add math) 2 3
+```
+
+#### Planned System Options
+
+**Option 1: Destructuring-based imports**
+```noolang
+# Using destructuring syntax for named imports
+{@foo, @bar} = import "module.noo"
+import "module.noo" {@foo, @bar}  # Alternative syntax
+import "module.noo" *             # Import everything
+```
+
+**Option 2: From-style imports** 
+```noolang
+import {foo, bar} from "module.noo"  # More traditional
+import * from "module.noo"
+import "module.noo" as mod
+```
+
+**Design Considerations:**
+- **Dependency→Value Flow**: `import "module.noo" [destructuring]` reads left-to-right with increasing specificity
+- **Tooling Support**: Module path first enables better intellisense/autocomplete
+- **Noo-like Syntax**: Should feel natural within noo's existing patterns
+- **Lexical Scoping**: Imports apply to current expression scope, not globally
+
+#### Constraint Import Challenge
+Key insight: If constraints are just regular values, then destructuring them shouldn't magically activate them in the type environment. This suggests either:
+1. Special import syntax for type-level constructs
+2. Explicit activation syntax (`use @MyConstraint`)
+3. Constraints work differently than regular values
+
+### Typeclass Architecture Planning
+
+#### Learning from Other Languages
+- **Haskell**: Typeclasses with instance resolution
+- **Rust**: Traits with explicit implementation
+- **Swift**: Protocols with extensions
+- **Scala**: Implicit parameters and type classes
+
+#### Key Design Questions
+1. **Constraint Definition**: How do users define their own constraints/typeclasses?
+2. **Instance Resolution**: How does the type checker find constraint implementations?
+3. **Import Integration**: How do typeclasses work with the module system?
+4. **Syntax Design**: What feels "noo-like" for typeclass definitions and usage?
+
+#### Current Constraint System Status
+- ✅ `hasField` constraints working well for record typing
+- ❌ Removed meaningless constraints (`Show`, `Eq`, `Number`, etc.)
+- 🤔 Need architectural vision for user-defined constraints
 
 ## 🔧 Enhanced REPL Debugging System Plan
 

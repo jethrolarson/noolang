@@ -1,0 +1,10 @@
+# Test accessor constraint violation
+
+# Define accessor 
+get_name = @name;
+
+# Try to use it on record without that field
+person_without_name = { @age 30 };
+bad_result = get_name person_without_name;  # Should fail
+
+bad_result

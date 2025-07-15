@@ -1521,12 +1521,8 @@ const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
       C.identifier(),
       C.keyword("is"),
       C.choice(
-        C.identifier(),
-        C.keyword("String"),
-        C.keyword("Number"),
-        C.keyword("Bool"),
-        C.keyword("Show"),
-        C.keyword("Eq")
+        C.identifier()
+        // Removed meaningless constraint keywords
       )
     ),
     ([typeVar, isKeyword, constraint]): ConstraintExpr => ({

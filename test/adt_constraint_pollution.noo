@@ -1,0 +1,11 @@
+type Shape a = Circle a | Rectangle a a | Triangle a a a;
+
+calculate_area = fn shape => match shape with (
+  Circle radius => radius * radius * 3;
+  Rectangle width height => width * height;
+  Triangle a b c => (a * b) / 2
+);
+
+shapes = [Circle 3, Rectangle 5 4, Triangle 2 3 4];
+areas = map calculate_area shapes;
+areas 

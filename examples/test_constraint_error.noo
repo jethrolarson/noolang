@@ -1,0 +1,11 @@
+# Test to reproduce constraint error with tail function
+
+import "stdlib.noo";
+
+# Test function composition with constrained function
+composed = compose tail id;
+
+# Apply to an Int - this should trigger constraint error
+result = composed 5;
+
+result

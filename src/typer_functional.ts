@@ -354,47 +354,20 @@ const solveCustomConstraint = (
   return state;
 };
 
-// Valid constraint names
+// Valid constraint names - only meaningful constraints remain
 const VALID_CONSTRAINTS = new Set([
-  "Number", "String", "Boolean", "Show", "List", "Record", "Function", "Eq"
+  // hasField constraints are handled separately and don't need to be in this set
 ]);
 
 // Validate that a constraint name is valid
 const validateConstraintName = (constraint: string): void => {
-  if (!VALID_CONSTRAINTS.has(constraint)) {
-    throw new Error(`Unknown constraint: ${constraint}`);
-  }
+  // All constraints are now meaningless type checks, so reject them all
+  throw new Error(`Constraint '${constraint}' is not supported. Use hasField constraints for record typing instead.`);
 };
 
 const satisfiesConstraint = (type: Type, constraint: string): boolean => {
-  switch (constraint) {
-    case "Number":
-      return type.kind === "primitive" && type.name === "Int";
-    case "String":
-      return type.kind === "primitive" && type.name === "String";
-    case "Boolean":
-      return type.kind === "primitive" && type.name === "Bool";
-    case "Show":
-      return (
-        type.kind === "primitive" ||
-        type.kind === "list" ||
-        type.kind === "record"
-      );
-    case "List":
-      return type.kind === "list";
-    case "Record":
-      return type.kind === "record";
-    case "Function":
-      return type.kind === "function";
-    case "Eq":
-      return (
-        type.kind === "primitive" ||
-        type.kind === "list" ||
-        type.kind === "record"
-      );
-    default:
-      return false;
-  }
+  // All non-hasField constraints are meaningless, so they're not supported
+  return false;
 };
 
 
