@@ -241,7 +241,7 @@ const solveIsConstraint = (
             `Type ${typeToString(
               typeVar,
               state.substitution
-            )} does not satisfy constraint '${constraint.constraint}'`,
+            )} does not satisfy constraint '${constraint.constraint}'. This often occurs when trying to use a partial function (one that can fail) in an unsafe context like function composition. Consider using total functions that return Option or Result types instead.`,
             {},
             location || { line: 1, column: 1 }
           )
@@ -356,7 +356,7 @@ const solveCustomConstraint = (
 
 // Valid constraint names
 const VALID_CONSTRAINTS = new Set([
-  "Collection", "Number", "String", "Boolean", "Show", "List", "Record", "Function", "Eq"
+  "Number", "String", "Boolean", "Show", "List", "Record", "Function", "Eq"
 ]);
 
 // Validate that a constraint name is valid
@@ -368,8 +368,6 @@ const validateConstraintName = (constraint: string): void => {
 
 const satisfiesConstraint = (type: Type, constraint: string): boolean => {
   switch (constraint) {
-    case "Collection":
-      return type.kind === "list" || type.kind === "record";
     case "Number":
       return type.kind === "primitive" && type.name === "Int";
     case "String":
@@ -954,24 +952,11 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
     quantifiedVars: [],
   });
 
-  // List operations (pure) - with constraints for safety
-  const headType = functionType(
-    [listTypeWithElement(typeVariable("a"))],
-    typeVariable("a")
-  ) as Type & { constraints: Constraint[] };
-  // Add constraint that the parameter must be a Collection
-  headType.constraints = [isConstraint("a", "Collection")];
-  newEnv.set("head", {
-    type: headType,
-    quantifiedVars: ["a"],
-  });
 
   const tailType = functionType(
     [listTypeWithElement(typeVariable("a"))],
     listTypeWithElement(typeVariable("a"))
-  ) as Type & { constraints: Constraint[] };
-  // Add constraint that the parameter must be a Collection
-  tailType.constraints = [isConstraint("a", "Collection")];
+  );
   newEnv.set("tail", {
     type: tailType,
     quantifiedVars: ["a"],
@@ -1061,9 +1046,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
   const lengthType = functionType(
     [listTypeWithElement(typeVariable("a"))],
     intType()
-  ) as Type & { constraints: Constraint[] };
-  // Add constraint that the parameter must be a Collection
-  lengthType.constraints = [isConstraint("a", "Collection")];
+  );
   newEnv.set("length", {
     type: lengthType,
     quantifiedVars: ["a"],
@@ -1153,6 +1136,14 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 
   newEnv.set("None", {
     type: optionType(typeVariable("a")),
+    quantifiedVars: ["a"],
+  });
+
+  // head function is now self-hosted in stdlib.noo
+  
+  // Minimal built-in for self-hosted functions
+  newEnv.set("list_get", {
+    type: functionType([intType(), listTypeWithElement(typeVariable("a"))], typeVariable("a")),
     quantifiedVars: ["a"],
   });
 
@@ -1327,6 +1318,7 @@ export const typeLiteral = (
   }
 };
 
+
 // Update typeFunction to thread state through freshenTypeVariables
 export const typeFunction = (
   expr: FunctionExpression,
@@ -1405,6 +1397,7 @@ export const typeFunction = (
     for (let i = paramTypes.length - 1; i >= 0; i--) {
       funcType = functionType([paramTypes[i]], funcType);
     }
+    
   }
 
   return { type: funcType, state: currentState };
@@ -1595,11 +1588,114 @@ export const typeApplication = (
 
     if (argTypes.length === funcType.params.length) {
       // Full application - return the return type
-      return { type: returnType, state: currentState };
+      
+      // CRITICAL FIX: Handle function composition constraint propagation
+      let finalReturnType = returnType;
+      
+      // Case 1: Direct compose function call
+      if (expr.func.kind === "variable" && expr.func.name === "compose" && 
+          expr.args.length >= 1) {
+        const fArg = expr.args[0];  // First function (f in "compose f g")
+        const fResult = typeExpression(fArg, currentState);
+        
+        // If f has constraints and returnType is a function, propagate the constraints
+        if (fResult.type.kind === "function" && fResult.type.constraints && 
+            returnType.kind === "function") {
+          const enhancedReturnType = { ...returnType };
+          
+          // Map constraint variables from f's type to the new function's type variables
+          const updatedConstraints: Constraint[] = [];
+          for (const constraint of fResult.type.constraints) {
+            if (constraint.kind === "is") {
+              // Find the corresponding parameter in the new function
+              // The first parameter of the composed function should inherit f's parameter constraints
+              if (enhancedReturnType.params.length > 0 && enhancedReturnType.params[0].kind === "variable") {
+                const newConstraint = isConstraint(enhancedReturnType.params[0].name, constraint.constraint);
+                updatedConstraints.push(newConstraint);
+              }
+            } else {
+              // For non-"is" constraints, copy as-is for now
+              updatedConstraints.push(constraint);
+            }
+          }
+          
+          enhancedReturnType.constraints = (enhancedReturnType.constraints || []).concat(updatedConstraints);
+          
+          // Also propagate constraints to parameter type variables in the result function
+          for (const constraint of updatedConstraints) {
+            if (constraint.kind === "is") {
+              propagateConstraintToTypeVariable(enhancedReturnType, constraint);
+            }
+          }
+          
+          finalReturnType = enhancedReturnType;
+        }
+      }
+      
+      // Case 2: Application to result of compose (e.g., (compose head) id)
+      else if (expr.func.kind === "application" && 
+               expr.func.func.kind === "variable" && 
+               expr.func.func.name === "compose" && 
+               expr.func.args.length >= 1) {
+        // This is applying the second argument to a partial compose result
+        const fArg = expr.func.args[0];  // First function from the compose
+        const fResult = typeExpression(fArg, currentState);
+        
+        if (fResult.type.kind === "function" && fResult.type.constraints && 
+            returnType.kind === "function") {
+          const enhancedReturnType = { ...returnType };
+          
+          // Map constraint variables from f's type to the new function's type variables
+          const updatedConstraints: Constraint[] = [];
+          for (const constraint of fResult.type.constraints) {
+            if (constraint.kind === "is") {
+              // Find the corresponding parameter in the new function
+              if (enhancedReturnType.params.length > 0 && enhancedReturnType.params[0].kind === "variable") {
+                const newConstraint = isConstraint(enhancedReturnType.params[0].name, constraint.constraint);
+                updatedConstraints.push(newConstraint);
+              }
+            } else {
+              updatedConstraints.push(constraint);
+            }
+          }
+          
+          enhancedReturnType.constraints = (enhancedReturnType.constraints || []).concat(updatedConstraints);
+          
+          for (const constraint of updatedConstraints) {
+            if (constraint.kind === "is") {
+              propagateConstraintToTypeVariable(enhancedReturnType, constraint);
+            }
+          }
+          
+          finalReturnType = enhancedReturnType;
+        }
+      }
+      
+      return { type: finalReturnType, state: currentState };
     } else {
       // Partial application - return a function with remaining parameters
       const remainingParams = funcType.params.slice(argTypes.length);
       const partialFunctionType = functionType(remainingParams, returnType);
+      
+      // CRITICAL FIX: Handle partial application of compose
+      if (expr.func.kind === "variable" && expr.func.name === "compose" && 
+          expr.args.length >= 1) {
+        const fArg = expr.args[0];  // First function
+        const fResult = typeExpression(fArg, currentState);
+        
+        // If f has constraints, the partial result should eventually inherit them
+        if (fResult.type.kind === "function" && fResult.type.constraints && 
+            partialFunctionType.kind === "function") {
+          partialFunctionType.constraints = (partialFunctionType.constraints || []).concat(fResult.type.constraints);
+          
+          for (const constraint of fResult.type.constraints) {
+            if (constraint.kind === "is") {
+              propagateConstraintToTypeVariable(partialFunctionType, constraint);
+            }
+          }
+        }
+      }
+      
       return { type: partialFunctionType, state: currentState };
     }
   } else if (funcType.kind === "variable") {
@@ -2477,7 +2573,7 @@ function validateAllSubstitutionConstraints(state: TypeState) {
             throw new Error(
               `Type variable '${varName}' was unified to ${typeToString(
                 concreteType
-              )} but does not satisfy constraint '${constraint.constraint}'`
+              )} but does not satisfy constraint '${constraint.constraint}'. This typically means a partial function is being used in an unsafe context. Consider using total functions that return Option or Result types instead of partial functions with constraints.`
             );
           }
         }
@@ -2518,7 +2614,7 @@ export const typeProgram = (program: Program): TypeResult => {
           throw new Error(
             `Type ${typeToString(
               substitutedType
-            )} does not satisfy constraint '${constraint.constraint}'`
+            )} does not satisfy constraint '${constraint.constraint}'. This error often indicates that a partial function (one that can fail at runtime) is being used in a context where total functions are required, such as function composition. Consider using total functions that return Option or Result types instead.`
           );
         }
       }
@@ -2996,7 +3092,7 @@ function unifyVariable(
                   `Type ${typeToString(
                     s2,
                     state.substitution
-                  )} does not satisfy constraint '${constraint.constraint}'`,
+                  )} does not satisfy constraint '${constraint.constraint}'. This error typically occurs when attempting to use a partial function (one that can fail) in an unsafe context like function composition. Consider using total functions that return Option or Result types instead.`,
                   {},
                   location || { line: 1, column: 1 }
                 )

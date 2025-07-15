@@ -127,7 +127,10 @@ describe("Evaluator", () => {
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
 
-    expect(unwrapValue(result.finalResult)).toBe(1);
+    // head now returns Some 1 instead of 1
+    const finalResult = unwrapValue(result.finalResult);
+    expect(finalResult.name).toBe("Some");
+    expect(unwrapValue(finalResult.args[0])).toBe(1);
     expect(result.executionTrace).toHaveLength(1);
   });
 
@@ -324,7 +327,9 @@ describe("Evaluator", () => {
 
     test("should handle recursive list sum", () => {
       const code = `
-        recSum = fn list => if isEmpty list then 0 else (head list) + (recSum (tail list));
+        # Helper to extract value from Some
+        getSome = fn opt => match opt with (Some x => x; None => 0);
+        recSum = fn list => if isEmpty list then 0 else (getSome (head list)) + (recSum (tail list));
         recSum [1, 2, 3, 4, 5]
       `;
       const lexer = new Lexer(code);
@@ -337,7 +342,9 @@ describe("Evaluator", () => {
 
     test("should handle recursive list reverse", () => {
       const code = `
-        recReverse = fn list => if isEmpty list then [] else append (recReverse (tail list)) [head list];
+        # Helper to extract value from Some
+        getSome = fn opt => match opt with (Some x => x; None => 0);
+        recReverse = fn list => if isEmpty list then [] else append (recReverse (tail list)) [getSome (head list)];
         recReverse [1, 2, 3]
       `;
       const lexer = new Lexer(code);

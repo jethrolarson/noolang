@@ -15,14 +15,13 @@ type Option a = Some a | None;
 type Result a b = Ok a | Err b;
 
 # ========================================
-# LIST OPERATIONS (built-in functions)
+# LIST OPERATIONS
 # ========================================
-# These are implemented in TypeScript but exposed through the environment
-# head : (List a) -> a given a is Collection
-# tail : (List a) -> List a given a is Collection  
-# length : (List a) -> Int given a is Collection
-# map : (a -> b) -> List a -> List b given a is Collection, b is Collection
-# filter : (a -> Bool) -> List a -> List a given a is Collection
+
+# Safe head function - returns Option instead of throwing
+head = fn list => if (length list) == 0 
+  then None 
+  else Some (list_get 0 list);
 
 # ========================================
 # UTILITY FUNCTIONS

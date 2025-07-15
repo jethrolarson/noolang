@@ -1525,7 +1525,6 @@ const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
         C.keyword("String"),
         C.keyword("Number"),
         C.keyword("Bool"),
-        C.keyword("Collection"),
         C.keyword("Show"),
         C.keyword("Eq")
       )

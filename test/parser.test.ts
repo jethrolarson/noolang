@@ -446,7 +446,7 @@ describe("Top-level sequence parsing", () => {
     const seq = program.statements[0];
     expect(seq.kind).toBe("binary");
   });
-});
+}); 
 
 describe("Type annotation parsing", () => {
   function parseType(typeSrc: string) {

@@ -360,14 +360,21 @@ export class Evaluator {
       })
     );
 
-    // List operations
+    // List operations - minimal built-ins for self-hosted functions
     this.environment.set(
-      "head",
-      createNativeFunction("head", (list: Value) => {
-        if (isList(list) && list.values.length > 0) return list.values[0];
-        throw new Error("Cannot get head of empty list or non-list");
+      "list_get",
+      createNativeFunction("list_get", (index: Value) => (list: Value) => {
+        if (isNumber(index) && isList(list)) {
+          const idx = index.value;
+          if (idx >= 0 && idx < list.values.length) {
+            return list.values[idx];
+          }
+        }
+        throw new Error("list_get: invalid index or not a list");
       })
     );
+
+    // List operations
     this.environment.set(
       "tail",
       createNativeFunction("tail", (list: Value) => {
@@ -557,14 +564,7 @@ export class Evaluator {
       })
     );
 
-    // Built-in ADT constructors
-    // Option constructors
-    this.environment.set("Some", createFunction((value: Value) => createConstructor("Some", [value])));
-    this.environment.set("None", createConstructor("None", []));
-
-    // Result constructors  
-    this.environment.set("Ok", createFunction((value: Value) => createConstructor("Ok", [value])));
-    this.environment.set("Err", createFunction((error: Value) => createConstructor("Err", [error])));
+    // Built-in ADT constructors are now self-hosted in stdlib.noo
 
     // Option utility functions
     this.environment.set("isSome", createNativeFunction("isSome", (option: Value) => {

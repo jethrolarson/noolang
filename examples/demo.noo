@@ -160,7 +160,7 @@ record_age = record_person | @age;
 # All list operations require Collection constraint
 numbers_for_constraints = [10, 20, 30, 40, 50];
 
-# These work because Int satisfies Collection constraint
+# These work because List Int satisfies Collection constraint
 first_number = head numbers_for_constraints;
 rest_numbers = tail numbers_for_constraints;
 count_numbers = length numbers_for_constraints;

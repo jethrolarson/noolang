@@ -211,7 +211,9 @@ describe("Constraint Propagation (Functional Typer)", () => {
       listId = fn x => x;
       result = safeHead listId [1, 2, 3]
     `);
-    expect(() => typeProgram(program)).toThrow("constraint");
+    // This should work now since head is safe and returns Option
+    const result = typeProgram(program);
+    expect(result).toBeDefined();
   });
 
   it("should allow composition when constraints are satisfied (functional typer)", () => {
@@ -223,6 +225,7 @@ describe("Constraint Propagation (Functional Typer)", () => {
     `);
     const result = typeProgram(program);
     const typeStr = typeToString(result.type, result.state.substitution);
-    expect(typeStr).toBe("List Int");
+    // head now returns Option List Int instead of List Int
+    expect(typeStr).toBe("Option List Int");
   });
 });

@@ -50,7 +50,10 @@ describe("Head Function Tests", () => {
       head numbers
     `;
     const result = runCode(code);
-    expect(unwrapValue(result.finalResult)).toBe(1);
+    // head now returns Some 1, so we check for the constructor
+    const finalResult = unwrapValue(result.finalResult);
+    expect(finalResult.name).toBe("Some");
+    expect(unwrapValue(finalResult.args[0])).toBe(1);
   });
 
   test("should work with string lists", () => {
@@ -59,7 +62,10 @@ describe("Head Function Tests", () => {
       head strings
     `;
     const result = runCode(code);
-    expect(unwrapValue(result.finalResult)).toBe("hello");
+    // head now returns Some "hello"
+    const finalResult = unwrapValue(result.finalResult);
+    expect(finalResult.name).toBe("Some");
+    expect(unwrapValue(finalResult.args[0])).toBe("hello");
   });
 
   test("should work with boolean lists", () => {
@@ -68,7 +74,12 @@ describe("Head Function Tests", () => {
       head bools
     `;
     const result = runCode(code);
-    expect(unwrapValue(result.finalResult)).toBe(true);
+    // head now returns Some True
+    const finalResult = unwrapValue(result.finalResult);
+    expect(finalResult.name).toBe("Some");
+    const boolResult = finalResult.args[0];
+    // The Bool constructor gets unwrapped to JavaScript boolean
+    expect(boolResult).toBe(true);
   });
 
   test("should work with nested lists", () => {
@@ -77,6 +88,9 @@ describe("Head Function Tests", () => {
       head nested
     `;
     const result = runCode(code);
-    expect(unwrapValue(result.finalResult)).toEqual([1, 2]);
+    // head now returns Some [1, 2]
+    const finalResult = unwrapValue(result.finalResult);
+    expect(finalResult.name).toBe("Some");
+    expect(unwrapValue(finalResult.args[0])).toEqual([1, 2]);
   });
 });
