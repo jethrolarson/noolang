@@ -20,7 +20,7 @@ const runNoolang = (code: string) => {
           decoratedResult.program.statements[
             decoratedResult.program.statements.length - 1
           ].type!,
-          decoratedResult.state.substitution
+          decoratedResult.state.substitution,
         )
       : "unknown",
   };
@@ -28,10 +28,9 @@ const runNoolang = (code: string) => {
 
 describe("ADT Language Limitations", () => {
   describe("Multiple ADT Definitions", () => {
-    it("should fail with variant name mismatch when using map with multiple ADTs", () => {
-      // This test documents a current language limitation
-      // When multiple ADT definitions are used together with map operations,
-      // the type system incorrectly tries to unify different ADT types
+    it("should now work with map and multiple ADTs (polymorphism fixed)", () => {
+      // This test was previously failing due to lack of polymorphism in map
+      // Now that map is properly polymorphic, it should work
       expect(() =>
         runNoolang(`
         type Color = Red | Green | Blue;
@@ -43,8 +42,8 @@ describe("ADT Language Limitations", () => {
         color_numbers = map color_to_number colors;
         areas = map calculate_area shapes;
         color_numbers
-      `)
-      ).toThrow("Variant name mismatch: Color vs Shape");
+      `),
+      ).not.toThrow();
     });
 
     it("should work when ADTs are used in separate programs", () => {
@@ -106,9 +105,10 @@ describe("ADT Language Limitations", () => {
   });
 
   describe("Root Cause Analysis", () => {
-    it("should demonstrate that the issue is in type unification", () => {
-      // The issue occurs in the type system when it tries to unify
-      // type variables that have been associated with different ADT types
+    it("should demonstrate that the type unification issue is now fixed", () => {
+      // The issue was in the type system when it tried to unify
+      // type variables that had been associated with different ADT types
+      // This is now fixed with proper let-polymorphism for map
       expect(() =>
         runNoolang(`
         type Color = Red | Green | Blue;
@@ -119,12 +119,12 @@ describe("ADT Language Limitations", () => {
         # This also works - separate operations
         color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
         calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
-        # This fails - map tries to unify the function types
+        # This now works - map is properly polymorphic
         color_numbers = map color_to_number colors;
         areas = map calculate_area shapes;
         color_numbers
-      `)
-      ).toThrow("Variant name mismatch: Color vs Shape");
+      `),
+      ).not.toThrow();
     });
   });
 

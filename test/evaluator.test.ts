@@ -1,5 +1,5 @@
-import { Lexer } from '../src/lexer';
-import { parse } from '../src/parser/parser';
+import { Lexer } from "../src/lexer";
+import { parse } from "../src/parser/parser";
 import { typeAndDecorate } from "../src/typer_functional";
 import { Evaluator } from "../src/evaluator";
 import { Value } from "../src/evaluator";
@@ -47,7 +47,7 @@ describe("Evaluator", () => {
 
   test("should set a field in a record using set", () => {
     const lexer = new Lexer(
-      'user = { @name "Alice", @age 30 }; user2 = set @age user 31; user2'
+      'user = { @name "Alice", @age 30 }; user2 = set @age user 31; user2',
     );
     const tokens = lexer.tokenize();
     const program = parse(tokens);
@@ -57,7 +57,7 @@ describe("Evaluator", () => {
 
   test("should add a new field to a record using set", () => {
     const lexer = new Lexer(
-      'user = { @name "Alice" }; user2 = set @age user 42; user2'
+      'user = { @name "Alice" }; user2 = set @age user 42; user2',
     );
     const tokens = lexer.tokenize();
     const program = parse(tokens);
@@ -67,7 +67,7 @@ describe("Evaluator", () => {
 
   test("set should not mutate the original record", () => {
     const lexer = new Lexer(
-      'user = { @name "Alice", @age 30 }; user2 = set @age user 31; user;'
+      'user = { @name "Alice", @age 30 }; user2 = set @age user 31; user;',
     );
     const tokens = lexer.tokenize();
     const program = parse(tokens);
@@ -503,7 +503,7 @@ describe("Evaluator", () => {
 
   test("should evaluate chained thrush operators", () => {
     const lexer = new Lexer(
-      "[1, 2, 3] | map (fn x => x + 1) | map (fn x => x * x)"
+      "[1, 2, 3] | map (fn x => x + 1) | map (fn x => x * x)",
     );
     const tokens = lexer.tokenize();
     const program = parse(tokens);
@@ -565,7 +565,7 @@ describe("Evaluator", () => {
 
   test("should set a field in a record using set", () => {
     const lexer = new Lexer(
-      'user = { @name "Alice", @age 30 }; user2 = set @age user 31; user2'
+      'user = { @name "Alice", @age 30 }; user2 = set @age user 31; user2',
     );
     const tokens = lexer.tokenize();
     const program = parse(tokens);
@@ -575,7 +575,7 @@ describe("Evaluator", () => {
 
   test("should add a new field to a record using set", () => {
     const lexer = new Lexer(
-      'user = { @name "Alice" }; user2 = set @age user 42; user2'
+      'user = { @name "Alice" }; user2 = set @age user 42; user2',
     );
     const tokens = lexer.tokenize();
     const program = parse(tokens);
@@ -585,7 +585,7 @@ describe("Evaluator", () => {
 
   test("set should not mutate the original record", () => {
     const lexer = new Lexer(
-      'user = { @name "Alice", @age 30 }; user2 = set @age user 31; user;'
+      'user = { @name "Alice", @age 30 }; user2 = set @age user 31; user;',
     );
     const tokens = lexer.tokenize();
     const program = parse(tokens);
@@ -622,10 +622,10 @@ describe("Semicolon sequencing", () => {
 
   test("complex sequencing", () => {
     expect(
-      unwrapValue(evalNoo("x = 1; if x == 1 then 100 else 200; x + 1"))
+      unwrapValue(evalNoo("x = 1; if x == 1 then 100 else 200; x + 1")),
     ).toBe(2);
     expect(
-      unwrapValue(evalNoo("x = 1; y = 2; if x < y then x else y; x + y"))
+      unwrapValue(evalNoo("x = 1; y = 2; if x < y then x else y; x + y")),
     ).toBe(3);
   });
 });
@@ -688,7 +688,7 @@ describe("Local Mutation (mut/mut!)", () => {
     const program = parse(tokens);
     const evaluator = new Evaluator();
     expect(() => evaluator.evaluateProgram(program)).toThrow(
-      /Cannot mutate non-mutable variable/
+      /Cannot mutate non-mutable variable/,
     );
   });
 
@@ -705,5 +705,3 @@ describe("Local Mutation (mut/mut!)", () => {
     }
   });
 });
-
-

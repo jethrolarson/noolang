@@ -11,19 +11,14 @@ export type Location = {
 };
 
 // Type system
-export type Effect = 
-  | 'io'
-  | 'log' 
-  | 'mut'
-  | 'rand'
-  | 'err';
+export type Effect = "io" | "log" | "mut" | "rand" | "err";
 
 // Type constraints for constrained polymorphism
-export type Constraint = 
-  | { kind: "is"; typeVar: string; constraint: string }  // a is Collection
-  | { kind: "hasField"; typeVar: string; field: string; fieldType: Type }  // a has field "length" of type Int
-  | { kind: "implements"; typeVar: string; interfaceName: string }  // a implements Show
-  | { kind: "custom"; typeVar: string; constraint: string; args: Type[] };  // a satisfies MyConstraint T1 T2
+export type Constraint =
+  | { kind: "is"; typeVar: string; constraint: string } // a is Collection
+  | { kind: "hasField"; typeVar: string; field: string; fieldType: Type } // a has field "length" of type Int
+  | { kind: "implements"; typeVar: string; interfaceName: string } // a implements Show
+  | { kind: "custom"; typeVar: string; constraint: string; args: Type[] }; // a satisfies MyConstraint T1 T2
 
 export type ConstraintExpr =
   | Constraint
@@ -46,7 +41,12 @@ export type Type =
   | { kind: "record"; fields: { [key: string]: Type } }
   | { kind: "union"; types: Type[] }
   | { kind: "variant"; name: string; args: Type[] } // ADT instance like Option Int or Result String Int
-  | { kind: "adt"; name: string; typeParams: string[]; constructors: ConstructorDefinition[] } // ADT definition
+  | {
+      kind: "adt";
+      name: string;
+      typeParams: string[];
+      constructors: ConstructorDefinition[];
+    } // ADT definition
   | { kind: "unit" }
   | { kind: "unknown" };
 
@@ -272,7 +272,6 @@ export interface MatchExpression {
   location: Location;
 }
 
-
 // Top-level constructs
 export type TopLevel = Expression;
 
@@ -297,12 +296,16 @@ export const createPosition = (line: number, column: number): Position => ({
 export const intType = (): Type => ({ kind: "primitive", name: "Int" });
 export const numberType = (): Type => ({ kind: "primitive", name: "Int" }); // Alias for backwards compatibility
 export const stringType = (): Type => ({ kind: "primitive", name: "String" });
-export const boolType = (): Type => ({ kind: "variant", name: "Bool", args: [] });
+export const boolType = (): Type => ({
+  kind: "variant",
+  name: "Bool",
+  args: [],
+});
 export const listType = (): Type => ({ kind: "primitive", name: "List" });
 export const functionType = (
   params: Type[],
   returnType: Type,
-  effects: Effect[] = []
+  effects: Effect[] = [],
 ): Type => ({
   kind: "function",
   params,
@@ -340,13 +343,13 @@ export const recordType = (fields: { [key: string]: Type }): Type => ({
 export const optionType = (element: Type): Type => ({
   kind: "variant",
   name: "Option",
-  args: [element]
+  args: [element],
 });
 
 export const resultType = (success: Type, error: Type): Type => ({
-  kind: "variant", 
+  kind: "variant",
   name: "Result",
-  args: [success, error]
+  args: [success, error],
 });
 
 // Convenience functions for common types
@@ -359,7 +362,7 @@ export const resultString = (error: Type): Type =>
 // Constraint helper functions
 export const isConstraint = (
   typeVar: string,
-  constraint: string
+  constraint: string,
 ): Constraint => ({
   kind: "is",
   typeVar,
@@ -369,7 +372,7 @@ export const isConstraint = (
 export const hasFieldConstraint = (
   typeVar: string,
   field: string,
-  fieldType: Type
+  fieldType: Type,
 ): Constraint => ({
   kind: "hasField",
   typeVar,
@@ -379,7 +382,7 @@ export const hasFieldConstraint = (
 
 export const implementsConstraint = (
   typeVar: string,
-  interfaceName: string
+  interfaceName: string,
 ): Constraint => ({
   kind: "implements",
   typeVar,
@@ -389,7 +392,7 @@ export const implementsConstraint = (
 export const customConstraint = (
   typeVar: string,
   constraint: string,
-  args: Type[]
+  args: Type[],
 ): Constraint => ({
   kind: "custom",
   typeVar,
@@ -400,7 +403,7 @@ export const customConstraint = (
 // Constrained type variable
 export const constrainedTypeVariable = (
   name: string,
-  constraints: Constraint[]
+  constraints: Constraint[],
 ): Type => ({
   kind: "variable",
   name,
@@ -412,11 +415,11 @@ export const constrainedFunctionType = (
   params: Type[],
   returnType: Type,
   effects: Effect[] = [],
-  constraints: Constraint[] = []
+  constraints: Constraint[] = [],
 ): Type => ({
   kind: "function",
   params,
   return: returnType,
   effects,
   constraints,
-}); 
+});

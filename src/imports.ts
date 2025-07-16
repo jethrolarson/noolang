@@ -22,7 +22,7 @@ export class ImportManager {
     // 3. Return the module with its exports
     const modulePromise = this.loadModule(path);
     this.moduleCache.set(path, modulePromise);
-    
+
     return await modulePromise;
   }
 
@@ -32,15 +32,15 @@ export class ImportManager {
     // - Parse it
     // - Evaluate it
     // - Return the module with exports
-    
+
     const module: Module = {
       name: path,
       exports: new Map(),
     };
 
     // Simulate loading delay
-    await new Promise(resolve => setTimeout(resolve, 0));
-    
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
     return module;
   }
 
@@ -59,15 +59,15 @@ export class ImportManager {
 
 // Export statement placeholder
 export interface ExportStatement {
-  kind: 'export';
+  kind: "export";
   name: string;
   value: any;
 }
 
-// Import statement placeholder  
+// Import statement placeholder
 export interface ImportStatement {
-  kind: 'import';
+  kind: "import";
   module: string;
   imports: string[];
   alias?: string;
-} 
+}

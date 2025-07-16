@@ -13,8 +13,8 @@ import {
   isUnit,
   isConstructor,
   Value,
-  boolValue
-} from './evaluator';
+  boolValue,
+} from "./evaluator";
 
 export function formatValue(value: Value): string {
   if (isNumber(value)) {
@@ -22,39 +22,43 @@ export function formatValue(value: Value): string {
   }
   if (isString(value)) {
     // Escape quotes and backslashes
-    return '"' + value.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+    return '"' + value.value.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
   }
   if (isBool(value)) {
-    return boolValue(value) ? 'True' : 'False';
+    return boolValue(value) ? "True" : "False";
   }
   if (isList(value)) {
-    return '[' + value.values.map(formatValue).join('; ') + ']';
+    return "[" + value.values.map(formatValue).join("; ") + "]";
   }
   if (isTuple && isTuple(value)) {
-    return '{' + value.values.map(formatValue).join('; ') + '}';
+    return "{" + value.values.map(formatValue).join("; ") + "}";
   }
   if (isRecord(value)) {
-    return '{ ' + Object.entries(value.fields)
-      .map(([k, v]) => `@${k} ${formatValue(v)}`)
-      .join('; ') + ' }';
+    return (
+      "{ " +
+      Object.entries(value.fields)
+        .map(([k, v]) => `@${k} ${formatValue(v)}`)
+        .join("; ") +
+      " }"
+    );
   }
   if (isFunction(value)) {
-    return '<function>';
+    return "<function>";
   }
   if (isNativeFunction(value)) {
     return `<native:${value.name}>`;
   }
   if (isUnit(value)) {
-    return '()';
+    return "()";
   }
   if (isConstructor(value)) {
     if (value.args.length === 0) {
       return value.name;
     } else {
-      return value.name + ' ' + value.args.map(formatValue).join(' ');
+      return value.name + " " + value.args.map(formatValue).join(" ");
     }
   }
-  return '<unknown>';
+  return "<unknown>";
 }
 
-export default formatValue; 
+export default formatValue;

@@ -1,5 +1,5 @@
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from "fs";
+import * as path from "path";
 import {
   Expression,
   Program,
@@ -18,136 +18,161 @@ import {
   TypeDefinitionExpression,
   MatchExpression,
   Pattern,
-  MatchCase
-} from './ast';
-import { createError, NoolangError } from './errors';
-import { formatValue } from './format';
-import { Lexer } from './lexer';
-import { parse } from './parser/parser';
+  MatchCase,
+} from "./ast";
+import { createError, NoolangError } from "./errors";
+import { formatValue } from "./format";
+import { Lexer } from "./lexer";
+import { parse } from "./parser/parser";
 
 // Value types (Phase 6: functions and native functions as tagged union)
 export type Value =
-  | { tag: 'number'; value: number }
-  | { tag: 'string'; value: string }
-  | { tag: 'tuple'; values: Value[] }
-  | { tag: 'list'; values: Value[] }
-  | { tag: 'record'; fields: { [key: string]: Value } }
-  | { tag: 'function'; fn: (...args: Value[]) => Value }
-  | { tag: 'native'; name: string; fn: any }
-  | { tag: 'constructor'; name: string; args: Value[] }
-  | { tag: 'unit' };
+  | { tag: "number"; value: number }
+  | { tag: "string"; value: string }
+  | { tag: "tuple"; values: Value[] }
+  | { tag: "list"; values: Value[] }
+  | { tag: "record"; fields: { [key: string]: Value } }
+  | { tag: "function"; fn: (...args: Value[]) => Value }
+  | { tag: "native"; name: string; fn: any }
+  | { tag: "constructor"; name: string; args: Value[] }
+  | { tag: "unit" };
 
 // --- Mutable Cell type ---
 export type Cell = { cell: true; value: Value };
 export function isCell(val: any): val is Cell {
-  return val && typeof val === 'object' && val.cell === true && 'value' in val;
+  return val && typeof val === "object" && val.cell === true && "value" in val;
 }
 export function createCell(value: Value): Cell {
   return { cell: true, value };
 }
 
-export function isNumber(value: Value): value is { tag: 'number'; value: number } {
-  return value.tag === 'number';
+export function isNumber(
+  value: Value,
+): value is { tag: "number"; value: number } {
+  return value.tag === "number";
 }
 
 export function createNumber(value: number): Value {
-  return { tag: 'number', value };
+  return { tag: "number", value };
 }
 
-export function isString(value: Value): value is { tag: 'string'; value: string } {
-  return value.tag === 'string';
+export function isString(
+  value: Value,
+): value is { tag: "string"; value: string } {
+  return value.tag === "string";
 }
 
 export function createString(value: string): Value {
-  return { tag: 'string', value };
+  return { tag: "string", value };
 }
 
 // Helper functions for Bool ADT constructors
 export function createTrue(): Value {
-  return { tag: 'constructor', name: 'True', args: [] };
+  return { tag: "constructor", name: "True", args: [] };
 }
 
 export function createFalse(): Value {
-  return { tag: 'constructor', name: 'False', args: [] };
+  return { tag: "constructor", name: "False", args: [] };
 }
 
 export function createBool(value: boolean): Value {
   return createConstructor(value ? "True" : "False", []);
 }
 
-export function isBool(value: Value): value is { tag: 'constructor'; name: 'True' | 'False'; args: [] } {
-  return value.tag === 'constructor' && (value.name === 'True' || value.name === 'False');
+export function isBool(
+  value: Value,
+): value is { tag: "constructor"; name: "True" | "False"; args: [] } {
+  return (
+    value.tag === "constructor" &&
+    (value.name === "True" || value.name === "False")
+  );
 }
 
 export function boolValue(value: Value): boolean {
-  if (value.tag === 'constructor' && value.name === 'True') return true;
-  if (value.tag === 'constructor' && value.name === 'False') return false;
+  if (value.tag === "constructor" && value.name === "True") return true;
+  if (value.tag === "constructor" && value.name === "False") return false;
   throw new Error(`Expected Bool constructor, got ${value.tag}`);
 }
 
-export function isList(value: Value): value is { tag: 'list'; values: Value[] } {
-  return value.tag === 'list';
+export function isList(
+  value: Value,
+): value is { tag: "list"; values: Value[] } {
+  return value.tag === "list";
 }
 
 export function createList(values: Value[]): Value {
-  return { tag: 'list', values };
+  return { tag: "list", values };
 }
 
-export function isRecord(value: Value): value is { tag: 'record'; fields: { [key: string]: Value } } {
-  return value.tag === 'record';
+export function isRecord(
+  value: Value,
+): value is { tag: "record"; fields: { [key: string]: Value } } {
+  return value.tag === "record";
 }
 
 export function createRecord(fields: { [key: string]: Value }): Value {
-  return { tag: 'record', fields };
+  return { tag: "record", fields };
 }
 
-export function isFunction(value: Value): value is { tag: 'function'; fn: (...args: Value[]) => Value } {
-  return value.tag === 'function';
+export function isFunction(
+  value: Value,
+): value is { tag: "function"; fn: (...args: Value[]) => Value } {
+  return value.tag === "function";
 }
 
 export function createFunction(fn: (...args: Value[]) => Value): Value {
-  return { tag: 'function', fn };
+  return { tag: "function", fn };
 }
 
-export function isNativeFunction(value: Value): value is { tag: 'native'; name: string; fn: (...args: Value[]) => Value } {
-  return value.tag === 'native';
+export function isNativeFunction(
+  value: Value,
+): value is { tag: "native"; name: string; fn: (...args: Value[]) => Value } {
+  return value.tag === "native";
 }
 
 export function createNativeFunction(name: string, fn: any): Value {
   function wrap(fn: any, curriedName: string): Value {
-    return { tag: 'native', name: curriedName, fn: (...args: Value[]) => {
-      const result = fn(...args);
-      if (typeof result === 'function') {
-        return wrap(result, curriedName + '_curried');
-      }
-      return result;
-    }};
+    return {
+      tag: "native",
+      name: curriedName,
+      fn: (...args: Value[]) => {
+        const result = fn(...args);
+        if (typeof result === "function") {
+          return wrap(result, curriedName + "_curried");
+        }
+        return result;
+      },
+    };
   }
   return wrap(fn, name);
 }
 
-export function isTuple(value: Value): value is { tag: 'tuple'; values: Value[] } {
-  return value.tag === 'tuple';
+export function isTuple(
+  value: Value,
+): value is { tag: "tuple"; values: Value[] } {
+  return value.tag === "tuple";
 }
 
 export function createTuple(values: Value[]): Value {
-  return { tag: 'tuple', values };
+  return { tag: "tuple", values };
 }
 
-export function isUnit(value: Value): value is { tag: 'unit' } {
-  return value.tag === 'unit';
+export function isUnit(value: Value): value is { tag: "unit" } {
+  return value.tag === "unit";
 }
 
 export function createUnit(): Value {
-  return { tag: 'unit' };
+  return { tag: "unit" };
 }
 
-export function isConstructor(value: Value): value is { tag: 'constructor'; name: string; args: Value[] } {
-  return value.tag === 'constructor';
+export function isConstructor(
+  value: Value,
+): value is { tag: "constructor"; name: string; args: Value[] } {
+  return value.tag === "constructor";
 }
 
 export function createConstructor(name: string, args: Value[]): Value {
-  return { tag: 'constructor', name, args };
+  return { tag: "constructor", name, args };
 }
 
 export type ExecutionStep = {
@@ -164,7 +189,6 @@ export type ProgramResult = {
 };
 
 export type Environment = Map<string, Value | Cell>;
-
 
 // Helper to flatten semicolon-separated binary expressions into individual statements
 const flattenStatements = (expr: Expression): Expression[] => {
@@ -191,27 +215,27 @@ export class Evaluator {
       createNativeFunction("+", (a: Value) => (b: Value) => {
         if (isNumber(a) && isNumber(b)) return createNumber(a.value + b.value);
         throw new Error(
-          `Cannot add ${a?.tag || "unit"} and ${b?.tag || "unit"}`
+          `Cannot add ${a?.tag || "unit"} and ${b?.tag || "unit"}`,
         );
-      })
+      }),
     );
     this.environment.set(
       "-",
       createNativeFunction("-", (a: Value) => (b: Value) => {
         if (isNumber(a) && isNumber(b)) return createNumber(a.value - b.value);
         throw new Error(
-          `Cannot subtract ${b?.tag || "unit"} from ${a?.tag || "unit"}`
+          `Cannot subtract ${b?.tag || "unit"} from ${a?.tag || "unit"}`,
         );
-      })
+      }),
     );
     this.environment.set(
       "*",
       createNativeFunction("*", (a: Value) => (b: Value) => {
         if (isNumber(a) && isNumber(b)) return createNumber(a.value * b.value);
         throw new Error(
-          `Cannot multiply ${a?.tag || "unit"} and ${b?.tag || "unit"}`
+          `Cannot multiply ${a?.tag || "unit"} and ${b?.tag || "unit"}`,
         );
-      })
+      }),
     );
     this.environment.set(
       "/",
@@ -223,16 +247,16 @@ export class Evaluator {
               "Division by zero",
               undefined,
               `${a.value} / ${b.value}`,
-              "Check that the divisor is not zero before dividing"
+              "Check that the divisor is not zero before dividing",
             );
             throw error;
           }
           return createNumber(a.value / b.value);
         }
         throw new Error(
-          `Cannot divide ${a?.tag || "unit"} by ${b?.tag || "unit"}`
+          `Cannot divide ${a?.tag || "unit"} by ${b?.tag || "unit"}`,
         );
-      })
+      }),
     );
 
     // Comparison operations
@@ -251,7 +275,7 @@ export class Evaluator {
           return createFalse();
         }
         return createFalse();
-      })
+      }),
     );
     this.environment.set(
       "!=",
@@ -268,37 +292,35 @@ export class Evaluator {
           return createTrue();
         }
         return createTrue();
-      })
+      }),
     );
     this.environment.set(
       "<",
       createNativeFunction("<", (a: Value) => (b: Value) => {
         if (isNumber(a) && isNumber(b)) return createBool(a.value < b.value);
         throw new Error(`Cannot compare ${typeof a} and ${typeof b}`);
-      })
+      }),
     );
     this.environment.set(
       ">",
       createNativeFunction(">", (a: Value) => (b: Value) => {
         if (isNumber(a) && isNumber(b)) return createBool(a.value > b.value);
         throw new Error(`Cannot compare ${typeof a} and ${typeof b}`);
-      })
+      }),
     );
     this.environment.set(
       "<=",
       createNativeFunction("<=", (a: Value) => (b: Value) => {
-        if (isNumber(a) && isNumber(b))
-          return createBool(a.value <= b.value);
+        if (isNumber(a) && isNumber(b)) return createBool(a.value <= b.value);
         throw new Error(`Cannot compare ${typeof a} and ${typeof b}`);
-      })
+      }),
     );
     this.environment.set(
       ">=",
       createNativeFunction(">=", (a: Value) => (b: Value) => {
-        if (isNumber(a) && isNumber(b))
-          return createBool(a.value >= b.value);
+        if (isNumber(a) && isNumber(b)) return createBool(a.value >= b.value);
         throw new Error(`Cannot compare ${typeof a} and ${typeof b}`);
-      })
+      }),
     );
 
     // Pipeline operator
@@ -307,9 +329,9 @@ export class Evaluator {
       createNativeFunction("|", (value: Value) => (func: Value) => {
         if (isFunction(func)) return func.fn(value);
         throw new Error(
-          `Cannot apply non-function in thrush: ${func?.tag || "unit"}`
+          `Cannot apply non-function in thrush: ${func?.tag || "unit"}`,
         );
-      })
+      }),
     );
 
     // Left-to-right composition
@@ -322,9 +344,9 @@ export class Evaluator {
         throw new Error(
           `Cannot compose non-functions: ${f?.tag || "unit"} and ${
             g?.tag || "unit"
-          }`
+          }`,
         );
-      })
+      }),
     );
 
     // Right-to-left composition
@@ -337,15 +359,15 @@ export class Evaluator {
         throw new Error(
           `Cannot compose non-functions: ${f?.tag || "unit"} and ${
             g?.tag || "unit"
-          }`
+          }`,
         );
-      })
+      }),
     );
 
     // Semicolon operator
     this.environment.set(
       ";",
-      createNativeFunction(";", (left: Value) => (right: Value) => right)
+      createNativeFunction(";", (left: Value) => (right: Value) => right),
     );
 
     // Dollar operator (low precedence function application)
@@ -355,9 +377,9 @@ export class Evaluator {
         if (isFunction(func)) return func.fn(arg);
         if (isNativeFunction(func)) return func.fn(arg);
         throw new Error(
-          `Cannot apply non-function in dollar operator: ${func?.tag || "unit"}`
+          `Cannot apply non-function in dollar operator: ${func?.tag || "unit"}`,
         );
-      })
+      }),
     );
 
     // List operations - minimal built-ins for self-hosted functions
@@ -371,7 +393,7 @@ export class Evaluator {
           }
         }
         throw new Error("list_get: invalid index or not a list");
-      })
+      }),
     );
 
     // List operations
@@ -381,14 +403,14 @@ export class Evaluator {
         if (isList(list) && list.values.length > 0)
           return createList(list.values.slice(1));
         throw new Error("Cannot get tail of empty list or non-list");
-      })
+      }),
     );
     this.environment.set(
       "cons",
       createNativeFunction("cons", (head: Value) => (tail: Value) => {
         if (isList(tail)) return createList([head, ...tail.values]);
         throw new Error("Second argument to cons must be a list");
-      })
+      }),
     );
 
     // List utility functions
@@ -399,7 +421,7 @@ export class Evaluator {
           return createList(list.values.map((item: Value) => func.fn(item)));
         }
         throw new Error("map requires a function and a list");
-      })
+      }),
     );
     this.environment.set(
       "filter",
@@ -413,11 +435,11 @@ export class Evaluator {
               }
               // For non-boolean results, treat as truthy/falsy
               return !isUnit(result);
-            })
+            }),
           );
         }
         throw new Error("filter requires a predicate function and a list");
-      })
+      }),
     );
     this.environment.set(
       "reduce",
@@ -427,28 +449,28 @@ export class Evaluator {
           if (isFunction(func) && isList(list)) {
             return list.values.reduce(
               (acc: Value, item: Value) => func.fn(acc, item),
-              initial
+              initial,
             );
           }
           throw new Error(
-            "reduce requires a function, initial value, and a list"
+            "reduce requires a function, initial value, and a list",
           );
-        }
-      )
+        },
+      ),
     );
     this.environment.set(
       "length",
       createNativeFunction("length", (list: Value) => {
         if (isList(list)) return createNumber(list.values.length);
         throw new Error("length requires a list");
-      })
+      }),
     );
     this.environment.set(
       "isEmpty",
       createNativeFunction("isEmpty", (list: Value) => {
         if (isList(list)) return createBool(list.values.length === 0);
         throw new Error("isEmpty requires a list");
-      })
+      }),
     );
     this.environment.set(
       "append",
@@ -456,7 +478,7 @@ export class Evaluator {
         if (isList(list1) && isList(list2))
           return createList([...list1.values, ...list2.values]);
         throw new Error("append requires two lists");
-      })
+      }),
     );
 
     // Math utilities
@@ -465,7 +487,7 @@ export class Evaluator {
       createNativeFunction("abs", (n: Value) => {
         if (isNumber(n)) return createNumber(Math.abs(n.value));
         throw new Error("abs requires a number");
-      })
+      }),
     );
     this.environment.set(
       "max",
@@ -473,7 +495,7 @@ export class Evaluator {
         if (isNumber(a) && isNumber(b))
           return createNumber(Math.max(a.value, b.value));
         throw new Error("max requires two numbers");
-      })
+      }),
     );
     this.environment.set(
       "min",
@@ -481,7 +503,7 @@ export class Evaluator {
         if (isNumber(a) && isNumber(b))
           return createNumber(Math.min(a.value, b.value));
         throw new Error("min requires two numbers");
-      })
+      }),
     );
 
     // Effectful functions
@@ -490,7 +512,7 @@ export class Evaluator {
       createNativeFunction("print", (value: Value) => {
         console.log(formatValue(value));
         return value; // Return the value that was printed
-      })
+      }),
     );
 
     // String utilities
@@ -499,13 +521,13 @@ export class Evaluator {
       createNativeFunction("concat", (a: Value) => (b: Value) => {
         if (isString(a) && isString(b)) return createString(a.value + b.value);
         throw new Error("concat requires two strings");
-      })
+      }),
     );
     this.environment.set(
       "toString",
       createNativeFunction("toString", (value: Value) =>
-        createString(valueToString(value))
-      )
+        createString(valueToString(value)),
+      ),
     );
 
     // Record utilities
@@ -516,7 +538,7 @@ export class Evaluator {
           return createBool(key.value in record.fields);
         }
         throw new Error("hasKey requires a record and a string key");
-      })
+      }),
     );
     this.environment.set(
       "hasValue",
@@ -525,7 +547,7 @@ export class Evaluator {
           return createBool(Object.values(record.fields).includes(value));
         }
         throw new Error("hasValue requires a record");
-      })
+      }),
     );
     this.environment.set(
       "set",
@@ -540,8 +562,8 @@ export class Evaluator {
             }
           }
           throw new Error("set requires an accessor, record, and new value");
-        }
-      )
+        },
+      ),
     );
 
     // Tuple operations
@@ -552,7 +574,7 @@ export class Evaluator {
           return createNumber(tuple.values.length);
         }
         throw new Error("tupleLength requires a tuple");
-      })
+      }),
     );
     this.environment.set(
       "tupleIsEmpty",
@@ -561,57 +583,76 @@ export class Evaluator {
           return createBool(tuple.values.length === 0);
         }
         throw new Error("tupleIsEmpty requires a tuple");
-      })
+      }),
     );
 
     // Built-in ADT constructors are now self-hosted in stdlib.noo
 
     // Option utility functions
-    this.environment.set("isSome", createNativeFunction("isSome", (option: Value) => {
-      if (isConstructor(option) && option.name === "Some") {
-        return createTrue();
-      } else if (isConstructor(option) && option.name === "None") {
-        return createFalse();
-      }
-      throw new Error("isSome requires an Option value");
-    }));
+    this.environment.set(
+      "isSome",
+      createNativeFunction("isSome", (option: Value) => {
+        if (isConstructor(option) && option.name === "Some") {
+          return createTrue();
+        } else if (isConstructor(option) && option.name === "None") {
+          return createFalse();
+        }
+        throw new Error("isSome requires an Option value");
+      }),
+    );
 
-    this.environment.set("isNone", createNativeFunction("isNone", (option: Value) => {
-      if (isConstructor(option) && option.name === "None") {
-        return createTrue();
-      } else if (isConstructor(option) && option.name === "Some") {
-        return createFalse();
-      }
-      throw new Error("isNone requires an Option value");
-    }));
+    this.environment.set(
+      "isNone",
+      createNativeFunction("isNone", (option: Value) => {
+        if (isConstructor(option) && option.name === "None") {
+          return createTrue();
+        } else if (isConstructor(option) && option.name === "Some") {
+          return createFalse();
+        }
+        throw new Error("isNone requires an Option value");
+      }),
+    );
 
-    this.environment.set("unwrap", createNativeFunction("unwrap", (option: Value) => {
-      if (isConstructor(option) && option.name === "Some" && option.args.length === 1) {
-        return option.args[0];
-      } else if (isConstructor(option) && option.name === "None") {
-        throw new Error("Cannot unwrap None value");
-      }
-      throw new Error("unwrap requires a Some value");
-    }));
+    this.environment.set(
+      "unwrap",
+      createNativeFunction("unwrap", (option: Value) => {
+        if (
+          isConstructor(option) &&
+          option.name === "Some" &&
+          option.args.length === 1
+        ) {
+          return option.args[0];
+        } else if (isConstructor(option) && option.name === "None") {
+          throw new Error("Cannot unwrap None value");
+        }
+        throw new Error("unwrap requires a Some value");
+      }),
+    );
 
     // Result utility functions
-    this.environment.set("isOk", createNativeFunction("isOk", (result: Value) => {
-      if (isConstructor(result) && result.name === "Ok") {
-        return createTrue();
-      } else if (isConstructor(result) && result.name === "Err") {
-        return createFalse();
-      }
-      throw new Error("isOk requires a Result value");
-    }));
+    this.environment.set(
+      "isOk",
+      createNativeFunction("isOk", (result: Value) => {
+        if (isConstructor(result) && result.name === "Ok") {
+          return createTrue();
+        } else if (isConstructor(result) && result.name === "Err") {
+          return createFalse();
+        }
+        throw new Error("isOk requires a Result value");
+      }),
+    );
 
-    this.environment.set("isErr", createNativeFunction("isErr", (result: Value) => {
-      if (isConstructor(result) && result.name === "Err") {
-        return createTrue();
-      } else if (isConstructor(result) && result.name === "Ok") {
-        return createFalse();
-      }
-      throw new Error("isErr requires a Result value");
-    }));
+    this.environment.set(
+      "isErr",
+      createNativeFunction("isErr", (result: Value) => {
+        if (isConstructor(result) && result.name === "Err") {
+          return createTrue();
+        } else if (isConstructor(result) && result.name === "Ok") {
+          return createFalse();
+        }
+        throw new Error("isErr requires a Result value");
+      }),
+    );
   }
 
   private loadStdlib(): void {
@@ -656,7 +697,7 @@ export class Evaluator {
           Array.from(this.environment.entries()).map(([k, v]) => [
             k,
             isCell(v) ? v.value : v,
-          ])
+          ]),
         ),
       };
     }
@@ -686,7 +727,7 @@ export class Evaluator {
         Array.from(this.environment.entries()).map(([k, v]) => [
           k,
           isCell(v) ? v.value : v,
-        ])
+        ]),
       ),
     };
   }
@@ -808,9 +849,7 @@ export class Evaluator {
       case "match":
         return this.evaluateMatch(expr as MatchExpression);
       default:
-        throw new Error(
-          `Unknown expression kind: ${(expr as any).kind}`
-        );
+        throw new Error(`Unknown expression kind: ${(expr as any).kind}`);
     }
   }
 
@@ -826,7 +865,7 @@ export class Evaluator {
             // It's already a value
             return element;
           }
-        })
+        }),
       );
     }
 
@@ -857,7 +896,7 @@ export class Evaluator {
           end: expr.location.end.line,
         },
         expr.name,
-        `Define the variable before using it: ${expr.name} = value`
+        `Define the variable before using it: ${expr.name} = value`,
       );
       throw error;
     }
@@ -914,7 +953,7 @@ export class Evaluator {
                 return remainingFunction.fn(nextArg);
               } else {
                 throw new Error(
-                  "Expected function but got: " + typeof remainingFunction
+                  "Expected function but got: " + typeof remainingFunction,
                 );
               }
             }
@@ -947,7 +986,7 @@ export class Evaluator {
           result = result(arg);
         } else {
           throw new Error(
-            `Cannot apply argument to non-function: ${typeof result}`
+            `Cannot apply argument to non-function: ${typeof result}`,
           );
         }
       }
@@ -968,7 +1007,7 @@ export class Evaluator {
           result = result.fn(arg);
         } else {
           throw new Error(
-            `Cannot apply argument to non-function: ${typeof result}`
+            `Cannot apply argument to non-function: ${typeof result}`,
           );
         }
       }
@@ -976,7 +1015,7 @@ export class Evaluator {
       return result;
     } else {
       throw new Error(
-        `Cannot apply non-function: ${typeof func} (${func?.tag || "unknown"})`
+        `Cannot apply non-function: ${typeof func} (${func?.tag || "unknown"})`,
       );
     }
   }
@@ -1007,7 +1046,7 @@ export class Evaluator {
           fn: (...args: Value[]) => Value;
         };
         composed = createFunction((x: Value) =>
-          nextFuncFn.fn(composedFn.fn(x))
+          nextFuncFn.fn(composedFn.fn(x)),
         );
       } else if (isNativeFunction(composed) && isNativeFunction(nextFunc)) {
         // Compose: nextFunc(composed(x))
@@ -1022,7 +1061,7 @@ export class Evaluator {
           fn: (...args: Value[]) => Value;
         };
         composed = createFunction((x: Value) =>
-          nextFuncFn.fn(composedFn.fn(x))
+          nextFuncFn.fn(composedFn.fn(x)),
         );
       } else if (isFunction(composed) && isNativeFunction(nextFunc)) {
         // Compose: nextFunc(composed(x))
@@ -1036,7 +1075,7 @@ export class Evaluator {
           fn: (...args: Value[]) => Value;
         };
         composed = createFunction((x: Value) =>
-          nextFuncFn.fn(composedFn.fn(x))
+          nextFuncFn.fn(composedFn.fn(x)),
         );
       } else if (isNativeFunction(composed) && isFunction(nextFunc)) {
         // Compose: nextFunc(composed(x))
@@ -1050,13 +1089,13 @@ export class Evaluator {
           fn: (...args: Value[]) => Value;
         };
         composed = createFunction((x: Value) =>
-          nextFuncFn.fn(composedFn.fn(x))
+          nextFuncFn.fn(composedFn.fn(x)),
         );
       } else {
         throw new Error(
           `Cannot compose non-functions in pipeline: ${valueToString(
-            composed
-          )} and ${valueToString(nextFunc)}`
+            composed,
+          )} and ${valueToString(nextFunc)}`,
         );
       }
     }
@@ -1082,7 +1121,7 @@ export class Evaluator {
         return right.fn(left);
       } else {
         throw new Error(
-          `Cannot apply non-function in thrush: ${valueToString(right)}`
+          `Cannot apply non-function in thrush: ${valueToString(right)}`,
         );
       }
     } else if (expr.operator === "$") {
@@ -1096,7 +1135,7 @@ export class Evaluator {
         return left.fn(right);
       } else {
         throw new Error(
-          `Cannot apply non-function in dollar operator: ${valueToString(left)}`
+          `Cannot apply non-function in dollar operator: ${valueToString(left)}`,
         );
       }
     } else if (expr.operator === "|>") {
@@ -1119,8 +1158,8 @@ export class Evaluator {
       } else {
         throw new Error(
           `Cannot compose non-functions in pipeline: ${valueToString(
-            left
-          )} and ${valueToString(right)}`
+            left,
+          )} and ${valueToString(right)}`,
         );
       }
     } else if (expr.operator === "<|") {
@@ -1137,8 +1176,8 @@ export class Evaluator {
       } else {
         throw new Error(
           `Cannot compose non-functions: ${valueToString(
-            left
-          )} and ${valueToString(right)}`
+            left,
+          )} and ${valueToString(right)}`,
         );
       }
     }
@@ -1277,7 +1316,7 @@ export class Evaluator {
           end: expr.location.end.line,
         },
         `import "${expr.path}"`,
-        "Check that the file exists and can be parsed, and that the path is correct relative to the importing file."
+        "Check that the file exists and can be parsed, and that the path is correct relative to the importing file.",
       );
       throw structuredError;
     }
@@ -1369,15 +1408,15 @@ export class Evaluator {
         );
       case "record":
         return expr.fields.some((field) =>
-          this.containsVariable(field.value, varName)
+          this.containsVariable(field.value, varName),
         );
       case "tuple":
         return expr.elements.some((element) =>
-          this.containsVariable(element, varName)
+          this.containsVariable(element, varName),
         );
       case "list":
         return expr.elements.some((element) =>
-          this.containsVariable(element, varName)
+          this.containsVariable(element, varName),
         );
       case "pipeline":
         return expr.steps.some((step) => this.containsVariable(step, varName));
@@ -1398,7 +1437,7 @@ export class Evaluator {
       Array.from(this.environment.entries()).map(([k, v]) => [
         k,
         isCell(v) ? v.value : v,
-      ])
+      ]),
     );
   }
 
@@ -1415,7 +1454,7 @@ export class Evaluator {
         return expr.name;
       case "function":
         return `fn ${expr.params.join(" ")} => ${this.expressionToString(
-          expr.body
+          expr.body,
         )}`;
       case "application":
         return `${this.expressionToString(expr.func)} ${expr.args
@@ -1431,9 +1470,9 @@ export class Evaluator {
         } ${this.expressionToString(expr.right)}`;
       case "if":
         return `if ${this.expressionToString(
-          expr.condition
+          expr.condition,
         )} then ${this.expressionToString(
-          expr.then
+          expr.then,
         )} else ${this.expressionToString(expr.else)}`;
       case "definition":
         return `${expr.name} = ${this.expressionToString(expr.value)}`;
@@ -1446,7 +1485,8 @@ export class Evaluator {
       case "record":
         return `{ ${expr.fields
           .map(
-            (field) => `${field.name} = ${this.expressionToString(field.value)}`
+            (field) =>
+              `${field.name} = ${this.expressionToString(field.value)}`,
           )
           .join(", ")} }`;
       case "accessor":
@@ -1465,24 +1505,30 @@ export class Evaluator {
     for (const constructor of expr.constructors) {
       if (constructor.args.length === 0) {
         // Nullary constructor: just create the constructor value
-        const constructorValue = { tag: 'constructor', name: constructor.name, args: [] } as Value;
+        const constructorValue = {
+          tag: "constructor",
+          name: constructor.name,
+          args: [],
+        } as Value;
         this.environment.set(constructor.name, constructorValue);
       } else {
         // N-ary constructor: create a function that builds the constructor
         const constructorFunction = (...args: Value[]): Value => {
           if (args.length !== constructor.args.length) {
-            throw new Error(`Constructor ${constructor.name} expects ${constructor.args.length} arguments but got ${args.length}`);
+            throw new Error(
+              `Constructor ${constructor.name} expects ${constructor.args.length} arguments but got ${args.length}`,
+            );
           }
-          return { tag: 'constructor', name: constructor.name, args } as Value;
+          return { tag: "constructor", name: constructor.name, args } as Value;
         };
-        
+
         // Create a simple constructor function that collects all arguments
         const createCurriedConstructor = (arity: number, name: string) => {
           const collectArgs = (collectedArgs: Value[] = []): Value => {
             return createFunction((nextArg: Value) => {
               const newArgs = [...collectedArgs, nextArg];
               if (newArgs.length === arity) {
-                return { tag: 'constructor', name, args: newArgs } as Value;
+                return { tag: "constructor", name, args: newArgs } as Value;
               } else {
                 return collectArgs(newArgs);
               }
@@ -1490,11 +1536,14 @@ export class Evaluator {
           };
           return collectArgs();
         };
-        
-        this.environment.set(constructor.name, createCurriedConstructor(constructor.args.length, constructor.name));
+
+        this.environment.set(
+          constructor.name,
+          createCurriedConstructor(constructor.args.length, constructor.name),
+        );
       }
     }
-    
+
     // Type definitions evaluate to unit
     return createUnit();
   }
@@ -1502,19 +1551,19 @@ export class Evaluator {
   private evaluateMatch(expr: MatchExpression): Value {
     // Evaluate the expression being matched
     const value = this.evaluateExpression(expr.expression);
-    
+
     // Try each case until one matches
     for (const matchCase of expr.cases) {
       const matchResult = this.tryMatchPattern(matchCase.pattern, value);
       if (matchResult.matched) {
         // Create new environment with pattern bindings
         const savedEnv = new Map(this.environment);
-        
+
         // Add bindings to environment
         for (const [name, boundValue] of matchResult.bindings) {
           this.environment.set(name, boundValue);
         }
-        
+
         try {
           // Evaluate the case expression
           const result = this.evaluateExpression(matchCase.expression);
@@ -1525,70 +1574,75 @@ export class Evaluator {
         }
       }
     }
-    
+
     throw new Error("No pattern matched in match expression");
   }
 
-  private tryMatchPattern(pattern: Pattern, value: Value): { matched: boolean; bindings: Map<string, Value> } {
+  private tryMatchPattern(
+    pattern: Pattern,
+    value: Value,
+  ): { matched: boolean; bindings: Map<string, Value> } {
     const bindings = new Map<string, Value>();
-    
+
     switch (pattern.kind) {
       case "wildcard":
         // Wildcard always matches
         return { matched: true, bindings };
-        
+
       case "variable":
         // Variable always matches and binds the value
         bindings.set(pattern.name, value);
         return { matched: true, bindings };
-        
+
       case "constructor": {
         // Constructor pattern only matches constructor values
-        if (value.tag !== 'constructor') {
+        if (value.tag !== "constructor") {
           return { matched: false, bindings };
         }
-        
+
         // Check constructor name
         if (value.name !== pattern.name) {
           return { matched: false, bindings };
         }
-        
+
         // Check argument count
         if (pattern.args.length !== value.args.length) {
           return { matched: false, bindings };
         }
-        
+
         // Match each argument
         for (let i = 0; i < pattern.args.length; i++) {
           const argMatch = this.tryMatchPattern(pattern.args[i], value.args[i]);
           if (!argMatch.matched) {
             return { matched: false, bindings };
           }
-          
+
           // Merge bindings
           for (const [name, boundValue] of argMatch.bindings) {
             bindings.set(name, boundValue);
           }
         }
-        
+
         return { matched: true, bindings };
       }
-      
+
       case "literal": {
         // Literal pattern matches if values are equal
         let matches = false;
-        
+
         if (typeof pattern.value === "number" && isNumber(value)) {
           matches = pattern.value === value.value;
         } else if (typeof pattern.value === "string" && isString(value)) {
           matches = pattern.value === value.value;
         }
-        
+
         return { matched: matches, bindings };
       }
-      
+
       default:
-        throw new Error(`Unsupported pattern kind: ${(pattern as Pattern).kind}`);
+        throw new Error(
+          `Unsupported pattern kind: ${(pattern as Pattern).kind}`,
+        );
     }
   }
 }
@@ -1600,7 +1654,7 @@ function valueToString(value: Value): string {
   } else if (isString(value)) {
     return '"' + value.value + '"';
   } else if (isBool(value)) {
-    return boolValue(value) ? 'True' : 'False';
+    return boolValue(value) ? "True" : "False";
   } else if (isList(value)) {
     return `[${value.values.map(valueToString).join("; ")}]`;
   } else if (isTuple(value)) {

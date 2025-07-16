@@ -75,7 +75,7 @@ describe("File-relative imports", () => {
 
     const result = evaluator.evaluateProgram(
       program,
-      "/test/dir/test_file.noo"
+      "/test/dir/test_file.noo",
     );
     expect(result.finalResult).toEqual({ tag: "number", value: 5 });
   });
@@ -104,7 +104,7 @@ describe("File-relative imports", () => {
 
     const result = evaluator.evaluateProgram(
       program,
-      "/test/dir/subdir/test_file.noo"
+      "/test/dir/subdir/test_file.noo",
     );
     expect(result.finalResult).toEqual({ tag: "number", value: 30 });
   });
@@ -133,7 +133,7 @@ describe("File-relative imports", () => {
 
     const result = evaluator.evaluateProgram(
       program,
-      "/test/dir/test_file.noo"
+      "/test/dir/test_file.noo",
     );
     expect(result.finalResult).toEqual({ tag: "number", value: 15 });
   });

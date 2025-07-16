@@ -1,16 +1,16 @@
-import { Position, Location, createPosition, createLocation } from './ast';
+import { Position, Location, createPosition, createLocation } from "./ast";
 
-export type TokenType = 
-  | 'IDENTIFIER'
-  | 'NUMBER'
-  | 'STRING'
-  | 'BOOLEAN'
-  | 'OPERATOR'
-  | 'PUNCTUATION'
-  | 'KEYWORD'
-  | 'COMMENT'
-  | 'ACCESSOR'
-  | 'EOF';
+export type TokenType =
+  | "IDENTIFIER"
+  | "NUMBER"
+  | "STRING"
+  | "BOOLEAN"
+  | "OPERATOR"
+  | "PUNCTUATION"
+  | "KEYWORD"
+  | "COMMENT"
+  | "ACCESSOR"
+  | "EOF";
 
 export interface Token {
   type: TokenType;
@@ -33,18 +33,20 @@ export class Lexer {
   }
 
   private peek(): string {
-    return this.isEOF() ? '\0' : this.input[this.position];
+    return this.isEOF() ? "\0" : this.input[this.position];
   }
 
   private peekNext(): string {
-    return this.position + 1 >= this.input.length ? '\0' : this.input[this.position + 1];
+    return this.position + 1 >= this.input.length
+      ? "\0"
+      : this.input[this.position + 1];
   }
 
   private advance(): string {
-    if (this.isEOF()) return '\0';
+    if (this.isEOF()) return "\0";
     const char = this.input[this.position];
     this.position++;
-    if (char === '\n') {
+    if (char === "\n") {
       this.line++;
       this.column = 1;
     } else {
@@ -63,11 +65,11 @@ export class Lexer {
   }
 
   private skipComment(): void {
-    if (this.peek() === '#') {
+    if (this.peek() === "#") {
       // Skip the # character
       this.advance();
       // Skip everything until newline or EOF
-      while (!this.isEOF() && this.peek() !== '\n') {
+      while (!this.isEOF() && this.peek() !== "\n") {
         this.advance();
       }
     }
@@ -75,13 +77,13 @@ export class Lexer {
 
   private readNumber(): Token {
     const start = this.createPosition();
-    let value = '';
+    let value = "";
 
     while (!this.isEOF() && /\d/.test(this.peek())) {
       value += this.advance();
     }
 
-    if (this.peek() === '.' && /\d/.test(this.peekNext())) {
+    if (this.peek() === "." && /\d/.test(this.peekNext())) {
       value += this.advance(); // consume the dot
       while (!this.isEOF() && /\d/.test(this.peek())) {
         value += this.advance();
@@ -89,7 +91,7 @@ export class Lexer {
     }
 
     return {
-      type: 'NUMBER',
+      type: "NUMBER",
       value,
       location: this.createLocation(start),
     };
@@ -98,10 +100,10 @@ export class Lexer {
   private readString(): Token {
     const start = this.createPosition();
     const quote = this.advance(); // consume opening quote
-    let value = '';
+    let value = "";
 
     while (!this.isEOF() && this.peek() !== quote) {
-      if (this.peek() === '\\') {
+      if (this.peek() === "\\") {
         this.advance(); // consume backslash
         if (!this.isEOF()) {
           value += this.advance(); // consume escaped character
@@ -116,7 +118,7 @@ export class Lexer {
     }
 
     return {
-      type: 'STRING',
+      type: "STRING",
       value,
       location: this.createLocation(start),
     };
@@ -124,7 +126,7 @@ export class Lexer {
 
   private readIdentifier(): Token {
     const start = this.createPosition();
-    let value = '';
+    let value = "";
 
     // Read the first character (must be letter or underscore)
     if (!this.isEOF() && /[a-zA-Z_]/.test(this.peek())) {
@@ -137,7 +139,7 @@ export class Lexer {
     }
 
     // Special case for mut! - check if we have "mut" followed by "!"
-    if (value === 'mut' && !this.isEOF() && this.peek() === '!') {
+    if (value === "mut" && !this.isEOF() && this.peek() === "!") {
       value += this.advance(); // consume the !
     }
 
@@ -168,7 +170,7 @@ export class Lexer {
       "Unit",
       "List",
     ];
-    const type = keywords.includes(value) ? 'KEYWORD' : 'IDENTIFIER';
+    const type = keywords.includes(value) ? "KEYWORD" : "IDENTIFIER";
 
     return {
       type,
@@ -179,7 +181,7 @@ export class Lexer {
 
   private readOperator(): Token {
     const start = this.createPosition();
-    let value = '';
+    let value = "";
 
     // Multi-character operators (must have spaces around them)
     const operators = [
@@ -221,7 +223,7 @@ export class Lexer {
     }
 
     return {
-      type: 'OPERATOR',
+      type: "OPERATOR",
       value,
       location: this.createLocation(start),
     };
@@ -232,7 +234,7 @@ export class Lexer {
     const value = this.advance();
 
     return {
-      type: 'PUNCTUATION',
+      type: "PUNCTUATION",
       value,
       location: this.createLocation(start),
     };
@@ -241,7 +243,7 @@ export class Lexer {
   private readAccessor(): Token {
     const start = this.createPosition();
     this.advance(); // consume @
-    let field = '';
+    let field = "";
 
     // Read letters, digits, and underscores after @
     while (!this.isEOF() && /[a-zA-Z0-9_]/.test(this.peek())) {
@@ -249,7 +251,7 @@ export class Lexer {
     }
 
     return {
-      type: 'ACCESSOR',
+      type: "ACCESSOR",
       value: field,
       location: this.createLocation(start),
     };
@@ -269,8 +271,8 @@ export class Lexer {
 
     if (this.isEOF()) {
       return {
-        type: 'EOF',
-        value: '',
+        type: "EOF",
+        value: "",
         location: this.createLocation(this.createPosition()),
       };
     }
@@ -304,12 +306,12 @@ export class Lexer {
     }
 
     // Handle accessors
-    if (char === '@') {
+    if (char === "@") {
       return this.readAccessor();
     }
 
     // Handle comments
-    if (char === '#') {
+    if (char === "#") {
       this.skipComment();
       // After skipping comment, get the next token
       return this.nextToken();
@@ -323,7 +325,7 @@ export class Lexer {
       return this.nextToken();
     }
     return {
-      type: 'PUNCTUATION',
+      type: "PUNCTUATION",
       value,
       location: this.createLocation(start),
     };
@@ -336,8 +338,8 @@ export class Lexer {
     do {
       token = this.nextToken();
       tokens.push(token);
-    } while (token.type !== 'EOF');
+    } while (token.type !== "EOF");
 
     return tokens;
   }
-} 
+}

@@ -1,5 +1,5 @@
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from "fs";
+import * as path from "path";
 import {
   Expression,
   Program,
@@ -75,10 +75,13 @@ export type TypeScheme = {
 export type TypeEnvironment = Map<string, TypeScheme>;
 
 // ADT registry for tracking defined algebraic data types
-export type ADTRegistry = Map<string, {
-  typeParams: string[];
-  constructors: Map<string, Type[]>; // constructor name -> arg types
-}>;
+export type ADTRegistry = Map<
+  string,
+  {
+    typeParams: string[];
+    constructors: Map<string, Type[]>; // constructor name -> arg types
+  }
+>;
 
 // Functional state for type inference
 export type TypeState = {
@@ -118,9 +121,12 @@ const countFunctionParams = (type: Type): number => {
 };
 
 // Helper function to propagate a constraint to matching type variables in a function type
-const propagateConstraintToTypeVariable = (funcType: Type, constraint: Constraint): void => {
+const propagateConstraintToTypeVariable = (
+  funcType: Type,
+  constraint: Constraint,
+): void => {
   if (funcType.kind !== "function") return;
-  
+
   // Apply constraint to matching type variables in parameters
   for (const param of funcType.params) {
     if (param.kind === "variable" && param.name === constraint.typeVar) {
@@ -129,21 +135,24 @@ const propagateConstraintToTypeVariable = (funcType: Type, constraint: Constrain
       }
       // Check if this constraint is already present
       const existingConstraint = param.constraints.find(
-        (c) => JSON.stringify(c) === JSON.stringify(constraint)
+        (c) => JSON.stringify(c) === JSON.stringify(constraint),
       );
       if (!existingConstraint) {
         param.constraints.push(constraint);
       }
     }
   }
-  
+
   // Also apply to return type if it matches
-  if (funcType.return.kind === "variable" && funcType.return.name === constraint.typeVar) {
+  if (
+    funcType.return.kind === "variable" &&
+    funcType.return.name === constraint.typeVar
+  ) {
     if (!funcType.return.constraints) {
       funcType.return.constraints = [];
     }
     const existingConstraint = funcType.return.constraints.find(
-      (c) => JSON.stringify(c) === JSON.stringify(constraint)
+      (c) => JSON.stringify(c) === JSON.stringify(constraint),
     );
     if (!existingConstraint) {
       funcType.return.constraints.push(constraint);
@@ -151,11 +160,10 @@ const propagateConstraintToTypeVariable = (funcType: Type, constraint: Constrain
   }
 };
 
-
 // Utility: mapObject for mapping over record fields
 function mapObject<T, U>(
   obj: { [k: string]: T },
-  fn: (v: T, k: string) => U
+  fn: (v: T, k: string) => U,
 ): { [k: string]: U } {
   const result: { [k: string]: U } = {};
   for (const k in obj) result[k] = fn(obj[k], k);
@@ -172,14 +180,14 @@ function mapSet<K, V>(map: Map<K, V>, key: K, value: V): Map<K, V> {
 // Utility: typeError for consistent error reporting
 function typeError(msg: string, context?: any): never {
   throw new Error(
-    `[TypeError] ${msg}${context ? `: ${JSON.stringify(context)}` : ""}`
+    `[TypeError] ${msg}${context ? `: ${JSON.stringify(context)}` : ""}`,
   );
 }
 
 // Utility: isTypeKind type guard
 function isTypeKind<T extends Type["kind"]>(
   t: Type,
-  kind: T
+  kind: T,
 ): t is Extract<Type, { kind: T }> {
   return t.kind === kind;
 }
@@ -188,7 +196,7 @@ function isTypeKind<T extends Type["kind"]>(
 export const solveConstraints = (
   constraints: Constraint[],
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState => {
   let currentState = state;
 
@@ -202,7 +210,7 @@ export const solveConstraints = (
 export const solveConstraint = (
   constraint: Constraint,
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState => {
   switch (constraint.kind) {
     case "is":
@@ -221,14 +229,14 @@ export const solveConstraint = (
 const solveIsConstraint = (
   constraint: { kind: "is"; typeVar: string; constraint: string },
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState => {
   // Validate constraint name first
   validateConstraintName(constraint.constraint);
-  
+
   const typeVar = substitute(
     typeVariable(constraint.typeVar),
-    state.substitution
+    state.substitution,
   );
 
   // If the type variable has been unified to a concrete type, check if it satisfies the constraint
@@ -240,12 +248,12 @@ const solveIsConstraint = (
           createTypeError(
             `Type ${typeToString(
               typeVar,
-              state.substitution
+              state.substitution,
             )} does not satisfy constraint '${constraint.constraint}'. This often occurs when trying to use a partial function (one that can fail) in an unsafe context like function composition. Consider using total functions that return Option or Result types instead.`,
             {},
-            location || { line: 1, column: 1 }
-          )
-        )
+            location || { line: 1, column: 1 },
+          ),
+        ),
       );
     }
   } else {
@@ -260,7 +268,7 @@ const solveIsConstraint = (
       (c) =>
         c.kind === "is" &&
         c.typeVar === constraint.typeVar &&
-        c.constraint === constraint.constraint
+        c.constraint === constraint.constraint,
     );
 
     if (!existingConstraint) {
@@ -279,11 +287,11 @@ const solveHasFieldConstraint = (
     fieldType: Type;
   },
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState => {
   const typeVar = substitute(
     typeVariable(constraint.typeVar),
-    state.substitution
+    state.substitution,
   );
 
   if (typeVar.kind === "record") {
@@ -294,9 +302,9 @@ const solveHasFieldConstraint = (
           createTypeError(
             `Record type missing required field '${constraint.field}'`,
             {},
-            location || { line: 1, column: 1 }
-          )
-        )
+            location || { line: 1, column: 1 },
+          ),
+        ),
       );
     }
 
@@ -306,7 +314,7 @@ const solveHasFieldConstraint = (
       typeVar.fields[constraint.field],
       constraint.fieldType,
       newState,
-      location
+      location,
     );
 
     return newState;
@@ -319,12 +327,12 @@ const solveHasFieldConstraint = (
         createTypeError(
           `Type ${typeToString(
             typeVar,
-            state.substitution
+            state.substitution,
           )} cannot have fields`,
           {},
-          location || { line: 1, column: 1 }
-        )
-      )
+          location || { line: 1, column: 1 },
+        ),
+      ),
     );
   }
 };
@@ -332,7 +340,7 @@ const solveHasFieldConstraint = (
 const solveImplementsConstraint = (
   constraint: { kind: "implements"; typeVar: string; interfaceName: string },
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState => {
   // For now, we'll just track the constraint
   // In a full implementation, we'd check if the type implements the interface
@@ -347,7 +355,7 @@ const solveCustomConstraint = (
     args: Type[];
   },
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState => {
   // For now, we'll just track the constraint
   // In a full implementation, we'd call the custom constraint solver
@@ -362,7 +370,9 @@ const VALID_CONSTRAINTS = new Set([
 // Validate that a constraint name is valid
 const validateConstraintName = (constraint: string): void => {
   // All constraints are now meaningless type checks, so reject them all
-  throw new Error(`Constraint '${constraint}' is not supported. Use hasField constraints for record typing instead.`);
+  throw new Error(
+    `Constraint '${constraint}' is not supported. Use hasField constraints for record typing instead.`,
+  );
 };
 
 const satisfiesConstraint = (type: Type, constraint: string): boolean => {
@@ -370,11 +380,10 @@ const satisfiesConstraint = (type: Type, constraint: string): boolean => {
   return false;
 };
 
-
 // Apply substitution to a type
 export const substitute = (
   type: Type,
-  substitution: Map<string, Type>
+  substitution: Map<string, Type>,
 ): Type => {
   switch (type.kind) {
     case "variable": {
@@ -390,7 +399,7 @@ export const substitute = (
         params: type.params.map((param) => substitute(param, substitution)),
         return: substitute(type.return, substitution),
         constraints: type.constraints?.map((c) =>
-          substituteConstraint(c, substitution)
+          substituteConstraint(c, substitution),
         ),
       };
     case "list":
@@ -423,7 +432,7 @@ export const substitute = (
 // Apply substitution to a constraint
 export const substituteConstraint = (
   constraint: Constraint,
-  substitution: Map<string, Type>
+  substitution: Map<string, Type>,
 ): Constraint => {
   switch (constraint.kind) {
     case "is":
@@ -461,7 +470,7 @@ export const occursIn = (varName: string, type: Type): boolean => {
       return type.elements.some((element) => occursIn(varName, element));
     case "record":
       return Object.values(type.fields).some((fieldType) =>
-        occursIn(varName, fieldType)
+        occursIn(varName, fieldType),
       );
     case "union":
       return type.types.some((t) => occursIn(varName, t));
@@ -481,7 +490,7 @@ export const unify = (
     reason?: string;
     operation?: string;
     hint?: string;
-  }
+  },
 ): TypeState => {
   const s1 = substitute(t1, state.substitution);
   const s2 = substitute(t2, state.substitution);
@@ -535,20 +544,24 @@ export const unify = (
   // If we get here, the types cannot be unified
   // Add debug info for difficult cases
   const debugContext = context || {};
-  if (s1.kind === s2.kind && s1.kind === 'primitive' && (s1 as any).name === (s2 as any).name) {
-    debugContext.reason = 'concrete_vs_variable';
+  if (
+    s1.kind === s2.kind &&
+    s1.kind === "primitive" &&
+    (s1 as any).name === (s2 as any).name
+  ) {
+    debugContext.reason = "concrete_vs_variable";
     debugContext.hint = `Both types appear to be ${(s1 as any).name} but they are not unifying. This suggests the type equality check is failing. Type 1: ${JSON.stringify(s1)}, Type 2: ${JSON.stringify(s2)}. Check if there are extra properties or constraints causing inequality.`;
   }
-  
+
   throw new Error(
     formatTypeError(
       unificationError(
         s1,
         s2,
         debugContext,
-        location || { line: 1, column: 1 }
-      )
-    )
+        location || { line: 1, column: 1 },
+      ),
+    ),
   );
 };
 
@@ -584,7 +597,7 @@ export const typesEqual = (t1: Type, t2: Type): boolean => {
         return false;
       }
       return t1.elements.every((element, i) =>
-        typesEqual(element, t2_tuple.elements[i])
+        typesEqual(element, t2_tuple.elements[i]),
       );
 
     case "record":
@@ -595,7 +608,7 @@ export const typesEqual = (t1: Type, t2: Type): boolean => {
         return false;
       }
       return keys1.every((key) =>
-        typesEqual(t1.fields[key], t2_record.fields[key])
+        typesEqual(t1.fields[key], t2_record.fields[key]),
       );
 
     case "union":
@@ -626,7 +639,7 @@ export const typesEqual = (t1: Type, t2: Type): boolean => {
 // Collect all free type variables in a type
 export const freeTypeVars = (
   type: Type,
-  acc: Set<string> = new Set()
+  acc: Set<string> = new Set(),
 ): Set<string> => {
   switch (type.kind) {
     case "variable":
@@ -668,15 +681,14 @@ export const freeTypeVarsEnv = (env: TypeEnvironment): Set<string> => {
 export const generalize = (
   type: Type,
   env: TypeEnvironment,
-  substitution: Map<string, Type>
+  substitution: Map<string, Type>,
 ): TypeScheme => {
   // Apply current substitution to the type before generalizing
   const substitutedType = substitute(type, substitution);
   const typeVars = freeTypeVars(substitutedType);
   const envVars = freeTypeVarsEnv(env);
   const quantifiedVars: string[] = [];
-  
-  
+
   for (const varName of typeVars) {
     if (!envVars.has(varName)) {
       quantifiedVars.push(varName);
@@ -688,7 +700,7 @@ export const generalize = (
 // Instantiate a type scheme by freshening all quantified variables (threading state)
 export const instantiate = (
   scheme: TypeScheme,
-  state: TypeState
+  state: TypeState,
 ): [Type, TypeState] => {
   const mapping = new Map<string, Type>();
   let currentState = state;
@@ -701,7 +713,7 @@ export const instantiate = (
   const [instantiatedType, finalState] = freshenTypeVariables(
     scheme.type,
     mapping,
-    currentState
+    currentState,
   );
 
   return [instantiatedType, finalState];
@@ -711,7 +723,7 @@ export const instantiate = (
 export const freshenTypeVariables = (
   type: Type,
   mapping: Map<string, Type> = new Map(),
-  state: TypeState
+  state: TypeState,
 ): [Type, TypeState] => {
   switch (type.kind) {
     case "variable":
@@ -724,7 +736,7 @@ export const freshenTypeVariables = (
             for (const c of type.constraints) {
               if (
                 !freshVar.constraints.some(
-                  (existing) => JSON.stringify(existing) === JSON.stringify(c)
+                  (existing) => JSON.stringify(existing) === JSON.stringify(c),
                 )
               ) {
                 freshVar.constraints.push(c);
@@ -742,7 +754,7 @@ export const freshenTypeVariables = (
         const [newParam, nextState] = freshenTypeVariables(
           param,
           mapping,
-          currentState
+          currentState,
         );
         newParams.push(newParam);
         currentState = nextState;
@@ -750,7 +762,7 @@ export const freshenTypeVariables = (
       const [newReturn, finalState] = freshenTypeVariables(
         type.return,
         mapping,
-        currentState
+        currentState,
       );
       return [{ ...type, params: newParams, return: newReturn }, finalState];
     }
@@ -758,7 +770,7 @@ export const freshenTypeVariables = (
       const [newElem, nextState] = freshenTypeVariables(
         type.element,
         mapping,
-        state
+        state,
       );
       return [{ ...type, element: newElem }, nextState];
     }
@@ -769,7 +781,7 @@ export const freshenTypeVariables = (
         const [newEl, nextState] = freshenTypeVariables(
           el,
           mapping,
-          currentState
+          currentState,
         );
         newElems.push(newEl);
         currentState = nextState;
@@ -783,7 +795,7 @@ export const freshenTypeVariables = (
         const [newField, nextState] = freshenTypeVariables(
           fieldType,
           mapping,
-          currentState
+          currentState,
         );
         newFields[key] = newField;
         currentState = nextState;
@@ -797,7 +809,7 @@ export const freshenTypeVariables = (
         const [newType, nextState] = freshenTypeVariables(
           t,
           mapping,
-          currentState
+          currentState,
         );
         newTypes.push(newType);
         currentState = nextState;
@@ -811,7 +823,7 @@ export const freshenTypeVariables = (
         const [newArg, nextState] = freshenTypeVariables(
           arg,
           mapping,
-          currentState
+          currentState,
         );
         newArgs.push(newArg);
         currentState = nextState;
@@ -914,10 +926,9 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
     quantifiedVars: [],
   });
 
-
   const tailType = functionType(
     [listTypeWithElement(typeVariable("a"))],
-    listTypeWithElement(typeVariable("a"))
+    listTypeWithElement(typeVariable("a")),
   );
   newEnv.set("tail", {
     type: tailType,
@@ -926,7 +937,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
   newEnv.set("cons", {
     type: functionType(
       [typeVariable("a"), listTypeWithElement(typeVariable("a"))],
-      listTypeWithElement(typeVariable("a"))
+      listTypeWithElement(typeVariable("a")),
     ),
     quantifiedVars: [],
   });
@@ -935,7 +946,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
   newEnv.set("|>", {
     type: functionType(
       [typeVariable("a"), functionType([typeVariable("a")], typeVariable("b"))],
-      typeVariable("b")
+      typeVariable("b"),
     ),
     quantifiedVars: [],
   });
@@ -944,7 +955,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
   newEnv.set("|", {
     type: functionType(
       [typeVariable("a"), functionType([typeVariable("a")], typeVariable("b"))],
-      typeVariable("b")
+      typeVariable("b"),
     ),
     quantifiedVars: [],
   });
@@ -953,7 +964,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
   newEnv.set(";", {
     type: functionType(
       [typeVariable("a"), typeVariable("b")],
-      typeVariable("b")
+      typeVariable("b"),
     ),
     quantifiedVars: [],
   });
@@ -962,7 +973,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
   newEnv.set("$", {
     type: functionType(
       [functionType([typeVariable("a")], typeVariable("b")), typeVariable("a")],
-      typeVariable("b")
+      typeVariable("b"),
     ),
     quantifiedVars: [],
   });
@@ -980,9 +991,9 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
         functionType([typeVariable("a")], typeVariable("b")),
         listTypeWithElement(typeVariable("a")),
       ],
-      listTypeWithElement(typeVariable("b"))
+      listTypeWithElement(typeVariable("b")),
     ),
-    quantifiedVars: [],
+    quantifiedVars: ["a", "b"],
   });
   newEnv.set("filter", {
     type: functionType(
@@ -990,9 +1001,9 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
         functionType([typeVariable("a")], boolType()),
         listTypeWithElement(typeVariable("a")),
       ],
-      listTypeWithElement(typeVariable("a"))
+      listTypeWithElement(typeVariable("a")),
     ),
-    quantifiedVars: [],
+    quantifiedVars: ["a"],
   });
   newEnv.set("reduce", {
     type: functionType(
@@ -1001,13 +1012,13 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
         typeVariable("b"),
         listTypeWithElement(typeVariable("a")),
       ],
-      typeVariable("b")
+      typeVariable("b"),
     ),
-    quantifiedVars: [],
+    quantifiedVars: ["a", "b"],
   });
   const lengthType = functionType(
     [listTypeWithElement(typeVariable("a"))],
-    intType()
+    intType(),
   );
   newEnv.set("length", {
     type: lengthType,
@@ -1023,7 +1034,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
         listTypeWithElement(typeVariable("a")),
         listTypeWithElement(typeVariable("a")),
       ],
-      listTypeWithElement(typeVariable("a"))
+      listTypeWithElement(typeVariable("a")),
     ),
     quantifiedVars: [],
   });
@@ -1068,7 +1079,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
         recordType({}),
         typeVariable("a"),
       ],
-      recordType({})
+      recordType({}),
     ),
     quantifiedVars: [],
   });
@@ -1076,11 +1087,11 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
   // Tuple operations - only keep sound ones
   newEnv.set(
     "tupleLength",
-    { type: functionType([tupleType([])], intType()), quantifiedVars: [] } // Any tuple -> Int
+    { type: functionType([tupleType([])], intType()), quantifiedVars: [] }, // Any tuple -> Int
   );
   newEnv.set(
     "tupleIsEmpty",
-    { type: functionType([tupleType([])], boolType()), quantifiedVars: [] } // Any tuple -> Bool
+    { type: functionType([tupleType([])], boolType()), quantifiedVars: [] }, // Any tuple -> Bool
   );
 
   // Built-in ADT constructors
@@ -1102,10 +1113,13 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
   });
 
   // head function is now self-hosted in stdlib.noo
-  
+
   // Minimal built-in for self-hosted functions
   newEnv.set("list_get", {
-    type: functionType([intType(), listTypeWithElement(typeVariable("a"))], typeVariable("a")),
+    type: functionType(
+      [intType(), listTypeWithElement(typeVariable("a"))],
+      typeVariable("a"),
+    ),
     quantifiedVars: ["a"],
   });
 
@@ -1119,7 +1133,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
   newEnv.set("Ok", {
     type: functionType(
       [typeVariable("a")],
-      resultType(typeVariable("a"), typeVariable("b"))
+      resultType(typeVariable("a"), typeVariable("b")),
     ),
     quantifiedVars: ["a", "b"],
   });
@@ -1127,7 +1141,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
   newEnv.set("Err", {
     type: functionType(
       [typeVariable("b")],
-      resultType(typeVariable("a"), typeVariable("b"))
+      resultType(typeVariable("a"), typeVariable("b")),
     ),
     quantifiedVars: ["a", "b"],
   });
@@ -1172,7 +1186,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
   newEnv.set("isOk", {
     type: functionType(
       [resultType(typeVariable("a"), typeVariable("b"))],
-      boolType()
+      boolType(),
     ),
     quantifiedVars: ["a", "b"],
   });
@@ -1180,7 +1194,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
   newEnv.set("isErr", {
     type: functionType(
       [resultType(typeVariable("a"), typeVariable("b"))],
-      boolType()
+      boolType(),
     ),
     quantifiedVars: ["a", "b"],
   });
@@ -1191,7 +1205,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 // Type inference for expressions
 export const typeExpression = (
   expr: Expression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   switch (expr.kind) {
     case "literal":
@@ -1259,7 +1273,7 @@ export const typeExpression = (
 
     default:
       throw new Error(
-        `Unsupported expression kind: ${(expr as Expression).kind}`
+        `Unsupported expression kind: ${(expr as Expression).kind}`,
       );
   }
 };
@@ -1267,7 +1281,7 @@ export const typeExpression = (
 // Type inference for literals
 export const typeLiteral = (
   expr: LiteralExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   const value = expr.value;
 
@@ -1280,11 +1294,10 @@ export const typeLiteral = (
   }
 };
 
-
 // Update typeFunction to thread state through freshenTypeVariables
 export const typeFunction = (
   expr: FunctionExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   // Create a fresh environment for the function body
   let functionEnv = new Map(state.environment);
@@ -1359,7 +1372,6 @@ export const typeFunction = (
     for (let i = paramTypes.length - 1; i >= 0; i--) {
       funcType = functionType([paramTypes[i]], funcType);
     }
-    
   }
 
   return { type: funcType, state: currentState };
@@ -1368,7 +1380,7 @@ export const typeFunction = (
 // Update typeApplication to thread state through freshenTypeVariables
 export const typeApplication = (
   expr: ApplicationExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   let currentState = state;
 
@@ -1398,9 +1410,9 @@ export const typeApplication = (
             {
               line: expr.location?.start.line || 1,
               column: expr.location?.start.column || 1,
-            }
-          )
-        )
+            },
+          ),
+        ),
       );
     }
 
@@ -1419,18 +1431,18 @@ export const typeApplication = (
           operation: `applying argument ${i + 1}`,
           hint: `Argument ${i + 1} has type ${typeToString(
             argTypes[i],
-            currentState.substitution
+            currentState.substitution,
           )} but the function parameter expects ${typeToString(
             funcType.params[i],
-            currentState.substitution
+            currentState.substitution,
           )}.`,
-        }
+        },
       );
 
       // After unification, validate constraints on the parameter
       const substitutedParam = substitute(
         funcType.params[i],
-        currentState.substitution
+        currentState.substitution,
       );
 
       // Check if the parameter has constraints that need to be validated
@@ -1443,7 +1455,7 @@ export const typeApplication = (
           if (constraint.kind === "is") {
             // Check if the type variable has been unified to a concrete type
             const concreteType = currentState.substitution.get(
-              constraint.typeVar
+              constraint.typeVar,
             );
             if (concreteType && concreteType.kind !== "variable") {
               // The type variable has been unified to a concrete type, validate the constraint
@@ -1453,7 +1465,7 @@ export const typeApplication = (
                     createTypeError(
                       `Type ${typeToString(
                         concreteType,
-                        currentState.substitution
+                        currentState.substitution,
                       )} does not satisfy constraint '${
                         constraint.constraint
                       }'`,
@@ -1461,9 +1473,9 @@ export const typeApplication = (
                       {
                         line: expr.location?.start.line || 1,
                         column: expr.location?.start.column || 1,
-                      }
-                    )
-                  )
+                      },
+                    ),
+                  ),
                 );
               }
             }
@@ -1477,7 +1489,7 @@ export const typeApplication = (
         for (const constraint of substitutedArg.constraints) {
           if (constraint.kind === "is") {
             const concreteType = currentState.substitution.get(
-              constraint.typeVar
+              constraint.typeVar,
             );
             if (concreteType && concreteType.kind !== "variable") {
               if (!satisfiesConstraint(concreteType, constraint.constraint)) {
@@ -1486,7 +1498,7 @@ export const typeApplication = (
                     createTypeError(
                       `Type ${typeToString(
                         concreteType,
-                        currentState.substitution
+                        currentState.substitution,
                       )} does not satisfy constraint '${
                         constraint.constraint
                       }'`,
@@ -1494,9 +1506,9 @@ export const typeApplication = (
                       {
                         line: expr.location?.start.line || 1,
                         column: expr.location?.start.column || 1,
-                      }
-                    )
-                  )
+                      },
+                    ),
+                  ),
                 );
               }
             }
@@ -1520,7 +1532,7 @@ export const typeApplication = (
                     createTypeError(
                       `Type ${typeToString(
                         substitutedArg,
-                        currentState.substitution
+                        currentState.substitution,
                       )} does not satisfy constraint '${
                         constraint.constraint
                       }'`,
@@ -1528,9 +1540,9 @@ export const typeApplication = (
                       {
                         line: expr.location?.start.line || 1,
                         column: expr.location?.start.column || 1,
-                      }
-                    )
-                  )
+                      },
+                    ),
+                  ),
                 );
               }
             }
@@ -1550,29 +1562,41 @@ export const typeApplication = (
 
     if (argTypes.length === funcType.params.length) {
       // Full application - return the return type
-      
+
       // CRITICAL FIX: Handle function composition constraint propagation
       let finalReturnType = returnType;
-      
+
       // Case 1: Direct compose function call
-      if (expr.func.kind === "variable" && expr.func.name === "compose" && 
-          expr.args.length >= 1) {
-        const fArg = expr.args[0];  // First function (f in "compose f g")
+      if (
+        expr.func.kind === "variable" &&
+        expr.func.name === "compose" &&
+        expr.args.length >= 1
+      ) {
+        const fArg = expr.args[0]; // First function (f in "compose f g")
         const fResult = typeExpression(fArg, currentState);
-        
+
         // If f has constraints and returnType is a function, propagate the constraints
-        if (fResult.type.kind === "function" && fResult.type.constraints && 
-            returnType.kind === "function") {
+        if (
+          fResult.type.kind === "function" &&
+          fResult.type.constraints &&
+          returnType.kind === "function"
+        ) {
           const enhancedReturnType = { ...returnType };
-          
+
           // Map constraint variables from f's type to the new function's type variables
           const updatedConstraints: Constraint[] = [];
           for (const constraint of fResult.type.constraints) {
             if (constraint.kind === "is") {
               // Find the corresponding parameter in the new function
               // The first parameter of the composed function should inherit f's parameter constraints
-              if (enhancedReturnType.params.length > 0 && enhancedReturnType.params[0].kind === "variable") {
-                const newConstraint = isConstraint(enhancedReturnType.params[0].name, constraint.constraint);
+              if (
+                enhancedReturnType.params.length > 0 &&
+                enhancedReturnType.params[0].kind === "variable"
+              ) {
+                const newConstraint = isConstraint(
+                  enhancedReturnType.params[0].name,
+                  constraint.constraint,
+                );
                 updatedConstraints.push(newConstraint);
               }
             } else {
@@ -1580,84 +1604,110 @@ export const typeApplication = (
               updatedConstraints.push(constraint);
             }
           }
-          
-          enhancedReturnType.constraints = (enhancedReturnType.constraints || []).concat(updatedConstraints);
-          
+
+          enhancedReturnType.constraints = (
+            enhancedReturnType.constraints || []
+          ).concat(updatedConstraints);
+
           // Also propagate constraints to parameter type variables in the result function
           for (const constraint of updatedConstraints) {
             if (constraint.kind === "is") {
               propagateConstraintToTypeVariable(enhancedReturnType, constraint);
             }
           }
-          
+
           finalReturnType = enhancedReturnType;
         }
       }
-      
+
       // Case 2: Application to result of compose (e.g., (compose head) id)
-      else if (expr.func.kind === "application" && 
-               expr.func.func.kind === "variable" && 
-               expr.func.func.name === "compose" && 
-               expr.func.args.length >= 1) {
+      else if (
+        expr.func.kind === "application" &&
+        expr.func.func.kind === "variable" &&
+        expr.func.func.name === "compose" &&
+        expr.func.args.length >= 1
+      ) {
         // This is applying the second argument to a partial compose result
-        const fArg = expr.func.args[0];  // First function from the compose
+        const fArg = expr.func.args[0]; // First function from the compose
         const fResult = typeExpression(fArg, currentState);
-        
-        if (fResult.type.kind === "function" && fResult.type.constraints && 
-            returnType.kind === "function") {
+
+        if (
+          fResult.type.kind === "function" &&
+          fResult.type.constraints &&
+          returnType.kind === "function"
+        ) {
           const enhancedReturnType = { ...returnType };
-          
+
           // Map constraint variables from f's type to the new function's type variables
           const updatedConstraints: Constraint[] = [];
           for (const constraint of fResult.type.constraints) {
             if (constraint.kind === "is") {
               // Find the corresponding parameter in the new function
-              if (enhancedReturnType.params.length > 0 && enhancedReturnType.params[0].kind === "variable") {
-                const newConstraint = isConstraint(enhancedReturnType.params[0].name, constraint.constraint);
+              if (
+                enhancedReturnType.params.length > 0 &&
+                enhancedReturnType.params[0].kind === "variable"
+              ) {
+                const newConstraint = isConstraint(
+                  enhancedReturnType.params[0].name,
+                  constraint.constraint,
+                );
                 updatedConstraints.push(newConstraint);
               }
             } else {
               updatedConstraints.push(constraint);
             }
           }
-          
-          enhancedReturnType.constraints = (enhancedReturnType.constraints || []).concat(updatedConstraints);
-          
+
+          enhancedReturnType.constraints = (
+            enhancedReturnType.constraints || []
+          ).concat(updatedConstraints);
+
           for (const constraint of updatedConstraints) {
             if (constraint.kind === "is") {
               propagateConstraintToTypeVariable(enhancedReturnType, constraint);
             }
           }
-          
+
           finalReturnType = enhancedReturnType;
         }
       }
-      
+
       return { type: finalReturnType, state: currentState };
     } else {
       // Partial application - return a function with remaining parameters
       const remainingParams = funcType.params.slice(argTypes.length);
       const partialFunctionType = functionType(remainingParams, returnType);
-      
+
       // CRITICAL FIX: Handle partial application of compose
-      if (expr.func.kind === "variable" && expr.func.name === "compose" && 
-          expr.args.length >= 1) {
-        const fArg = expr.args[0];  // First function
+      if (
+        expr.func.kind === "variable" &&
+        expr.func.name === "compose" &&
+        expr.args.length >= 1
+      ) {
+        const fArg = expr.args[0]; // First function
         const fResult = typeExpression(fArg, currentState);
-        
+
         // If f has constraints, the partial result should eventually inherit them
-        if (fResult.type.kind === "function" && fResult.type.constraints && 
-            partialFunctionType.kind === "function") {
-          partialFunctionType.constraints = (partialFunctionType.constraints || []).concat(fResult.type.constraints);
-          
+        if (
+          fResult.type.kind === "function" &&
+          fResult.type.constraints &&
+          partialFunctionType.kind === "function"
+        ) {
+          partialFunctionType.constraints = (
+            partialFunctionType.constraints || []
+          ).concat(fResult.type.constraints);
+
           for (const constraint of fResult.type.constraints) {
             if (constraint.kind === "is") {
-              propagateConstraintToTypeVariable(partialFunctionType, constraint);
+              propagateConstraintToTypeVariable(
+                partialFunctionType,
+                constraint,
+              );
             }
           }
         }
       }
-      
+
       return { type: partialFunctionType, state: currentState };
     }
   } else if (funcType.kind === "variable") {
@@ -1691,8 +1741,8 @@ export const typeApplication = (
         nonFunctionApplicationError(funcType, {
           line: expr.location?.start.line || 1,
           column: expr.location?.start.column || 1,
-        })
-      )
+        }),
+      ),
     );
   }
 };
@@ -1700,7 +1750,7 @@ export const typeApplication = (
 // Type inference for binary expressions
 export const typeBinary = (
   expr: BinaryExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   let currentState = state;
 
@@ -1719,7 +1769,7 @@ export const typeBinary = (
     const [finalType, finalState] = freshenTypeVariables(
       rightResult.type,
       new Map(),
-      currentState
+      currentState,
     );
     return { type: finalType, state: finalState };
   }
@@ -1733,15 +1783,15 @@ export const typeBinary = (
           nonFunctionApplicationError(rightResult.type, {
             line: expr.location?.start.line || 1,
             column: expr.location?.start.column || 1,
-          })
-        )
+          }),
+        ),
       );
     }
 
     // Check that the function can take the left value as an argument
     if (rightResult.type.params.length !== 1) {
       throw new Error(
-        `Thrush operator requires function with exactly one parameter, got ${rightResult.type.params.length}`
+        `Thrush operator requires function with exactly one parameter, got ${rightResult.type.params.length}`,
       );
     }
 
@@ -1752,7 +1802,7 @@ export const typeBinary = (
       {
         line: expr.location?.start.line || 1,
         column: expr.location?.start.column || 1,
-      }
+      },
     );
 
     // Return the function's return type
@@ -1775,7 +1825,7 @@ export const typeBinary = (
   // Build expected function type
   const expectedType = functionType(
     [leftResult.type, rightResult.type],
-    resultType
+    resultType,
   );
 
   // Unify operator type with expected type
@@ -1794,19 +1844,19 @@ export const typeBinary = (
         expr.operator
       } operator expects compatible operand types. Left operand: ${typeToString(
         leftResult.type,
-        currentState.substitution
+        currentState.substitution,
       )}, Right operand: ${typeToString(
         rightResult.type,
-        currentState.substitution
+        currentState.substitution,
       )}.`,
-    }
+    },
   );
 
   // Apply substitution to get final result type
   const [finalResultType, finalResultState] = freshenTypeVariables(
     resultType,
     new Map(),
-    currentState
+    currentState,
   );
 
   return { type: finalResultType, state: finalResultState };
@@ -1849,7 +1899,7 @@ export const typeIf = (expr: IfExpression, state: TypeState): TypeResult => {
 // Update typeDefinition to thread state through freshenTypeVariables
 export const typeDefinition = (
   expr: DefinitionExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   let currentState = state;
 
@@ -1884,7 +1934,7 @@ export const typeDefinition = (
   const scheme = generalize(
     valueResult.type,
     envForGen,
-    currentState.substitution
+    currentState.substitution,
   );
 
   // Add to environment with generalized type
@@ -1895,7 +1945,7 @@ export const typeDefinition = (
   const [finalType, finalState] = freshenTypeVariables(
     valueResult.type,
     new Map(),
-    currentState
+    currentState,
   );
   return { type: finalType, state: finalState };
 };
@@ -1903,7 +1953,7 @@ export const typeDefinition = (
 // Type inference for variables
 export const typeVariableExpr = (
   expr: VariableExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   const scheme = state.environment.get(expr.name);
   if (!scheme) {
@@ -1912,8 +1962,8 @@ export const typeVariableExpr = (
         undefinedVariableError(expr.name, {
           line: expr.location?.start.line || 1,
           column: expr.location?.start.column || 1,
-        })
-      )
+        }),
+      ),
     );
   }
 
@@ -1925,7 +1975,7 @@ export const typeVariableExpr = (
 // Type inference for pipeline expressions
 export const typePipeline = (
   expr: PipelineExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   // Pipeline should be function composition, not function application
   // For a pipeline like f |> g |> h, we want to compose them as h(g(f(x)))
@@ -1960,9 +2010,9 @@ export const typePipeline = (
               {
                 line: expr.location?.start.line || 1,
                 column: expr.location?.start.column || 1,
-              }
-            )
-          )
+              },
+            ),
+          ),
         );
       }
 
@@ -1973,22 +2023,22 @@ export const typePipeline = (
         {
           line: expr.location?.start.line || 1,
           column: expr.location?.start.column || 1,
-        }
+        },
       );
 
       // The composed function takes the input of the first function and returns the output of the last function
       composedType = {
         type: functionType(
           [composedType.type.params[0]],
-          nextFuncType.type.return
+          nextFuncType.type.return,
         ),
         state: currentState,
       };
     } else {
       throw new Error(
         `Cannot compose non-function types in pipeline: ${typeToString(
-          composedType.type
-        )} and ${typeToString(nextFuncType.type)}`
+          composedType.type,
+        )} and ${typeToString(nextFuncType.type)}`,
       );
     }
   }
@@ -2002,7 +2052,7 @@ export const typePipeline = (
 // Type inference for mutable definitions
 export const typeMutableDefinition = (
   expr: MutableDefinitionExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   // Handle mutable definitions similar to regular definitions
   const valueResult = typeExpression(expr.value, state);
@@ -2019,7 +2069,7 @@ export const typeMutableDefinition = (
 // Type inference for mutations
 export const typeMutation = (
   expr: MutationExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   // For mutations, we need to check that the target exists and the value type matches
   const targetScheme = state.environment.get(expr.target);
@@ -2029,8 +2079,8 @@ export const typeMutation = (
         undefinedVariableError(expr.target, {
           line: expr.location?.start.line || 1,
           column: expr.location?.start.column || 1,
-        })
-      )
+        }),
+      ),
     );
   }
 
@@ -2042,7 +2092,7 @@ export const typeMutation = (
     {
       line: expr.location?.start.line || 1,
       column: expr.location?.start.column || 1,
-    }
+    },
   );
 
   return { type: unitType(), state: newState }; // Mutations return unit
@@ -2051,7 +2101,7 @@ export const typeMutation = (
 // Type inference for imports
 export const typeImport = (
   expr: ImportExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   // For now, assume imports return a record type
   return { type: recordType({}), state };
@@ -2060,7 +2110,7 @@ export const typeImport = (
 // Type inference for records
 export const typeRecord = (
   expr: RecordExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   const fields: { [key: string]: Type } = {};
   let currentState = state;
@@ -2077,7 +2127,7 @@ export const typeRecord = (
 // Type inference for accessors
 export const typeAccessor = (
   expr: AccessorExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   // Accessors return functions that take any record with the required field and return the field type
   // @bar should have type {bar: a, ...} -> a (allows extra fields)
@@ -2103,7 +2153,7 @@ export const typeAccessor = (
 // Type inference for tuples
 export const typeTuple = (
   expr: TupleExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   const elements: Type[] = [];
   let currentState = state;
@@ -2120,7 +2170,7 @@ export const typeTuple = (
 // Type inference for lists
 export const typeList = (
   expr: ListExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   if (expr.elements.length === 0) {
     // Empty list - we can't infer the element type
@@ -2146,7 +2196,7 @@ export const typeList = (
   // Apply substitution to get the resolved element type
   const resolvedElementType = substitute(
     firstElementType,
-    currentState.substitution
+    currentState.substitution,
   );
   return {
     type: listTypeWithElement(resolvedElementType),
@@ -2157,7 +2207,7 @@ export const typeList = (
 // Type inference for where expressions
 export const typeWhere = (
   expr: WhereExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   // Create a new type environment with the where-clause definitions
   let whereEnv = new Map(state.environment);
@@ -2176,7 +2226,7 @@ export const typeWhere = (
       const scheme = generalize(
         valueResult.type,
         tempEnv,
-        currentState.substitution
+        currentState.substitution,
       );
 
       whereEnv = mapSet(currentState.environment, definitionDef.name, scheme);
@@ -2205,7 +2255,7 @@ export const typeWhere = (
 // Type inference for typed expressions
 export const typeTyped = (
   expr: TypedExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   // For typed expressions, validate that the explicit type matches the inferred type
   const inferredResult = typeExpression(expr.expression, state);
@@ -2218,7 +2268,7 @@ export const typeTyped = (
     {
       line: expr.location?.start.line || 1,
       column: expr.location?.start.column || 1,
-    }
+    },
   );
 
   return { type: explicitType, state: newState }; // Use the explicit type
@@ -2227,7 +2277,7 @@ export const typeTyped = (
 // Type inference for constrained expressions
 export const typeConstrained = (
   expr: ConstrainedExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   // For constrained expressions, validate that the explicit type matches the inferred type
   const inferredResult = typeExpression(expr.expression, state);
@@ -2240,7 +2290,7 @@ export const typeConstrained = (
     {
       line: expr.location?.start.line || 1,
       column: expr.location?.start.column || 1,
-    }
+    },
   );
 
   // Special case: if this constrained expression is inside a function body,
@@ -2306,7 +2356,7 @@ export const applyConstraintsToType = (
   type: Type,
   state: TypeState,
   mapping: Map<string, string>,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState => {
   // Extract all type variables from the type
   const typeVars = freeTypeVars(type);
@@ -2329,7 +2379,7 @@ const applyConstraintToTypeVariable = (
   type: Type,
   constraint: Constraint,
   state: TypeState,
-  mapping: Map<string, string>
+  mapping: Map<string, string>,
 ): void => {
   switch (type.kind) {
     case "variable":
@@ -2341,7 +2391,7 @@ const applyConstraintToTypeVariable = (
         }
         // Check if this constraint is already present
         const existingConstraint = type.constraints.find(
-          (c) => JSON.stringify(c) === JSON.stringify(constraint)
+          (c) => JSON.stringify(c) === JSON.stringify(constraint),
         );
         if (!existingConstraint) {
           type.constraints.push(constraint);
@@ -2409,7 +2459,7 @@ const flattenConstraintExpr = (expr: ConstraintExpr): Constraint[] => {
 export const evaluateConstraintExpr = (
   constraintExpr: ConstraintExpr,
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState => {
   switch (constraintExpr.kind) {
     case "is":
@@ -2424,7 +2474,7 @@ export const evaluateConstraintExpr = (
       let leftState = evaluateConstraintExpr(
         constraintExpr.left,
         state,
-        location
+        location,
       );
       return evaluateConstraintExpr(constraintExpr.right, leftState, location);
 
@@ -2443,7 +2493,7 @@ export const evaluateConstraintExpr = (
 
     default:
       throw new Error(
-        `Unknown constraint expression kind: ${(constraintExpr as any).kind}`
+        `Unknown constraint expression kind: ${(constraintExpr as any).kind}`,
       );
   }
 };
@@ -2452,7 +2502,7 @@ export const evaluateConstraintExpr = (
 export const validateConstraints = (
   type: Type,
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState => {
   let currentState = state;
 
@@ -2477,7 +2527,7 @@ export const validateConstraints = (
     currentState = validateConstraints(
       substitutedType.return,
       currentState,
-      location
+      location,
     );
 
     // Check function-level constraints
@@ -2485,7 +2535,7 @@ export const validateConstraints = (
       currentState = solveConstraints(
         substitutedType.constraints,
         currentState,
-        location
+        location,
       );
     }
   }
@@ -2495,7 +2545,7 @@ export const validateConstraints = (
     currentState = validateConstraints(
       substitutedType.element,
       currentState,
-      location
+      location,
     );
   }
 
@@ -2517,7 +2567,7 @@ function validateAllSubstitutionConstraints(state: TypeState) {
       // Collect all constraints from the substitution chain
       const constraintsToCheck = collectAllConstraintsForVar(
         varName,
-        state.substitution
+        state.substitution,
       );
       for (const constraint of constraintsToCheck) {
         if (
@@ -2526,7 +2576,7 @@ function validateAllSubstitutionConstraints(state: TypeState) {
         ) {
           if (!(constraint.field in concreteType.fields)) {
             throw new Error(
-              `Record type missing required field '${constraint.field}'`
+              `Record type missing required field '${constraint.field}'`,
             );
           }
           // Optionally, unify field types here if needed
@@ -2534,8 +2584,8 @@ function validateAllSubstitutionConstraints(state: TypeState) {
           if (!satisfiesConstraint(concreteType, constraint.constraint)) {
             throw new Error(
               `Type variable '${varName}' was unified to ${typeToString(
-                concreteType
-              )} but does not satisfy constraint '${constraint.constraint}'. This typically means a partial function is being used in an unsafe context. Consider using total functions that return Option or Result types instead of partial functions with constraints.`
+                concreteType,
+              )} but does not satisfy constraint '${constraint.constraint}'. This typically means a partial function is being used in an unsafe context. Consider using total functions that return Option or Result types instead of partial functions with constraints.`,
             );
           }
         }
@@ -2575,8 +2625,8 @@ export const typeProgram = (program: Program): TypeResult => {
         ) {
           throw new Error(
             `Type ${typeToString(
-              substitutedType
-            )} does not satisfy constraint '${constraint.constraint}'. This error often indicates that a partial function (one that can fail at runtime) is being used in a context where total functions are required, such as function composition. Consider using total functions that return Option or Result types instead.`
+              substitutedType,
+            )} does not satisfy constraint '${constraint.constraint}'. This error often indicates that a partial function (one that can fail at runtime) is being used in a context where total functions are required, such as function composition. Consider using total functions that return Option or Result types instead.`,
           );
         }
       }
@@ -2597,7 +2647,7 @@ export const typeAndDecorate = (program: Program, initialState?: TypeState) => {
   // Helper to recursively decorate expressions
   function decorate(
     expr: Expression,
-    state: TypeState
+    state: TypeState,
   ): [Expression, TypeState] {
     switch (expr.kind) {
       case "literal": {
@@ -2697,7 +2747,7 @@ export const typeAndDecorate = (program: Program, initialState?: TypeState) => {
         expr.fields = expr.fields.map((field) => {
           const [decoratedValue, valueState] = decorate(
             field.value,
-            currentState
+            currentState,
           );
           currentState = valueState;
           return { ...field, value: decoratedValue };
@@ -2782,7 +2832,7 @@ export const typeAndDecorate = (program: Program, initialState?: TypeState) => {
       }
       default:
         throw new Error(
-          `Unknown expression kind: ${(expr as Expression).kind}`
+          `Unknown expression kind: ${(expr as Expression).kind}`,
         );
     }
   }
@@ -2809,7 +2859,7 @@ export const typeAndDecorate = (program: Program, initialState?: TypeState) => {
 export const typeToString = (
   type: Type,
   substitution: Map<string, Type> = new Map(),
-  showConstraints: boolean = true
+  showConstraints: boolean = true,
 ): string => {
   const greek = [
     "α",
@@ -2922,7 +2972,7 @@ export const typeToString = (
         // that matches the parameter it's constraining
         const normalizedVarName2 = mapping.get(c.typeVar) || c.typeVar;
         return `${normalizedVarName2} has field "${c.field}" of type ${norm(
-          c.fieldType
+          c.fieldType,
         )}`;
       case "implements":
         const normalizedVarName3 = mapping.get(c.typeVar) || c.typeVar;
@@ -2946,11 +2996,11 @@ export const typeToString = (
         return formatConstraint(expr);
       case "and":
         return `${formatConstraintExpr(expr.left)} and ${formatConstraintExpr(
-          expr.right
+          expr.right,
         )}`;
       case "or":
         return `${formatConstraintExpr(expr.left)} or ${formatConstraintExpr(
-          expr.right
+          expr.right,
         )}`;
       case "paren":
         return `(${formatConstraintExpr(expr.expr)})`;
@@ -2985,7 +3035,7 @@ function unifyVariable(
   s1: Type,
   s2: Type,
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState {
   if (!isTypeKind(s1, "variable")) {
     throw new Error("unifyVariable called with non-variable s1");
@@ -3010,7 +3060,7 @@ function unifyVariable(
     for (const c of constraintsToCheck) {
       if (
         !s2.constraints.some(
-          (existing) => JSON.stringify(existing) === JSON.stringify(c)
+          (existing) => JSON.stringify(existing) === JSON.stringify(c),
         )
       ) {
         s2.constraints.push(c);
@@ -3024,12 +3074,12 @@ function unifyVariable(
         createTypeError(
           `Occurs check failed: ${s1.name} occurs in ${typeToString(
             s2,
-            state.substitution
+            state.substitution,
           )}`,
           {},
-          location || { line: 1, column: 1 }
-        )
-      )
+          location || { line: 1, column: 1 },
+        ),
+      ),
     );
   let newState = {
     ...state,
@@ -3043,7 +3093,7 @@ function unifyVariable(
           s2.fields[constraint.field],
           constraint.fieldType,
           newState,
-          location
+          location,
         );
       } else if (constraint.kind === "is") {
         if (isTypeKind(s2, "primitive")) {
@@ -3053,12 +3103,12 @@ function unifyVariable(
                 createTypeError(
                   `Type ${typeToString(
                     s2,
-                    state.substitution
+                    state.substitution,
                   )} does not satisfy constraint '${constraint.constraint}'. This error typically occurs when attempting to use a partial function (one that can fail) in an unsafe context like function composition. Consider using total functions that return Option or Result types instead.`,
                   {},
-                  location || { line: 1, column: 1 }
-                )
-              )
+                  location || { line: 1, column: 1 },
+                ),
+              ),
             );
           }
         } else {
@@ -3081,7 +3131,7 @@ function propagateConstraintToType(type: Type, constraint: Constraint) {
       type.constraints = type.constraints || [];
       if (
         !type.constraints.some(
-          (c) => JSON.stringify(c) === JSON.stringify(constraint)
+          (c) => JSON.stringify(c) === JSON.stringify(constraint),
         )
       ) {
         type.constraints.push(constraint);
@@ -3120,7 +3170,7 @@ function unifyFunction(
   s1: Type,
   s2: Type,
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState {
   if (!isTypeKind(s1, "function") || !isTypeKind(s2, "function")) {
     throw new Error("unifyFunction called with non-function types");
@@ -3134,9 +3184,9 @@ function unifyFunction(
           s2,
           0,
           undefined,
-          location || { line: 1, column: 1 }
-        )
-      )
+          location || { line: 1, column: 1 },
+        ),
+      ),
     );
 
   let currentState = state;
@@ -3168,7 +3218,7 @@ function unifyFunction(
       for (const c of s1var.constraints) {
         if (
           !s2var.constraints.some(
-            (existing: any) => JSON.stringify(existing) === JSON.stringify(c)
+            (existing: any) => JSON.stringify(existing) === JSON.stringify(c),
           )
         ) {
           s2var.constraints.push(c);
@@ -3178,7 +3228,7 @@ function unifyFunction(
       for (const c of s2var.constraints) {
         if (
           !s1var.constraints.some(
-            (existing: any) => JSON.stringify(existing) === JSON.stringify(c)
+            (existing: any) => JSON.stringify(existing) === JSON.stringify(c),
           )
         ) {
           s1var.constraints.push(c);
@@ -3196,7 +3246,7 @@ function unifyList(
   s1: Type,
   s2: Type,
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState {
   if (!isTypeKind(s1, "list") || !isTypeKind(s2, "list")) {
     throw new Error("unifyList called with non-list types");
@@ -3208,7 +3258,7 @@ function unifyTuple(
   s1: Type,
   s2: Type,
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState {
   if (!isTypeKind(s1, "tuple") || !isTypeKind(s2, "tuple")) {
     throw new Error("unifyTuple called with non-tuple types");
@@ -3219,9 +3269,9 @@ function unifyTuple(
         createTypeError(
           `Tuple length mismatch: ${s1.elements.length} vs ${s2.elements.length}`,
           {},
-          location || { line: 1, column: 1 }
-        )
-      )
+          location || { line: 1, column: 1 },
+        ),
+      ),
     );
   let currentState = state;
   for (let i = 0; i < s1.elements.length; i++) {
@@ -3229,7 +3279,7 @@ function unifyTuple(
       s1.elements[i],
       s2.elements[i],
       currentState,
-      location
+      location,
     );
   }
   return currentState;
@@ -3239,7 +3289,7 @@ function unifyVariant(
   s1: Type,
   s2: Type,
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState {
   if (!isTypeKind(s1, "variant") || !isTypeKind(s2, "variant")) {
     throw new Error("unifyVariant called with non-variant types");
@@ -3252,9 +3302,9 @@ function unifyVariant(
         createTypeError(
           `Variant name mismatch: ${s1.name} vs ${s2.name}`,
           {},
-          location || { line: 1, column: 1 }
-        )
-      )
+          location || { line: 1, column: 1 },
+        ),
+      ),
     );
   }
 
@@ -3265,9 +3315,9 @@ function unifyVariant(
         createTypeError(
           `Variant arity mismatch: ${s1.name} has ${s1.args.length} vs ${s2.args.length} type arguments`,
           {},
-          location || { line: 1, column: 1 }
-        )
-      )
+          location || { line: 1, column: 1 },
+        ),
+      ),
     );
   }
 
@@ -3283,7 +3333,7 @@ function unifyRecord(
   s1: Type,
   s2: Type,
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState {
   if (!isTypeKind(s1, "record") || !isTypeKind(s2, "record")) {
     throw new Error("unifyRecord called with non-record types");
@@ -3297,15 +3347,15 @@ function unifyRecord(
           createTypeError(
             `Required field missing: ${key}`,
             {},
-            location || { line: 1, column: 1 }
-          )
-        )
+            location || { line: 1, column: 1 },
+          ),
+        ),
       );
     currentState = unify(
       s1.fields[key],
       s2.fields[key],
       currentState,
-      location
+      location,
     );
   }
   return currentState;
@@ -3315,7 +3365,7 @@ function unifyUnion(
   s1: Type,
   s2: Type,
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState {
   if (!isTypeKind(s1, "union") || !isTypeKind(s2, "union")) {
     throw new Error("unifyUnion called with non-union types");
@@ -3327,9 +3377,9 @@ function unifyUnion(
         createTypeError(
           `Union type mismatch: ${s1.types.length} vs ${s2.types.length} types`,
           {},
-          location || { line: 1, column: 1 }
-        )
-      )
+          location || { line: 1, column: 1 },
+        ),
+      ),
     );
   let currentState = state;
   for (let i = 0; i < s1.types.length; i++) {
@@ -3342,7 +3392,7 @@ function unifyPrimitive(
   s1: Type,
   s2: Type,
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState {
   if (!isTypeKind(s1, "primitive") || !isTypeKind(s2, "primitive")) {
     throw new Error("unifyPrimitive called with non-primitive types");
@@ -3350,8 +3400,8 @@ function unifyPrimitive(
   if (s1.name !== s2.name)
     throw new Error(
       formatTypeError(
-        operatorTypeError("", s1, s2, location || { line: 1, column: 1 })
-      )
+        operatorTypeError("", s1, s2, location || { line: 1, column: 1 }),
+      ),
     );
   return state;
 }
@@ -3360,7 +3410,7 @@ function unifyUnit(
   s1: Type,
   s2: Type,
   state: TypeState,
-  location?: { line: number; column: number }
+  location?: { line: number; column: number },
 ): TypeState {
   if (!isTypeKind(s1, "unit") || !isTypeKind(s2, "unit")) {
     throw new Error("unifyUnit called with non-unit types");
@@ -3371,7 +3421,7 @@ function unifyUnit(
 // Collect all constraints for a variable, following the substitution chain
 function collectAllConstraintsForVar(
   varName: string,
-  substitution: Map<string, Type>
+  substitution: Map<string, Type>,
 ): Constraint[] {
   const seen = new Set<string>();
   let constraints: Constraint[] = [];
@@ -3404,7 +3454,7 @@ function collectAllConstraintsForVar(
 // Type inference for ADT type definitions
 export const typeTypeDefinition = (
   expr: TypeDefinitionExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   // Register the ADT in the registry first to enable recursive references
   const constructorMap = new Map<string, Type[]>();
@@ -3477,7 +3527,7 @@ export const typeTypeDefinition = (
 // Type inference for match expressions
 export const typeMatch = (
   expr: MatchExpression,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   // Type the expression being matched
   const exprResult = typeExpression(expr.expression, state);
@@ -3492,7 +3542,7 @@ export const typeMatch = (
   const firstCaseResult = typeMatchCase(
     expr.cases[0],
     exprResult.type,
-    currentState
+    currentState,
   );
   currentState = firstCaseResult.state;
   let resultType = firstCaseResult.type;
@@ -3502,7 +3552,7 @@ export const typeMatch = (
     const caseResult = typeMatchCase(
       expr.cases[i],
       exprResult.type,
-      currentState
+      currentState,
     );
     currentState = caseResult.state;
 
@@ -3511,7 +3561,7 @@ export const typeMatch = (
       resultType,
       caseResult.type,
       currentState,
-      expr.cases[i].location.start
+      expr.cases[i].location.start,
     );
     resultType = substitute(resultType, currentState.substitution);
   }
@@ -3523,7 +3573,7 @@ export const typeMatch = (
 const typeMatchCase = (
   matchCase: MatchCase,
   matchedType: Type,
-  state: TypeState
+  state: TypeState,
 ): TypeResult => {
   // Type the pattern and get bindings
   const patternResult = typePattern(matchCase.pattern, matchedType, state);
@@ -3544,7 +3594,7 @@ const typeMatchCase = (
 const typePattern = (
   pattern: Pattern,
   expectedType: Type,
-  state: TypeState
+  state: TypeState,
 ): { state: TypeState; bindings: Map<string, Type> } => {
   const bindings = new Map<string, Type>();
 
@@ -3596,15 +3646,15 @@ const typePattern = (
         throw new Error(
           `Pattern expects constructor but got ${typeToString(
             expectedType,
-            state.substitution
-          )}`
+            state.substitution,
+          )}`,
         );
       }
 
       // Look up constructor in ADT registry
       if (!isTypeKind(actualType, "variant")) {
         throw new Error(
-          `Internal error: actualType should be variant but got ${actualType.kind}`
+          `Internal error: actualType should be variant but got ${actualType.kind}`,
         );
       }
       const adtInfo = state.adtRegistry.get(actualType.name);
@@ -3615,7 +3665,7 @@ const typePattern = (
       const constructorArgs = adtInfo.constructors.get(pattern.name);
       if (!constructorArgs) {
         throw new Error(
-          `Unknown constructor: ${pattern.name} for ADT ${actualType.name}`
+          `Unknown constructor: ${pattern.name} for ADT ${actualType.name}`,
         );
       }
 
@@ -3627,13 +3677,13 @@ const typePattern = (
 
       // Substitute type parameters with actual type arguments
       const substitutedArgs = constructorArgs.map((arg) =>
-        substitute(arg, paramSubstitution)
+        substitute(arg, paramSubstitution),
       );
 
       // Check argument count
       if (pattern.args.length !== substitutedArgs.length) {
         throw new Error(
-          `Constructor ${pattern.name} expects ${substitutedArgs.length} arguments but got ${pattern.args.length}`
+          `Constructor ${pattern.name} expects ${substitutedArgs.length} arguments but got ${pattern.args.length}`,
         );
       }
 
@@ -3642,7 +3692,7 @@ const typePattern = (
         const argResult = typePattern(
           pattern.args[i],
           substitutedArgs[i],
-          currentState
+          currentState,
         );
         currentState = argResult.state;
 
@@ -3670,7 +3720,7 @@ const typePattern = (
         expectedType,
         literalType,
         state,
-        pattern.location.start
+        pattern.location.start,
       );
       return { state: unifiedState, bindings };
 

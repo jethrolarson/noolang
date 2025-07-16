@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { Lexer } from './lexer';
-import { parse } from './parser/parser';
-import { Evaluator } from './evaluator';
+import { Lexer } from "./lexer";
+import { parse } from "./parser/parser";
+import { Evaluator } from "./evaluator";
 import { typeAndDecorate, typeToString } from "./typer_functional";
 import * as fs from "fs";
 import * as path from "path";
@@ -28,17 +28,17 @@ function printUsage() {
   console.log(`  ${colorize.identifier('noo --eval "1 + 2 * 3"')}`);
   console.log(`  ${colorize.identifier('noo -e "x = 10; x * 2"')}`);
   console.log(
-    `  ${colorize.identifier('noo --tokens "{ @add fn x y => x + y }"')}`
+    `  ${colorize.identifier('noo --tokens "{ @add fn x y => x + y }"')}`,
   );
   console.log(
-    `  ${colorize.identifier('noo --ast "if x > 0 then x else -x"')}`
+    `  ${colorize.identifier('noo --ast "if x > 0 then x else -x"')}`,
   );
   console.log(`  ${colorize.identifier("noo --tokens-file std/math.noo")}`);
   console.log(`  ${colorize.identifier("noo --ast-file std/math.noo")}`);
   console.log(`  ${colorize.identifier('noo --types "fn x => x + 1"')}`);
   console.log(`  ${colorize.identifier("noo --types-file std/math.noo")}`);
   console.log(
-    `  ${colorize.identifier('noo --types-detailed "fn x => x + 1"')}`
+    `  ${colorize.identifier('noo --types-detailed "fn x => x + 1"')}`,
   );
   console.log(`  ${colorize.identifier('noo --types-env "fn x => x + 1"')}`);
   console.log(`  ${colorize.identifier('noo --types-ast "fn x => x + 1"')}`);
@@ -71,8 +71,8 @@ async function main() {
       tokens.forEach((token, i) => {
         console.log(
           `  ${colorize.number(`${i}:`)} ${colorize.type(
-            token.type
-          )} ${colorize.string(`('${token.value}')`)}`
+            token.type,
+          )} ${colorize.string(`('${token.value}')`)}`,
         );
       });
     } catch (err) {
@@ -94,8 +94,8 @@ async function main() {
       tokens.forEach((token, i) => {
         console.log(
           `  ${colorize.number(`${i}:`)} ${colorize.type(
-            token.type
-          )} ${colorize.string(`('${token.value}')`)}`
+            token.type,
+          )} ${colorize.string(`('${token.value}')`)}`,
         );
       });
     } catch (err) {
@@ -154,7 +154,7 @@ async function main() {
             stmt.type
               ? typeToString(stmt.type, state.substitution)
               : "<no type>"
-          }`
+          }`,
         );
       });
     } catch (err) {
@@ -181,7 +181,7 @@ async function main() {
             stmt.type
               ? typeToString(stmt.type, state.substitution)
               : "<no type>"
-          }`
+          }`,
         );
       });
     } catch (err) {
@@ -206,7 +206,7 @@ async function main() {
             stmt.type
               ? typeToString(stmt.type, state.substitution)
               : "<no type>"
-          }`
+          }`,
         );
       });
     } catch (err) {
@@ -258,13 +258,24 @@ async function main() {
   if ((args[0] === "--eval" || args[0] === "-e") && args[1]) {
     const expr = args[1];
     try {
+      const startTime = performance.now();
+
       const lexer = new Lexer(expr);
       const tokens = lexer.tokenize();
+      const lexTime = performance.now();
+
       const program = parse(tokens);
+      const parseTime = performance.now();
+
       const { program: decoratedProgram, state } = typeAndDecorate(program);
+      const typeTime = performance.now();
+
       const evaluator = new Evaluator();
       const finalResult = evaluator.evaluateProgram(decoratedProgram);
+      const evalTime = performance.now();
+
       const valueStr = formatValue(finalResult.finalResult);
+      const formatTime = performance.now();
       // Get the type from the last statement in the typed AST
       let typeStr = "";
       if (
@@ -279,9 +290,28 @@ async function main() {
       }
       // ANSI cyan for type
       const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
+      const gray = (s: string) => `\x1b[90m${s}\x1b[0m`;
+
       console.log(valueStr);
       if (typeStr) {
         console.log(cyan("\t:\t") + cyan(typeStr));
+      }
+
+      // Performance measurements for --eval
+      const totalTime = formatTime - startTime;
+      if (totalTime > 50) {
+        // Show timing for eval expressions that take >50ms
+        const lexMs = lexTime - startTime;
+        const parseMs = parseTime - lexTime;
+        const typeMs = typeTime - parseTime;
+        const evalMs = evalTime - typeTime;
+        const formatMs = formatTime - evalTime;
+
+        console.log(
+          gray(
+            `\nPerformance (${totalTime.toFixed(1)}ms): Lex ${lexMs.toFixed(1)}ms, Parse ${parseMs.toFixed(1)}ms, Type ${typeMs.toFixed(1)}ms, Eval ${evalMs.toFixed(1)}ms`,
+          ),
+        );
       }
     } catch (err) {
       console.error("Error:", (err as Error).message);
@@ -298,15 +328,28 @@ async function main() {
   }
 
   try {
+    const startTime = performance.now();
+
     const fullPath = path.resolve(file);
     const code = fs.readFileSync(fullPath, "utf8");
+    const readTime = performance.now();
+
     const lexer = new Lexer(code);
     const tokens = lexer.tokenize();
+    const lexTime = performance.now();
+
     const program = parse(tokens);
+    const parseTime = performance.now();
+
     const { program: decoratedProgram, state } = typeAndDecorate(program);
+    const typeTime = performance.now();
+
     const evaluator = new Evaluator();
     const finalResult = evaluator.evaluateProgram(decoratedProgram);
+    const evalTime = performance.now();
+
     const valueStr = formatValue(finalResult.finalResult);
+    const formatTime = performance.now();
     // Get the type from the last statement in the typed AST
     let typeStr = "";
     if (
@@ -321,9 +364,56 @@ async function main() {
     }
     // ANSI cyan for type
     const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
+    const gray = (s: string) => `\x1b[90m${s}\x1b[0m`;
+
     console.log(valueStr);
     if (typeStr) {
       console.log(cyan("Type: ") + cyan(typeStr));
+    }
+
+    // Performance measurements
+    const totalTime = formatTime - startTime;
+    const readMs = readTime - startTime;
+    const lexMs = lexTime - readTime;
+    const parseMs = parseTime - lexTime;
+    const typeMs = typeTime - parseTime;
+    const evalMs = evalTime - typeTime;
+    const formatMs = formatTime - evalTime;
+
+    if (totalTime > 100) {
+      // Only show timing for files that take >100ms
+      const lines = code.split("\n").length;
+      const chars = code.length;
+      console.log(
+        gray(
+          `\nPerformance (${totalTime.toFixed(1)}ms total, ${lines} lines, ${chars} chars):`,
+        ),
+      );
+      console.log(gray(`  Read: ${readMs.toFixed(1)}ms`));
+      console.log(gray(`  Lex:  ${lexMs.toFixed(1)}ms`));
+      console.log(gray(`  Parse: ${parseMs.toFixed(1)}ms`));
+      console.log(gray(`  Type:  ${typeMs.toFixed(1)}ms`));
+      console.log(gray(`  Eval:  ${evalMs.toFixed(1)}ms`));
+      console.log(gray(`  Format: ${formatMs.toFixed(1)}ms`));
+
+      // Highlight the slowest phase
+      const phases = [
+        { name: "Type", time: typeMs },
+        { name: "Eval", time: evalMs },
+        { name: "Parse", time: parseMs },
+        { name: "Lex", time: lexMs },
+        { name: "Format", time: formatMs },
+        { name: "Read", time: readMs },
+      ];
+      const slowest = phases.reduce((a, b) => (a.time > b.time ? a : b));
+      if (slowest.time > totalTime * 0.3) {
+        // If any phase is >30% of total
+        console.log(
+          gray(
+            `  Slowest: ${slowest.name} (${((slowest.time / totalTime) * 100).toFixed(1)}%)`,
+          ),
+        );
+      }
     }
   } catch (err) {
     const errorMessage = (err as Error).message;
@@ -340,4 +430,4 @@ async function main() {
   }
 }
 
-main(); 
+main();

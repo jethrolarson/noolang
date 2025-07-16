@@ -21,7 +21,7 @@ describe("Functional Typer - Let-Polymorphism", () => {
       const program = parseProgram("id = fn x => x");
       const result = typeProgram(program);
       expect(typeToString(result.type, result.state.substitution)).toBe(
-        "(α) -> α"
+        "(α) -> α",
       );
     });
 
@@ -60,7 +60,7 @@ describe("Functional Typer - Let-Polymorphism", () => {
       const result = typeProgram(program);
       // This should work with proper generalization
       expect(typeToString(result.type, result.state.substitution)).toBe(
-        "(α) -> α"
+        "(α) -> α",
       );
     });
 
@@ -111,4 +111,4 @@ describe("Functional Typer - Let-Polymorphism", () => {
       expect(typeToString(result.type, result.state.substitution)).toBe("Bool");
     });
   });
-}); 
+});

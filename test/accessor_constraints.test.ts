@@ -12,7 +12,7 @@ const parseProgram = (code: string) => {
 describe("Accessor Constraints", () => {
   describe("hasField constraint generation", () => {
     it("should generate hasField constraints for record accessors", () => {
-      const program = parseProgram("getName = @name; getName {@name \"Alice\"}");
+      const program = parseProgram('getName = @name; getName {@name "Alice"}');
       const result = typeProgram(program);
       expect(result).toBeDefined();
     });
@@ -40,12 +40,12 @@ describe("Accessor Constraints", () => {
       const evaluator = new Evaluator();
       const program = parseProgram('getName = @name; getName {@name "Alice"}');
       const result = evaluator.evaluateProgram(program);
-      expect(result.finalResult).toEqual({tag: "string", value: "Alice"});
+      expect(result.finalResult).toEqual({ tag: "string", value: "Alice" });
     });
 
     it("should handle missing field at runtime", () => {
       const evaluator = new Evaluator();
-      const program = parseProgram('getName = @name; getName {@age 30}');
+      const program = parseProgram("getName = @name; getName {@age 30}");
       expect(() => evaluator.evaluateProgram(program)).toThrow();
     });
   });

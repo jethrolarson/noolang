@@ -27,7 +27,7 @@ describe("Functional Type Inference", () => {
       const program = parseProgram('"hello"');
       const result = typeProgram(program);
       expect(typeToString(result.type, result.state.substitution)).toBe(
-        "String"
+        "String",
       );
     });
 
@@ -43,7 +43,7 @@ describe("Functional Type Inference", () => {
       const program = parseProgram("fn x => x");
       const result = typeProgram(program);
       expect(typeToString(result.type, result.state.substitution)).toBe(
-        "(α) -> α"
+        "(α) -> α",
       );
     });
 
@@ -51,7 +51,7 @@ describe("Functional Type Inference", () => {
       const program = parseProgram("fn x y => x + y");
       const result = typeProgram(program);
       expect(typeToString(result.type, result.state.substitution)).toBe(
-        "(Int) -> (Int) -> Int"
+        "(Int) -> (Int) -> Int",
       );
     });
 
@@ -59,7 +59,7 @@ describe("Functional Type Inference", () => {
       const program = parseProgram("fn x => fn y => x + y");
       const result = typeProgram(program);
       expect(typeToString(result.type, result.state.substitution)).toBe(
-        "(Int) -> (Int) -> Int"
+        "(Int) -> (Int) -> Int",
       );
     });
   });
@@ -75,13 +75,13 @@ describe("Functional Type Inference", () => {
       const program = parseProgram('id = fn x => x; id 42; id "hello"');
       const result = typeProgram(program);
       expect(typeToString(result.type, result.state.substitution)).toBe(
-        "String"
+        "String",
       );
     });
 
     it("should handle recursive definitions", () => {
       const program = parseProgram(
-        "fact = fn n => if n == 0 then 1 else n * (fact (n - 1)); fact 5"
+        "fact = fn n => if n == 0 then 1 else n * (fact (n - 1)); fact 5",
       );
       const result = typeProgram(program);
       expect(typeToString(result.type, result.state.substitution)).toBe("Int");
@@ -97,7 +97,7 @@ describe("Functional Type Inference", () => {
 
     it("should handle partial application", () => {
       const program = parseProgram(
-        "add = fn x y => x + y; add5 = add 5; add5 3"
+        "add = fn x y => x + y; add5 = add 5; add5 3",
       );
       const result = typeProgram(program);
       expect(typeToString(result.type, result.state.substitution)).toBe("Int");

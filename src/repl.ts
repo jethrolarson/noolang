@@ -1,8 +1,14 @@
-import * as readline from 'readline';
-import { Lexer } from './lexer';
-import { parse } from './parser/parser';
-import { Evaluator, Value, isNativeFunction } from './evaluator';
-import { typeAndDecorate, typeToString, TypeState, createTypeState, initializeBuiltins } from "./typer_functional";
+import * as readline from "readline";
+import { Lexer } from "./lexer";
+import { parse } from "./parser/parser";
+import { Evaluator, Value, isNativeFunction } from "./evaluator";
+import {
+  typeAndDecorate,
+  typeToString,
+  TypeState,
+  createTypeState,
+  initializeBuiltins,
+} from "./typer_functional";
 import { Type } from "./ast";
 import { formatValue } from "./format";
 import { colorize, supportsColors } from "./colors";
@@ -63,8 +69,11 @@ export class REPL {
       const program = parse(tokens);
 
       // Type check the program using functional typer with persistent state
-      const { program: decoratedProgram, state } = typeAndDecorate(program, this.typeState);
-      
+      const { program: decoratedProgram, state } = typeAndDecorate(
+        program,
+        this.typeState,
+      );
+
       // Update the persistent type state for next REPL input
       this.typeState = state;
       const finalType =
@@ -73,19 +82,19 @@ export class REPL {
 
       // Evaluate the decorated program (with type information)
       const programResult = this.evaluator.evaluateProgram(decoratedProgram);
-      
+
       // Note: The evaluator's environment should already be updated by evaluateProgram
       // No need to manually copy the environment back
 
       // Print final result prominently
       console.log(
         `${colorize.section("➡")} ${colorize.value(
-          formatValue(programResult.finalResult)
+          formatValue(programResult.finalResult),
         )} \t ${colorize.section(":")} ${
           finalType
             ? colorize.type(typeToString(finalType, state.substitution))
             : "unknown"
-        }`
+        }`,
       );
 
       // Show execution trace for debugging (LLM-friendly)
@@ -94,10 +103,10 @@ export class REPL {
         programResult.executionTrace.forEach((step, i) => {
           console.log(
             `  ${colorize.number(`${i + 1}.`)} ${colorize.identifier(
-              step.expression
+              step.expression,
             )} ${colorize.operator("→")} ${colorize.value(
-              formatValue(step.result)
-            )}`
+              formatValue(step.result),
+            )}`,
           );
         });
       }
@@ -133,7 +142,7 @@ export class REPL {
         return type.name;
       case "function":
         return `${this.typeToString(type.params[0])} -> ${this.typeToString(
-          type.return
+          type.return,
         )}`;
       case "variable":
         return type.name;
@@ -154,40 +163,40 @@ export class REPL {
     console.log("");
     console.log(colorize.section("Environment Commands:"));
     console.log(
-      `  ${colorize.command(".env")}      - Show current environment`
+      `  ${colorize.command(".env")}      - Show current environment`,
     );
     console.log(
       `  ${colorize.command(
-        ".env-detail"
-      )} - Show detailed environment with types`
+        ".env-detail",
+      )} - Show detailed environment with types`,
     );
     console.log(
-      `  ${colorize.command(".env-json")} - Show environment as JSON`
+      `  ${colorize.command(".env-json")} - Show environment as JSON`,
     );
     console.log(`  ${colorize.command(".clear-env")} - Clear environment`);
     console.log(`  ${colorize.command(".types")}    - Show type environment`);
     console.log("");
     console.log(colorize.section("Debugging Commands:"));
     console.log(
-      `  ${colorize.command(".tokens (expr)")}     - Show tokens for expression`
+      `  ${colorize.command(".tokens (expr)")}     - Show tokens for expression`,
     );
     console.log(
-      `  ${colorize.command(".tokens-file file")}  - Show tokens for file`
+      `  ${colorize.command(".tokens-file file")}  - Show tokens for file`,
     );
     console.log(
-      `  ${colorize.command(".ast (expr)")}        - Show AST for expression`
+      `  ${colorize.command(".ast (expr)")}        - Show AST for expression`,
     );
     console.log(
-      `  ${colorize.command(".ast-file file")}     - Show AST for expression`
+      `  ${colorize.command(".ast-file file")}     - Show AST for expression`,
     );
     console.log(
-      `  ${colorize.command(".ast-json (expr)")}   - Show AST as JSON`
+      `  ${colorize.command(".ast-json (expr)")}   - Show AST as JSON`,
     );
     console.log(
-      `  ${colorize.command(".error-detail")}      - Show detailed error info`
+      `  ${colorize.command(".error-detail")}      - Show detailed error info`,
     );
     console.log(
-      `  ${colorize.command(".error-context")}     - Show error context`
+      `  ${colorize.command(".error-context")}     - Show error context`,
     );
     console.log("");
     console.log(colorize.section("Examples:"));
@@ -207,7 +216,7 @@ export class REPL {
     console.log(colorize.section("Current Environment:"));
     for (const [name, value] of env) {
       console.log(
-        `  ${colorize.identifier(name)}: ${colorize.value(formatValue(value))}`
+        `  ${colorize.identifier(name)}: ${colorize.value(formatValue(value))}`,
       );
     }
   }
@@ -287,11 +296,11 @@ export class REPL {
       console.log(`  ${colorize.identifier(name)}:`);
       console.log(
         `    ${colorize.section("Value:")} ${colorize.value(
-          this.valueToString(value)
-        )}`
+          this.valueToString(value),
+        )}`,
       );
       console.log(
-        `    ${colorize.section("Type:")} ${colorize.type("unknown")}`
+        `    ${colorize.section("Type:")} ${colorize.type("unknown")}`,
       );
     }
   }
@@ -326,8 +335,8 @@ export class REPL {
     if (!match) {
       console.log(
         colorize.warning(
-          "Usage: .tokens (expression) - expression must be wrapped in parentheses"
-        )
+          "Usage: .tokens (expression) - expression must be wrapped in parentheses",
+        ),
       );
       return;
     }
@@ -340,19 +349,19 @@ export class REPL {
 
       console.log(
         `${colorize.section("Tokens for")} "${colorize.identifier(
-          expression
-        )}":`
+          expression,
+        )}":`,
       );
       tokens.forEach((token, i) => {
         console.log(
           `  ${colorize.number(`${i}:`)} ${colorize.type(
-            token.type
-          )} ${colorize.string(`'${token.value}'`)}`
+            token.type,
+          )} ${colorize.string(`'${token.value}'`)}`,
         );
       });
     } catch (error) {
       console.error(
-        colorize.error(`Error tokenizing: ${(error as Error).message}`)
+        colorize.error(`Error tokenizing: ${(error as Error).message}`),
       );
     }
   }
@@ -368,18 +377,18 @@ export class REPL {
       const tokens = lexer.tokenize();
 
       console.log(
-        `${colorize.section("Tokens for")} "${colorize.identifier(input)}":`
+        `${colorize.section("Tokens for")} "${colorize.identifier(input)}":`,
       );
       tokens.forEach((token, i) => {
         console.log(
           `  ${colorize.number(`${i}:`)} ${colorize.type(
-            token.type
-          )} ${colorize.string(`'${token.value}'`)}`
+            token.type,
+          )} ${colorize.string(`'${token.value}'`)}`,
         );
       });
     } catch (error) {
       console.error(
-        colorize.error(`Error tokenizing: ${(error as Error).message}`)
+        colorize.error(`Error tokenizing: ${(error as Error).message}`),
       );
     }
   }
@@ -398,8 +407,8 @@ export class REPL {
 
       console.log(
         `${colorize.section("Tokens for file")} "${colorize.identifier(
-          filename
-        )}":`
+          filename,
+        )}":`,
       );
       const lexer = new Lexer(code);
       const tokens = lexer.tokenize();
@@ -407,13 +416,13 @@ export class REPL {
       tokens.forEach((token, i) => {
         console.log(
           `  ${colorize.number(`${i}:`)} ${colorize.type(
-            token.type
-          )} ${colorize.string(`'${token.value}'`)}`
+            token.type,
+          )} ${colorize.string(`'${token.value}'`)}`,
         );
       });
     } catch (error) {
       console.error(
-        colorize.error(`Error reading file: ${(error as Error).message}`)
+        colorize.error(`Error reading file: ${(error as Error).message}`),
       );
     }
   }
@@ -429,8 +438,8 @@ export class REPL {
     if (!match) {
       console.log(
         colorize.warning(
-          "Usage: .ast (expression) - expression must be wrapped in parentheses"
-        )
+          "Usage: .ast (expression) - expression must be wrapped in parentheses",
+        ),
       );
       return;
     }
@@ -443,12 +452,12 @@ export class REPL {
       const program = parse(tokens);
 
       console.log(
-        `${colorize.section("AST for")} "${colorize.identifier(expression)}":`
+        `${colorize.section("AST for")} "${colorize.identifier(expression)}":`,
       );
       console.log(this.astToString(program.statements[0]));
     } catch (error) {
       console.error(
-        colorize.error(`Error parsing: ${(error as Error).message}`)
+        colorize.error(`Error parsing: ${(error as Error).message}`),
       );
     }
   }
@@ -465,12 +474,12 @@ export class REPL {
       const program = parse(tokens);
 
       console.log(
-        `${colorize.section("AST for")} "${colorize.identifier(input)}":`
+        `${colorize.section("AST for")} "${colorize.identifier(input)}":`,
       );
       console.log(this.astToString(program.statements[0]));
     } catch (error) {
       console.error(
-        colorize.error(`Error parsing: ${(error as Error).message}`)
+        colorize.error(`Error parsing: ${(error as Error).message}`),
       );
     }
   }
@@ -493,13 +502,13 @@ export class REPL {
 
       console.log(
         `${colorize.section("AST for file")} "${colorize.identifier(
-          filename
-        )}":`
+          filename,
+        )}":`,
       );
       console.log(this.astToString(program.statements[0]));
     } catch (error) {
       console.error(
-        colorize.error(`Error parsing file: ${(error as Error).message}`)
+        colorize.error(`Error parsing file: ${(error as Error).message}`),
       );
     }
   }
@@ -515,8 +524,8 @@ export class REPL {
     if (!match) {
       console.log(
         colorize.warning(
-          "Usage: .ast-json (expression) - expression must be wrapped in parentheses"
-        )
+          "Usage: .ast-json (expression) - expression must be wrapped in parentheses",
+        ),
       );
       return;
     }
@@ -531,7 +540,7 @@ export class REPL {
       console.log(JSON.stringify(program.statements[0], null, 2));
     } catch (error) {
       console.error(
-        colorize.error(`Error parsing: ${(error as Error).message}`)
+        colorize.error(`Error parsing: ${(error as Error).message}`),
       );
     }
   }
@@ -550,20 +559,20 @@ export class REPL {
       console.log(JSON.stringify(program.statements[0], null, 2));
     } catch (error) {
       console.error(
-        colorize.error(`Error parsing: ${(error as Error).message}`)
+        colorize.error(`Error parsing: ${(error as Error).message}`),
       );
     }
   }
 
   private showErrorDetail(): void {
     console.log(
-      colorize.warning("Error detail not available - no recent error")
+      colorize.warning("Error detail not available - no recent error"),
     );
   }
 
   private showErrorContext(): void {
     console.log(
-      colorize.warning("Error context not available - no recent error")
+      colorize.warning("Error context not available - no recent error"),
     );
   }
 
@@ -573,68 +582,68 @@ export class REPL {
     switch (expr.kind) {
       case "literal":
         return `${spaces}${colorize.type("Literal")}: ${colorize.value(
-          expr.value
+          expr.value,
         )}`;
       case "variable":
         return `${spaces}${colorize.type("Variable")}: ${colorize.identifier(
-          expr.name
+          expr.name,
         )}`;
       case "function":
         return `${spaces}${colorize.type(
-          "Function"
+          "Function",
         )}:\n${spaces}  ${colorize.section("params")}: [${expr.params
           .map((p: string) => colorize.identifier(p))
           .join(", ")}]\n${spaces}  ${colorize.section(
-          "body"
+          "body",
         )}: ${this.astToString(expr.body, indent + 1)}`;
       case "application":
         return `${spaces}${colorize.type(
-          "Application"
+          "Application",
         )}:\n${spaces}  ${colorize.section("func")}: ${this.astToString(
           expr.func,
-          indent + 1
+          indent + 1,
         )}\n${spaces}  ${colorize.section("args")}: [${expr.args
           .map((arg: any) => this.astToString(arg, indent + 1))
           .join(", ")}]`;
       case "binary":
         return `${spaces}${colorize.type("Binary")}(${colorize.operator(
-          expr.operator
+          expr.operator,
         )}):\n${spaces}  ${colorize.section("left")}: ${this.astToString(
           expr.left,
-          indent + 1
+          indent + 1,
         )}\n${spaces}  ${colorize.section("right")}: ${this.astToString(
           expr.right,
-          indent + 1
+          indent + 1,
         )}`;
       case "definition":
         return `${spaces}${colorize.type(
-          "Definition"
+          "Definition",
         )}:\n${spaces}  ${colorize.section("name")}: ${colorize.identifier(
-          expr.name
+          expr.name,
         )}\n${spaces}  ${colorize.section("value")}: ${this.astToString(
           expr.value,
-          indent + 1
+          indent + 1,
         )}`;
       case "import":
         return `${spaces}${colorize.type("Import")}: ${colorize.string(
-          `"${expr.path}"`
+          `"${expr.path}"`,
         )}`;
       case "record":
         return `${spaces}${colorize.type("Record")}:\n${expr.fields
           .map(
             (field: any) =>
               `${spaces}  ${colorize.identifier(
-                field.name
-              )}: ${this.astToString(field.value, indent + 1)}`
+                field.name,
+              )}: ${this.astToString(field.value, indent + 1)}`,
           )
           .join("\n")}`;
       case "accessor":
         return `${spaces}${colorize.type("Accessor")}: ${colorize.operator(
-          "@"
+          "@",
         )}${colorize.identifier(expr.field)}`;
       default:
         return `${spaces}${colorize.type(expr.kind)}: ${colorize.value(
-          JSON.stringify(expr)
+          JSON.stringify(expr),
         )}`;
     }
   }
@@ -642,13 +651,13 @@ export class REPL {
   private showTypeEnvironment(): void {
     console.log(colorize.section("Type Environment:"));
     console.log(
-      colorize.warning("Type environment not available in functional typer")
+      colorize.warning("Type environment not available in functional typer"),
     );
   }
 }
 
 // Start the REPL if this file is run directly
-if (typeof require !== 'undefined' && require.main === module) {
+if (typeof require !== "undefined" && require.main === module) {
   const repl = new REPL();
   repl.start();
-} 
+}

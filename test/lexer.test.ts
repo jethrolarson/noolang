@@ -1,7 +1,7 @@
-import { Lexer } from '../src/lexer';
+import { Lexer } from "../src/lexer";
 
-describe('Lexer - comments', () => {
-  test('should skip single-line comments', () => {
+describe("Lexer - comments", () => {
+  test("should skip single-line comments", () => {
     const codeWithComments = `
       # this is a comment
       x = 5 # inline comment
@@ -18,8 +18,10 @@ describe('Lexer - comments', () => {
     const tokensWithoutComments = new Lexer(codeWithoutComments).tokenize();
     // Remove location info for comparison
     const stripLoc = (t: any) => ({ type: t.type, value: t.value });
-    expect(tokensWithComments.map(stripLoc)).toEqual(tokensWithoutComments.map(stripLoc));
+    expect(tokensWithComments.map(stripLoc)).toEqual(
+      tokensWithoutComments.map(stripLoc),
+    );
     // Ensure no COMMENT tokens are present
-    expect(tokensWithComments.some(t => t.type === 'COMMENT')).toBe(false);
+    expect(tokensWithComments.some((t) => t.type === "COMMENT")).toBe(false);
   });
-}); 
+});

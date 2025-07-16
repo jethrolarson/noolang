@@ -1,10 +1,10 @@
-import { Evaluator, Value } from '../src/evaluator';
-import { parse } from '../src/parser/parser';
-import { Lexer } from '../src/lexer';
+import { Evaluator, Value } from "../src/evaluator";
+import { parse } from "../src/parser/parser";
+import { Lexer } from "../src/lexer";
 
 function unwrapValue(val: Value): any {
   if (val === null) return null;
-  if (typeof val !== 'object') return val;
+  if (typeof val !== "object") return val;
   switch (val.tag) {
     case "number":
       return val.value;
@@ -28,7 +28,7 @@ function unwrapValue(val: Value): any {
   }
 }
 
-describe('Closure behavior', () => {
+describe("Closure behavior", () => {
   function evalNoo(src: string) {
     const lexer = new Lexer(src);
     const tokens = lexer.tokenize();
@@ -37,7 +37,7 @@ describe('Closure behavior', () => {
     return evaluator.evaluateProgram(program).finalResult;
   }
 
-  test('simple closure: makeAdder', () => {
+  test("simple closure: makeAdder", () => {
     const src = `
       makeAdder = fn x => fn y => x + y;
       add5 = makeAdder 5;
@@ -47,7 +47,7 @@ describe('Closure behavior', () => {
     expect(unwrapValue(evalNoo(src))).toBe(15);
   });
 
-  test('closure in a record', () => {
+  test("closure in a record", () => {
     const code = `
       makeCounter = fn start => { @value start };
       counter = makeCounter 10;
@@ -59,11 +59,11 @@ describe('Closure behavior', () => {
     const program = parse(tokens);
     const evaluator = new Evaluator();
     const result = evaluator.evaluateProgram(program);
-    
+
     expect(unwrapValue(result.finalResult)).toBe(10);
   });
 
-  test('closure with function in record', () => {
+  test("closure with function in record", () => {
     const code = `
       makeCounter = fn start => { @value start };
       counter1 = makeCounter 10;
@@ -77,7 +77,7 @@ describe('Closure behavior', () => {
     const program = parse(tokens);
     const evaluator = new Evaluator();
     const result = evaluator.evaluateProgram(program);
-    
+
     expect(unwrapValue(result.finalResult)).toBe(30);
   });
-}); 
+});

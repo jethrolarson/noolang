@@ -1,59 +1,69 @@
-import { Lexer } from '../src/lexer';
-import { parse } from '../src/parser/parser';
-import { Expression, LiteralExpression, VariableExpression, FunctionExpression, ApplicationExpression, BinaryExpression, IfExpression, RecordExpression, AccessorExpression } from '../src/ast';
+import { Lexer } from "../src/lexer";
+import { parse } from "../src/parser/parser";
+import {
+  Expression,
+  LiteralExpression,
+  VariableExpression,
+  FunctionExpression,
+  ApplicationExpression,
+  BinaryExpression,
+  IfExpression,
+  RecordExpression,
+  AccessorExpression,
+} from "../src/ast";
 
 // Helper functions for type-safe testing
 function assertLiteralExpression(expr: Expression): LiteralExpression {
-  if (expr.kind !== 'literal') {
+  if (expr.kind !== "literal") {
     throw new Error(`Expected literal expression, got ${expr.kind}`);
   }
   return expr;
 }
 
 function assertVariableExpression(expr: Expression): VariableExpression {
-  if (expr.kind !== 'variable') {
+  if (expr.kind !== "variable") {
     throw new Error(`Expected variable expression, got ${expr.kind}`);
   }
   return expr;
 }
 
 function assertFunctionExpression(expr: Expression): FunctionExpression {
-  if (expr.kind !== 'function') {
+  if (expr.kind !== "function") {
     throw new Error(`Expected function expression, got ${expr.kind}`);
   }
   return expr;
 }
 
 function assertApplicationExpression(expr: Expression): ApplicationExpression {
-  if (expr.kind !== 'application') {
+  if (expr.kind !== "application") {
     throw new Error(`Expected application expression, got ${expr.kind}`);
   }
   return expr;
 }
 
 function assertBinaryExpression(expr: Expression): BinaryExpression {
-  if (expr.kind !== 'binary') {
+  if (expr.kind !== "binary") {
     throw new Error(`Expected binary expression, got ${expr.kind}`);
   }
   return expr;
 }
 
 function assertIfExpression(expr: Expression): IfExpression {
-  if (expr.kind !== 'if') {
+  if (expr.kind !== "if") {
     throw new Error(`Expected if expression, got ${expr.kind}`);
   }
   return expr;
 }
 
 function assertRecordExpression(expr: Expression): RecordExpression {
-  if (expr.kind !== 'record') {
+  if (expr.kind !== "record") {
     throw new Error(`Expected record expression, got ${expr.kind}`);
   }
   return expr;
 }
 
 function assertAccessorExpression(expr: Expression): AccessorExpression {
-  if (expr.kind !== 'accessor') {
+  if (expr.kind !== "accessor") {
     throw new Error(`Expected accessor expression, got ${expr.kind}`);
   }
   return expr;
@@ -446,7 +456,7 @@ describe("Top-level sequence parsing", () => {
     const seq = program.statements[0];
     expect(seq.kind).toBe("binary");
   });
-}); 
+});
 
 describe("Type annotation parsing", () => {
   function parseType(typeSrc: string) {
@@ -499,7 +509,7 @@ describe("Type annotation parsing", () => {
 
   test("parses nested record type", () => {
     const result = parseType(
-      "{ person: { name: String, age: Number }, active: Bool }"
+      "{ person: { name: String, age: Number }, active: Bool }",
     );
     expect(result.success).toBe(true);
     expect(result.value.kind).toBe("record");
@@ -521,7 +531,7 @@ describe("Top-level definitions with type annotations", () => {
 
   test("parses definition with function type annotation", () => {
     const result = parseDefinition(
-      "add = fn x y => x + y : Number -> Number -> Number;"
+      "add = fn x y => x + y : Number -> Number -> Number;",
     );
     expect(result.statements).toHaveLength(1);
     expect(result.statements[0].kind).toBe("definition");
@@ -562,4 +572,4 @@ describe("Top-level definitions with type annotations", () => {
     expect(seq.kind).toBe("binary"); // semicolon sequence
     expect(seq.operator).toBe(";");
   });
-}); 
+});

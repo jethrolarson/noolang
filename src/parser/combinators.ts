@@ -190,7 +190,7 @@ export const lazy =
 // Separated by something
 export const sepBy = <T, S>(
   parser: Parser<T>,
-  separator: Parser<S>
+  separator: Parser<S>,
 ): Parser<T[]> => {
   return (tokens: Token[]) => {
     const results: T[] = [];

@@ -5,7 +5,7 @@ import { Evaluator, Value } from "../src/evaluator";
 
 function unwrapValue(val: Value): any {
   if (val === null) return null;
-  if (typeof val !== 'object') return val;
+  if (typeof val !== "object") return val;
   switch (val.tag) {
     case "number":
       return val.value;

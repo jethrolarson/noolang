@@ -14,19 +14,19 @@ const runNoolang = (source: string) => {
   const lexer = new Lexer(source);
   const tokens = lexer.tokenize();
   const program = parse(tokens);
-  
+
   // Type check first
   const typeResult = typeProgram(program);
-  
+
   // Then evaluate
   const evaluator = new Evaluator();
   const evalResult = evaluator.evaluateProgram(program);
-  
+
   return {
     typeResult,
     evalResult,
     finalType: typeToString(typeResult.type, typeResult.state.substitution),
-    finalValue: evalResult.finalResult
+    finalValue: evalResult.finalResult,
   };
 };
 
@@ -37,11 +37,11 @@ describe("Algebraic Data Types (ADTs)", () => {
         x = Some 42;
         x
       `);
-      
+
       expect(result.finalValue).toEqual({
-        tag: 'constructor',
-        name: 'Some',
-        args: [{ tag: 'number', value: 42 }]
+        tag: "constructor",
+        name: "Some",
+        args: [{ tag: "number", value: 42 }],
       });
     });
 
@@ -50,11 +50,11 @@ describe("Algebraic Data Types (ADTs)", () => {
         x = None;
         x
       `);
-      
+
       expect(result.finalValue).toEqual({
-        tag: 'constructor',
-        name: 'None',
-        args: []
+        tag: "constructor",
+        name: "None",
+        args: [],
       });
     });
 
@@ -64,8 +64,8 @@ describe("Algebraic Data Types (ADTs)", () => {
         result = match x with (Some y => y * 2; None => 0);
         result
       `);
-      
-      expect(result.finalValue).toEqual({ tag: 'number', value: 42 });
+
+      expect(result.finalValue).toEqual({ tag: "number", value: 42 });
     });
 
     it("should pattern match on None", () => {
@@ -74,8 +74,8 @@ describe("Algebraic Data Types (ADTs)", () => {
         result = match x with (Some y => y * 2; None => 99);
         result
       `);
-      
-      expect(result.finalValue).toEqual({ tag: 'number', value: 99 });
+
+      expect(result.finalValue).toEqual({ tag: "number", value: 99 });
     });
 
     it("should handle nested Option values", () => {
@@ -87,8 +87,8 @@ describe("Algebraic Data Types (ADTs)", () => {
         );
         result
       `);
-      
-      expect(result.finalValue).toEqual({ tag: 'number', value: 10 });
+
+      expect(result.finalValue).toEqual({ tag: "number", value: 10 });
     });
   });
 
@@ -98,11 +98,11 @@ describe("Algebraic Data Types (ADTs)", () => {
         x = Ok 100;
         x
       `);
-      
+
       expect(result.finalValue).toEqual({
-        tag: 'constructor',
-        name: 'Ok',
-        args: [{ tag: 'number', value: 100 }]
+        tag: "constructor",
+        name: "Ok",
+        args: [{ tag: "number", value: 100 }],
       });
     });
 
@@ -111,11 +111,11 @@ describe("Algebraic Data Types (ADTs)", () => {
         x = Err "failed";
         x
       `);
-      
+
       expect(result.finalValue).toEqual({
-        tag: 'constructor',
-        name: 'Err',
-        args: [{ tag: 'string', value: 'failed' }]
+        tag: "constructor",
+        name: "Err",
+        args: [{ tag: "string", value: "failed" }],
       });
     });
 
@@ -125,8 +125,8 @@ describe("Algebraic Data Types (ADTs)", () => {
         result = match x with (Ok value => value + 10; Err msg => 0);
         result
       `);
-      
-      expect(result.finalValue).toEqual({ tag: 'number', value: 60 });
+
+      expect(result.finalValue).toEqual({ tag: "number", value: 60 });
     });
 
     it("should pattern match on Err", () => {
@@ -135,8 +135,8 @@ describe("Algebraic Data Types (ADTs)", () => {
         result = match x with (Ok value => value; Err msg => 404);
         result
       `);
-      
-      expect(result.finalValue).toEqual({ tag: 'number', value: 404 });
+
+      expect(result.finalValue).toEqual({ tag: "number", value: 404 });
     });
   });
 
@@ -147,11 +147,11 @@ describe("Algebraic Data Types (ADTs)", () => {
         favorite = Red;
         favorite
       `);
-      
+
       expect(result.finalValue).toEqual({
-        tag: 'constructor',
-        name: 'Red',
-        args: []
+        tag: "constructor",
+        name: "Red",
+        args: [],
       });
     });
 
@@ -161,14 +161,14 @@ describe("Algebraic Data Types (ADTs)", () => {
         origin = Point 0 0;
         origin
       `);
-      
+
       expect(result.finalValue).toEqual({
-        tag: 'constructor',
-        name: 'Point',
+        tag: "constructor",
+        name: "Point",
         args: [
-          { tag: 'number', value: 0 },
-          { tag: 'number', value: 0 }
-        ]
+          { tag: "number", value: 0 },
+          { tag: "number", value: 0 },
+        ],
       });
     });
 
@@ -183,8 +183,8 @@ describe("Algebraic Data Types (ADTs)", () => {
         result = getColorCode Red;
         result
       `);
-      
-      expect(result.finalValue).toEqual({ tag: 'number', value: 1 });
+
+      expect(result.finalValue).toEqual({ tag: "number", value: 1 });
     });
 
     it.skip("should handle recursive ADTs", () => {
@@ -199,8 +199,8 @@ describe("Algebraic Data Types (ADTs)", () => {
         result = getFirst myList;
         result
       `);
-      
-      expect(result.finalValue).toEqual({ tag: 'number', value: 1 });
+
+      expect(result.finalValue).toEqual({ tag: "number", value: 1 });
     });
 
     it.skip("should handle complex pattern matching with variables", () => {
@@ -215,8 +215,8 @@ describe("Algebraic Data Types (ADTs)", () => {
         result = sumTree tree;
         result
       `);
-      
-      expect(result.finalValue).toEqual({ tag: 'number', value: 15 });
+
+      expect(result.finalValue).toEqual({ tag: "number", value: 15 });
     });
   });
 
@@ -237,14 +237,14 @@ describe("Algebraic Data Types (ADTs)", () => {
 
     it("should handle literal patterns", () => {
       const result = runNoolang(
-        `type Status = Success | Error | Code Int; getStatusMessage = fn status => match status with (Success => "ok"; Error => "fail"; Code 404 => "not found"; Code x => "unknown code"); result = getStatusMessage (Code 404); result`
+        `type Status = Success | Error | Code Int; getStatusMessage = fn status => match status with (Success => "ok"; Error => "fail"; Code 404 => "not found"; Code x => "unknown code"); result = getStatusMessage (Code 404); result`,
       );
       expect(result.finalValue).toEqual({ tag: "string", value: "not found" });
     });
 
     it("should handle nested patterns", () => {
       const result = runNoolang(
-        `type Wrapper a = Wrap a; type Inner = Value Int; nested = Wrap (Value 123); extract = fn w => match w with (Wrap (Value n) => n; _ => 0); result = extract nested; result`
+        `type Wrapper a = Wrap a; type Inner = Value Int; nested = Wrap (Value 123); extract = fn w => match w with (Wrap (Value n) => n; _ => 0); result = extract nested; result`,
       );
       expect(result.finalValue).toEqual({ tag: "number", value: 123 });
     });
@@ -403,8 +403,9 @@ describe("Algebraic Data Types (ADTs)", () => {
       expect(result.finalValue).toEqual({ tag: "number", value: 1 });
     });
 
-    it("should fail with variant name mismatch when using map with multiple ADTs", () => {
-      // This test documents the current language limitation
+    it("should now work with map and multiple ADTs (polymorphism fixed)", () => {
+      // This test was previously failing due to lack of polymorphism in map
+      // Now that map is properly polymorphic, it should work
       expect(() =>
         runNoolang(`
         type Color = Red | Green | Blue;
@@ -416,8 +417,8 @@ describe("Algebraic Data Types (ADTs)", () => {
         color_numbers = map color_to_number colors;
         areas = map calculate_area shapes;
         color_numbers
-      `)
-      ).toThrow("Variant name mismatch: Color vs Shape");
+      `),
+      ).not.toThrow();
     });
 
     it("should work when ADTs are used in separate operations", () => {

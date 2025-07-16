@@ -1,4 +1,4 @@
-import { Token } from '../lexer';
+import { Token } from "../lexer";
 import {
   Expression,
   Program,
@@ -48,9 +48,11 @@ const parseTypeName: C.Parser<Token> = (tokens: Token[]) => {
 
   const [first, ...rest] = tokens;
   const typeKeywords = ["Int", "Number", "String", "Unit", "List"];
-  
-  if (first.type === "IDENTIFIER" || 
-      (first.type === "KEYWORD" && typeKeywords.includes(first.value))) {
+
+  if (
+    first.type === "IDENTIFIER" ||
+    (first.type === "KEYWORD" && typeKeywords.includes(first.value))
+  ) {
     return {
       success: true,
       value: first,
@@ -121,14 +123,14 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
           C.seq(
             C.identifier(),
             C.punctuation(":"),
-            C.lazy(() => parseTypeExpression)
+            C.lazy(() => parseTypeExpression),
           ),
-          ([name, colon, type]) => [name.value, type] as [string, Type]
+          ([name, colon, type]) => [name.value, type] as [string, Type],
         ),
-        C.punctuation(",")
-      )
+        C.punctuation(","),
+      ),
     ),
-    C.punctuation("}")
+    C.punctuation("}"),
   )(tokens);
   if (recordResult.success) {
     const fields: Array<[string, Type]> = recordResult.value[1] || [];
@@ -149,10 +151,10 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
     C.optional(
       C.sepBy(
         C.lazy(() => parseTypeExpression),
-        C.punctuation(",")
-      )
+        C.punctuation(","),
+      ),
     ),
-    C.punctuation("}")
+    C.punctuation("}"),
   )(tokens);
   if (tupleResult.success) {
     const elements = tupleResult.value[1] || [];
@@ -166,7 +168,7 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
   // Try List type
   const listResult = C.seq(
     C.keyword("List"),
-    C.lazy(() => parseTypeExpression)
+    C.lazy(() => parseTypeExpression),
   )(tokens);
   if (listResult.success) {
     return {
@@ -179,7 +181,7 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
   // Try Tuple type constructor: Tuple T1 T2 T3
   const tupleConstructorResult = C.seq(
     C.keyword("Tuple"),
-    C.many(C.lazy(() => parseTypeExpression))
+    C.many(C.lazy(() => parseTypeExpression)),
   )(tokens);
   if (tupleConstructorResult.success) {
     const elementTypes = tupleConstructorResult.value[1];
@@ -194,7 +196,7 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
   const parenResult = C.seq(
     C.punctuation("("),
     C.lazy(() => parseTypeExpression),
-    C.punctuation(")")
+    C.punctuation(")"),
   )(tokens);
   if (parenResult.success) {
     return {
@@ -205,18 +207,24 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
   }
 
   // Try user-defined type constructor: TypeName arg1 arg2 ...
-  if (tokens.length > 0 && tokens[0].type === "IDENTIFIER" && /^[A-Z]/.test(tokens[0].value)) {
+  if (
+    tokens.length > 0 &&
+    tokens[0].type === "IDENTIFIER" &&
+    /^[A-Z]/.test(tokens[0].value)
+  ) {
     const typeNameResult = C.identifier()(tokens);
     if (typeNameResult.success) {
       // Try to parse type arguments
-      const argsResult = C.many(C.lazy(() => parseTypeAtom))(typeNameResult.remaining);
+      const argsResult = C.many(C.lazy(() => parseTypeAtom))(
+        typeNameResult.remaining,
+      );
       if (argsResult.success) {
         return {
           success: true as const,
           value: {
             kind: "variant",
             name: typeNameResult.value.value,
-            args: argsResult.value
+            args: argsResult.value,
           } as Type,
           remaining: argsResult.remaining,
         };
@@ -265,7 +273,6 @@ export const parseTypeExpression: C.Parser<Type> = (tokens) => {
     return funcType;
   }
 
-
   // Try type variable (lowercase identifier)
   if (
     tokens.length > 0 &&
@@ -291,14 +298,14 @@ export const parseTypeExpression: C.Parser<Type> = (tokens) => {
           C.seq(
             C.identifier(),
             C.punctuation(":"),
-            C.lazy(() => parseTypeExpression)
+            C.lazy(() => parseTypeExpression),
           ),
-          ([name, colon, type]) => [name.value, type] as [string, Type]
+          ([name, colon, type]) => [name.value, type] as [string, Type],
         ),
-        C.punctuation(",")
-      )
+        C.punctuation(","),
+      ),
     ),
-    C.punctuation("}")
+    C.punctuation("}"),
   )(tokens);
   if (recordResult.success) {
     const fields: Array<[string, Type]> = recordResult.value[1] || [];
@@ -319,10 +326,10 @@ export const parseTypeExpression: C.Parser<Type> = (tokens) => {
     C.optional(
       C.sepBy(
         C.lazy(() => parseTypeExpression),
-        C.punctuation(",")
-      )
+        C.punctuation(","),
+      ),
     ),
-    C.punctuation("}")
+    C.punctuation("}"),
   )(tokens);
   if (tupleResult.success) {
     const elements = tupleResult.value[1] || [];
@@ -336,7 +343,7 @@ export const parseTypeExpression: C.Parser<Type> = (tokens) => {
   // Try List type
   const listResult = C.seq(
     C.keyword("List"),
-    C.lazy(() => parseTypeExpression)
+    C.lazy(() => parseTypeExpression),
   )(tokens);
   if (listResult.success) {
     return {
@@ -359,7 +366,7 @@ const parseIdentifier = C.map(
     kind: "variable",
     name: token.value,
     location: token.location,
-  })
+  }),
 );
 
 const parseNumber = C.map(
@@ -368,7 +375,7 @@ const parseNumber = C.map(
     kind: "literal",
     value: parseFloat(token.value),
     location: token.location,
-  })
+  }),
 );
 
 const parseString = C.map(
@@ -377,7 +384,7 @@ const parseString = C.map(
     kind: "literal",
     value: token.value,
     location: token.location,
-  })
+  }),
 );
 
 const parseAccessor = C.map(
@@ -386,13 +393,13 @@ const parseAccessor = C.map(
     kind: "accessor",
     field: token.value,
     location: token.location,
-  })
+  }),
 );
 
 // --- Record Parsing ---
 const parseRecordFieldName = C.map(
   C.accessor(),
-  (token) => token.value // Just get the field name without @
+  (token) => token.value, // Just get the field name without @
 );
 
 // Parse an expression that stops at @ (accessor tokens) or semicolon
@@ -419,13 +426,13 @@ const parseRecordField = C.map(
     name: fieldName,
     value,
     isNamed: true,
-  })
+  }),
 );
 
 // Parse a single record field (named or positional)
 const parseRecordFieldOrPositional =
   (
-    index: number
+    index: number,
   ): C.Parser<{ name: string; value: Expression; isNamed: boolean }> =>
   (tokens) => {
     // Try to parse as named field first (with accessor)
@@ -458,7 +465,7 @@ const parseRecordFieldOrPositional =
 
 // Custom parser for a sequence of fields separated by semicolons
 const parseRecordFields: C.Parser<{ name: string; value: Expression }[]> = (
-  tokens
+  tokens,
 ) => {
   let fields: { name: string; value: Expression; isNamed: boolean }[] = [];
   let rest = tokens;
@@ -549,10 +556,10 @@ const parseRecord = C.map(
     } else {
       // Mixed fields: error
       throw new Error(
-        "Cannot mix named and positional fields in the same record/tuple"
+        "Cannot mix named and positional fields in the same record/tuple",
       );
     }
-  }
+  },
 );
 
 // --- Parenthesized Expressions ---
@@ -560,9 +567,9 @@ const parseParenExpr: C.Parser<Expression> = C.map(
   C.seq(
     C.punctuation("("),
     C.lazy(() => parseSequence), // Use parseSequence to allow full semicolon-separated sequences
-    C.punctuation(")")
+    C.punctuation(")"),
   ),
-  ([open, expr, close]) => expr
+  ([open, expr, close]) => expr,
 );
 
 // --- Function Body Parser ---
@@ -606,7 +613,7 @@ const parseLambdaExpression: C.Parser<FunctionExpression> = (tokens) => {
   } else {
     const braceResult = C.seq(
       C.punctuation("{"),
-      C.punctuation("}")
+      C.punctuation("}"),
     )(remaining);
     if (braceResult.success) {
       // Unit parameter
@@ -636,7 +643,7 @@ const parseLambdaExpression: C.Parser<FunctionExpression> = (tokens) => {
 
   // Parse the body (use parseSequenceTermWithIf to allow full expressions)
   const bodyResult = C.lazy(() => parseSequenceTermWithIf)(
-    arrowResult.remaining
+    arrowResult.remaining,
   );
   if (!bodyResult.success) {
     return bodyResult;
@@ -718,7 +725,7 @@ const parseList: C.Parser<ListExpression> = C.map(
       elements: elementsList,
       location: open.location,
     };
-  }
+  },
 );
 
 // --- Import Expression ---
@@ -728,7 +735,7 @@ const parseImportExpression: C.Parser<ImportExpression> = C.map(
     kind: "import",
     path: path.value,
     location: importKw.location,
-  })
+  }),
 );
 
 // --- If Expression (special: do not allow semicolon in branches) ---
@@ -739,7 +746,7 @@ const parseIfExpression: C.Parser<Expression> = C.map(
     C.keyword("then"),
     C.lazy(() => parseSequenceTerm),
     C.keyword("else"),
-    C.lazy(() => parseSequenceTerm)
+    C.lazy(() => parseSequenceTerm),
   ),
   ([ifKw, condition, thenKw, thenExpr, elseKw, elseExpr]) => {
     return {
@@ -749,7 +756,7 @@ const parseIfExpression: C.Parser<Expression> = C.map(
       else: elseExpr,
       location: ifKw.location,
     };
-  }
+  },
 );
 
 // --- Primary Expressions (no unary minus) ---
@@ -768,13 +775,13 @@ const parsePrimary: C.Parser<Expression> = (tokens) => {
     parseParenExpr,
     parseLambdaExpression,
     C.lazy(() => parseDefinitionWithType),
-    parseImportExpression
+    parseImportExpression,
   )(tokens);
   // DEBUG: Log result
   if (process.env.NOO_DEBUG_PARSE) {
     console.log(
       "parsePrimary result:",
-      result.success ? result.value : result.error
+      result.success ? result.value : result.error,
     );
   }
   return result;
@@ -785,19 +792,19 @@ const parsePrimaryWithPostfix: C.Parser<Expression> = (tokens) => {
   if (process.env.NOO_DEBUG_PARSE) {
     console.log(
       "parsePrimaryWithPostfix tokens:",
-      tokens.map((t) => t.value).join(" ")
+      tokens.map((t) => t.value).join(" "),
     );
   }
   const primaryResult = parsePrimary(tokens);
   if (!primaryResult.success) return primaryResult;
   const postfixResult = parsePostfixFromResult(
     primaryResult.value,
-    primaryResult.remaining
+    primaryResult.remaining,
   );
   if (process.env.NOO_DEBUG_PARSE) {
     console.log(
       "parsePrimaryWithPostfix result:",
-      postfixResult.success ? postfixResult.value : postfixResult.error
+      postfixResult.success ? postfixResult.value : postfixResult.error,
     );
   }
   return postfixResult;
@@ -849,7 +856,7 @@ const parseUnary: C.Parser<Expression> = (tokens) => {
   if (process.env.NOO_DEBUG_PARSE) {
     console.log(
       "parseUnary result:",
-      result.success ? result.value : result.error
+      result.success ? result.value : result.error,
     );
   }
   return result;
@@ -870,7 +877,7 @@ const parseApplication: C.Parser<Expression> = (tokens) => {
         };
       }
       return result;
-    }
+    },
   )(tokens);
 
   if (!appResult.success) return appResult;
@@ -885,8 +892,8 @@ const parseMultiplicative: C.Parser<Expression> = (tokens) => {
     C.seq(
       parseApplication,
       C.many(
-        C.seq(C.choice(C.operator("*"), C.operator("/")), parseApplication)
-      )
+        C.seq(C.choice(C.operator("*"), C.operator("/")), parseApplication),
+      ),
     ),
     ([left, rest]) => {
       let result = left;
@@ -900,7 +907,7 @@ const parseMultiplicative: C.Parser<Expression> = (tokens) => {
         };
       }
       return result;
-    }
+    },
   )(tokens);
 
   if (!multResult.success) return multResult;
@@ -915,8 +922,8 @@ const parseAdditive: C.Parser<Expression> = (tokens) => {
     C.seq(
       parseMultiplicative,
       C.many(
-        C.seq(C.choice(C.operator("+"), C.operator("-")), parseMultiplicative)
-      )
+        C.seq(C.choice(C.operator("+"), C.operator("-")), parseMultiplicative),
+      ),
     ),
     ([left, rest]) => {
       let result = left;
@@ -930,7 +937,7 @@ const parseAdditive: C.Parser<Expression> = (tokens) => {
         };
       }
       return result;
-    }
+    },
   )(tokens);
 
   if (!addResult.success) return addResult;
@@ -952,11 +959,11 @@ const parseComparison: C.Parser<Expression> = (tokens) => {
             C.operator("<="),
             C.operator(">="),
             C.operator("=="),
-            C.operator("!=")
+            C.operator("!="),
           ),
-          parseAdditive
-        )
-      )
+          parseAdditive,
+        ),
+      ),
     ),
     ([left, rest]) => {
       let result = left;
@@ -970,7 +977,7 @@ const parseComparison: C.Parser<Expression> = (tokens) => {
         };
       }
       return result;
-    }
+    },
   )(tokens);
 
   if (!compResult.success) return compResult;
@@ -985,8 +992,8 @@ const parseCompose: C.Parser<Expression> = (tokens) => {
     C.seq(
       parseComparison,
       C.many(
-        C.seq(C.choice(C.operator("|>"), C.operator("<|")), parseComparison)
-      )
+        C.seq(C.choice(C.operator("|>"), C.operator("<|")), parseComparison),
+      ),
     ),
     ([left, rest]) => {
       // Build steps array for pipeline expression
@@ -1006,7 +1013,7 @@ const parseCompose: C.Parser<Expression> = (tokens) => {
 
       // Otherwise just return the single expression
       return left;
-    }
+    },
   )(tokens);
 
   if (!compResult.success) return compResult;
@@ -1031,7 +1038,7 @@ const parseThrush: C.Parser<Expression> = (tokens) => {
         };
       }
       return result;
-    }
+    },
   )(tokens);
 
   if (!thrushResult.success) return thrushResult;
@@ -1056,7 +1063,7 @@ const parseDollar: C.Parser<Expression> = (tokens) => {
         };
       }
       return result;
-    }
+    },
   )(tokens);
 
   if (!dollarResult.success) return dollarResult;
@@ -1077,7 +1084,7 @@ const parseIfAfterDollar: C.Parser<Expression> = (tokens) => {
 // Helper function to apply postfix operators to an expression
 const parsePostfixFromResult = (
   expr: Expression,
-  tokens: Token[]
+  tokens: Token[],
 ): C.ParseResult<Expression> => {
   let result = expr;
   let remaining = tokens;
@@ -1100,7 +1107,7 @@ const parsePostfixFromResult = (
         typeResult.remaining[0].value === "given"
       ) {
         const constraintResult = parseConstraintExpr(
-          typeResult.remaining.slice(1)
+          typeResult.remaining.slice(1),
         );
         if (!constraintResult.success) break;
 
@@ -1142,14 +1149,14 @@ const parseTypedExpression: C.Parser<Expression> = C.map(
   C.seq(
     parseDollar,
     C.punctuation(":"),
-    C.lazy(() => parseTypeExpression)
+    C.lazy(() => parseTypeExpression),
   ),
   ([expr, colon, type]): TypedExpression => ({
     kind: "typed",
     expression: expr,
     type: type as Type,
     location: expr.location,
-  })
+  }),
 );
 
 // --- Definition ---
@@ -1157,7 +1164,7 @@ const parseDefinition: C.Parser<DefinitionExpression> = C.map(
   C.seq(
     C.identifier(),
     C.operator("="),
-    C.lazy(() => parseSequenceTermWithIf)
+    C.lazy(() => parseSequenceTermWithIf),
   ),
   ([name, equals, value]): DefinitionExpression => {
     return {
@@ -1166,7 +1173,7 @@ const parseDefinition: C.Parser<DefinitionExpression> = C.map(
       value,
       location: name.location,
     };
-  }
+  },
 );
 
 // --- Definition with typed expression (now just a regular definition) ---
@@ -1180,7 +1187,7 @@ const parseMutableDefinition: C.Parser<
     C.keyword("mut"),
     C.identifier(),
     C.operator("="),
-    C.lazy(() => parseSequenceTermWithIf)
+    C.lazy(() => parseSequenceTermWithIf),
   ),
   ([
     mut,
@@ -1194,7 +1201,7 @@ const parseMutableDefinition: C.Parser<
       value,
       location: mut.location,
     };
-  }
+  },
 );
 
 // --- Mutation ---
@@ -1203,7 +1210,7 @@ const parseMutation: C.Parser<import("../ast").MutationExpression> = C.map(
     C.keyword("mut!"),
     C.identifier(),
     C.operator("="),
-    C.lazy(() => parseSequenceTermWithIf)
+    C.lazy(() => parseSequenceTermWithIf),
   ),
   ([mut, name, equals, value]): import("../ast").MutationExpression => {
     return {
@@ -1212,7 +1219,7 @@ const parseMutation: C.Parser<import("../ast").MutationExpression> = C.map(
       value,
       location: mut.location,
     };
-  }
+  },
 );
 
 // Custom parser for where clause definitions (both regular and mutable)
@@ -1243,7 +1250,7 @@ const parseConstructor: C.Parser<ConstructorDefinition> = C.map(
     name: name.value,
     args,
     location: createLocation(name.location.start, name.location.end),
-  })
+  }),
 );
 
 // --- Type Definition ---
@@ -1253,7 +1260,7 @@ const parseTypeDefinition: C.Parser<TypeDefinitionExpression> = C.map(
     parseTypeName,
     C.many(C.identifier()),
     C.operator("="),
-    C.sepBy(parseConstructor, C.operator("|"))
+    C.sepBy(parseConstructor, C.operator("|")),
   ),
   ([
     type,
@@ -1268,9 +1275,10 @@ const parseTypeDefinition: C.Parser<TypeDefinitionExpression> = C.map(
     constructors,
     location: createLocation(
       type.location.start,
-      constructors[constructors.length - 1]?.location.end || equals.location.end
+      constructors[constructors.length - 1]?.location.end ||
+        equals.location.end,
     ),
-  })
+  }),
 );
 
 // --- Pattern Parsing ---
@@ -1282,7 +1290,7 @@ const parseBasicPattern: C.Parser<Pattern> = C.choice(
     (underscore): Pattern => ({
       kind: "wildcard",
       location: underscore.location,
-    })
+    }),
   ),
   // Literal pattern: number or string
   C.map(
@@ -1291,7 +1299,7 @@ const parseBasicPattern: C.Parser<Pattern> = C.choice(
       kind: "literal",
       value: parseInt(num.value),
       location: num.location,
-    })
+    }),
   ),
   C.map(
     C.string(),
@@ -1299,7 +1307,7 @@ const parseBasicPattern: C.Parser<Pattern> = C.choice(
       kind: "literal",
       value: str.value,
       location: str.location,
-    })
+    }),
   ),
   // Constructor or variable pattern: identifier (decide based on capitalization)
   C.map(C.identifier(), (name): Pattern => {
@@ -1319,7 +1327,7 @@ const parseBasicPattern: C.Parser<Pattern> = C.choice(
         location: name.location,
       };
     }
-  })
+  }),
 );
 
 const parsePattern: C.Parser<Pattern> = C.choice(
@@ -1329,7 +1337,7 @@ const parsePattern: C.Parser<Pattern> = C.choice(
     (underscore): Pattern => ({
       kind: "wildcard",
       location: underscore.location,
-    })
+    }),
   ),
   // Constructor pattern with arguments: Some x y
   C.map(
@@ -1340,9 +1348,9 @@ const parsePattern: C.Parser<Pattern> = C.choice(
       args,
       location: createLocation(
         name.location.start,
-        args[args.length - 1].location.end
+        args[args.length - 1].location.end,
       ),
-    })
+    }),
   ),
   // Constructor pattern with parenthesized arguments: Wrap (Value n)
   C.map(
@@ -1350,14 +1358,14 @@ const parsePattern: C.Parser<Pattern> = C.choice(
       C.identifier(),
       C.punctuation("("),
       C.lazy(() => parsePattern),
-      C.punctuation(")")
+      C.punctuation(")"),
     ),
     ([name, openParen, arg, closeParen]): Pattern => ({
       kind: "constructor",
       name: name.value,
       args: [arg],
       location: createLocation(name.location.start, closeParen.location.end),
-    })
+    }),
   ),
   // Constructor or variable pattern: identifier (decide based on capitalization)
   C.map(C.identifier(), (name): Pattern => {
@@ -1377,7 +1385,7 @@ const parsePattern: C.Parser<Pattern> = C.choice(
         location: name.location,
       };
     }
-  })
+  }),
 );
 
 // --- Match Case ---
@@ -1385,13 +1393,13 @@ const parseMatchCase: C.Parser<MatchCase> = C.map(
   C.seq(
     parsePattern,
     C.operator("=>"),
-    C.lazy(() => parseSequenceTermWithIfExceptRecord)
+    C.lazy(() => parseSequenceTermWithIfExceptRecord),
   ),
   ([pattern, arrow, expression]): MatchCase => ({
     pattern,
     expression,
     location: createLocation(pattern.location.start, expression.location.end),
-  })
+  }),
 );
 
 // --- Match Expression ---
@@ -1402,7 +1410,7 @@ const parseMatchExpression: C.Parser<MatchExpression> = C.map(
     C.keyword("with"),
     C.punctuation("("),
     C.sepBy(parseMatchCase, C.punctuation(";")),
-    C.punctuation(")")
+    C.punctuation(")"),
   ),
   ([
     match,
@@ -1416,7 +1424,7 @@ const parseMatchExpression: C.Parser<MatchExpression> = C.map(
     expression,
     cases,
     location: createLocation(match.location.start, closeParen.location.end),
-  })
+  }),
 );
 
 // --- Where Expression ---
@@ -1426,7 +1434,7 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
     C.keyword("where"),
     C.punctuation("("),
     C.sepBy(parseWhereDefinition, C.punctuation(";")),
-    C.punctuation(")")
+    C.punctuation(")"),
   ),
   ([main, where, openParen, definitions, closeParen]): WhereExpression => {
     return {
@@ -1435,7 +1443,7 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
       definitions,
       location: main.location,
     };
-  }
+  },
 );
 
 // --- Sequence term: everything else ---
@@ -1452,7 +1460,7 @@ const parseSequenceTerm: C.Parser<Expression> = C.choice(
   parseDollar, // full expression hierarchy (includes all primaries and type annotations)
   parseRecord,
   parseThrush,
-  parseLambdaExpression
+  parseLambdaExpression,
 );
 
 // Version without records to avoid circular dependency
@@ -1470,7 +1478,7 @@ const parseSequenceTermExceptRecord: C.Parser<Expression> = C.choice(
   parseIdentifier,
   parseList,
   parseAccessor,
-  parseParenExpr
+  parseParenExpr,
 );
 
 // parseSequenceTerm now includes parseIfExpression
@@ -1479,7 +1487,7 @@ const parseSequenceTermWithIf: C.Parser<Expression> = parseSequenceTerm;
 // Version with if but without records to avoid circular dependency
 const parseSequenceTermWithIfExceptRecord: C.Parser<Expression> = C.choice(
   parseSequenceTermExceptRecord,
-  parseIfExpression
+  parseIfExpression,
 );
 
 // --- Sequence Term: definition or expression ---
@@ -1501,7 +1509,7 @@ const parseSequenceTermNew: C.Parser<Expression> = C.choice(
   parseIdentifier,
   parseList,
   parseAccessor,
-  parseParenExpr
+  parseParenExpr,
 );
 
 // --- Parse atomic constraint ---
@@ -1511,9 +1519,9 @@ const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
     C.seq(
       C.punctuation("("),
       C.lazy(() => parseConstraintExpr),
-      C.punctuation(")")
+      C.punctuation(")"),
     ),
-    ([open, expr, close]) => ({ kind: "paren", expr })
+    ([open, expr, close]) => ({ kind: "paren", expr }),
   ),
   // a is Collection
   C.map(
@@ -1521,15 +1529,15 @@ const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
       C.identifier(),
       C.keyword("is"),
       C.choice(
-        C.identifier()
+        C.identifier(),
         // Removed meaningless constraint keywords
-      )
+      ),
     ),
     ([typeVar, isKeyword, constraint]): ConstraintExpr => ({
       kind: "is",
       typeVar: typeVar.value,
       constraint: constraint.value,
-    })
+    }),
   ),
   // a has field "name" of type T
   C.map(
@@ -1540,7 +1548,7 @@ const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
       C.string(),
       C.keyword("of"),
       C.keyword("type"),
-      C.lazy(() => parseTypeExpression)
+      C.lazy(() => parseTypeExpression),
     ),
     ([
       typeVar,
@@ -1555,7 +1563,7 @@ const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
       typeVar: typeVar.value,
       field: fieldName.value,
       fieldType,
-    })
+    }),
   ),
   // a implements Interface
   C.map(
@@ -1564,8 +1572,8 @@ const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
       kind: "implements",
       typeVar: typeVar.value,
       interfaceName: interfaceName.value,
-    })
-  )
+    }),
+  ),
 );
 
 // --- Parse constraint expression with precedence: and > or ---
@@ -1620,7 +1628,7 @@ const parseExprWithType: C.Parser<Expression> = C.choice(
       C.punctuation(":"),
       C.lazy(() => parseTypeExpression),
       C.keyword("given"),
-      parseConstraintExpr
+      parseConstraintExpr,
     ),
     ([expr, colon, type, given, constraint]): ConstrainedExpression => ({
       kind: "constrained",
@@ -1628,23 +1636,23 @@ const parseExprWithType: C.Parser<Expression> = C.choice(
       type,
       constraint,
       location: expr.location,
-    })
+    }),
   ),
   // Expression with just type: expr : type
   C.map(
     C.seq(
       parseDollar, // Use parseDollar to support full expression hierarchy
       C.punctuation(":"),
-      C.lazy(() => parseTypeExpression)
+      C.lazy(() => parseTypeExpression),
     ),
     ([expr, colon, type]): TypedExpression => ({
       kind: "typed",
       expression: expr,
       type,
       location: expr.location,
-    })
+    }),
   ),
-  parseDollar // Fallback to regular expressions
+  parseDollar, // Fallback to regular expressions
 );
 
 // --- Sequence (semicolon) ---
@@ -1655,9 +1663,9 @@ const parseSequence: C.Parser<Expression> = C.map(
     C.many(
       C.seq(
         C.punctuation(";"),
-        C.lazy(() => parseSequenceTermWithIf)
-      )
-    )
+        C.lazy(() => parseSequenceTermWithIf),
+      ),
+    ),
   ),
   ([left, rest]) => {
     let result = left;
@@ -1671,7 +1679,7 @@ const parseSequence: C.Parser<Expression> = C.map(
       };
     }
     return result;
-  }
+  },
 );
 
 // --- Expression (top-level) ---
@@ -1720,11 +1728,11 @@ export const parse = (tokens: Token[]): Program => {
   if (rest.length > 0) {
     const next = rest[0];
     throw new Error(
-      `Unexpected token after expression: ${next.type} '${next.value}' at line ${next.location.start.line}, column ${next.location.start.column}`
+      `Unexpected token after expression: ${next.type} '${next.value}' at line ${next.location.start.line}, column ${next.location.start.column}`,
     );
   }
   return {
     statements,
     location: createLocation({ line: 1, column: 1 }, { line: 1, column: 1 }),
   };
-}; 
+};
