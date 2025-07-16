@@ -200,10 +200,12 @@ const flattenStatements = (expr: Expression): Expression[] => {
 
 export class Evaluator {
   public environment: Environment;
+  private environmentStack: Environment[]; // Stack for efficient scoping
   private currentFileDir?: string; // Track the directory of the current file being evaluated
 
   constructor() {
     this.environment = new Map();
+    this.environmentStack = [];
     this.initializeBuiltins();
     this.loadStdlib();
   }
@@ -923,10 +925,11 @@ export class Evaluator {
 
         let result;
         if (params.length === 1) {
-          // Create a temporary evaluator with the call environment
-          const tempEvaluator = new Evaluator();
-          tempEvaluator.environment = callEnv;
-          result = tempEvaluator.evaluateExpression(body);
+          // Use environment stacking for efficient scoping
+          result = self.withNewEnvironment(() => {
+            self.environment = callEnv;
+            return self.evaluateExpression(body);
+          });
         } else {
           // Create a function that captures the current parameter
           const capturedParam = param;
@@ -938,16 +941,18 @@ export class Evaluator {
             nextCallEnv.set(remainingParams[0], nextArg);
 
             if (remainingParams.length === 1) {
-              const tempEvaluator = new Evaluator();
-              tempEvaluator.environment = nextCallEnv;
-              return tempEvaluator.evaluateExpression(body);
+              return self.withNewEnvironment(() => {
+                self.environment = nextCallEnv;
+                return self.evaluateExpression(body);
+              });
             } else {
               // Continue currying for remaining parameters
-              const tempEvaluator = new Evaluator();
-              tempEvaluator.environment = nextCallEnv;
-              const remainingFunction = tempEvaluator.evaluateFunction({
-                ...expr,
-                params: remainingParams,
+              const remainingFunction = self.withNewEnvironment(() => {
+                self.environment = nextCallEnv;
+                return self.evaluateFunction({
+                  ...expr,
+                  params: remainingParams,
+                });
               });
               if (isFunction(remainingFunction)) {
                 return remainingFunction.fn(nextArg);
@@ -1346,33 +1351,21 @@ export class Evaluator {
   }
 
   private evaluateWhere(expr: any): Value {
-    // Create a new environment with the where-clause definitions
-    const whereEnv = new Map(this.environment);
-
-    // Evaluate all definitions in the where clause
-    for (const def of expr.definitions) {
-      if (def.kind === "definition") {
-        const value = this.evaluateExpression(def.value);
-        whereEnv.set(def.name, value);
-      } else if (def.kind === "mutable-definition") {
-        const value = this.evaluateExpression(def.value);
-        whereEnv.set(def.name, createCell(value));
+    // Use environment stacking for where clause
+    return this.withNewEnvironment(() => {
+      // Evaluate all definitions in the where clause
+      for (const def of expr.definitions) {
+        if (def.kind === "definition") {
+          const value = this.evaluateExpression(def.value);
+          this.environment.set(def.name, value);
+        } else if (def.kind === "mutable-definition") {
+          const value = this.evaluateExpression(def.value);
+          this.environment.set(def.name, createCell(value));
+        }
       }
-    }
-
-    // Save the current environment
-    const oldEnv = this.environment;
-
-    // Switch to the where environment
-    this.environment = whereEnv;
-
-    // Evaluate the main expression
-    const result = this.evaluateExpression(expr.main);
-
-    // Restore the original environment
-    this.environment = oldEnv;
-
-    return result;
+      // Evaluate the main expression
+      return this.evaluateExpression(expr.main);
+    });
   }
 
   private containsVariable(expr: Expression, varName: string): boolean {
@@ -1428,6 +1421,27 @@ export class Evaluator {
         return false;
       default:
         return false;
+    }
+  }
+
+  // Efficient environment stack management
+  private pushEnvironment(): void {
+    this.environmentStack.push(this.environment);
+    this.environment = new Map(this.environment);
+  }
+
+  private popEnvironment(): void {
+    if (this.environmentStack.length > 0) {
+      this.environment = this.environmentStack.pop()!;
+    }
+  }
+
+  private withNewEnvironment<T>(fn: () => T): T {
+    this.pushEnvironment();
+    try {
+      return fn();
+    } finally {
+      this.popEnvironment();
     }
   }
 
@@ -1556,22 +1570,15 @@ export class Evaluator {
     for (const matchCase of expr.cases) {
       const matchResult = this.tryMatchPattern(matchCase.pattern, value);
       if (matchResult.matched) {
-        // Create new environment with pattern bindings
-        const savedEnv = new Map(this.environment);
-
-        // Add bindings to environment
-        for (const [name, boundValue] of matchResult.bindings) {
-          this.environment.set(name, boundValue);
-        }
-
-        try {
+        // Use environment stacking for pattern bindings
+        return this.withNewEnvironment(() => {
+          // Add bindings to environment
+          for (const [name, boundValue] of matchResult.bindings) {
+            this.environment.set(name, boundValue);
+          }
           // Evaluate the case expression
-          const result = this.evaluateExpression(matchCase.expression);
-          return result;
-        } finally {
-          // Restore environment
-          this.environment = savedEnv;
-        }
+          return this.evaluateExpression(matchCase.expression);
+        });
       }
     }
 

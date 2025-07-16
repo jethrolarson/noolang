@@ -90,6 +90,7 @@ export type TypeState = {
   counter: number;
   constraints: Constraint[]; // Track constraints during inference
   adtRegistry: ADTRegistry; // Track ADT definitions
+  accessorCache: Map<string, Type>; // Cache accessor types by field name
 };
 
 // Type inference result
@@ -105,7 +106,62 @@ export const createTypeState = (): TypeState => ({
   counter: 0,
   constraints: [],
   adtRegistry: new Map(),
+  accessorCache: new Map(),
 });
+
+// Efficient constraint comparison to replace expensive JSON.stringify
+const constraintsEqual = (c1: Constraint, c2: Constraint): boolean => {
+  if (c1.kind !== c2.kind || c1.typeVar !== c2.typeVar) return false;
+  
+  switch (c1.kind) {
+    case "is":
+      return c1.constraint === (c2 as any).constraint;
+    case "hasField":
+      const c2HasField = c2 as any;
+      return c1.field === c2HasField.field && typesSimilar(c1.fieldType, c2HasField.fieldType);
+    case "implements":
+      return c1.interfaceName === (c2 as any).interfaceName;
+    case "custom":
+      return c1.constraint === (c2 as any).constraint;
+    default:
+      return false;
+  }
+};
+
+// Efficient type similarity check to avoid JSON.stringify (simplified for constraint comparison)
+const typesSimilar = (t1: Type, t2: Type): boolean => {
+  if (t1.kind !== t2.kind) return false;
+  
+  switch (t1.kind) {
+    case "primitive":
+      return t1.name === (t2 as any).name;
+    case "variable":
+      return t1.name === (t2 as any).name;
+    case "function":
+      const t2Func = t2 as any;
+      return t1.params.length === t2Func.params.length &&
+             t1.params.every((p, i) => typesSimilar(p, t2Func.params[i])) &&
+             typesSimilar(t1.return, t2Func.return);
+    case "list":
+      return typesSimilar(t1.element, (t2 as any).element);
+    case "record":
+      const t2Record = t2 as any;
+      const fields1 = Object.keys(t1.fields);
+      const fields2 = Object.keys(t2Record.fields);
+      return fields1.length === fields2.length &&
+             fields1.every(f => f in t2Record.fields && typesSimilar(t1.fields[f], t2Record.fields[f]));
+    case "tuple":
+      const t2Tuple = t2 as any;
+      return t1.elements.length === t2Tuple.elements.length &&
+             t1.elements.every((e, i) => typesSimilar(e, t2Tuple.elements[i]));
+    case "union":
+      const t2Union = t2 as any;
+      return t1.types.length === t2Union.types.length &&
+             t1.types.every((type, i) => typesSimilar(type, t2Union.types[i]));
+    default:
+      return false;
+  }
+};
 
 // Fresh type variable generation
 export const freshTypeVariable = (state: TypeState): [Type, TypeState] => {
@@ -135,7 +191,7 @@ const propagateConstraintToTypeVariable = (
       }
       // Check if this constraint is already present
       const existingConstraint = param.constraints.find(
-        (c) => JSON.stringify(c) === JSON.stringify(constraint),
+        (c) => constraintsEqual(c, constraint),
       );
       if (!existingConstraint) {
         param.constraints.push(constraint);
@@ -152,7 +208,7 @@ const propagateConstraintToTypeVariable = (
       funcType.return.constraints = [];
     }
     const existingConstraint = funcType.return.constraints.find(
-      (c) => JSON.stringify(c) === JSON.stringify(constraint),
+      (c) => constraintsEqual(c, constraint),
     );
     if (!existingConstraint) {
       funcType.return.constraints.push(constraint);
@@ -385,44 +441,59 @@ export const substitute = (
   type: Type,
   substitution: Map<string, Type>,
 ): Type => {
+  return substituteWithCache(type, substitution, new Set());
+};
+
+const substituteWithCache = (
+  type: Type,
+  substitution: Map<string, Type>,
+  seen: Set<string>,
+): Type => {
   switch (type.kind) {
     case "variable": {
+      if (seen.has(type.name)) {
+        // Cycle detected, return original variable
+        return type;
+      }
       const sub = substitution.get(type.name);
       if (sub) {
-        return substitute(sub, substitution);
+        seen.add(type.name);
+        const result = substituteWithCache(sub, substitution, seen);
+        seen.delete(type.name);
+        return result;
       }
       return type;
     }
     case "function":
       return {
         ...type,
-        params: type.params.map((param) => substitute(param, substitution)),
-        return: substitute(type.return, substitution),
+        params: type.params.map((param) => substituteWithCache(param, substitution, seen)),
+        return: substituteWithCache(type.return, substitution, seen),
         constraints: type.constraints?.map((c) =>
           substituteConstraint(c, substitution),
         ),
       };
     case "list":
-      return { ...type, element: substitute(type.element, substitution) };
+      return { ...type, element: substituteWithCache(type.element, substitution, seen) };
     case "tuple":
       return {
         ...type,
-        elements: type.elements.map((el) => substitute(el, substitution)),
+        elements: type.elements.map((el) => substituteWithCache(el, substitution, seen)),
       };
     case "record":
       return {
         ...type,
-        fields: mapObject(type.fields, (v, k) => substitute(v, substitution)),
+        fields: mapObject(type.fields, (v, k) => substituteWithCache(v, substitution, seen)),
       };
     case "union":
       return {
         ...type,
-        types: type.types.map((t) => substitute(t, substitution)),
+        types: type.types.map((t) => substituteWithCache(t, substitution, seen)),
       };
     case "variant":
       return {
         ...type,
-        args: type.args.map((arg) => substitute(arg, substitution)),
+        args: type.args.map((arg) => substituteWithCache(arg, substitution, seen)),
       };
     default:
       return type;
@@ -2129,9 +2200,15 @@ export const typeAccessor = (
   expr: AccessorExpression,
   state: TypeState,
 ): TypeResult => {
+  // Check cache first
+  const fieldName = expr.field;
+  const cachedType = state.accessorCache.get(fieldName);
+  if (cachedType) {
+    return { type: cachedType, state };
+  }
+
   // Accessors return functions that take any record with the required field and return the field type
   // @bar should have type {bar: a, ...} -> a (allows extra fields)
-  const fieldName = expr.field;
   // Use a fresh type variable for the field type
   const [fieldType, nextState] = freshTypeVariable(state);
   // Create a simple type variable for the record (no constraints on the variable itself)
@@ -2144,9 +2221,16 @@ export const typeAccessor = (
       hasFieldConstraint(recordVar.name, fieldName, fieldType),
     ];
   }
+
+  // Cache the result for future use
+  const resultState = {
+    ...finalState,
+    accessorCache: new Map(finalState.accessorCache).set(fieldName, funcType),
+  };
+
   return {
     type: funcType,
-    state: finalState,
+    state: resultState,
   };
 };
 
@@ -2391,7 +2475,7 @@ const applyConstraintToTypeVariable = (
         }
         // Check if this constraint is already present
         const existingConstraint = type.constraints.find(
-          (c) => JSON.stringify(c) === JSON.stringify(constraint),
+          (c) => constraintsEqual(c, constraint),
         );
         if (!existingConstraint) {
           type.constraints.push(constraint);
@@ -3011,13 +3095,11 @@ export const typeToString = (
 
   // Helper function to deduplicate constraints
   function deduplicateConstraints(constraints: Constraint[]): Constraint[] {
-    const seen = new Set<string>();
     const result: Constraint[] = [];
 
     for (const constraint of constraints) {
-      const key = JSON.stringify(constraint);
-      if (!seen.has(key)) {
-        seen.add(key);
+      const isDuplicate = result.some(c => constraintsEqual(c, constraint));
+      if (!isDuplicate) {
         result.push(constraint);
       }
     }
@@ -3131,7 +3213,7 @@ function propagateConstraintToType(type: Type, constraint: Constraint) {
       type.constraints = type.constraints || [];
       if (
         !type.constraints.some(
-          (c) => JSON.stringify(c) === JSON.stringify(constraint),
+          (c) => constraintsEqual(c, constraint),
         )
       ) {
         type.constraints.push(constraint);

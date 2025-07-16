@@ -308,22 +308,6 @@ values = map extract_or_zero options;
 # 12. FINAL DEMONSTRATION
 # ========================================
 # Showcase all features working together
-final_demo = {
-  @factorial factorial 5,
-  @fibonacci fibonacci 10,
-  @person person,
-  @mapped mapped,
-  @head head_result,
-  @constraint_demo {
-    @head_with_constraint head_with_constraint,
-    @safe_head_result safe_head_result,
-    @record_name record_name,
-    @first_string first_string,
-    @first_record first_record
-  }
-};
-
-# Final expression to evaluate and return
 final_demo_with_adts = {
   @factorial factorial 5,
   @fibonacci fibonacci 10,
