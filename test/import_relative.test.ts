@@ -1,22 +1,54 @@
 import { Lexer } from "../src/lexer";
 import { parse } from "../src/parser/parser";
 import { Evaluator } from "../src/evaluator";
-import * as fs from "fs";
-
-// Mock fs.readFileSync
-jest.mock("fs", () => ({
-  readFileSync: jest.fn(),
-}));
 
 describe("File-relative imports", () => {
   let evaluator: Evaluator;
-  const mockReadFileSync = fs.readFileSync as jest.MockedFunction<
-    typeof fs.readFileSync
-  >;
+  let mockReadFileSync: any;
+  let mockExistsSync: any;
+
+  beforeAll(() => {
+    jest.resetModules();
+    jest.doMock("fs", () => ({
+      readFileSync: jest.fn((filePath: any) => {
+        if (typeof filePath === "string" && filePath.includes("stdlib.noo")) {
+          return "# Noolang Standard Library\n# This file defines the global default environment\n";
+        }
+        if (
+          typeof filePath === "string" &&
+          filePath.includes("math_functions.noo")
+        ) {
+          return "{ @add fn x y => x + y, @multiply fn x y => x * y }";
+        }
+        throw new Error(`File not found: ${filePath}`);
+      }),
+      existsSync: jest.fn((filePath: any) => {
+        if (typeof filePath === "string" && filePath.includes("stdlib.noo")) {
+          return true;
+        }
+        if (
+          typeof filePath === "string" &&
+          filePath.includes("math_functions.noo")
+        ) {
+          return true;
+        }
+        return false;
+      }),
+    }));
+
+    // Re-import fs after mocking
+    const fs = require("fs");
+    mockReadFileSync = fs.readFileSync;
+    mockExistsSync = fs.existsSync;
+  });
+
+  afterAll(() => {
+    jest.resetModules();
+    jest.dontMock("fs");
+  });
 
   beforeEach(() => {
     evaluator = new Evaluator();
-    mockReadFileSync.mockReset();
   });
 
   test("should import from same directory", () => {

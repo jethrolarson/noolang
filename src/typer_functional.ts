@@ -834,17 +834,6 @@ const flattenStatements = (expr: Expression): Expression[] => {
 // Load standard library from stdlib.noo
 export const loadStdlib = (state: TypeState): TypeState => {
   try {
-    // Check if fs functions are available (they might not be in test environments)
-    if (
-      typeof fs.existsSync !== "function" ||
-      typeof fs.readFileSync !== "function"
-    ) {
-      console.warn(
-        `Warning: File system functions not available, skipping stdlib loading`
-      );
-      return state;
-    }
-
     // Find stdlib.noo relative to this file
     const stdlibPath = path.join(__dirname, "..", "stdlib.noo");
 

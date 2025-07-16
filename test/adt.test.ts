@@ -370,4 +370,93 @@ describe("Algebraic Data Types (ADTs)", () => {
       }
     });
   });
+
+  describe("Multiple ADT Definitions", () => {
+    it("should handle multiple ADT definitions in the same program", () => {
+      const result = runNoolang(`
+        type Color = Red | Green | Blue;
+        type Shape a = Circle a | Rectangle a a | Triangle a a a;
+        colors = [Red, Green, Blue];
+        shapes = [Circle 3, Rectangle 5 4];
+        colors
+      `);
+
+      expect(result.finalValue).toEqual({
+        tag: "list",
+        values: [
+          { tag: "constructor", name: "Red", args: [] },
+          { tag: "constructor", name: "Green", args: [] },
+          { tag: "constructor", name: "Blue", args: [] },
+        ],
+      });
+    });
+
+    it("should handle pattern matching on different ADTs separately", () => {
+      const result = runNoolang(`
+        type Color = Red | Green | Blue;
+        type Shape a = Circle a | Rectangle a a | Triangle a a a;
+        color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
+        calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
+        color_to_number Red
+      `);
+
+      expect(result.finalValue).toEqual({ tag: "number", value: 1 });
+    });
+
+    it("should fail with variant name mismatch when using map with multiple ADTs", () => {
+      // This test documents the current language limitation
+      expect(() =>
+        runNoolang(`
+        type Color = Red | Green | Blue;
+        type Shape a = Circle a | Rectangle a a | Triangle a a a;
+        colors = [Red, Green, Blue];
+        shapes = [Circle 3, Rectangle 5 4];
+        color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
+        calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
+        color_numbers = map color_to_number colors;
+        areas = map calculate_area shapes;
+        color_numbers
+      `)
+      ).toThrow("Variant name mismatch: Color vs Shape");
+    });
+
+    it("should work when ADTs are used in separate operations", () => {
+      const result = runNoolang(`
+        type Color = Red | Green | Blue;
+        type Shape a = Circle a | Rectangle a a | Triangle a a a;
+        colors = [Red, Green, Blue];
+        color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
+        color_numbers = map color_to_number colors;
+        color_numbers
+      `);
+
+      expect(result.finalValue).toEqual({
+        tag: "list",
+        values: [
+          { tag: "number", value: 1 },
+          { tag: "number", value: 2 },
+          { tag: "number", value: 3 },
+        ],
+      });
+    });
+
+    it("should work when shapes are processed separately", () => {
+      const result = runNoolang(`
+        type Color = Red | Green | Blue;
+        type Shape a = Circle a | Rectangle a a | Triangle a a a;
+        shapes = [Circle 3, Rectangle 5 4];
+        calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
+        areas = map calculate_area shapes;
+        areas
+      `);
+
+      expect(result.finalValue).toEqual({
+        tag: "list",
+        values: [
+          { tag: "number", value: 27 },
+          { tag: "number", value: 20 },
+        ],
+      });
+    });
+  });
 });

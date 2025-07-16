@@ -60,7 +60,7 @@ describe("Option Type Unification Tests", () => {
     expect(unwrapped.args).toEqual([]);
   });
 
-  test.skip("should handle Option in conditional expressions", () => {
+  test("should handle Option in conditional expressions", () => {
     // FIXME: Currently fails with "Cannot unify Option a with Option a"
     const code = `
       result = if True then Some 42 else None;
@@ -72,8 +72,7 @@ describe("Option Type Unification Tests", () => {
     expect(unwrapped.args).toEqual([42]);
   });
 
-  test.skip("should handle Option function return types", () => {
-    // FIXME: Currently fails with "Cannot unify Option a with Option a"
+  test("should handle Option function return types", () => {
     const code = `
       makeOption = fn x => if x > 0 then Some x else None;
       makeOption 5
@@ -84,7 +83,7 @@ describe("Option Type Unification Tests", () => {
     expect(unwrapped.args).toEqual([5]);
   });
 
-  test.skip("should handle safe division function", () => {
+  test("should handle safe division function", () => {
     // FIXME: Currently fails with "Cannot unify Option a with Option a"
     const code = `
       safe_divide = fn a b => if b == 0 then None else Some (a / b);
