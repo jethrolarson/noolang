@@ -1,38 +1,38 @@
-import { Token } from "../lexer";
+import type { Token } from "../lexer";
 import {
-  Expression,
-  Program,
-  LiteralExpression,
-  VariableExpression,
-  FunctionExpression,
-  createLocation,
-  DefinitionExpression,
-  MutableDefinitionExpression,
-  ImportExpression,
-  AccessorExpression,
-  Type,
-  intType,
-  stringType,
-  unitType,
-  listTypeWithElement,
-  functionType,
-  typeVariable,
-  TypedExpression,
-  ConstrainedExpression,
-  ListExpression,
-  WhereExpression,
-  recordType,
-  tupleType,
-  tupleTypeConstructor,
-  ConstraintExpr,
-  TypeDefinitionExpression,
-  MatchExpression,
-  ConstructorDefinition,
-  Pattern,
-  MatchCase,
-  UnitExpression,
-  RecordExpression,
-  TupleExpression,
+	type Expression,
+	type Program,
+	type LiteralExpression,
+	type VariableExpression,
+	type FunctionExpression,
+	createLocation,
+	type DefinitionExpression,
+	type MutableDefinitionExpression,
+	type ImportExpression,
+	type AccessorExpression,
+	type Type,
+	intType,
+	stringType,
+	unitType,
+	listTypeWithElement,
+	functionType,
+	typeVariable,
+	type TypedExpression,
+	type ConstrainedExpression,
+	type ListExpression,
+	type WhereExpression,
+	recordType,
+	tupleType,
+	tupleTypeConstructor,
+	type ConstraintExpr,
+	type TypeDefinitionExpression,
+	type MatchExpression,
+	type ConstructorDefinition,
+	type Pattern,
+	type MatchCase,
+	type UnitExpression,
+	type RecordExpression,
+	type TupleExpression,
 } from "../ast";
 import * as C from "./combinators";
 
@@ -571,27 +571,6 @@ const parseParenExpr: C.Parser<Expression> = C.map(
   ),
   ([open, expr, close]) => expr
 );
-
-// --- Function Body Parser ---
-// Allows a parenthesized sequence, or a single non-sequence expression
-const parseFunctionBody: C.Parser<Expression> = (tokens) => {
-  // Try parenthesized expression first
-  const parenResult = parseParenExpr(tokens);
-  if (parenResult.success) return parenResult;
-
-  // Try a single non-sequence expression, but fail if next token is a semicolon
-  const exprResult = parseAdditive(tokens);
-  if (!exprResult.success) return exprResult;
-  const next = exprResult.remaining[0];
-  if (next && next.type === "PUNCTUATION" && next.value === ";") {
-    return {
-      success: false,
-      error: "Unexpected semicolon in function body",
-      position: next.location.start.line,
-    };
-  }
-  return exprResult;
-};
 
 // --- Lambda Expression ---
 const parseLambdaExpression: C.Parser<FunctionExpression> = (tokens) => {
@@ -1144,21 +1123,6 @@ const parsePostfixFromResult = (
   };
 };
 
-// --- Typed Expression (expr : type) ---
-const parseTypedExpression: C.Parser<Expression> = C.map(
-  C.seq(
-    parseDollar,
-    C.punctuation(":"),
-    C.lazy(() => parseTypeExpression)
-  ),
-  ([expr, colon, type]): TypedExpression => ({
-    kind: "typed",
-    expression: expr,
-    type: type as Type,
-    location: expr.location,
-  })
-);
-
 // --- Definition ---
 const parseDefinition: C.Parser<DefinitionExpression> = C.map(
   C.seq(
@@ -1487,28 +1451,6 @@ const parseSequenceTermWithIf: C.Parser<Expression> = parseSequenceTerm;
 const parseSequenceTermWithIfExceptRecord: C.Parser<Expression> = C.choice(
   parseSequenceTermExceptRecord,
   parseIfExpression
-);
-
-// --- Sequence Term: definition or expression ---
-const parseSequenceTermNew: C.Parser<Expression> = C.choice(
-  parseTypeDefinition, // ADT type definitions
-  parseMatchExpression, // ADT pattern matching
-  parseDefinitionWithType, // allow definitions
-  parseDollar, // allow full expressions with precedence
-  parseIfExpression,
-  parseRecord,
-  parseMutableDefinition,
-  parseMutation,
-  parseWhereExpression,
-  parseImportExpression,
-  parseThrush,
-  parseLambdaExpression,
-  parseNumber,
-  parseString,
-  parseIdentifier,
-  parseList,
-  parseAccessor,
-  parseParenExpr
 );
 
 // --- Parse atomic constraint ---

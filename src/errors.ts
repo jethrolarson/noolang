@@ -20,21 +20,19 @@ export interface NoolangError {
   suggestion?: string;
 }
 
-export function createError(
-  type: ErrorType,
-  message: string,
-  location?: ErrorLocation,
-  context?: string,
-  suggestion?: string,
-): NoolangError {
-  return {
-    type,
-    message,
-    location,
-    context,
-    suggestion,
-  };
-}
+export const createError = (
+	type: ErrorType,
+	message: string,
+	location?: ErrorLocation,
+	context?: string,
+	suggestion?: string,
+): NoolangError => ({
+	type,
+	message,
+	location,
+	context,
+	suggestion,
+});
 
 export function errorToString(error: NoolangError): string {
   let result = `${error.type}: ${error.message}`;
@@ -54,6 +52,5 @@ export function errorToString(error: NoolangError): string {
   return result;
 }
 
-export function errorToJSON(error: NoolangError): string {
-  return JSON.stringify(error, null, 2);
-}
+export const errorToJSON = (error: NoolangError): string =>
+	JSON.stringify(error, null, 2);

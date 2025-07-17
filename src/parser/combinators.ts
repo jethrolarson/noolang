@@ -1,4 +1,4 @@
-import { Token, TokenType } from "../lexer";
+import type { Token, TokenType } from "../lexer";
 
 export type ParseError = {
   success: false;
@@ -158,14 +158,13 @@ export const optional =
   <T>(parser: Parser<T>): Parser<T | null> =>
   (tokens: Token[]) => {
     const result = parser(tokens);
-    if (result.success) {
-      return result;
-    }
-    return {
-      success: true,
-      value: null,
-      remaining: tokens,
-    };
+    return result.success
+					? result
+					: {
+							success: true,
+							value: null,
+							remaining: tokens,
+						};
   };
 
 // Transform parse result
@@ -173,14 +172,13 @@ export const map =
   <T, U>(parser: Parser<T>, fn: (value: T) => U): Parser<U> =>
   (tokens: Token[]) => {
     const result = parser(tokens);
-    if (!result.success) {
-      return result;
-    }
-    return {
-      success: true,
-      value: fn(result.value),
-      remaining: result.remaining,
-    };
+    return result.success
+					? {
+							success: true,
+							value: fn(result.value),
+							remaining: result.remaining,
+						}
+					: result;
   };
 
 // Lazy parser for recursive grammars
@@ -237,33 +235,29 @@ export const sepBy = <T, S>(
 
 // Parse until end of input
 export const parseAll =
-  <T>(parser: Parser<T>): Parser<T> =>
-  (tokens: Token[]) => {
-    const result = parser(tokens);
-    if (!result.success) {
-      return result;
-    }
+	<T>(parser: Parser<T>): Parser<T> =>
+	(tokens: Token[]) => {
+		const result = parser(tokens);
+		if (!result.success || !result.remaining.length) {
+			return result;
+		}
 
-    if (result.remaining.length > 0) {
-      const unexpected = result.remaining[0];
-      return {
-        success: false,
-        error: `Unexpected ${unexpected.type} '${unexpected.value}' at end of input`,
-        position: unexpected.location.start.line,
-      };
-    }
-
-    return result;
-  };
+		const unexpected = result.remaining[0];
+		return {
+			success: false,
+			error: `Unexpected ${unexpected.type} '${unexpected.value}' at end of input`,
+			position: unexpected.location.start.line,
+		};
+	};
 
 // Convenience parsers for common token types
 export const identifier = (): Parser<Token> => token("IDENTIFIER");
 export const number = (): Parser<Token> => token("NUMBER");
 export const string = (): Parser<Token> => token("STRING");
 export const keyword = (value: string): Parser<Token> =>
-  token("KEYWORD", value);
+	token("KEYWORD", value);
 export const operator = (value: string): Parser<Token> =>
-  token("OPERATOR", value);
+	token("OPERATOR", value);
 export const punctuation = (value: string): Parser<Token> =>
-  token("PUNCTUATION", value);
+	token("PUNCTUATION", value);
 export const accessor = (): Parser<Token> => token("ACCESSOR");

@@ -215,11 +215,16 @@ export interface ImportExpression {
   location: Location;
 }
 
-export interface RecordExpression {
-  kind: "record";
-  fields: { name: string; value: Expression }[];
-  type?: Type;
-  location: Location;
+export type RecordExpression = {
+	kind: "record";
+	fields: FieldExpression[];
+	type?: Type;
+	location: Location;
+};
+
+export interface FieldExpression {
+	name: string;
+	value: Expression;
 }
 
 export interface AccessorExpression {
@@ -407,6 +412,7 @@ export const primitiveType = (
   name,
 });
 
+
 export const variableType = (
   name: string,
   constraints?: Constraint[]
@@ -458,45 +464,71 @@ export const optionInt = (): VariantType => optionType(intType());
 export const resultString = (error: Type): VariantType =>
   resultType(stringType(), error);
 
+export type HasFieldConstraint = {
+	kind: "hasField";
+	typeVar: string;
+	field: string;
+	fieldType: Type;
+};
+
+export type IsConstraint = {
+	kind: "is";
+	typeVar: string;
+	constraint: string;
+};
+
 // Constraint helper functions
 export const isConstraint = (
-  typeVar: string,
-  constraint: string
-): Constraint => ({
-  kind: "is",
-  typeVar,
-  constraint,
+	typeVar: string,
+	constraint: string,
+): IsConstraint => ({
+	kind: "is",
+	typeVar,
+	constraint,
 });
 
 export const hasFieldConstraint = (
-  typeVar: string,
-  field: string,
-  fieldType: Type
-): Constraint => ({
-  kind: "hasField",
-  typeVar,
-  field,
-  fieldType,
+	typeVar: string,
+	field: string,
+	fieldType: Type,
+): HasFieldConstraint => ({
+	kind: "hasField",
+	typeVar,
+	field,
+	fieldType,
 });
+
+export type ImplementsConstraint = {
+	kind: "implements";
+	typeVar: string;
+	interfaceName: string;
+};
 
 export const implementsConstraint = (
-  typeVar: string,
-  interfaceName: string
-): Constraint => ({
-  kind: "implements",
-  typeVar,
-  interfaceName,
+	typeVar: string,
+	interfaceName: string,
+): ImplementsConstraint => ({
+	kind: "implements",
+	typeVar,
+	interfaceName,
 });
 
+export type CustomConstraint = {
+	kind: "custom";
+	typeVar: string;
+	constraint: string;
+	args: Type[];
+};
+
 export const customConstraint = (
-  typeVar: string,
-  constraint: string,
-  args: Type[]
-): Constraint => ({
-  kind: "custom",
-  typeVar,
-  constraint,
-  args,
+	typeVar: string,
+	constraint: string,
+	args: Type[],
+): CustomConstraint => ({
+	kind: "custom",
+	typeVar,
+	constraint,
+	args,
 });
 
 // Constrained type variable

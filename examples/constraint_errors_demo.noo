@@ -25,14 +25,14 @@
 
 # bad_tail_int = tail 42;                    # ❌ Int does not satisfy Collection
 # bad_tail_string = tail "hello";            # ❌ String does not satisfy Collection (only List and Record do)
-# bad_tail_boolean = tail true;              # ❌ Boolean does not satisfy Collection
+# bad_tail_boolean = tail True;              # ❌ Boolean does not satisfy Collection
 
 # length function also requires Collection constraint
 # These would cause errors:
 
 # bad_length_int = length 42;                # ❌ Int does not satisfy Collection
 # bad_length_string = length "hello";        # ❌ String does not satisfy Collection (only List and Record do)
-# bad_length_boolean = length true;          # ❌ Boolean does not satisfy Collection
+# bad_length_boolean = length True;          # ❌ Boolean does not satisfy Collection
 
 # ========================================
 # 3. FUNCTION COMPOSITION CONSTRAINT VIOLATIONS
@@ -48,7 +48,7 @@ safeHead = compose head;
 
 # bad_compose_head = safeHead 42;            # ❌ Int does not satisfy Collection
 # bad_compose_head_string = safeHead "hello"; # ❌ String does not satisfy Collection (only List and Record do)
-# bad_compose_head_boolean = safeHead true;   # ❌ Boolean does not satisfy Collection
+# bad_compose_head_boolean = safeHead True;   # ❌ Boolean does not satisfy Collection
 
 # ========================================
 # 4. ACCESSOR CONSTRAINT VIOLATIONS
