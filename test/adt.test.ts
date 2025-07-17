@@ -2,12 +2,7 @@ import { describe, it, expect } from "@jest/globals";
 import { Lexer } from "../src/lexer";
 import { parse } from "../src/parser/parser";
 import { Evaluator } from "../src/evaluator";
-import {
-  typeProgram,
-  typeToString,
-  createTypeState,
-  initializeBuiltins,
-} from "../src/typer_functional";
+import { typeProgram, typeToString } from "../src/typer";
 
 // Helper function to parse and evaluate Noolang code
 const runNoolang = (source: string) => {

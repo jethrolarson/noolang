@@ -82,12 +82,12 @@ if 42 then 1 else 2
 TypeError: Condition must be boolean
   at line 1, column 1
 
-💡 Use a boolean expression (true/false) or a comparison that returns a boolean.
+💡 Use a boolean expression (True/False) or a comparison that returns a boolean.
 ```
 
 ### If Branch Type Mismatch
 ```noolang
-if true then 1 else "hello"
+if True then 1 else "hello"
 ```
 
 **Error:**

@@ -26,29 +26,69 @@ export type ConstraintExpr =
   | { kind: "or"; left: ConstraintExpr; right: ConstraintExpr }
   | { kind: "paren"; expr: ConstraintExpr };
 
+// Extracted type definitions
+export type PrimitiveType = {
+  kind: "primitive";
+  name: "Int" | "String" | "Bool" | "List";
+};
+
+export type FunctionType = {
+  kind: "function";
+  params: Type[];
+  return: Type;
+  effects: Effect[];
+  constraints?: Constraint[];
+};
+
+export type VariableType = {
+  kind: "variable";
+  name: string;
+  constraints?: Constraint[];
+};
+
+export type ListType = {
+  kind: "list";
+  element: Type;
+};
+
+export type UnionType = {
+  kind: "union";
+  types: Type[];
+};
+
+export type VariantType = {
+  kind: "variant";
+  name: string;
+  args: Type[];
+};
+
+export type ADTType = {
+  kind: "adt";
+  name: string;
+  typeParams: string[];
+  constructors: ConstructorDefinition[];
+};
+
+export type UnitType = {
+  kind: "unit";
+};
+
+export type UnknownType = {
+  kind: "unknown";
+};
+
 export type Type =
-  | { kind: "primitive"; name: "Int" | "String" | "Bool" | "List" }
-  | {
-      kind: "function";
-      params: Type[];
-      return: Type;
-      effects: Effect[];
-      constraints?: Constraint[];
-    }
-  | { kind: "variable"; name: string; constraints?: Constraint[] }
-  | { kind: "list"; element: Type }
-  | { kind: "tuple"; elements: Type[] }
-  | { kind: "record"; fields: { [key: string]: Type } }
-  | { kind: "union"; types: Type[] }
-  | { kind: "variant"; name: string; args: Type[] } // ADT instance like Option Int or Result String Int
-  | {
-      kind: "adt";
-      name: string;
-      typeParams: string[];
-      constructors: ConstructorDefinition[];
-    } // ADT definition
-  | { kind: "unit" }
-  | { kind: "unknown" };
+  | PrimitiveType
+  | FunctionType
+  | VariableType
+  | ListType
+  | TupleType
+  | RecordType
+  | UnionType
+  | VariantType
+  | ADTType
+  | UnitType
+  | UnknownType;
 
 // Expressions
 export type Expression =
@@ -272,12 +312,9 @@ export interface MatchExpression {
   location: Location;
 }
 
-// Top-level constructs
-export type TopLevel = Expression;
-
 // Program
 export interface Program {
-  statements: TopLevel[];
+  statements: Expression[];
   location: Location;
 }
 
@@ -293,76 +330,138 @@ export const createPosition = (line: number, column: number): Position => ({
 });
 
 // Type constructors
-export const intType = (): Type => ({ kind: "primitive", name: "Int" });
-export const numberType = (): Type => ({ kind: "primitive", name: "Int" }); // Alias for backwards compatibility
-export const stringType = (): Type => ({ kind: "primitive", name: "String" });
-export const boolType = (): Type => ({
+export const intType = (): PrimitiveType => ({
+  kind: "primitive",
+  name: "Int",
+});
+export const numberType = (): PrimitiveType => ({
+  kind: "primitive",
+  name: "Int",
+}); // Alias for backwards compatibility
+export const stringType = (): PrimitiveType => ({
+  kind: "primitive",
+  name: "String",
+});
+export const boolType = (): VariantType => ({
   kind: "variant",
   name: "Bool",
   args: [],
 });
-export const listType = (): Type => ({ kind: "primitive", name: "List" });
+export const listType = (): PrimitiveType => ({
+  kind: "primitive",
+  name: "List",
+});
 export const functionType = (
   params: Type[],
   returnType: Type,
-  effects: Effect[] = [],
-): Type => ({
+  effects: Effect[] = []
+): FunctionType => ({
   kind: "function",
   params,
   return: returnType,
   effects,
 });
-export const typeVariable = (name: string): Type => ({
+export const typeVariable = (name: string): VariableType => ({
   kind: "variable",
   name,
 });
-export const unknownType = (): Type => ({ kind: "unknown" });
+export const unknownType = (): UnknownType => ({ kind: "unknown" });
 
 // New type constructors
-export const listTypeWithElement = (element: Type): Type => ({
+export const listTypeWithElement = (element: Type): ListType => ({
   kind: "list",
   element,
 });
-export const tupleType = (elements: Type[]): Type => ({
+
+export type TupleType = {
+  kind: "tuple";
+  elements: Type[];
+};
+
+export const tupleType = (elements: Type[]): TupleType => ({
   kind: "tuple",
   elements,
 });
 
 // Add tuple type constructor for Tuple T1 T2 syntax
-export const tupleTypeConstructor = (elementTypes: Type[]): Type => ({
+export const tupleTypeConstructor = (elementTypes: Type[]): TupleType => ({
   kind: "tuple",
   elements: elementTypes,
 });
 
-export const recordType = (fields: { [key: string]: Type }): Type => ({
+export type RecordType = {
+  kind: "record";
+  fields: { [key: string]: Type };
+};
+
+export const recordType = (fields: { [key: string]: Type }): RecordType => ({
   kind: "record",
   fields,
 });
 
+// Constructor functions for new types
+export const primitiveType = (
+  name: "Int" | "String" | "Bool" | "List"
+): PrimitiveType => ({
+  kind: "primitive",
+  name,
+});
+
+export const variableType = (
+  name: string,
+  constraints?: Constraint[]
+): VariableType => ({
+  kind: "variable",
+  name,
+  constraints,
+});
+
+export const unionType = (types: Type[]): UnionType => ({
+  kind: "union",
+  types,
+});
+
+export const variantType = (name: string, args: Type[]): VariantType => ({
+  kind: "variant",
+  name,
+  args,
+});
+
+export const adtType = (
+  name: string,
+  typeParams: string[],
+  constructors: ConstructorDefinition[]
+): ADTType => ({
+  kind: "adt",
+  name,
+  typeParams,
+  constructors,
+});
+
+export const unitType = (): UnitType => ({ kind: "unit" });
+
 // Helper functions to create ADT variant types
-export const optionType = (element: Type): Type => ({
+export const optionType = (element: Type): VariantType => ({
   kind: "variant",
   name: "Option",
   args: [element],
 });
 
-export const resultType = (success: Type, error: Type): Type => ({
+export const resultType = (success: Type, error: Type): VariantType => ({
   kind: "variant",
   name: "Result",
   args: [success, error],
 });
 
 // Convenience functions for common types
-export const unitType = (): Type => ({ kind: "unit" });
-export const unionType = (types: Type[]): Type => ({ kind: "union", types });
-export const optionInt = (): Type => optionType(intType());
-export const resultString = (error: Type): Type =>
+export const optionInt = (): VariantType => optionType(intType());
+export const resultString = (error: Type): VariantType =>
   resultType(stringType(), error);
 
 // Constraint helper functions
 export const isConstraint = (
   typeVar: string,
-  constraint: string,
+  constraint: string
 ): Constraint => ({
   kind: "is",
   typeVar,
@@ -372,7 +471,7 @@ export const isConstraint = (
 export const hasFieldConstraint = (
   typeVar: string,
   field: string,
-  fieldType: Type,
+  fieldType: Type
 ): Constraint => ({
   kind: "hasField",
   typeVar,
@@ -382,7 +481,7 @@ export const hasFieldConstraint = (
 
 export const implementsConstraint = (
   typeVar: string,
-  interfaceName: string,
+  interfaceName: string
 ): Constraint => ({
   kind: "implements",
   typeVar,
@@ -392,7 +491,7 @@ export const implementsConstraint = (
 export const customConstraint = (
   typeVar: string,
   constraint: string,
-  args: Type[],
+  args: Type[]
 ): Constraint => ({
   kind: "custom",
   typeVar,
@@ -403,8 +502,8 @@ export const customConstraint = (
 // Constrained type variable
 export const constrainedTypeVariable = (
   name: string,
-  constraints: Constraint[],
-): Type => ({
+  constraints: Constraint[]
+): VariableType => ({
   kind: "variable",
   name,
   constraints,
@@ -415,8 +514,8 @@ export const constrainedFunctionType = (
   params: Type[],
   returnType: Type,
   effects: Effect[] = [],
-  constraints: Constraint[] = [],
-): Type => ({
+  constraints: Constraint[] = []
+): FunctionType => ({
   kind: "function",
   params,
   return: returnType,

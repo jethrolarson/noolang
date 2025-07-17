@@ -1,7 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
 import { Lexer } from "../src/lexer";
 import { parse } from "../src/parser/parser";
-import { typeAndDecorate, typeToString } from "../src/typer_functional";
+import { typeAndDecorate, typeToString } from "../src/typer";
 import { Evaluator } from "../src/evaluator";
 
 // Helper function to run Noolang code and get both value and type

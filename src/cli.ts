@@ -2,7 +2,7 @@
 import { Lexer } from "./lexer";
 import { parse } from "./parser/parser";
 import { Evaluator } from "./evaluator";
-import { typeAndDecorate, typeToString } from "./typer_functional";
+import { typeAndDecorate, typeToString } from "./typer";
 import * as fs from "fs";
 import * as path from "path";
 import { formatValue } from "./format";

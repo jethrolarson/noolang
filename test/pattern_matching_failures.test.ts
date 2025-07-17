@@ -1,6 +1,6 @@
 import { Lexer } from "../src/lexer";
 import { parse } from "../src/parser/parser";
-import { typeAndDecorate } from "../src/typer_functional";
+import { typeAndDecorate } from "../src/typer";
 import { Evaluator, Value } from "../src/evaluator";
 
 function unwrapValue(val: Value): any {

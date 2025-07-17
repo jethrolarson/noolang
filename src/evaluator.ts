@@ -14,13 +14,11 @@ import {
   ImportExpression,
   RecordExpression,
   AccessorExpression,
-  WhereExpression,
   TypeDefinitionExpression,
   MatchExpression,
   Pattern,
-  MatchCase,
 } from "./ast";
-import { createError, NoolangError } from "./errors";
+import { createError } from "./errors";
 import { formatValue } from "./format";
 import { Lexer } from "./lexer";
 import { parse } from "./parser/parser";

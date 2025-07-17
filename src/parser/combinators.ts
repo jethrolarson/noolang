@@ -1,16 +1,18 @@
 import { Token, TokenType } from "../lexer";
 
-export type ParseResult<T> =
-  | {
-      success: true;
-      value: T;
-      remaining: Token[];
-    }
-  | {
-      success: false;
-      error: string;
-      position: number;
-    };
+export type ParseError = {
+  success: false;
+  error: string;
+  position: number;
+};
+
+export type ParseSuccess<T> = {
+  success: true;
+  value: T;
+  remaining: Token[];
+};
+
+export type ParseResult<T> = ParseSuccess<T> | ParseError;
 
 export type Parser<T> = (tokens: Token[]) => ParseResult<T>;
 

@@ -41,10 +41,8 @@ export const colors = {
 export const supportsColors = process.stdout.isTTY && !process.env.NO_COLOR;
 
 // Create color functions that respect color support
-function createColorFunction(colorCode: string) {
-  return (text: string) =>
-    supportsColors ? `${colorCode}${text}${colors.reset}` : text;
-}
+const createColorFunction = (colorCode: string) => (text: string) =>
+  supportsColors ? `${colorCode}${text}${colors.reset}` : text;
 
 // Color functions for common use cases
 export const colorize = {
