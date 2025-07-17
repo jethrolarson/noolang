@@ -2,9 +2,10 @@
 import { Lexer } from "./lexer";
 import { parse } from "./parser/parser";
 import { Evaluator } from "./evaluator";
-import { typeAndDecorate, typeToString } from "./typer";
-import * as fs from "fs";
-import * as path from "path";
+import { typeAndDecorate } from './typer';
+import { typeToString } from './typer/helpers';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { formatValue } from "./format";
 import { colorize } from "./colors";
 

@@ -1,12 +1,10 @@
 import { describe, it, expect } from "@jest/globals";
 import { Lexer } from "../../lexer";
 import { parse } from "../../parser/parser";
-import {
-  typeProgram,
-  typeToString,
-  createTypeState,
-  initializeBuiltins,
-} from "..";
+import { typeProgram } from '..';
+import { typeToString } from '../helpers';
+import { createTypeState } from '..';
+import { initializeBuiltins } from '../builtins';
 
 // Helper function to parse a string into a program
 const parseProgram = (source: string) => {

@@ -4,13 +4,10 @@ import * as path from "node:path";
 import { Lexer } from "./lexer";
 import { parse } from "./parser/parser";
 import { Evaluator, type Value, isNativeFunction } from "./evaluator";
-import {
-	typeAndDecorate,
-	typeToString,
-	type TypeState,
-	createTypeState,
-	initializeBuiltins,
-} from "./typer";
+import { typeAndDecorate, createTypeState } from './typer';
+import { initializeBuiltins } from './typer/builtins';
+import { typeToString } from './typer/helpers';
+import type { TypeState } from './typer/types';
 import type {
 	Expression,
 	FieldExpression,
