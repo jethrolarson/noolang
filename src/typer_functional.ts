@@ -240,6 +240,32 @@ function typeError(msg: string, context?: any): never {
   );
 }
 
+// Helper: Extract location from expression or provide default
+function getExprLocation(expr: { location?: { start: { line: number; column: number } } }): { line: number; column: number } {
+  return {
+    line: expr.location?.start.line || 1,
+    column: expr.location?.start.column || 1,
+  };
+}
+
+// Helper: Throw formatted type error with consistent pattern
+function throwTypeError(
+  errorFactory: (location: { line: number; column: number }) => any,
+  location?: { line: number; column: number }
+): never {
+  const loc = location || { line: 1, column: 1 };
+  throw new Error(formatTypeError(errorFactory(loc)));
+}
+
+// Helper: Create common function types
+function createUnaryFunctionType(paramType: Type, returnType: Type): Type {
+  return functionType([paramType], returnType);
+}
+
+function createBinaryFunctionType(param1Type: Type, param2Type: Type, returnType: Type): Type {
+  return functionType([param1Type, param2Type], returnType);
+}
+
 // Utility: isTypeKind type guard
 function isTypeKind<T extends Type["kind"]>(
   t: Type,
@@ -1087,60 +1113,58 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
     ),
     quantifiedVars: ["a", "b"],
   });
-  const lengthType = functionType(
-    [listTypeWithElement(typeVariable("a"))],
-    intType(),
+  const lengthType = createUnaryFunctionType(
+    listTypeWithElement(typeVariable("a")),
+    intType()
   );
   newEnv.set("length", {
     type: lengthType,
     quantifiedVars: ["a"],
   });
   newEnv.set("isEmpty", {
-    type: functionType([listTypeWithElement(typeVariable("a"))], boolType()),
+    type: createUnaryFunctionType(listTypeWithElement(typeVariable("a")), boolType()),
     quantifiedVars: [],
   });
   newEnv.set("append", {
-    type: functionType(
-      [
-        listTypeWithElement(typeVariable("a")),
-        listTypeWithElement(typeVariable("a")),
-      ],
+    type: createBinaryFunctionType(
       listTypeWithElement(typeVariable("a")),
+      listTypeWithElement(typeVariable("a")),
+      listTypeWithElement(typeVariable("a"))
     ),
     quantifiedVars: [],
   });
 
   // Math utilities (pure)
   newEnv.set("abs", {
-    type: functionType([intType()], intType()),
+    type: createUnaryFunctionType(intType(), intType()),
     quantifiedVars: [],
   });
   newEnv.set("max", {
-    type: functionType([intType(), intType()], intType()),
+    type: createBinaryFunctionType(intType(), intType(), intType()),
     quantifiedVars: [],
   });
   newEnv.set("min", {
-    type: functionType([intType(), intType()], intType()),
+    type: createBinaryFunctionType(intType(), intType(), intType()),
     quantifiedVars: [],
   });
 
   // String utilities (pure)
   newEnv.set("concat", {
-    type: functionType([stringType(), stringType()], stringType()),
+    type: createBinaryFunctionType(stringType(), stringType(), stringType()),
     quantifiedVars: [],
   });
   newEnv.set("toString", {
-    type: functionType([typeVariable("a")], stringType()),
+    type: createUnaryFunctionType(typeVariable("a"), stringType()),
     quantifiedVars: [],
   });
 
   // Record utilities
   newEnv.set("hasKey", {
-    type: functionType([recordType({}), stringType()], boolType()),
+    type: createBinaryFunctionType(recordType({}), stringType(), boolType()),
     quantifiedVars: [],
   });
   newEnv.set("hasValue", {
-    type: functionType([recordType({}), typeVariable("a")], boolType()),
+    type: createBinaryFunctionType(recordType({}), typeVariable("a"), boolType()),
     quantifiedVars: [],
   });
   newEnv.set("set", {
@@ -1471,19 +1495,15 @@ export const typeApplication = (
   // Handle function application by checking if funcType is a function
   if (funcType.kind === "function") {
     if (argTypes.length > funcType.params.length) {
-      throw new Error(
-        formatTypeError(
-          functionApplicationError(
-            funcType.params[funcType.params.length - 1],
-            argTypes[funcType.params.length - 1],
-            funcType.params.length - 1,
-            undefined,
-            {
-              line: expr.location?.start.line || 1,
-              column: expr.location?.start.column || 1,
-            },
-          ),
+      throwTypeError(
+        (location) => functionApplicationError(
+          funcType.params[funcType.params.length - 1],
+          argTypes[funcType.params.length - 1],
+          funcType.params.length - 1,
+          undefined,
+          location
         ),
+        getExprLocation(expr)
       );
     }
 
@@ -1493,10 +1513,7 @@ export const typeApplication = (
         funcType.params[i],
         argTypes[i],
         currentState,
-        {
-          line: expr.location?.start.line || 1,
-          column: expr.location?.start.column || 1,
-        },
+        getExprLocation(expr),
         {
           reason: "function_application",
           operation: `applying argument ${i + 1}`,
@@ -1849,13 +1866,9 @@ export const typeBinary = (
   if (expr.operator === "|") {
     // Thrush: a | b means b(a) - apply right function to left value
     if (rightResult.type.kind !== "function") {
-      throw new Error(
-        formatTypeError(
-          nonFunctionApplicationError(rightResult.type, {
-            line: expr.location?.start.line || 1,
-            column: expr.location?.start.column || 1,
-          }),
-        ),
+      throwTypeError(
+        (location) => nonFunctionApplicationError(rightResult.type, location),
+        getExprLocation(expr)
       );
     }
 
@@ -1870,10 +1883,7 @@ export const typeBinary = (
       rightResult.type.params[0],
       leftResult.type,
       currentState,
-      {
-        line: expr.location?.start.line || 1,
-        column: expr.location?.start.column || 1,
-      },
+      getExprLocation(expr)
     );
 
     // Return the function's return type
@@ -1904,10 +1914,7 @@ export const typeBinary = (
     operatorType,
     expectedType,
     currentState,
-    {
-      line: expr.location?.start.line || 1,
-      column: expr.location?.start.column || 1,
-    },
+    getExprLocation(expr),
     {
       reason: "operator_application",
       operation: `applying operator ${expr.operator}`,
@@ -1942,10 +1949,7 @@ export const typeIf = (expr: IfExpression, state: TypeState): TypeResult => {
   currentState = conditionResult.state;
 
   // Unify condition with boolean
-  currentState = unify(conditionResult.type, boolType(), currentState, {
-    line: expr.location?.start.line || 1,
-    column: expr.location?.start.column || 1,
-  });
+  currentState = unify(conditionResult.type, boolType(), currentState, getExprLocation(expr));
 
   // Type then branch
   const thenResult = typeExpression(expr.then, currentState);
@@ -1956,10 +1960,7 @@ export const typeIf = (expr: IfExpression, state: TypeState): TypeResult => {
   currentState = elseResult.state;
 
   // Unify then and else types
-  currentState = unify(thenResult.type, elseResult.type, currentState, {
-    line: expr.location?.start.line || 1,
-    column: expr.location?.start.column || 1,
-  });
+  currentState = unify(thenResult.type, elseResult.type, currentState, getExprLocation(expr));
 
   // Apply substitution to get final type
   const finalType = substitute(thenResult.type, currentState.substitution);
@@ -1992,10 +1993,7 @@ export const typeDefinition = (
   expr.value.type = valueResult.type;
 
   // Unify placeholder with actual type for recursion
-  currentState = unify(placeholderType, valueResult.type, currentState, {
-    line: expr.location?.start.line || 1,
-    column: expr.location?.start.column || 1,
-  });
+  currentState = unify(placeholderType, valueResult.type, currentState, getExprLocation(expr));
 
   // Remove the just-defined variable from the environment for generalization
   const envForGen = new Map(currentState.environment);
@@ -2028,13 +2026,9 @@ export const typeVariableExpr = (
 ): TypeResult => {
   const scheme = state.environment.get(expr.name);
   if (!scheme) {
-    throw new Error(
-      formatTypeError(
-        undefinedVariableError(expr.name, {
-          line: expr.location?.start.line || 1,
-          column: expr.location?.start.column || 1,
-        }),
-      ),
+    throwTypeError(
+      (location) => undefinedVariableError(expr.name, location),
+      getExprLocation(expr)
     );
   }
 
@@ -2145,13 +2139,9 @@ export const typeMutation = (
   // For mutations, we need to check that the target exists and the value type matches
   const targetScheme = state.environment.get(expr.target);
   if (!targetScheme) {
-    throw new Error(
-      formatTypeError(
-        undefinedVariableError(expr.target, {
-          line: expr.location?.start.line || 1,
-          column: expr.location?.start.column || 1,
-        }),
-      ),
+    throwTypeError(
+      (location) => undefinedVariableError(expr.target, location),
+      getExprLocation(expr)
     );
   }
 
@@ -2160,10 +2150,7 @@ export const typeMutation = (
     targetScheme.type,
     valueResult.type,
     valueResult.state,
-    {
-      line: expr.location?.start.line || 1,
-      column: expr.location?.start.column || 1,
-    },
+    getExprLocation(expr)
   );
 
   return { type: unitType(), state: newState }; // Mutations return unit
