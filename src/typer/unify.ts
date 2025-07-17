@@ -9,7 +9,7 @@ import {
 	unificationError,
 } from './type-errors';
 import { Constraint } from '../ast';
-import { mapSet, typeToString, occursIn } from './helpers';
+import { mapSet, typeToString, occursIn, constraintsEqual } from './helpers';
 import { satisfiesConstraint, propagateConstraintToType } from './constraints';
 import { functionApplicationError } from './type-errors';
 
@@ -183,11 +183,7 @@ function unifyVariable(
 	if (isTypeKind(s2, 'variable')) {
 		s2.constraints = s2.constraints || [];
 		for (const c of constraintsToCheck) {
-			if (
-				!s2.constraints.some(
-					existing => JSON.stringify(existing) === JSON.stringify(c)
-				)
-			) {
+			if (!s2.constraints.some(existing => constraintsEqual(existing, c))) {
 				s2.constraints.push(c);
 			}
 		}
@@ -302,9 +298,7 @@ function unifyFunction(
 			// Propagate s1 -> s2
 			for (const c of s1var.constraints) {
 				if (
-					!s2var.constraints.some(
-						(existing: any) => JSON.stringify(existing) === JSON.stringify(c)
-					)
+					!s2var.constraints.some(existing => constraintsEqual(existing, c))
 				) {
 					s2var.constraints.push(c);
 				}
@@ -312,9 +306,7 @@ function unifyFunction(
 			// Propagate s2 -> s1
 			for (const c of s2var.constraints) {
 				if (
-					!s1var.constraints.some(
-						(existing: any) => JSON.stringify(existing) === JSON.stringify(c)
-					)
+					!s1var.constraints.some(existing => constraintsEqual(existing, c))
 				) {
 					s1var.constraints.push(c);
 				}

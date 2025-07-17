@@ -26,3 +26,9 @@ export type TypeState = {
 	adtRegistry: ADTRegistry; // Track ADT definitions
 	accessorCache: Map<string, Type>; // Cache accessor types by field name
 };
+
+// Type inference result
+export type TypeResult = {
+	type: Type;
+	state: TypeState;
+};
