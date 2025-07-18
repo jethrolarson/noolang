@@ -64,8 +64,12 @@ export function mapObject<T, U>(
   return result;
 }
 
-// Utility: mapSet for immutable Map updates
+// Utility: mapSet for immutable Map updates - optimized to avoid copying large maps
 export function mapSet<K, V>(map: Map<K, V>, key: K, value: V): Map<K, V> {
+  // For performance, avoid copying large maps unnecessarily
+  if (map.has(key) && map.get(key) === value) {
+    return map; // No change needed
+  }
   const copy = new Map(map);
   copy.set(key, value);
   return copy;
@@ -80,11 +84,35 @@ export function isTypeKind<T extends Type["kind"]>(
 }
 
 
+// Cache for typesEqual to avoid repeated deep comparisons
+const typesEqualCache = new Map<string, boolean>();
+
 // Check if two types are structurally equal
 export const typesEqual = (t1: Type, t2: Type): boolean => {
+  // Quick reference equality check
+  if (t1 === t2) return true;
+  
   if (t1.kind !== t2.kind) {
     return false;
   }
+  
+  // Simple cache for primitive/variable types
+  if ((t1.kind === 'primitive' || t1.kind === 'variable') && (t2.kind === 'primitive' || t2.kind === 'variable')) {
+    const key = `${t1.kind}:${(t1 as any).name}-${t2.kind}:${(t2 as any).name}`;
+    let cached = typesEqualCache.get(key);
+    if (cached !== undefined) return cached;
+    
+    const result = typesEqualUncached(t1, t2);
+    if (typesEqualCache.size < 500) {
+      typesEqualCache.set(key, result);
+    }
+    return result;
+  }
+  
+  return typesEqualUncached(t1, t2);
+};
+
+const typesEqualUncached = (t1: Type, t2: Type): boolean => {
 
   switch (t1.kind) {
     case "variable":

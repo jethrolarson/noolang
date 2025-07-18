@@ -1,12 +1,44 @@
 import { type Type, type Constraint } from "../ast";
 import { mapObject } from "./helpers";
 
+// Performance tracking for substitute
+let substituteCallCount = 0;
+let totalSubstituteTime = 0;
+
+// Cache for substitution results to avoid repeated work
+const substituteCache = new Map<string, Type>();
+
 // Apply substitution to a type
 export const substitute = (
 	type: Type,
 	substitution: Map<string, Type>,
 ): Type => {
-	return substituteWithCache(type, substitution, new Set());
+	const startTime = Date.now();
+	substituteCallCount++;
+	
+	let result: Type;
+	// Generate cache key - only for type variables as they're most common
+	if (type.kind === 'variable' && substitution.size < 20) {
+		const cacheKey = `${type.name}:${Array.from(substitution.entries()).map(([k,v]) => `${k}=${v.kind}`).join(',')}`;
+		const cached = substituteCache.get(cacheKey);
+		if (cached) {
+			result = cached;
+		} else {
+			result = substituteWithCache(type, substitution, new Set());
+			if (substituteCache.size < 1000) { // Prevent unbounded cache growth
+				substituteCache.set(cacheKey, result);
+			}
+		}
+	} else {
+		result = substituteWithCache(type, substitution, new Set());
+	}
+	
+	const elapsed = Date.now() - startTime;
+	totalSubstituteTime += elapsed;
+	
+	// Stats tracking (disabled for clean output)
+	
+	return result;
 };
 
 const substituteWithCache = (

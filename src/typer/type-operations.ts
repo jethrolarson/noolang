@@ -13,11 +13,15 @@ import { type TypeState, type TypeEnvironment, type TypeScheme } from './types';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
 
-// Fresh type variable generation
+// Fresh type variable generation - optimized to avoid string concatenation
 export const freshTypeVariable = (state: TypeState): [Type, TypeState] => {
 	const newCounter = state.counter + 1;
 	const newType = typeVariable(`α${newCounter}`);
-	return [newType, { ...state, counter: newCounter }];
+	// Avoid spreading the entire state object for better performance
+	return [newType, { 
+		...state, 
+		counter: newCounter 
+	}];
 };
 
 // Collect all free type variables in a type

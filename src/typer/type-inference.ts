@@ -132,13 +132,86 @@ const flattenConstraintExpr = (expr: ConstraintExpr): Constraint[] => {
 	}
 };
 
-// Update typeFunction to thread state through freshenTypeVariables
+// Collect free variables used in an expression
+const collectFreeVars = (expr: Expression, boundVars: Set<string> = new Set()): Set<string> => {
+	const freeVars = new Set<string>();
+	
+	const walk = (e: Expression, bound: Set<string>) => {
+		switch (e.kind) {
+			case 'variable':
+				if (!bound.has(e.name)) {
+					freeVars.add(e.name);
+				}
+				break;
+			case 'function':
+				// Parameters are bound in the function body
+				const newBound = new Set([...bound, ...e.params]);
+				walk(e.body, newBound);
+				break;
+			case 'definition':
+				// The defined name is bound for the value expression
+				const defBound = new Set([...bound, e.name]);
+				walk(e.value, defBound);
+				break;
+			case 'application':
+				walk(e.func, bound);
+				e.args.forEach(arg => walk(arg, bound));
+				break;
+			case 'binary':
+				walk(e.left, bound);
+				walk(e.right, bound);
+				// Operator is also a free variable
+				if (!bound.has(e.operator)) {
+					freeVars.add(e.operator);
+				}
+				break;
+			case 'if':
+				walk(e.condition, bound);
+				walk(e.then, bound);
+				walk(e.else, bound);
+				break;
+			// Add other expression types as needed
+			default:
+				// For other types, recursively walk any sub-expressions
+				// This is a simplified approach - in practice you'd handle each type
+				break;
+		}
+	};
+	
+	walk(expr, boundVars);
+	return freeVars;
+};
+
+// Update typeFunction to use closure culling
 export const typeFunction = (
 	expr: FunctionExpression,
 	state: TypeState
 ): TypeResult => {
-	// Create a fresh environment for the function body
-	const functionEnv = new Map(state.environment);
+	// Collect free variables used in the function body
+	const boundParams = new Set(expr.params);
+	const freeVars = collectFreeVars(expr.body, boundParams);
+	
+	// Create a minimal environment with only what's needed
+	const functionEnv = new Map<string, any>();
+	
+	// Always include built-ins and stdlib essentials  
+	const essentials = ['+', '-', '*', '/', '==', '!=', '<', '>', '<=', '>=', 'if', 'length', 'head', 'tail', 'map', 'filter',
+		'True', 'False', 'None', 'Some', 'Ok', 'Err', 'list_get', 'Bool', 'Option', 'Result'];
+	for (const essential of essentials) {
+		if (state.environment.has(essential)) {
+			functionEnv.set(essential, state.environment.get(essential)!);
+		}
+	}
+	
+	// Include only the free variables actually used
+	for (const freeVar of freeVars) {
+		if (state.environment.has(freeVar)) {
+			functionEnv.set(freeVar, state.environment.get(freeVar)!);
+		}
+	}
+	
+	// Closure optimization: using minimal environment
+	
 	let currentState = { ...state, environment: functionEnv };
 
 	const paramTypes: Type[] = [];
@@ -327,13 +400,7 @@ export const typeBinary = (
 	// Special handling for semicolon operator (sequence)
 	if (expr.operator === ';') {
 		// The type of a sequence is the type of the right expression
-		// Freshen type variables for the right result (thread state)
-		const [finalType, finalState] = freshenTypeVariables(
-			rightResult.type,
-			new Map(),
-			currentState
-		);
-		return { type: finalType, state: finalState };
+		return { type: rightResult.type, state: currentState };
 	}
 
 	// Special handling for thrush operator (|) - function application

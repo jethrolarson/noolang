@@ -30,12 +30,67 @@ import {
 import { typeApplication, typePipeline } from './function-application';
 import { typeMatch, typeTypeDefinition } from './pattern-matching';
 
+// Helper to flatten semicolon-separated expressions into a list for iterative processing
+const flattenSemicolonSequence = (expr: Expression): Expression[] => {
+	if (expr.kind === 'binary' && (expr as any).operator === ';') {
+		const binaryExpr = expr as any;
+		return [...flattenSemicolonSequence(binaryExpr.left), ...flattenSemicolonSequence(binaryExpr.right)];
+	}
+	return [expr];
+};
+
+// Process a large semicolon sequence iteratively instead of recursively
+const decorateSequenceIteratively = (expr: Expression, state: TypeState): [Expression, TypeState] => {
+	const statements = flattenSemicolonSequence(expr);
+	// Processing statements iteratively
+	
+	let currentState = state;
+	let decoratedStatements: Expression[] = [];
+	
+	for (let i = 0; i < statements.length; i++) {
+		const statement = statements[i];
+		const stmtStart = Date.now();
+		
+		// Use typeExpression directly for better performance, then decorate manually
+		const result = typeExpression(statement, currentState);
+		statement.type = result.type;
+		decoratedStatements.push(statement);
+		currentState = result.state;
+		
+		const stmtTime = Date.now() - stmtStart;
+		if (stmtTime > 50) {
+			// Statement processed
+		}
+	}
+	
+	// Rebuild the binary tree structure but with decorated nodes
+	let result = decoratedStatements[decoratedStatements.length - 1];
+	for (let i = decoratedStatements.length - 2; i >= 0; i--) {
+		result = {
+			kind: 'binary',
+			operator: ';',
+			left: decoratedStatements[i],
+			right: result,
+			type: result.type
+		} as any;
+	}
+	
+	return [result, currentState];
+};
+
 // Decorate AST nodes with inferred types (like the class-based typeAndDecorate)
 export const typeAndDecorate = (program: Program, initialState?: TypeState) => {
+	const start = Date.now();
+	
 	let state = initialState || createTypeState();
 	if (!initialState) {
+		const builtinStart = Date.now();
 		state = initializeBuiltins(state);
+		// Built-ins initialized
+		
+		const stdlibStart = Date.now();
 		state = loadStdlib(state);
+		// Standard library loaded
 	}
 
 	// Helper to recursively decorate expressions
@@ -233,11 +288,34 @@ export const typeAndDecorate = (program: Program, initialState?: TypeState) => {
 
 	// Decorate all top-level statements
 	let currentState = state;
-	const decoratedStatements = program.statements.map(stmt => {
+	// Processing program statements
+	
+	// Disabled iterative processing for now due to error
+	// if (program.statements.length === 1 && program.statements[0].kind === 'binary' && 
+	// 	(program.statements[0] as any).operator === ';') {
+	// 	process.stderr.write('Detected large semicolon sequence, using iterative processing\n');
+	// 	const [decorated, finalState] = decorateSequenceIteratively(program.statements[0], currentState);
+	// 	return {
+	// 		program: {
+	// 			...program,
+	// 			statements: [decorated],
+	// 		},
+	// 		state: finalState,
+	// 	};
+	// }
+	
+	const decorateStart = Date.now();
+	const decoratedStatements = program.statements.map((stmt, i) => {
+		const stmtStart = Date.now();
 		const [decorated, nextState] = decorate(stmt, currentState);
+		const stmtTime = Date.now() - stmtStart;
+		if (stmtTime > 20) {
+			// Statement processed
+		}
 		currentState = nextState;
 		return decorated;
 	});
+	// Decoration complete
 
 	// Return a decorated program and the final state
 	return {

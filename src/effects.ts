@@ -45,7 +45,7 @@ export class EffectManager {
 export class DefaultIOHandler implements EffectHandler {
 	async handle(effect: Effect): Promise<unknown> {
 		if (effect.kind === "IO") {
-			console.log(`IO Effect: ${effect.action}`, effect.data);
+			// IO Effect handler
 			return null;
 		}
 		throw new Error(`Unsupported effect: ${effect.kind}`);

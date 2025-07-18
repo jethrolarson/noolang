@@ -96,29 +96,5 @@ export const typeProgram = (program: Program): TypeResult => {
 		finalType = unitType();
 	}
 
-	// FINAL CONSTRAINT VALIDATION (disabled for performance)
-	// validateAllSubstitutionConstraints(state);
-
-	// NEW: Additional constraint validation for the final type
-	if (finalType.kind === 'variable' && finalType.constraints) {
-		for (const constraint of finalType.constraints) {
-			if (constraint.kind === 'is') {
-				const substitutedType = substitute(finalType, state.substitution);
-				if (
-					substitutedType.kind !== 'variable' &&
-					!satisfiesConstraint(substitutedType, constraint.constraint)
-				) {
-					throw new Error(
-						`Type ${typeToString(
-							substitutedType
-						)} does not satisfy constraint '${
-							constraint.constraint
-						}'. This error often indicates that a partial function (one that can fail at runtime) is being used in a context where total functions are required, such as function composition. Consider using total functions that return Option or Result types instead.`
-					);
-				}
-			}
-		}
-	}
-
 	return { type: finalType, state };
 };

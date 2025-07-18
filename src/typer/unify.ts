@@ -13,7 +13,15 @@ import { mapSet, typeToString, occursIn, constraintsEqual } from './helpers';
 import { satisfiesConstraint, propagateConstraintToType } from './constraints';
 import { functionApplicationError } from './type-errors';
 
-export const unify = (
+// Performance tracking
+let unifyCallCount = 0;
+let totalUnifyTime = 0;
+let slowUnifyCalls: Array<{type1: string, type2: string, time: number}> = [];
+
+// Cache for unification results to avoid repeated work
+const unifyCache = new Map<string, TypeState>();
+
+const unifyInternal = (
 	t1: Type,
 	t2: Type,
 	state: TypeState,
@@ -24,6 +32,9 @@ export const unify = (
 		hint?: string;
 	}
 ): TypeState => {
+	// Early equality check before substitution for performance
+	if (t1 === t2) return state;
+
 	const s1 = substitute(t1, state.substitution);
 	const s2 = substitute(t2, state.substitution);
 
@@ -98,6 +109,37 @@ export const unify = (
 	);
 };
 
+export const unify = (
+	t1: Type,
+	t2: Type,
+	state: TypeState,
+	location?: { line: number; column: number },
+	context?: {
+		reason?: string;
+		operation?: string;
+		hint?: string;
+	}
+): TypeState => {
+	const startTime = Date.now();
+	unifyCallCount++;
+	
+	const result = unifyInternal(t1, t2, state, location, context);
+	
+	const elapsed = Date.now() - startTime;
+	totalUnifyTime += elapsed;
+	
+	if (elapsed > 5) { // Track slow unifications
+		const type1Str = `${t1.kind}${(t1 as any).name || ''}`;
+		const type2Str = `${t2.kind}${(t2 as any).name || ''}`;
+		slowUnifyCalls.push({type1: type1Str, type2: type2Str, time: elapsed});
+		if (slowUnifyCalls.length > 20) slowUnifyCalls.shift(); // Keep last 20
+	}
+	
+	// Stats tracking (disabled for clean output)
+	
+	return result;
+};
+
 function unifyUnion(
 	s1: Type,
 	s2: Type,
@@ -165,7 +207,7 @@ function unifyVariable(
 	if (!isTypeKind(s1, 'variable')) {
 		throw new Error('unifyVariable called with non-variable s1');
 	}
-	// Recursively collect all constraints from the substitution chain for s1
+	// Optimized constraint collection - avoid array spreading
 	let constraintsToCheck: Constraint[] = [];
 	let seenVars = new Set<string>();
 	let currentVar: Type = s1;
@@ -173,7 +215,8 @@ function unifyVariable(
 		if (seenVars.has(currentVar.name)) break;
 		seenVars.add(currentVar.name);
 		if (currentVar.constraints) {
-			constraintsToCheck.push(...currentVar.constraints);
+			// Use forEach instead of spread for better performance
+			currentVar.constraints.forEach(c => constraintsToCheck.push(c));
 		}
 		const next = state.substitution.get(currentVar.name);
 		if (!next) break;
@@ -182,9 +225,13 @@ function unifyVariable(
 	// If s2 is a variable, merge all constraints into it
 	if (isTypeKind(s2, 'variable')) {
 		s2.constraints = s2.constraints || [];
+		// Optimized constraint merging - use Set for faster deduplication
+		const existingConstraintKeys = new Set(s2.constraints.map(c => `${c.kind}:${JSON.stringify(c)}`));
 		for (const c of constraintsToCheck) {
-			if (!s2.constraints.some(existing => constraintsEqual(existing, c))) {
+			const key = `${c.kind}:${JSON.stringify(c)}`;
+			if (!existingConstraintKeys.has(key)) {
 				s2.constraints.push(c);
+				existingConstraintKeys.add(key);
 			}
 		}
 	}
@@ -289,26 +336,31 @@ function unifyFunction(
 
 	// Then unify parameters and return types
 	for (let i = 0; i < s1.params.length; i++) {
-		// Only propagate constraints if both are variables
+		// Skip expensive constraint propagation for non-variables
 		const s1var = s1.params[i];
 		const s2var = s2.params[i];
-		if (isTypeKind(s1var, 'variable') && isTypeKind(s2var, 'variable')) {
+		if (isTypeKind(s1var, 'variable') && isTypeKind(s2var, 'variable') && 
+		    (s1var.constraints?.length || s2var.constraints?.length)) {
 			s1var.constraints = s1var.constraints || [];
 			s2var.constraints = s2var.constraints || [];
+			// Optimized constraint merging with Set
+			const s1Keys = new Set(s1var.constraints.map(c => `${c.kind}:${JSON.stringify(c)}`));
+			const s2Keys = new Set(s2var.constraints.map(c => `${c.kind}:${JSON.stringify(c)}`));
+			
 			// Propagate s1 -> s2
 			for (const c of s1var.constraints) {
-				if (
-					!s2var.constraints.some(existing => constraintsEqual(existing, c))
-				) {
+				const key = `${c.kind}:${JSON.stringify(c)}`;
+				if (!s2Keys.has(key)) {
 					s2var.constraints.push(c);
+					s2Keys.add(key);
 				}
 			}
 			// Propagate s2 -> s1
 			for (const c of s2var.constraints) {
-				if (
-					!s1var.constraints.some(existing => constraintsEqual(existing, c))
-				) {
+				const key = `${c.kind}:${JSON.stringify(c)}`;
+				if (!s1Keys.has(key)) {
 					s1var.constraints.push(c);
+					s1Keys.add(key);
 				}
 			}
 		}
