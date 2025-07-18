@@ -81,6 +81,29 @@ export type UnificationConstraint =
 	| { kind: 'instance'; typeVar: string; type: Type; location?: { line: number; column: number } }
 	| { kind: 'check'; constraint: import('../ast').Constraint; type: Type; location?: { line: number; column: number } };
 
+// Efficient constraint equality check
+const unificationConstraintsEqual = (c1: UnificationConstraint, c2: UnificationConstraint): boolean => {
+	if (c1.kind !== c2.kind) return false;
+	
+	switch (c1.kind) {
+		case 'equal':
+			const c2Equal = c2 as { kind: 'equal'; type1: Type; type2: Type };
+			return c1.type1.kind === c2Equal.type1.kind && c1.type2.kind === c2Equal.type2.kind &&
+				   JSON.stringify(c1.type1) === JSON.stringify(c2Equal.type1) &&
+				   JSON.stringify(c1.type2) === JSON.stringify(c2Equal.type2);
+		case 'instance':
+			const c2Instance = c2 as { kind: 'instance'; typeVar: string; type: Type };
+			return c1.typeVar === c2Instance.typeVar && 
+				   JSON.stringify(c1.type) === JSON.stringify(c2Instance.type);
+		case 'check':
+			const c2Check = c2 as { kind: 'check'; constraint: import('../ast').Constraint; type: Type };
+			return JSON.stringify(c1.constraint) === JSON.stringify(c2Check.constraint) &&
+				   JSON.stringify(c1.type) === JSON.stringify(c2Check.type);
+		default:
+			return false;
+	}
+};
+
 // Constraint solver state
 export interface ConstraintSolverState {
 	constraints: UnificationConstraint[];
@@ -91,7 +114,6 @@ export interface ConstraintSolverState {
 
 export class ConstraintSolver {
 	private state: ConstraintSolverState;
-	private constraintStrings: Set<string> = new Set(); // For deduplication
 
 	constructor() {
 		this.state = {
@@ -104,12 +126,10 @@ export class ConstraintSolver {
 
 	// Add a constraint to be solved
 	addConstraint(constraint: UnificationConstraint): void {
-		// Deduplicate constraints to prevent infinite loops
-		const constraintStr = JSON.stringify(constraint);
-		if (this.constraintStrings.has(constraintStr)) {
+		// Deduplicate constraints to prevent infinite loops using efficient comparison
+		if (this.state.constraints.some(existing => unificationConstraintsEqual(constraint, existing))) {
 			return; // Skip duplicate constraints
 		}
-		this.constraintStrings.add(constraintStr);
 		this.state.constraints.push(constraint);
 	}
 

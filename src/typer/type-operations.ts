@@ -12,6 +12,7 @@ import { Lexer } from '../lexer';
 import { type TypeState, type TypeEnvironment, type TypeScheme } from './types';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
+import { constraintsEqual } from './helpers';
 
 // Fresh type variable generation - optimized to avoid string concatenation
 export const freshTypeVariable = (state: TypeState): [Type, TypeState] => {
@@ -124,7 +125,7 @@ export const freshenTypeVariables = (
 						for (const c of type.constraints) {
 							if (
 								!freshVar.constraints.some(
-									existing => JSON.stringify(existing) === JSON.stringify(c)
+									existing => constraintsEqual(existing, c)
 								)
 							) {
 								freshVar.constraints.push(c);

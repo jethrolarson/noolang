@@ -1,7 +1,7 @@
 import { Type } from '../ast';
 import { substitute } from './substitute';
 import { TypeState } from './types';
-import { isTypeKind, typesEqual } from './helpers';
+import { isTypeKind, typesEqual, constraintsEqual } from './helpers';
 import {
 	formatTypeError,
 	createTypeError,
@@ -9,7 +9,7 @@ import {
 	unificationError,
 } from './type-errors';
 import { Constraint } from '../ast';
-import { mapSet, typeToString, occursIn, constraintsEqual } from './helpers';
+import { mapSet, typeToString, occursIn } from './helpers';
 import { satisfiesConstraint, propagateConstraintToType } from './constraints';
 import { functionApplicationError } from './type-errors';
 
@@ -265,13 +265,10 @@ function unifyVariable(
 	// If s2 is a variable, merge all constraints into it
 	if (isTypeKind(s2, 'variable')) {
 		s2.constraints = s2.constraints || [];
-		// Optimized constraint merging - use Set for faster deduplication
-		const existingConstraintKeys = new Set(s2.constraints.map(c => `${c.kind}:${JSON.stringify(c)}`));
+		// Optimized constraint merging - use efficient constraint comparison
 		for (const c of constraintsToCheck) {
-			const key = `${c.kind}:${JSON.stringify(c)}`;
-			if (!existingConstraintKeys.has(key)) {
+			if (!s2.constraints.some(existing => constraintsEqual(c, existing))) {
 				s2.constraints.push(c);
-				existingConstraintKeys.add(key);
 			}
 		}
 	}
@@ -395,24 +392,17 @@ function unifyFunction(
 		    (s1var.constraints?.length || s2var.constraints?.length)) {
 			s1var.constraints = s1var.constraints || [];
 			s2var.constraints = s2var.constraints || [];
-			// Optimized constraint merging with Set
-			const s1Keys = new Set(s1var.constraints.map(c => `${c.kind}:${JSON.stringify(c)}`));
-			const s2Keys = new Set(s2var.constraints.map(c => `${c.kind}:${JSON.stringify(c)}`));
-			
+			// Optimized constraint merging using efficient comparison
 			// Propagate s1 -> s2
 			for (const c of s1var.constraints) {
-				const key = `${c.kind}:${JSON.stringify(c)}`;
-				if (!s2Keys.has(key)) {
+				if (!s2var.constraints.some(existing => constraintsEqual(c, existing))) {
 					s2var.constraints.push(c);
-					s2Keys.add(key);
 				}
 			}
 			// Propagate s2 -> s1
 			for (const c of s2var.constraints) {
-				const key = `${c.kind}:${JSON.stringify(c)}`;
-				if (!s1Keys.has(key)) {
+				if (!s1var.constraints.some(existing => constraintsEqual(c, existing))) {
 					s1var.constraints.push(c);
-					s1Keys.add(key);
 				}
 			}
 		}

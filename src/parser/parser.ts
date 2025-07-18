@@ -744,18 +744,56 @@ const parsePrimary: C.Parser<Expression> = (tokens) => {
   if (process.env.NOO_DEBUG_PARSE) {
     console.log("parsePrimary tokens:", tokens.map((t) => t.value).join(" "));
   }
-  const result = C.choice(
-    parseNumber,
-    parseString,
-    parseIdentifier,
-    parseList,
-    parseRecord,
-    parseAccessor,
-    parseParenExpr,
-    parseLambdaExpression,
-    C.lazy(() => parseDefinitionWithType),
-    parseImportExpression
-  )(tokens);
+  
+  // Fast token-based dispatch instead of sequential choice attempts
+  if (tokens.length === 0) {
+    return { success: false, error: "Unexpected end of input", position: 0 };
+  }
+  
+  const firstToken = tokens[0];
+  let result: C.ParseResult<Expression>;
+  
+  // Dispatch based on token type and value for O(1) selection
+  switch (firstToken.type) {
+    case "NUMBER":
+      result = parseNumber(tokens);
+      break;
+    case "STRING": 
+      result = parseString(tokens);
+      break;
+    case "IDENTIFIER":
+      result = parseIdentifier(tokens);
+      break;
+    case "ACCESSOR":
+      result = parseAccessor(tokens);
+      break;
+    case "PUNCTUATION":
+      if (firstToken.value === "[") {
+        result = parseList(tokens);
+      } else if (firstToken.value === "{") {
+        result = parseRecord(tokens);
+      } else if (firstToken.value === "(") {
+        result = parseParenExpr(tokens);
+      } else {
+        result = { success: false, error: `Unexpected punctuation: ${firstToken.value}`, position: firstToken.location.start.line };
+      }
+      break;
+    case "KEYWORD":
+      if (firstToken.value === "fn") {
+        result = parseLambdaExpression(tokens);
+      } else if (firstToken.value === "let") {
+        result = C.lazy(() => parseDefinitionWithType)(tokens);
+      } else if (firstToken.value === "import") {
+        result = parseImportExpression(tokens);
+      } else {
+        result = { success: false, error: `Unexpected keyword: ${firstToken.value}`, position: firstToken.location.start.line };
+      }
+      break;
+    default:
+      result = { success: false, error: `Unexpected token type: ${firstToken.type}`, position: firstToken.location.start.line };
+      break;
+  }
+  
   // DEBUG: Log result
   if (process.env.NOO_DEBUG_PARSE) {
     console.log(
