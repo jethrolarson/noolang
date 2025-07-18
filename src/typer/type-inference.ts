@@ -58,7 +58,7 @@ import {
 } from './constraints';
 import { substitute } from './substitute';
 import { unify } from './unify';
-import { freshTypeVariable, generalize, instantiate, freshenTypeVariables } from './type-operations';
+import { freshTypeVariable, generalize, instantiate, freshenTypeVariables, flattenStatements } from './type-operations';
 import { typeExpression } from './expression-dispatcher';
 
 // Note: Main typeExpression is now in expression-dispatcher.ts
@@ -387,6 +387,22 @@ export const typeBinary = (
 	expr: BinaryExpression,
 	state: TypeState
 ): TypeResult => {
+	// Special handling for semicolon operator (sequence) - flatten to avoid O(n²) re-evaluation
+	if (expr.operator === ';') {
+		// Flatten the semicolon sequence and process each statement exactly once
+		const statements = flattenStatements(expr);
+		let currentState = state;
+		let finalType = null;
+		
+		for (const statement of statements) {
+			const result = typeExpression(statement, currentState);
+			currentState = result.state;
+			finalType = result.type;
+		}
+		
+		return { type: finalType || unitType(), state: currentState };
+	}
+
 	let currentState = state;
 
 	// Type left operand
@@ -396,12 +412,6 @@ export const typeBinary = (
 	// Type right operand
 	const rightResult = typeExpression(expr.right, currentState);
 	currentState = rightResult.state;
-
-	// Special handling for semicolon operator (sequence)
-	if (expr.operator === ';') {
-		// The type of a sequence is the type of the right expression
-		return { type: rightResult.type, state: currentState };
-	}
 
 	// Special handling for thrush operator (|) - function application
 	if (expr.operator === '|') {

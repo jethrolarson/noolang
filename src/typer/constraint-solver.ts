@@ -91,6 +91,7 @@ export interface ConstraintSolverState {
 
 export class ConstraintSolver {
 	private state: ConstraintSolverState;
+	private constraintStrings: Set<string> = new Set(); // For deduplication
 
 	constructor() {
 		this.state = {
@@ -103,18 +104,31 @@ export class ConstraintSolver {
 
 	// Add a constraint to be solved
 	addConstraint(constraint: UnificationConstraint): void {
+		// Deduplicate constraints to prevent infinite loops
+		const constraintStr = JSON.stringify(constraint);
+		if (this.constraintStrings.has(constraintStr)) {
+			return; // Skip duplicate constraints
+		}
+		this.constraintStrings.add(constraintStr);
 		this.state.constraints.push(constraint);
 	}
 
 	// Add multiple constraints
 	addConstraints(constraints: UnificationConstraint[]): void {
-		this.state.constraints.push(...constraints);
+		for (const constraint of constraints) {
+			this.addConstraint(constraint); // Use addConstraint for deduplication
+		}
 	}
 
 	// Solve all accumulated constraints
 	solve(): { success: boolean; substitution: Map<string, Type>; errors: string[] } {
+		const solveStart = Date.now();
 		try {
 			this.solveConstraints();
+			const solveTime = Date.now() - solveStart;
+			if (solveTime > 10) {
+				console.warn(`Slow constraint solve: ${solveTime}ms for ${this.state.constraints.length} constraints`);
+			}
 			return {
 				success: this.state.errors.length === 0,
 				substitution: this.state.substitution,
@@ -136,10 +150,15 @@ export class ConstraintSolver {
 		let iterations = 0;
 		const maxIterations = 100; // Prevent infinite loops
 
+		// Debug: Track constraint counts
+		const initialConstraintCount = this.state.constraints.length;
+
 		while (changed && iterations < maxIterations) {
 			changed = false;
 			iterations++;
 
+			const constraintsBefore = this.state.constraints.length;
+			
 			for (let i = 0; i < this.state.constraints.length; i++) {
 				const constraint = this.state.constraints[i];
 				
@@ -150,10 +169,14 @@ export class ConstraintSolver {
 					i--; // Adjust index after removal
 				}
 			}
+
+			const constraintsAfter = this.state.constraints.length;
+			
+			// Debug logging disabled for clean performance test
 		}
 
 		if (iterations >= maxIterations) {
-			this.state.errors.push("Constraint solving exceeded maximum iterations - possible infinite constraint loop");
+			this.state.errors.push(`Constraint solving exceeded maximum iterations (${iterations}) - possible infinite constraint loop. Started with ${initialConstraintCount} constraints, ${this.state.constraints.length} remaining.`);
 		}
 
 		// Check for remaining unsolved constraints
@@ -196,12 +219,12 @@ export class ConstraintSolver {
 
 		// If one is a type variable, create instance constraint
 		if (t1.kind === 'variable') {
-			this.addConstraint({ kind: 'instance', typeVar: t1.name, type: t2, location });
-			return true;
+			// Directly process instance constraint instead of adding to queue
+			return this.processInstanceConstraint(t1.name, t2, location);
 		}
 		if (t2.kind === 'variable') {
-			this.addConstraint({ kind: 'instance', typeVar: t2.name, type: t1, location });
-			return true;
+			// Directly process instance constraint instead of adding to queue
+			return this.processInstanceConstraint(t2.name, t1, location);
 		}
 
 		// Both are concrete types - decompose structurally
@@ -222,14 +245,11 @@ export class ConstraintSolver {
 		const currentSub = this.state.substitution.get(typeVar);
 		
 		if (currentSub) {
-			// If already substituted, add equality constraint to check consistency
-			this.addConstraint({ 
-				kind: 'equal', 
-				type1: currentSub, 
-				type2: substitutedType, 
-				location 
-			});
-			return false; // Don't remove constraint yet, let equality be processed
+			// If already substituted, check consistency directly instead of adding new constraints
+			if (!this.typesEqual(currentSub, substitutedType)) {
+				this.state.errors.push(`Type variable ${typeVar} has conflicting substitutions: ${this.typeToString(currentSub)} vs ${this.typeToString(substitutedType)}`);
+			}
+			return true; // Remove constraint - we've handled it
 		}
 
 		// Add to substitution
@@ -243,13 +263,10 @@ export class ConstraintSolver {
 			if (otherVar !== typeVar) {
 				const otherSub = this.state.substitution.get(otherVar);
 				if (otherSub) {
-					// Check consistency
-					this.addConstraint({ 
-						kind: 'equal', 
-						type1: otherSub, 
-						type2: substitutedType, 
-						location 
-					});
+					// Check consistency directly instead of adding constraints
+					if (!this.typesEqual(otherSub, substitutedType)) {
+						this.state.errors.push(`Type variable ${otherVar} has conflicting substitutions: ${this.typeToString(otherSub)} vs ${this.typeToString(substitutedType)}`);
+					}
 				} else {
 					this.state.substitution.set(otherVar, substitutedType);
 				}
@@ -343,6 +360,7 @@ export class ConstraintSolver {
 				if (type2.kind !== 'primitive') return false;
 				if (type1.name !== type2.name) {
 					this.state.errors.push(`Type mismatch: expected ${type1.name} but got ${type2.name}`);
+					return true; // Mark as processed so constraint is removed
 				}
 				return true;
 
@@ -384,18 +402,55 @@ export class ConstraintSolver {
 	}
 
 	private typesEqual(type1: Type, type2: Type): boolean {
+		// Apply substitutions first
+		const t1 = this.applySubstitution(type1);
+		const t2 = this.applySubstitution(type2);
+		
 		// Structural equality check
-		if (type1.kind !== type2.kind) return false;
+		if (t1.kind !== t2.kind) return false;
 
-		switch (type1.kind) {
+		switch (t1.kind) {
 			case 'variable':
-				return type2.kind === 'variable' && 
-					   this.state.unionFind.areUnified(type1.name, type2.name);
+				if (t2.kind !== 'variable') return false;
+				return t1.name === t2.name || this.state.unionFind.areUnified(t1.name, t2.name);
 			case 'primitive':
-				return type2.kind === 'primitive' && type1.name === type2.name;
+				return t2.kind === 'primitive' && t1.name === t2.name;
 			case 'unit':
-				return type2.kind === 'unit';
-			// Add other cases as needed
+				return t2.kind === 'unit';
+			case 'function':
+				if (t2.kind !== 'function') return false;
+				if (t1.params.length !== t2.params.length) return false;
+				for (let i = 0; i < t1.params.length; i++) {
+					if (!this.typesEqual(t1.params[i], t2.params[i])) return false;
+				}
+				return this.typesEqual(t1.return, t2.return);
+			case 'list':
+				return t2.kind === 'list' && this.typesEqual(t1.element, t2.element);
+			case 'tuple':
+				if (t2.kind !== 'tuple') return false;
+				if (t1.elements.length !== t2.elements.length) return false;
+				for (let i = 0; i < t1.elements.length; i++) {
+					if (!this.typesEqual(t1.elements[i], t2.elements[i])) return false;
+				}
+				return true;
+			case 'record':
+				if (t2.kind !== 'record') return false;
+				const keys1 = Object.keys(t1.fields);
+				const keys2 = Object.keys(t2.fields);
+				if (keys1.length !== keys2.length) return false;
+				for (const key of keys1) {
+					if (!(key in t2.fields)) return false;
+					if (!this.typesEqual(t1.fields[key], t2.fields[key])) return false;
+				}
+				return true;
+			case 'variant':
+				if (t2.kind !== 'variant') return false;
+				if (t1.name !== t2.name) return false;
+				if (t1.args.length !== t2.args.length) return false;
+				for (let i = 0; i < t1.args.length; i++) {
+					if (!this.typesEqual(t1.args[i], t2.args[i])) return false;
+				}
+				return true;
 			default:
 				return false;
 		}
@@ -469,5 +524,6 @@ export class ConstraintSolver {
 			substitution: new Map(),
 			errors: []
 		};
+		this.constraintStrings.clear();
 	}
 }

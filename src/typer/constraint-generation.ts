@@ -353,49 +353,68 @@ export const solveConstraintsAndGetResult = (
 	// Apply the substitution to the result type
 	const finalType = applySubstitutionToType(constraintResult.type, solution.substitution);
 
+	// Also merge substitutions into the state
+	const mergedSubstitution = new Map(constraintResult.state.substitution);
+	for (const [typeVar, type] of solution.substitution) {
+		mergedSubstitution.set(typeVar, type);
+	}
+
 	return {
 		type: finalType,
-		state: constraintResult.state
+		state: {
+			...constraintResult.state,
+			substitution: mergedSubstitution
+		}
 	};
 };
 
-// Helper to apply substitution to a type
-const applySubstitutionToType = (type: Type, substitution: Map<string, Type>): Type => {
+// Helper to apply substitution to a type with cycle detection
+const applySubstitutionToType = (type: Type, substitution: Map<string, Type>, seen: Set<string> = new Set()): Type => {
 	switch (type.kind) {
 		case 'variable':
+			if (seen.has(type.name)) {
+				// Cycle detected, return the variable as-is
+				return type;
+			}
 			const sub = substitution.get(type.name);
-			return sub ? applySubstitutionToType(sub, substitution) : type;
+			if (sub) {
+				seen.add(type.name);
+				const result = applySubstitutionToType(sub, substitution, seen);
+				seen.delete(type.name);
+				return result;
+			}
+			return type;
 		
 		case 'function':
 			return {
 				...type,
-				params: type.params.map(p => applySubstitutionToType(p, substitution)),
-				return: applySubstitutionToType(type.return, substitution)
+				params: type.params.map(p => applySubstitutionToType(p, substitution, seen)),
+				return: applySubstitutionToType(type.return, substitution, seen)
 			};
 		
 		case 'list':
 			return {
 				...type,
-				element: applySubstitutionToType(type.element, substitution)
+				element: applySubstitutionToType(type.element, substitution, seen)
 			};
 		
 		case 'tuple':
 			return {
 				...type,
-				elements: type.elements.map(e => applySubstitutionToType(e, substitution))
+				elements: type.elements.map(e => applySubstitutionToType(e, substitution, seen))
 			};
 		
 		case 'record':
 			const newFields: { [key: string]: Type } = {};
 			for (const [key, fieldType] of Object.entries(type.fields)) {
-				newFields[key] = applySubstitutionToType(fieldType, substitution);
+				newFields[key] = applySubstitutionToType(fieldType, substitution, seen);
 			}
 			return { ...type, fields: newFields };
 		
 		case 'variant':
 			return {
 				...type,
-				args: type.args.map(a => applySubstitutionToType(a, substitution))
+				args: type.args.map(a => applySubstitutionToType(a, substitution, seen))
 			};
 		
 		default:

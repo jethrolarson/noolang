@@ -10,12 +10,20 @@ import { TypeState } from './types';
 import { ConstraintSolver, UnificationConstraint } from './constraint-solver';
 
 // Drop-in replacement for the existing unify function
+// Track unify call frequency
+let unifyCallCount = 0;
+let totalUnifyTime = 0;
+let lastReportTime = Date.now();
+
 export const constraintBasedUnify = (
 	t1: Type,
 	t2: Type,
 	state: TypeState,
 	location?: { line: number; column: number }
 ): TypeState => {
+	const unifyStart = Date.now();
+	unifyCallCount++;
+	
 	// Create a constraint solver
 	const solver = new ConstraintSolver();
 	
@@ -41,6 +49,22 @@ export const constraintBasedUnify = (
 	const newSubstitution = new Map(state.substitution);
 	for (const [typeVar, type] of result.substitution) {
 		newSubstitution.set(typeVar, type);
+	}
+	
+	const unifyTime = Date.now() - unifyStart;
+	totalUnifyTime += unifyTime;
+	
+	// Report slow individual unify calls
+	if (unifyTime > 5) {
+		console.warn(`SLOW UNIFY: ${unifyTime}ms for ${t1.kind}:${t1.kind === 'variable' ? t1.name : '?'} = ${t2.kind}:${t2.kind === 'variable' ? t2.name : '?'} (${result.substitution.size} subs)`);
+	}
+	
+	// Report every 1000 calls
+	if (unifyCallCount % 1000 === 0) {
+		const now = Date.now();
+		const elapsed = now - lastReportTime;
+		console.warn(`Constraint unify: ${unifyCallCount} calls, ${totalUnifyTime}ms total, last 1000 in ${elapsed}ms`);
+		lastReportTime = now;
 	}
 	
 	return {

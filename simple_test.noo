@@ -1,0 +1,15 @@
+# Simple test with just a few functions
+add = fn a b => a + b;
+result1 = add 1 2;
+
+multiply = fn x y => x * y;  
+result2 = multiply 3 4;
+
+identity = fn x => x;
+result3 = identity 5;
+
+final = {
+  @add_result result1,
+  @mul_result result2, 
+  @id_result result3
+}
