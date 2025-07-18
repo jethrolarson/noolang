@@ -63,10 +63,11 @@ Noolang is a principled, expression-based language designed for LLM-assisted and
 #### **Polymorphism**
 
 * Lowercase type names (`a`, `b`) are considered generic type variables
-* **Current limitation**: Type variables are not unified to concrete types yet
+* **✅ Type Variable Unification**: Type variables are properly unified to concrete types
 
   ```noolang
-  identity = fn x => x : a -> a  # Type variable 'a' not resolved yet
+  identity = fn x => x : a -> a  # Polymorphic type variables work correctly
+  add = fn x y => x + y         # Shows (Int) -> (Int) -> Int, not t1 -> t2 -> t3
   ```
 
 ---
@@ -176,21 +177,78 @@ nested : a -> b given
 
 Noolang makes **side effects explicit** in types. All functions that perform I/O, mutation, or other impure operations must declare those effects.
 
-#### **Effect Type Syntax (Planned)**
+#### **🎯 Effect System Refactoring Plan**
+
+**Current Problem**: Effects are embedded within function types, creating architectural limitations.
+
+**Target Architecture**: Expressions should have **`(Type, Effects)` pairs** instead of types with embedded effects.
+
+```typescript
+// Current: Effects embedded in types  
+type TypeWithEffects = FunctionType & { effects: Effect[] }
+
+// Target: Separate type and effects
+type ExpressionResult = {
+  type: Type,
+  effects: Effects  
+}
+```
+
+#### **Effect Type Syntax**
 
 * Effects follow the return type using postfix annotation: `: Type !effect1 !effect2`
-* **Current limitation**: Effect annotations cause parser errors and are temporarily disabled
+* **Design Philosophy**: Using effects should be "a little annoying" to encourage pure code
+* **Explicit Only**: No effect inference - all effects must be declared manually
 
-  ```noolang
-  # Planned syntax (currently commented out):
-  #readFile = path => ... : String !io
-  ```
+```noolang
+# Pure expressions - no effects
+add = fn x y => x + y : (Int) -> (Int) -> Int
+
+# Effectful expressions - explicit effect annotations  
+readFile = fn path => ... : String !io
+logLine = fn msg => log msg : Unit !log
+getUserInput = fn prompt => ... : String !io !log
+```
+
+#### **Effect Composition Rules**
+
+* **Union Composition**: `!io !read + !log !read = !io !read !log`
+* **Explicit Effects**: Keep all effects visible rather than unifying to most permissive
+* **Effect Propagation**: Effects must propagate through function composition
+
+```noolang
+# Effect composition examples
+fileLogger = fn msg => (
+  content = readFile "log.txt" : String !io;
+  logLine (content + msg) : Unit !log  
+) : Unit !io !log  # Both effects required
+
+# Function composition preserves effects
+safeFileLog = compose fileLogger  # Still requires !io !log
+```
+
+#### **Implementation Plan**
+
+**Phase 1: Enable Parser**
+1. Uncomment/fix the `!effect` parsing syntax in parser
+2. Update AST types to include effect annotations  
+3. Get basic parsing working without breaking existing code
+
+**Phase 2: Type System Integration**
+4. Modify `TypeResult` in `src/typer/types.ts` to include effects
+5. Update `typeExpression` to return `(Type, Effects)` pairs
+6. Implement effect union composition logic
+
+**Phase 3: Effect Validation**  
+7. Check that functions with effects are properly annotated
+8. Propagate effects through function composition
+9. Add effect mismatch error reporting
 
 #### **Current Effect Implementation**
 
+* **Current limitation**: Effect annotations cause parser errors and are temporarily disabled
 * Effects are currently modeled by attaching effects to function types
 * Uses thunking workaround for effectful computations
-* **Key insight identified**: Expressions should have (Type, Effects) pairs, not types with embedded effects
 
 #### **Rules**
 
@@ -207,19 +265,6 @@ Noolang makes **side effects explicit** in types. All functions that perform I/O
 * `!rand` – nondeterminism
 * `!err` – error throwing (if introduced; currently `Result` is preferred)
 
-#### **Examples**
-
-```noolang
-# Current working syntax:
-add = fn x y => x + y : Number -> Number -> Number
-
-# Planned effect syntax (currently disabled):
-#logLine = fn msg => log msg : unit !log
-#getUserName = fn () => readFile "/user.txt" : String !io
-
-compute = fn n => n * n : Number
-```
-
 ---
 
 ### 🔧 Type Inference Strategy (Current Implementation)
@@ -227,7 +272,7 @@ compute = fn n => n * n : Number
 * **✅ Functional Hindley-Milner**: Fully implemented with let-polymorphism
 * **✅ Constraint Propagation**: Robust constraint system with proper unification
 * **✅ Type Variable Management**: Fresh variable generation and substitution
-* **Current limitation**: Type variables are not unified to concrete types (e.g., `t1 -> Number` not resolved to `Number -> Number`)
+* **✅ Type Variable Unification**: Type variables properly resolve to concrete types (e.g., shows `(Int) -> Int` not `t1 -> t2`)
 * Effects must always be declared manually and are not inferred (by design)
 * REPL and dev tools can show inferred types inline for LLM and human inspection
 
@@ -236,21 +281,20 @@ compute = fn n => n * n : Number
 ### 🧪 Current Implementation Status
 
 * **Parser**: ✅ Fully supports type annotations with `name = expr : type` syntax
-* **Type Variables**: ❌ Not unified yet (e.g., `t1 -> Number` not resolved to `Number -> Number`)
+* **Expression-level type annotations**: ✅ `(expr : type)` syntax fully implemented and working
+* **Type Variables**: ✅ Proper unification to concrete types (shows `(Int) -> Int` not `t1 -> t2`)
 * **Effect Annotations**: ❌ Parser errors - temporarily disabled
 * **Record Type Annotations**: ❌ Parser doesn't support `{ name: String, age: Number }` yet
 * **Type Constructors**: ❌ `List T`, `Tuple T1 T2` not implemented yet
-* **Expression-level type annotations**: ❌ `(expr : type)` syntax not implemented yet
 * **Constraint Annotations**: ❌ `given` syntax not implemented yet (constraints work automatically)
 
 ### 🎯 Next Implementation Priorities
 
-1. **Type Variable Unification**: Resolve `t1 -> Number` to `Number -> Number`
-2. **Effect System Refactoring**: Separate types from effects (expressions have (Type, Effects) pairs)
-3. **Expression-level type annotations**: Support `(expr : type)` syntax for complex expressions
-4. **Record Type Annotations**: Support `{ name: String, age: Number }` syntax
-5. **Type Constructors**: Implement `List T`, `Tuple T1 T2` syntax
-6. **Constraint Annotations**: Add `given` syntax for explicit constraint declarations
+1. **Effect System Refactoring**: Separate types from effects (expressions have (Type, Effects) pairs)
+2. **Record Type Annotations**: Support `{@name String, @age Number}` syntax  
+3. **Type Constructors**: Implement `List T`, `Tuple T1 T2` syntax
+4. **Constraint Annotations**: Add `given` syntax for explicit constraint declarations
+5. **VSCode Integration**: Language Server Protocol (LSP) for intellisense and hover type information
 
 ---
 
@@ -451,6 +495,50 @@ Key architectural question: How do constraints become available in the type envi
 3. **Integrate with import system design**
 4. **Consider effect system interactions**
 5. **Prototype user-defined constraint support**
+
+---
+
+### 🎯 Planned: VSCode Type Integration
+
+Enable rich editor support through Language Server Protocol (LSP) integration.
+
+#### **Core Features**
+
+* **Hover Type Information**: Show inferred types when hovering over expressions
+* **Intellisense/Autocomplete**: Variable names, function signatures, record field suggestions
+* **Error Squiggles**: Real-time type error highlighting
+* **Go-to-Definition**: Navigate to variable/function definitions
+
+#### **Implementation Strategy**
+
+The existing type system infrastructure provides everything needed:
+
+* **Type Inference**: Hindley-Milner system already computes all type information
+* **AST Mapping**: Parser tracks source positions for mapping cursor to AST nodes
+* **VSCode Extension**: Foundation already exists with syntax highlighting
+
+#### **LSP Server Architecture**
+
+```typescript
+// Core LSP operations using existing type system
+onHover(position) => {
+  const node = findASTNodeAtPosition(position)
+  const typeResult = typeExpression(node, currentState)
+  return formatTypeForDisplay(typeResult.type)
+}
+
+onCompletion(position) => {
+  const context = getCompletionContext(position)
+  return getAvailableCompletions(context.environment)
+}
+```
+
+#### **Development Benefits**
+
+* **Type-aware Development**: See type information while coding
+* **Error Prevention**: Catch type errors before running code
+* **Enhanced Productivity**: Autocomplete reduces typing and errors
+* **Learning Aid**: Understand type inference results interactively
 
 ---
 

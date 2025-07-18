@@ -55,6 +55,34 @@ Or run the compiled version:
 npm start
 ```
 
+### CLI Debugging Tools
+
+The CLI provides extensive debugging capabilities for development:
+
+```bash
+# Execute expressions
+npm run start -- --eval "1 + 2 * 3"
+npm run start -- -e "x = 10; x * 2"
+
+# Debug tokenization
+npm run start -- --tokens "fn x => x + 1"
+npm run start -- --tokens-file examples/demo.noo
+
+# Debug parsing (AST)
+npm run start -- --ast "if x > 0 then x else -x"
+npm run start -- --ast-file examples/demo.noo
+
+# Debug type inference
+npm run start -- --types "fn x => x + 1"
+npm run start -- --types-file examples/demo.noo
+npm run start -- --types-detailed "fn x => x + 1"
+npm run start -- --types-env "fn x => x + 1"
+npm run start -- --types-ast "fn x => x + 1"
+
+# Run files
+npm run start -- examples/demo.noo
+```
+
 #### REPL Debugging Commands
 
 The REPL includes comprehensive debugging tools:
