@@ -10,6 +10,7 @@
     "cli": "node dist/cli.js",
     "test": "jest",
     "test:watch": "jest --watch",
+    "benchmark": "node benchmark.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"*.ts\" \"*.js\" \"*.json\"",
     "vscode:package": "vsce package",
     "vscode:publish": "vsce publish"

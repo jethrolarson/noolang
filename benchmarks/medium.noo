@@ -1,0 +1,25 @@
+# Medium benchmark - recursive list operations
+map = fn f list =>
+  if list == []
+  then []
+  else f @head(list) :: map f @tail(list);
+
+filter = fn pred list =>
+  if list == []
+  then []
+  else if pred @head(list)
+       then @head(list) :: filter pred @tail(list)
+       else filter pred @tail(list);
+
+fold = fn f acc list =>
+  if list == []
+  then acc
+  else fold f (f acc @head(list)) @tail(list);
+
+# Test data and operations
+numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+doubled = map (fn x => x * 2) numbers;
+evens = filter (fn x => x % 2 == 0) numbers;
+sum = fold (fn acc x => acc + x) 0 numbers;
+
+{@doubled doubled, @evens evens, @sum sum}

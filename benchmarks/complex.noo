@@ -1,0 +1,47 @@
+# Complex benchmark - heavy type inference and nested computations
+
+# Manual map implementation for complex operations
+map = fn f list =>
+  if list == []
+  then []
+  else f @head(list) :: map f @tail(list);
+
+filter = fn pred list =>
+  if list == []
+  then []
+  else if pred @head(list)
+       then @head(list) :: filter pred @tail(list)
+       else filter pred @tail(list);
+
+# Complex nested function with heavy type inference
+complex_fn = fn x =>
+  (fn a =>
+    (fn b =>
+      (fn c =>
+        map c [1, 2, 3, 4, 5]
+      ) (fn z => b z + a)
+    ) (fn y => a * y)
+  ) (x + 1);
+
+# Nested operations with multiple type constraints
+process = fn f g h list =>
+  map h (filter g (map f list));
+
+# Heavy constraint propagation with records
+make_record = fn x y z =>
+  {@a x, @b y, @c z, @computed x + y * z};
+
+# Deeply nested record computation
+records = map (fn i => make_record i (i * 2) (i * 3)) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+# Complex expression with multiple constraint interactions
+nested_computation = map (fn record =>
+  {@original record, @doubled map (fn x => x * 2) [record.@a, record.@b, record.@c]}
+) records;
+
+{
+  @complex_result complex_fn 10,
+  @processed process (fn x => x * 2) (fn x => x > 5) (fn x => x - 1) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+  @records records,
+  @nested nested_computation
+}

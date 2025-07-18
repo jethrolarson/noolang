@@ -1,0 +1,17 @@
+# Simple benchmark - basic language features
+factorial = fn n =>
+  if n <= 1
+  then 1
+  else n * factorial (n - 1);
+
+fibonacci = fn n =>
+  if n <= 1
+  then n
+  else fibonacci (n - 1) + fibonacci (n - 2);
+
+# Test basic arithmetic and function calls
+{
+  @fact5 factorial 5,
+  @fib10 fibonacci 10,
+  @arithmetic 1 + 2 * 3 - 4
+}

@@ -682,6 +682,28 @@ All 198 tests pass, including parser, evaluator, typer, ADTs, constraints, and r
 npm run build
 ```
 
+### Performance Benchmarking
+
+Noolang includes a comprehensive benchmarking system to track performance as language features are added:
+
+```bash
+npm run benchmark
+```
+
+This runs three benchmark suites:
+- **Simple**: Basic language features (factorial, fibonacci) 
+- **Medium**: Recursive list operations and higher-order functions
+- **Complex**: Heavy type inference, constraint propagation, and nested computations
+
+Results are automatically saved with git commit tracking to `benchmark-results/` for historical analysis.
+
+**Benchmark files:**
+- `benchmarks/simple.noo` - Basic arithmetic and recursion
+- `benchmarks/medium.noo` - List operations with manual implementations  
+- `benchmarks/complex.noo` - Complex nested functions and record operations
+
+The benchmark runner provides statistical analysis (min/max/avg/median) across multiple runs with warmup phases to eliminate cold start effects.
+
 ### VSCode Extension
 
 ```bash
