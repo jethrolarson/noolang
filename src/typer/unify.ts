@@ -120,24 +120,9 @@ export const unify = (
 		hint?: string;
 	}
 ): TypeState => {
-	const startTime = Date.now();
-	unifyCallCount++;
-	
-	const result = unifyInternal(t1, t2, state, location, context);
-	
-	const elapsed = Date.now() - startTime;
-	totalUnifyTime += elapsed;
-	
-	if (elapsed > 5) { // Track slow unifications
-		const type1Str = `${t1.kind}${(t1 as any).name || ''}`;
-		const type2Str = `${t2.kind}${(t2 as any).name || ''}`;
-		slowUnifyCalls.push({type1: type1Str, type2: type2Str, time: elapsed});
-		if (slowUnifyCalls.length > 20) slowUnifyCalls.shift(); // Keep last 20
-	}
-	
-	// Stats tracking (disabled for clean output)
-	
-	return result;
+	// Temporarily revert to original unify while we fix constraint solver
+	// TODO: Re-enable constraint-based unification after fixing infinite loops
+	return unifyInternal(t1, t2, state, location, context);
 };
 
 function unifyUnion(
