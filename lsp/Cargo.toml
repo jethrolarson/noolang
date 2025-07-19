@@ -1,0 +1,20 @@
+[package]
+name = "noolang-lsp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tower-lsp = "0.20"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+anyhow = "1.0"
+thiserror = "1.0"
+
+[lib]
+name = "noolang_lsp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "noolang-lsp"
+path = "src/main.rs" 

@@ -1,0 +1,3 @@
+Content-Length: 116
+
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":123,"rootUri":"file:///tmp","capabilities":{}}} 
