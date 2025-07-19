@@ -94,6 +94,15 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: [],
 	});
 
+	// Compose operator
+	newEnv.set('<|', {
+		type: functionType(
+			[typeVariable('a'), functionType([typeVariable('a')], typeVariable('b'))],
+			typeVariable('b')
+		),
+		quantifiedVars: [],
+	});
+
 	// Thrush operator (pure) - same as pipeline
 	newEnv.set('|', {
 		type: functionType(
@@ -123,7 +132,11 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 
 	// Effectful functions
 	newEnv.set('print', {
-		type: functionType([typeVariable('a')], typeVariable('a'), new Set(['log'])),
+		type: functionType(
+			[typeVariable('a')],
+			typeVariable('a'),
+			new Set(['log'])
+		),
 		quantifiedVars: [],
 	});
 

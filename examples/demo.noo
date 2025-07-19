@@ -14,17 +14,15 @@ unit_literal = {};
 # Basic function
 identity = fn x => x;
 
-# Curried function (Haskell-style)
-add = fn a => fn b => a + b;
+# all functions are curried just like Haskell and F#
+add = fn a b => a + b;
 add_ten = add 10;
 result = add_ten 5;
-
-# Function with multiple parameters
 multiply = fn a b => a * b;
 product = multiply 6 7;
 
 # ========================================
-# 3. RECURSION (NEW FEATURE!)
+# 3. RECURSION
 # ========================================
 # Factorial function
 factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1));
@@ -70,7 +68,7 @@ comparison_result = 5 < 10;
 # ========================================
 # 7. PIPELINE, THRUSH, AND DOLLAR OPERATORS
 # ========================================
-# Thrush operator (|) - function application
+# Thrush/pipe operator (|) - function application
 thrush_result = [1, 2, 3, 4, 5] | map (fn x => x * 2);
 
 # Pipeline operator (|>) - function composition
