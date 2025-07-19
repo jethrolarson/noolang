@@ -229,26 +229,31 @@ safeFileLog = compose fileLogger  # Still requires !io !log
 
 #### **Implementation Plan**
 
-**Phase 1: Enable Parser**
-1. Uncomment/fix the `!effect` parsing syntax in parser
-2. Update AST types to include effect annotations  
-3. Get basic parsing working without breaking existing code
+**✅ Phase 1: Enable Parser (COMPLETE)**
+1. ✅ Fixed `!effect` parsing syntax in parser
+2. ✅ Updated AST types to include effect annotations  
+3. ✅ Basic parsing working without breaking existing code
+4. ✅ Comprehensive test suite with 10/10 tests passing
+5. ✅ Refactored to use `Set<Effect>` for automatic deduplication
+6. ✅ Proper error handling for invalid effects and syntax
 
-**Phase 2: Type System Integration**
-4. Modify `TypeResult` in `src/typer/types.ts` to include effects
-5. Update `typeExpression` to return `(Type, Effects)` pairs
-6. Implement effect union composition logic
+**🚧 Phase 2: Type System Integration (NEXT)**
+7. Modify `TypeResult` in `src/typer/types.ts` to include effects
+8. Update `typeExpression` to return `(Type, Effects)` pairs
+9. Implement effect union composition logic
 
-**Phase 3: Effect Validation**  
-7. Check that functions with effects are properly annotated
-8. Propagate effects through function composition
-9. Add effect mismatch error reporting
+**🚧 Phase 3: Effect Validation (PLANNED)**  
+10. Check that functions with effects are properly annotated
+11. Propagate effects through function composition
+12. Add effect mismatch error reporting
 
 #### **Current Effect Implementation**
 
-* **Current limitation**: Effect annotations cause parser errors and are temporarily disabled
-* Effects are currently modeled by attaching effects to function types
-* Uses thunking workaround for effectful computations
+* **✅ Phase 1 Complete**: Effect parsing syntax fully implemented and working
+* **✅ Parser Support**: Functions can be typed with effects using `!effect` syntax
+* **✅ Set-based Storage**: Effects stored as `Set<Effect>` for automatic deduplication
+* **✅ Comprehensive Testing**: 10/10 effect parsing tests passing
+* **Current Architecture**: Effects are still embedded in function types (Phase 2 will separate them)
 
 #### **Rules**
 
@@ -283,18 +288,19 @@ safeFileLog = compose fileLogger  # Still requires !io !log
 * **Parser**: ✅ Fully supports type annotations with `name = expr : type` syntax
 * **Expression-level type annotations**: ✅ `(expr : type)` syntax fully implemented and working
 * **Type Variables**: ✅ Proper unification to concrete types (shows `(Int) -> Int` not `t1 -> t2`)
-* **Effect Annotations**: ❌ Parser errors - temporarily disabled
+* **Effect Annotations**: ✅ Parser fully supports `!effect` syntax (Phase 1 complete)
 * **Record Type Annotations**: ❌ Parser doesn't support `{ name: String, age: Number }` yet
 * **Type Constructors**: ❌ `List T`, `Tuple T1 T2` not implemented yet
 * **Constraint Annotations**: ❌ `given` syntax not implemented yet (constraints work automatically)
 
 ### 🎯 Next Implementation Priorities
 
-1. **Effect System Refactoring**: Separate types from effects (expressions have (Type, Effects) pairs)
-2. **Record Type Annotations**: Support `{@name String, @age Number}` syntax  
-3. **Type Constructors**: Implement `List T`, `Tuple T1 T2` syntax
-4. **Constraint Annotations**: Add `given` syntax for explicit constraint declarations
-5. **VSCode Integration**: Language Server Protocol (LSP) for intellisense and hover type information
+1. **Effect System Phase 2**: Refactor type system to use (Type, Effects) pairs instead of embedded effects
+2. **Effect System Phase 3**: Add effect validation and propagation through function composition
+3. **Record Type Annotations**: Support `{@name String, @age Number}` syntax  
+4. **Type Constructors**: Implement `List T`, `Tuple T1 T2` syntax
+5. **Constraint Annotations**: Add `given` syntax for explicit constraint declarations
+6. **VSCode Integration**: Language Server Protocol (LSP) for intellisense and hover type information
 
 ---
 

@@ -63,11 +63,11 @@ src/
 ---
 
 ## 🚩 Current Session Status
-- **Performance**: ✅ Major optimizations complete (30% improvement)
-- **Benchmarking**: ✅ Comprehensive suite with git-tracked results
-- **Parser**: ✅ Optimized from O(n²) to O(1) token dispatch
-- **Type System**: ✅ Constraint comparison optimized
-- **All Features**: ✅ Working robustly with full test coverage
+- **Effect System Phase 1**: ✅ Complete - Effect parsing syntax fully implemented
+- **Parser**: ✅ Supports `!effect` syntax for function types (e.g., `Int -> Int !io !log`)
+- **Type System**: ✅ Effects stored as `Set<Effect>` for automatic deduplication
+- **Testing**: ✅ Comprehensive test suite (10/10 effect parsing tests passing)
+- **Code Quality**: ✅ Refactored effect string serialization, proper TypeScript assertions
 
 ## ✅ Core Features Complete
 - **Parser**: Combinator-based with performance optimizations
@@ -90,15 +90,16 @@ src/
 - **Parser Optimization**: Token-based dispatch instead of backtracking choice
 - **Constraint System**: Structural comparison instead of JSON serialization
 - **Type Variables**: Proper unification with constraint propagation
-- **Effects**: Currently embedded in function types, planned separation
+- **Effects**: Phase 1 complete (parsing syntax), refactoring to (Type, Effects) pairs in progress
 
 ## 🚀 Next Steps (Prioritized)
-1. **Effect System Refactoring**: Separate types from effects (expressions have (Type, Effects) pairs)
-2. **Record Type Annotations**: Support `{@name String, @age Number}` syntax
-3. **Constraint Annotations**: Add `given` syntax for explicit constraint declarations
-4. **VSCode Integration**: Language Server Protocol (LSP) for intellisense and hover types
-5. **FFI**: JavaScript/TypeScript interop capabilities
-6. **Standard Library**: Move built-ins to Noolang source files
+1. **Effect System Phase 2**: Refactor type system to use (Type, Effects) pairs instead of embedded effects
+2. **Effect System Phase 3**: Add effect validation and propagation through function composition
+3. **Record Type Annotations**: Support `{@name String, @age Number}` syntax
+4. **Constraint Annotations**: Add `given` syntax for explicit constraint declarations
+5. **VSCode Integration**: Language Server Protocol (LSP) for intellisense and hover types
+6. **FFI**: JavaScript/TypeScript interop capabilities
+7. **Standard Library**: Move built-ins to Noolang source files
 
 ## 🎯 Language Design Principles
 - **Whitespace Significant**: Indentation and spacing matter
