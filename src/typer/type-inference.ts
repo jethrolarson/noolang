@@ -102,7 +102,9 @@ export const typeVariableExpr = (
 
 	const [instantiatedType, newState] = instantiate(scheme, state);
 
-	return createPureTypeResult(instantiatedType, newState);
+	// Handle effects from TypeScheme
+	const effects = scheme.effects || emptyEffects();
+	return createTypeResult(instantiatedType, effects, newState);
 };
 
 // Helper function to count parameters in a function type

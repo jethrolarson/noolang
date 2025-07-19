@@ -71,11 +71,15 @@ comparison_result = 5 < 10;
 # Thrush/pipe operator (|) - function application
 thrush_result = [1, 2, 3, 4, 5] | map (fn x => x * 2);
 
-# Pipeline operator (|>) - function composition
+# Pipeline operator (|>) - left-to-right function composition
 add_one = fn x => x + 1;
 square = fn x => x * x;
 composed = add_one |> square;
 pipeline_result = 10 | composed;
+
+# Compose operator (<|) - right-to-left function composition
+composed_reverse = square <| add_one;
+composed_reverse_result = 10 | composed_reverse;
 
 # Dollar operator ($) - low-precedence function application
 # Useful for avoiding parentheses in complex expressions
@@ -195,7 +199,7 @@ first_record = head record_list;
 record_count = length record_list;
 
 # ========================================
-# 11. ALGEBRAIC DATA TYPES (ADTs) - NEW FEATURE!
+# 11. ALGEBRAIC DATA TYPES (ADTs)
 # ========================================
 
 # ========================================

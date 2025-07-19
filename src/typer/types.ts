@@ -13,6 +13,7 @@ export type ADTRegistry = Map<
 export type TypeScheme = {
 	type: Type;
 	quantifiedVars: string[];
+	effects?: Set<Effect>; // Effects for values that have effects
 };
 
 export type TypeEnvironment = Map<string, TypeScheme>;

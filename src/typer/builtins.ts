@@ -8,7 +8,9 @@ import {
 	tupleType,
 	listTypeWithElement,
 	typeVariable,
+	unitType,
 	Type,
+	Effect,
 } from '../ast';
 
 // Helper: Create common function types
@@ -130,7 +132,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: [],
 	});
 
-	// Effectful functions
+	// Effectful functions - I/O and logging
 	newEnv.set('print', {
 		type: functionType(
 			[typeVariable('a')],
@@ -138,6 +140,87 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 			new Set(['log'])
 		),
 		quantifiedVars: [],
+	});
+
+	newEnv.set('println', {
+		type: functionType(
+			[typeVariable('a')],
+			typeVariable('a'),
+			new Set(['log'])
+		),
+		quantifiedVars: [],
+	});
+
+	newEnv.set('readFile', {
+		type: functionType(
+			[stringType()],
+			stringType(),
+			new Set(['io'])
+		),
+		quantifiedVars: [],
+	});
+
+	newEnv.set('writeFile', {
+		type: functionType(
+			[stringType(), stringType()],
+			unitType(),
+			new Set(['io'])
+		),
+		quantifiedVars: [],
+	});
+
+	newEnv.set('log', {
+		type: functionType(
+			[stringType()],
+			unitType(),
+			new Set(['log'])
+		),
+		quantifiedVars: [],
+	});
+
+	// Random number generation - special zero-arg function syntax
+	newEnv.set('random', {
+		type: intType(), // For now, treat as a value with effects
+		quantifiedVars: [],
+		effects: new Set(['rand'] as Effect[])  // Store effects separately
+	});
+
+	newEnv.set('randomRange', {
+		type: functionType(
+			[intType(), intType()],
+			intType(),
+			new Set(['rand'])
+		),
+		quantifiedVars: [],
+	});
+
+	// Error throwing (throws exceptions)
+	newEnv.set('throw', {
+		type: functionType(
+			[stringType()],
+			typeVariable('a'),
+			new Set(['err'])
+		),
+		quantifiedVars: ['a'],
+	});
+
+	// Mutation effects for future mutable data structures
+	newEnv.set('mutSet', {
+		type: functionType(
+			[typeVariable('ref'), typeVariable('a')],
+			unitType(),
+			new Set(['mut'])
+		),
+		quantifiedVars: ['ref', 'a'],
+	});
+
+	newEnv.set('mutGet', {
+		type: functionType(
+			[typeVariable('ref')],
+			typeVariable('a'),
+			new Set(['mut'])
+		),
+		quantifiedVars: ['ref', 'a'],
 	});
 
 	// List utility functions (pure)

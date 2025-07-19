@@ -24,6 +24,11 @@ import {
 	createTypeResult, 
 	unionEffects 
 } from './types';
+import { 
+	validateFunctionCall, 
+	areEffectsCompatible,
+	mergeEffects 
+} from './effect-validation';
 import { satisfiesConstraint } from './constraints';
 import { substitute } from './substitute';
 import { unify } from './unify';
@@ -270,6 +275,10 @@ export const typeApplication = (
 			column: expr.location?.start.column || 1,
 		});
 
+		// Phase 3: Add effect validation for function calls
+		// Add function's effects to the collected effects
+		allEffects = unionEffects(allEffects, funcType.effects);
+
 		if (argTypes.length === funcType.params.length) {
 			// Full application - return the return type
 
@@ -386,7 +395,7 @@ export const typeApplication = (
 		} else {
 			// Partial application - return a function with remaining parameters
 			const remainingParams = funcType.params.slice(argTypes.length);
-			const partialFunctionType = functionType(remainingParams, returnType);
+			const partialFunctionType = functionType(remainingParams, returnType, funcType.effects);
 
 			// CRITICAL FIX: Handle partial application of compose
 			if (
