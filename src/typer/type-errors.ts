@@ -1,5 +1,6 @@
 import type { Expression, Type } from "../ast";
 import { createError, type NoolangError, type ErrorLocation } from "../errors";
+import { formatEffectsString } from "./helpers";
 
 export interface TypeErrorContext {
 	expression?: Expression;
@@ -336,7 +337,7 @@ function typeToString(type: Type): string {
 		case "function":
 			const paramStr = type.params.map(typeToString).join(" ");
 			const effectStr =
-				type.effects.length > 0 ? ` !${type.effects.join(" !")}` : "";
+				formatEffectsString(type.effects);
 			return `(${paramStr}) -> ${typeToString(type.return)}${effectStr}`;
 		case "list":
 			return `List ${typeToString(type.element)}`;

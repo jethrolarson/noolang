@@ -123,7 +123,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 
 	// Effectful functions
 	newEnv.set('print', {
-		type: functionType([typeVariable('a')], typeVariable('a'), ['log']),
+		type: functionType([typeVariable('a')], typeVariable('a'), new Set(['log'])),
 		quantifiedVars: [],
 	});
 

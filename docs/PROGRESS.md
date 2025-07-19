@@ -128,3 +128,4 @@ noolang/
 * Need to add support for Float or make Int into float and not have int
 * `new Lexer("a = 1; b = 2; a + b;");`???
 * Imports aren't being inferred correctly
+* What if we have a way for the llm to ask what the type at a particular point in the program is? maybe with a `^` character? Similar to how users can hover over code with the mouse. or maybe just supporting LSP will do that?

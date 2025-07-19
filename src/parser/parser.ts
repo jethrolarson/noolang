@@ -11,6 +11,7 @@ import {
 	type ImportExpression,
 	type AccessorExpression,
 	type Type,
+	type Effect,
 	intType,
 	stringType,
 	unitType,
@@ -240,6 +241,36 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 }
 
 // --- Type Expression ---
+// Helper function to parse function types without top-level effects
+const parseFunctionTypeWithoutEffects: C.Parser<Type> = (tokens) => {
+  let leftResult = parseTypeAtom(tokens);
+  if (!leftResult.success) return leftResult;
+  let left = leftResult.value;
+  let rest = leftResult.remaining;
+
+  while (
+    rest &&
+    rest.length > 0 &&
+    rest[0].type === "OPERATOR" &&
+    rest[0].value === "->"
+  ) {
+    rest = rest.slice(1);
+    const rightResult = parseFunctionTypeWithoutEffects(rest);
+    if (!rightResult.success) return rightResult;
+    if (!rightResult.value)
+      return {
+        success: false,
+        error: "Expected type expression",
+        position: tokens[0]?.location.start.line || 0,
+      };
+    
+    left = functionType([left], rightResult.value);
+    rest = rightResult.remaining;
+  }
+  
+  return { success: true as const, value: left, remaining: rest };
+};
+
 export const parseTypeExpression: C.Parser<Type> = (tokens) => {
   // Try function type (right-associative): a -> b -> c FIRST
   const funcType = (() => {
@@ -255,7 +286,7 @@ export const parseTypeExpression: C.Parser<Type> = (tokens) => {
       rest[0].value === "->"
     ) {
       rest = rest.slice(1);
-      const rightResult = parseTypeExpression(rest);
+      const rightResult = parseFunctionTypeWithoutEffects(rest);
       if (!rightResult.success) return rightResult;
       if (!rightResult.value)
         return {
@@ -263,14 +294,71 @@ export const parseTypeExpression: C.Parser<Type> = (tokens) => {
           error: "Expected type expression",
           position: tokens[0]?.location.start.line || 0,
         };
+      
       left = functionType([left], rightResult.value);
       rest = rightResult.remaining;
     }
-    return { success: true as const, value: left, remaining: rest };
+    
+    // Parse effects at the end of the entire function type chain
+    let effects = new Set<Effect>();
+    let effectRest = rest;
+    
+    // Parse effects: !effect1 !effect2 ...
+    while (
+      effectRest &&
+      effectRest.length > 0 &&
+      effectRest[0].type === "OPERATOR" &&
+      effectRest[0].value === "!"
+    ) {
+      effectRest = effectRest.slice(1); // consume !
+      
+      // Expect an effect name (identifier or keyword)
+      if (
+        !effectRest ||
+        effectRest.length === 0 ||
+        (effectRest[0].type !== "IDENTIFIER" && effectRest[0].type !== "KEYWORD")
+      ) {
+        return {
+          success: false,
+          error: "Expected effect name after !",
+          position: effectRest?.[0]?.location?.start?.line || 0,
+        };
+      }
+      
+      const effectName = effectRest[0].value;
+      
+      // Validate effect name
+      const validEffects: Effect[] = ["io", "log", "mut", "rand", "err"];
+      if (!validEffects.includes(effectName as Effect)) {
+        return {
+          success: false,
+          error: `Invalid effect: ${effectName}. Valid effects: ${validEffects.join(", ")}`,
+          position: effectRest[0].location.start.line,
+        };
+      }
+      
+      effects.add(effectName as Effect);
+      effectRest = effectRest.slice(1); // consume effect name
+    }
+    
+    // Apply effects to the function type (including empty effects)
+    if (left.kind === 'function') {
+      left = { ...left, effects };
+    }
+    
+    return { success: true as const, value: left, remaining: effectRest };
   })();
 
   if (funcType.success && funcType.value) {
     return funcType;
+  }
+  
+  // If function type parsing failed with a specific effect error, return that error
+  if (!funcType.success && (
+    funcType.error.includes("Invalid effect:") || 
+    funcType.error.includes("Expected effect name after !")
+  )) {
+    return funcType as C.ParseError;
   }
 
   // Try type variable (lowercase identifier)

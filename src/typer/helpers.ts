@@ -2,6 +2,7 @@ import { type Type, functionType, typeVariable, type VariableType, type Primitiv
 import { formatTypeError } from "./type-errors";
 import { NoolangError } from "../errors";
 import { substitute } from "./substitute";
+import type { Effect } from "../ast";
 
 type CodeLocation = {
   line: number;
@@ -23,6 +24,12 @@ export function throwTypeError(
 ): never {
   const loc = location || { line: 1, column: 1 };
   throw new Error(formatTypeError(errorFactory(loc)));
+}
+
+// Helper: Format effects as string for type display
+export function formatEffectsString(effects: Set<Effect>): string {
+  if (effects.size === 0) return "";
+  return ` ${Array.from(effects).map(e => `!${e}`).join(' ')}`;
 }
 
 // Helper: Create common function types
@@ -340,8 +347,7 @@ export const typeToString = (
 				return t.name;
 			case "function": {
 				const paramStr = t.params.map(norm).join(" ");
-				const effectStr =
-					t.effects.length > 0 ? ` !${t.effects.join(" !")}` : "";
+				const effectStr = formatEffectsString(t.effects);
 				const baseType = `(${paramStr}) -> ${norm(t.return)}${effectStr}`;
 
 				const constraintStr =

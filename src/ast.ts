@@ -36,7 +36,7 @@ export type FunctionType = {
   kind: "function";
   params: Type[];
   return: Type;
-  effects: Effect[];
+  effects: Set<Effect>;
   constraints?: Constraint[];
 };
 
@@ -359,7 +359,7 @@ export const listType = (): PrimitiveType => ({
 export const functionType = (
   params: Type[],
   returnType: Type,
-  effects: Effect[] = []
+  effects: Set<Effect> = new Set()
 ): FunctionType => ({
   kind: "function",
   params,
@@ -545,7 +545,7 @@ export const constrainedTypeVariable = (
 export const constrainedFunctionType = (
   params: Type[],
   returnType: Type,
-  effects: Effect[] = [],
+  effects: Set<Effect> = new Set(),
   constraints: Constraint[] = []
 ): FunctionType => ({
   kind: "function",

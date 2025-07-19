@@ -544,6 +544,5 @@ export class ConstraintSolver {
 			substitution: new Map(),
 			errors: []
 		};
-		this.constraintStrings.clear();
-	}
+		}
 }

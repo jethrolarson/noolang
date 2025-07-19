@@ -574,8 +574,9 @@ describe("Type annotation parsing", () => {
 		const result = parseType("Number -> Number");
 		assertParseSuccess(result);
 		assertFunctionType(result.value);
-		expect(result.value.params[0].kind).toBe("primitive");
-		expect(result.value.return.kind).toBe("primitive");
+		const funcType = result.value;
+		expect(funcType.params[0].kind).toBe("primitive");
+		expect(funcType.return.kind).toBe("primitive");
 	});
 
 	test("parses type variable", () => {
@@ -650,5 +651,118 @@ describe("Top-level definitions with type annotations", () => {
 		const seq = assertBinaryExpression(result.statements[0]);
 		expect(seq.kind).toBe("binary"); // semicolon sequence
 		expect(seq.operator).toBe(";");
+	});
+
+	// Phase 1: Effect parsing tests
+	describe("Effect parsing", () => {
+		test("should parse function type with single effect", () => {
+			const lexer = new Lexer("Int -> Int !io");
+			const tokens = lexer.tokenize();
+			const result = parseTypeExpression(tokens);
+			
+			assertParseSuccess(result);
+			assertFunctionType(result.value);
+		const funcType = result.value;
+			expect([...funcType.effects]).toEqual(["io"]);
+			expect(funcType.params).toHaveLength(1);
+			expect(funcType.params[0].kind).toBe("primitive");
+			expect(funcType.return.kind).toBe("primitive");
+		});
+
+		test("should parse function type with multiple effects", () => {
+			const lexer = new Lexer("Int -> String !io !log");
+			const tokens = lexer.tokenize();
+			const result = parseTypeExpression(tokens);
+			
+			assertParseSuccess(result);
+			assertFunctionType(result.value);
+		const funcType = result.value;
+			expect([...funcType.effects].sort()).toEqual(["io", "log"]);
+		});
+
+		test("should parse function type with all valid effects", () => {
+			const lexer = new Lexer("Int -> Int !io !log !mut !rand !err");
+			const tokens = lexer.tokenize();
+			const result = parseTypeExpression(tokens);
+			
+			assertParseSuccess(result);
+			assertFunctionType(result.value);
+		const funcType = result.value;
+			expect([...funcType.effects].sort()).toEqual(["err", "io", "log", "mut", "rand"]);
+		});
+
+		test("should parse function type with no effects", () => {
+			const lexer = new Lexer("Int -> Int");
+			const tokens = lexer.tokenize();
+			const result = parseTypeExpression(tokens);
+			
+			assertParseSuccess(result);
+			assertFunctionType(result.value);
+		const funcType = result.value;
+			expect([...funcType.effects]).toEqual([]);
+		});
+
+		test("should parse multi-parameter function with effects", () => {
+			const lexer = new Lexer("Int -> String -> Bool !io");
+			const tokens = lexer.tokenize();
+			const result = parseTypeExpression(tokens);
+			
+			assertParseSuccess(result);
+			assertFunctionType(result.value);
+		const funcType = result.value;
+			expect([...funcType.effects]).toEqual(["io"]);
+			expect(funcType.params).toHaveLength(1);
+			expect(funcType.return.kind).toBe("function");
+		});
+
+		test("should reject invalid effect names", () => {
+			const lexer = new Lexer("Int -> Int !invalid");
+			const tokens = lexer.tokenize();
+			const result = parseTypeExpression(tokens);
+			
+			assertParseError(result);
+			expect(result.error).toContain("Invalid effect: invalid");
+		});
+
+		test("should require effect name after exclamation mark", () => {
+			const lexer = new Lexer("Int -> Int !");
+			const tokens = lexer.tokenize();
+			const result = parseTypeExpression(tokens);
+			
+			assertParseError(result);
+			expect(result.error).toContain("Expected effect name after !");
+		});
+
+		test("should parse typed expression with effects", () => {
+			const result = parseDefinition("x : Int -> Int !io");
+			expect(result.statements).toHaveLength(1);
+			const typed = assertTypedExpression(result.statements[0]);
+			assertFunctionType(typed.type);
+		const funcType = typed.type;
+			expect([...funcType.effects]).toEqual(["io"]);
+		});
+
+		test("should parse function definition with effect annotation", () => {
+			const result = parseDefinition("fn x => x : Int -> Int !log");
+			expect(result.statements).toHaveLength(1);
+			const func = assertFunctionExpression(result.statements[0]);
+			const typed = assertTypedExpression(func.body);
+			assertFunctionType(typed.type);
+		const funcType = typed.type;
+			expect([...funcType.effects]).toEqual(["log"]);
+		});
+
+		test("should automatically deduplicate effects", () => {
+			const lexer = new Lexer("Int -> Int !io !log !io");
+			const tokens = lexer.tokenize();
+			const result = parseTypeExpression(tokens);
+			
+			assertParseSuccess(result);
+			assertFunctionType(result.value);
+		const funcType = result.value;
+			// Set automatically deduplicates, so !io !log !io becomes {io, log}
+			expect([...funcType.effects].sort()).toEqual(["io", "log"]);
+			expect(funcType.effects.size).toBe(2);
+		});
 	});
 });
