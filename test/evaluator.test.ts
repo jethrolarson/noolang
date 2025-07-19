@@ -153,6 +153,15 @@ describe("Evaluator", () => {
     expect(result.executionTrace).toHaveLength(1);
   });
 
+  test('should evaluate reduce function', () => {
+		const lexer = new Lexer('reduce (fn acc x => acc + x) 0 [1, 2, 3, 4, 5]');
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		const result = evaluator.evaluateProgram(program);
+		expect(unwrapValue(result.finalResult)).toBe(15); // 0 + 1 + 2 + 3 + 4 + 5 = 15
+		expect(result.executionTrace).toHaveLength(1);
+	});
+
   test("should evaluate length function", () => {
     const lexer = new Lexer("length [1, 2, 3, 4, 5]");
     const tokens = lexer.tokenize();

@@ -445,10 +445,15 @@ export class Evaluator {
 					"reduce",
 					(func: Value) => (initial: Value) => (list: Value) => {
 						if (isFunction(func) && isList(list)) {
-							return list.values.reduce(
-								(acc: Value, item: Value) => func.fn(acc, item),
-								initial,
-							);
+							return list.values.reduce((acc: Value, item: Value) => {
+								const partial = func.fn(acc);
+								if (isFunction(partial)) {
+									return partial.fn(item);
+								}
+								throw new Error(
+									'reduce function must return a function after first argument'
+								);
+							}, initial);
 						}
 						throw new Error(
 							"reduce requires a function, initial value, and a list",

@@ -24,7 +24,7 @@ import {
 	unitType,
 } from '../ast';
 
-import { TypeState, TypeResult } from './types';
+import { TypeState, TypeResult, createPureTypeResult } from './types';
 import { ConstraintSolver, UnificationConstraint } from './constraint-solver';
 import { freshTypeVariable, instantiate } from './type-operations';
 import { getExprLocation } from './helpers';
@@ -359,13 +359,10 @@ export const solveConstraintsAndGetResult = (
 		mergedSubstitution.set(typeVar, type);
 	}
 
-	return {
-		type: finalType,
-		state: {
-			...constraintResult.state,
-			substitution: mergedSubstitution
-		}
-	};
+	return createPureTypeResult(finalType, {
+		...constraintResult.state,
+		substitution: mergedSubstitution
+	});
 };
 
 // Helper to apply substitution to a type with cycle detection

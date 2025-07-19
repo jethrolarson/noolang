@@ -18,11 +18,10 @@ import {
 	Program,
 } from '../ast';
 
-import { TypeState, TypeResult } from './types';
-import { 
+import { TypeState, TypeResult, createPureTypeResult } from './types';
+import {
 	generateConstraintsForExpression,
 	solveConstraintsAndGetResult,
-	ConstraintTypeResult
 } from './constraint-generation';
 import { createTypeState, loadStdlib } from './type-operations';
 import { initializeBuiltins } from './builtins';
@@ -55,7 +54,7 @@ export const typeProgramConstraintBased = (program: Program): TypeResult => {
 		finalType = unitType();
 	}
 
-	return { type: finalType, state };
+	return createPureTypeResult(finalType, state);
 };
 
 // Individual constraint-based type inference functions for compatibility

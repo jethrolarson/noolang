@@ -151,7 +151,10 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	newEnv.set('reduce', {
 		type: functionType(
 			[
-				functionType([typeVariable('b'), typeVariable('a')], typeVariable('b')),
+				functionType(
+					[typeVariable('b')],
+					functionType([typeVariable('a')], typeVariable('b'))
+				),
 				typeVariable('b'),
 				listTypeWithElement(typeVariable('a')),
 			],
