@@ -667,10 +667,7 @@ export class Evaluator {
 				this.path.join(process.cwd(), 'src', '..', 'stdlib.noo'),
 			];
 
-			console.log(
-				'[Noolang] Attempting to load stdlib.noo from the following paths:'
-			);
-			for (const p of possiblePaths) console.log('  -', p);
+
 
 			let stdlibPath: string | null = null;
 			for (const path of possiblePaths) {
@@ -687,8 +684,6 @@ export class Evaluator {
 				console.error(msg);
 				throw new Error(msg);
 			}
-
-			console.log(`[Noolang] Loading stdlib from: ${stdlibPath}`);
 			const stdlibContent = this.fs.readFileSync(stdlibPath, 'utf-8');
 			const lexer = new Lexer(stdlibContent);
 			const tokens = lexer.tokenize();
@@ -697,15 +692,9 @@ export class Evaluator {
 			for (const statement of stdlibProgram.statements) {
 				allStatements.push(...flattenStatements(statement));
 			}
-			console.log(
-				`[Noolang] Loaded ${allStatements.length} statements from stdlib`
-			);
 			for (const statement of allStatements) {
 				this.evaluateExpression(statement);
 			}
-			console.log(
-				`[Noolang] Stdlib loaded successfully. Environment now has ${this.environment.size} entries`
-			);
 		}
 
 		evaluateProgram(program: Program, filePath?: string): ProgramResult {

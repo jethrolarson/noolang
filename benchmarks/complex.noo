@@ -2,16 +2,16 @@
 
 # Manual map implementation for complex operations
 map = fn f list =>
-  if list == []
-  then []
-  else cons (f (head list)) (map f (tail list));
+  option_get_or [] (option_map (fn first => 
+    cons (f first) (map f (tail list))
+  ) (head list));
 
 filter = fn pred list =>
-  if list == []
-  then []
-  else if pred (head list)
-       then cons (head list) (filter pred (tail list))
-       else filter pred (tail list);
+  option_get_or [] (option_map (fn first => 
+    if pred first
+    then cons first (filter pred (tail list))
+    else filter pred (tail list)
+  ) (head list));
 
 # Complex nested function with heavy type inference
 complex_fn = fn x =>

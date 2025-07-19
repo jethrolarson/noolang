@@ -449,7 +449,7 @@ describe("Evaluator", () => {
   });
 
   test("should evaluate basic import", () => {
-    const lexer = new Lexer('import "examples/test_import"');
+    const lexer = new Lexer('import "test/test_import"');
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const result = evaluator.evaluateProgram(program);
