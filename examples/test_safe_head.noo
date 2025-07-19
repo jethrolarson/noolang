@@ -1,9 +1,0 @@
-# Test the new safe head function
-
-# Test with non-empty list
-result1 = head [1, 2, 3];
-
-# Test with empty list  
-result2 = head [];
-
-result1

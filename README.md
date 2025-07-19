@@ -178,7 +178,6 @@ print "hello"; map (fn x => x * 2) [4, 5, 6]
 ```noolang
 42          # Integer
 "hello"     # String
-true        # Boolean
 {}          # Unit
 [1, 2, 3]   # List (comma-separated)
 { @name "Alice", @age 30 }  # Record (comma-separated fields)

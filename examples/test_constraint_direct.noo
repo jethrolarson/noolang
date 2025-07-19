@@ -1,6 +1,0 @@
-# Test constraint error directly
-
-# Try to call tail with wrong type
-result = tail 5;
-
-result

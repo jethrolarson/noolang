@@ -33,7 +33,7 @@ Noolang is a principled, expression-based language designed for LLM-assisted and
   ```noolang
   (
     1 : Number;
-    false : Boolean;
+    False : Boolean;
     "foo" : String
   ) : String  # Each subexpression checked, final type is String
   ```
@@ -321,7 +321,7 @@ Extract values from tuples by position:
 
 ```noolang
 # Basic tuple destructuring
-{one, two} = {1, true}  # one = 1, two = true
+{one, two} = {1, True}  # one = 1, two = True
 
 # With type annotations
 {first: Number, second: String} = {42, "hello"}  # first = 42, second = "hello"
@@ -338,10 +338,10 @@ Extract fields from records with flexible naming:
 
 ```noolang
 # Record destructuring with renaming
-{@key localName} = {@key true}  # localName = true
+{@key localName} = {@key True}  # localName = True
 
 # Record shorthand (field name = variable name)
-{@key, @key2} = {@key true, @key2 2}  # key = true, key2 = 2
+{@key, @key2} = {@key True, @key2 2}  # key = True, key2 = 2
 
 # Mixed renaming and shorthand
 {@name userName, @age} = {@name "Alice", @age 30}  # userName = "Alice", age = 30

@@ -1,8 +1,0 @@
-# Test function composition with safe head
-import "stdlib.noo";
-
-# Test the compose function with safe head 
-composed = compose head id;
-result = composed [1, 2, 3];
-
-result

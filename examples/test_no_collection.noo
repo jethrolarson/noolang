@@ -1,8 +1,0 @@
-# Test that tail and length work without Collection constraint
-
-list = [1, 2, 3, 4];
-
-tail_result = tail list;
-length_result = length list;
-
-tail_result
