@@ -254,7 +254,7 @@ safeFileLog = compose fileLogger  # Still requires !read !log
 * **✅ Phase 3 Complete**: Effect validation and propagation through all language constructs
 * **✅ Parser Support**: Functions can be typed with effects using `!effect` syntax
 * **✅ Set-based Storage**: Effects stored as `Set<Effect>` for automatic deduplication
-* **✅ Comprehensive Testing**: Phase 2 (31/31), Phase 3 (32/41) tests passing
+* **✅ Comprehensive Testing**: Phase 2 (31/31), Phase 3 (40/40) tests passing
 * **✅ Built-in Functions**: Complete set of effectful functions (read/write, logging, random, state mutation)
 * **✅ Effect Propagation**: Automatic effect collection through function composition and data structures
 

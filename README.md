@@ -2,11 +2,12 @@
 
 An expression-based, LLM-friendly programming language designed for linear, declarative code with explicit effects and strong type inference.
 
-## Current Status (June 2024)
+## Current Status (July 2024)
 - **All core features implemented:** parser, evaluator, type inference, REPL, CLI, and debugging tools
-- **All tests passing** (198/198 tests) ✅ - parser, evaluator, typer, ADTs, constraints, recursion
+- **All tests passing** (316/316 tests) ✅ - parser, evaluator, typer, ADTs, constraints, recursion, effects
+- **Complete effect system**: 3-phase implementation with effect validation and propagation
 - **Comma-separated data structures**: `[1, 2, 3]`, `{ @name "Alice", @age 30 }`
-- **Explicit effects**: Effects are tracked in the type system (e.g., `print` is effectful)
+- **Explicit effects**: Effects are tracked in the type system with granular effect taxonomy
 - **Strong type inference**: Powered by a functional Hindley-Milner type inference engine with let-polymorphism
 - **Type Constraints**: Full constraint system with automatic propagation and validation (9 built-in constraints)
 - **Algebraic Data Types**: Complete ADT implementation with type definitions, constructors, and pattern matching
@@ -14,6 +15,7 @@ An expression-based, LLM-friendly programming language designed for linear, decl
 - **REPL and CLI**: Feature colorized output and advanced debugging commands (tokens, AST, types, environment, etc.)
 - **Robust error handling and debugging**: All foundational issues resolved
 - **VSCode syntax highlighting**: Full support for `.noo` files
+- **Performance optimized**: 30% improvement with comprehensive benchmarking system
 
 ## Features
 
@@ -336,13 +338,143 @@ Noolang uses commas as separators for all data structures:
 
 ### Built-in Functions
 
-- **Arithmetic**: `+`, `-`, `*`, `/`
-- **Comparison**: `==`, `!=`, `<`, `>`, `<=`, `>=`
-- **List operations**: `head`, `tail`, `cons`, `map`, `filter`, `reduce`, `length`, `isEmpty`, `append`
-- **Record operations**: Accessors (`@field`) for getting record fields
-- **Math utilities**: `abs`, `max`, `min`
-- **String utilities**: `concat`, `toString`
-- **Utility**: `print`
+Noolang provides a comprehensive set of built-in functions organized by category:
+
+#### Arithmetic Operations (Pure)
+- **`+`** - Addition: `Int -> Int -> Int`
+- **`-`** - Subtraction: `Int -> Int -> Int` 
+- **`*`** - Multiplication: `Int -> Int -> Int`
+- **`/`** - Division: `Int -> Int -> Int` (throws error on division by zero)
+
+#### Comparison Operations (Pure)
+- **`==`** - Equality: `a -> a -> Bool` (polymorphic)
+- **`!=`** - Inequality: `a -> a -> Bool` (polymorphic)
+- **`<`** - Less than: `Int -> Int -> Bool`
+- **`>`** - Greater than: `Int -> Int -> Bool`
+- **`<=`** - Less than or equal: `Int -> Int -> Bool`
+- **`>=`** - Greater than or equal: `Int -> Int -> Bool`
+
+#### Function Application and Composition (Pure)
+- **`|`** - Thrush operator (function application): `a -> (a -> b) -> b`
+- **`|>`** - Pipeline operator (left-to-right composition): `(a -> b) -> (b -> c) -> (a -> c)`
+- **`<|`** - Compose operator (right-to-left composition): `(b -> c) -> (a -> b) -> (a -> c)`
+- **`$`** - Dollar operator (low precedence function application): `(a -> b) -> a -> b`
+- **`;`** - Semicolon operator (sequence): `a -> b -> b`
+
+#### List Operations (Pure)
+- **`tail`** - Get list tail: `List a -> List a`
+- **`cons`** - Prepend element: `a -> List a -> List a`
+- **`map`** - Map function over list: `(a -> b) -> List a -> List b`
+- **`filter`** - Filter list with predicate: `(a -> Bool) -> List a -> List a`
+- **`reduce`** - Reduce list with accumulator: `(b -> a -> b) -> b -> List a -> b`
+- **`length`** - Get list length: `List a -> Int`
+- **`isEmpty`** - Check if list is empty: `List a -> Bool`
+- **`append`** - Concatenate two lists: `List a -> List a -> List a`
+
+#### Math Utilities (Pure)
+- **`abs`** - Absolute value: `Int -> Int`
+- **`max`** - Maximum of two numbers: `Int -> Int -> Int`
+- **`min`** - Minimum of two numbers: `Int -> Int -> Int`
+
+#### String Operations (Pure)
+- **`concat`** - Concatenate strings: `String -> String -> String`
+- **`toString`** - Convert value to string: `a -> String`
+
+#### Record Operations (Pure)
+- **`hasKey`** - Check if record has key: `Record -> String -> Bool`
+- **`hasValue`** - Check if record has value: `Record -> a -> Bool`
+- **`set`** - Set field in record: `accessor -> Record -> a -> Record`
+- **Accessors** - `@field` for getting record fields: `Record -> a`
+
+#### Tuple Operations (Pure)
+- **`tupleLength`** - Get tuple length: `Tuple -> Int`
+- **`tupleIsEmpty`** - Check if tuple is empty: `Tuple -> Bool`
+
+#### I/O Operations (Effectful)
+- **`print`** - Print value: `a -> a` (effect: `!write`)
+- **`println`** - Print line: `a -> a` (effect: `!write`)
+- **`readFile`** - Read file: `String -> String` (effect: `!read`)
+- **`writeFile`** - Write file: `String -> String -> Unit` (effect: `!write`)
+- **`log`** - Log message: `String -> Unit` (effect: `!log`)
+
+#### Random Number Generation (Effectful)
+- **`random`** - Random integer: `Int` (effect: `!rand`)
+- **`randomRange`** - Random in range: `Int -> Int -> Int` (effect: `!rand`)
+
+#### Mutable State Operations (Effectful)
+- **`mutSet`** - Set mutable reference: `ref -> a -> Unit` (effect: `!state`)
+- **`mutGet`** - Get mutable reference: `ref -> a` (effect: `!state`)
+
+#### ADT Constructors and Utilities
+
+**Option Type:**
+- **`Some`** - Option constructor: `a -> Option a`
+- **`None`** - Empty option: `Option a`
+- **`isSome`** - Check if Option is Some: `Option a -> Bool`
+- **`isNone`** - Check if Option is None: `Option a -> Bool`
+- **`unwrap`** - Extract value from Some: `Option a -> a` (throws on None)
+
+**Result Type:**
+- **`Ok`** - Success constructor: `a -> Result a b`
+- **`Err`** - Error constructor: `b -> Result a b`
+- **`isOk`** - Check if Result is Ok: `Result a b -> Bool`
+- **`isErr`** - Check if Result is Err: `Result a b -> Bool`
+
+**Boolean Type:**
+- **`True`** - Boolean true constructor
+- **`False`** - Boolean false constructor
+
+### Standard Library Functions
+
+The following functions are defined in `stdlib.noo` and automatically loaded:
+
+#### List Operations (Standard Library)
+- **`head`** - Safe head function: `List a -> Option a` (returns `None` for empty lists)
+
+#### Utility Functions (Standard Library)
+- **`id`** - Identity function: `a -> a`
+- **`compose`** - Function composition: `(b -> c) -> (a -> b) -> (a -> c)`
+
+#### Boolean Operations (Standard Library)
+- **`not`** - Boolean negation: `Bool -> Bool`
+- **`bool_and`** - Boolean AND: `Bool -> Bool -> Bool`
+- **`bool_or`** - Boolean OR: `Bool -> Bool -> Bool`
+
+#### Option Utilities (Standard Library)
+- **`option_get_or`** - Extract Option with default: `a -> Option a -> a`
+- **`option_map`** - Map over Option: `(a -> b) -> Option a -> Option b`
+
+#### Result Utilities (Standard Library)
+- **`result_get_or`** - Extract Result with default: `a -> Result a b -> a`
+- **`result_map`** - Map over Result: `(a -> b) -> Result a b -> Result b c`
+
+### Effect System
+
+Noolang has a comprehensive effect system that tracks side effects in function types. Effects are denoted with the `!effect` syntax:
+
+#### Available Effects:
+- **`!read`** - File/input reading operations
+- **`!write`** - Output/printing operations  
+- **`!log`** - Logging operations
+- **`!state`** - Mutable state operations
+- **`!rand`** - Random number generation
+- **`!time`** - Time-related operations
+- **`!ffi`** - Foreign function interface
+- **`!async`** - Asynchronous operations
+
+#### Effect Syntax:
+```noolang
+# Pure function (no effects)
+add = fn x y => x + y : Int -> Int -> Int
+
+# Effectful function
+readAndPrint = fn filename => (
+  content = readFile filename;
+  print content
+) : String -> String !read !write
+```
+
+Effects automatically propagate through function composition and are validated by the type system.
 
 ## Algebraic Data Types (ADTs)
 
@@ -701,7 +833,7 @@ syntaxes/
 npm test
 ```
 
-All 198 tests pass, including parser, evaluator, typer, ADTs, constraints, and recursion tests. The functional typer is used exclusively.
+All 316 tests pass, including parser, evaluator, typer, ADTs, constraints, recursion, and effects tests. The functional typer is used exclusively.
 
 ### Building
 
@@ -771,25 +903,28 @@ The type system provides:
 - **Type inference** for all expressions using a functional Hindley-Milner engine
 - **Primitive types**: Int, String, Bool, List, Record, Unit
 - **Function types**: `(Int Int) -> Int`
-- **Type constraints**: Early support for constraints (e.g., Collection, hasField) is present, but advanced constraint propagation is still in progress
+- **Type constraints**: Complete constraint system with automatic propagation and validation
 - **Type annotations** (planned for future versions)
 
-### Effects
+### Effects (Implemented)
 
-Effects are planned to be explicit and tracked:
+Effects are explicit and fully tracked in the type system:
 
-- IO operations will be marked
-- State mutations will be tracked
-- Error handling will be explicit
+- **IO operations** are marked with `!read`, `!write`, `!log`
+- **State mutations** are tracked with `!state`
+- **Random operations** are marked with `!rand`
+- **All effects** propagate through function composition automatically
+- **Effect validation** ensures type safety and explicit effect handling
 
 ## Future Features
 
-- **Type annotations**: `x = 42 : Int` types are postfix for all expressions
-- **Effect tracking**: Explicit IO and state effects
-- **File imports**: Module system for code organization
-- **Pattern matching**: Destructuring and pattern-based control flow
+- **Enhanced type annotations**: Record type syntax `{@name String, @age Number}`
+- **Constraint annotations**: Explicit `given` syntax for constraint declarations
+- **File imports**: Module system for code organization  
+- **Destructuring patterns**: Pattern-based assignment for tuples and records
 - **JavaScript compilation**: Compile to JavaScript for production use
-- **Standard library**: Comprehensive built-in functions for common operations
+- **VSCode Language Server**: LSP integration for intellisense and hover types
+- **Show constraints**: Add `Show` constraint to `print` function for type safety
 
 ## Contributing
 
