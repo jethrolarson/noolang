@@ -84,7 +84,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 			[typeVariable('a'), listTypeWithElement(typeVariable('a'))],
 			listTypeWithElement(typeVariable('a'))
 		),
-		quantifiedVars: [],
+		quantifiedVars: ['a'],
 	});
 
 	// Pipeline operator (pure)
@@ -93,7 +93,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 			[typeVariable('a'), functionType([typeVariable('a')], typeVariable('b'))],
 			typeVariable('b')
 		),
-		quantifiedVars: [],
+		quantifiedVars: ['a', 'b'],
 	});
 
 	// Compose operator
@@ -102,7 +102,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 			[typeVariable('a'), functionType([typeVariable('a')], typeVariable('b'))],
 			typeVariable('b')
 		),
-		quantifiedVars: [],
+		quantifiedVars: ['a', 'b'],
 	});
 
 	// Thrush operator (pure) - same as pipeline
@@ -111,7 +111,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 			[typeVariable('a'), functionType([typeVariable('a')], typeVariable('b'))],
 			typeVariable('b')
 		),
-		quantifiedVars: [],
+		quantifiedVars: ['a', 'b'],
 	});
 
 	// Semicolon operator (effectful - effects are unioned)
@@ -120,7 +120,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 			[typeVariable('a'), typeVariable('b')],
 			typeVariable('b')
 		),
-		quantifiedVars: [],
+		quantifiedVars: ['a', 'b'],
 	});
 
 	// Dollar operator (low precedence function application)
@@ -129,7 +129,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 			[functionType([typeVariable('a')], typeVariable('b')), typeVariable('a')],
 			typeVariable('b')
 		),
-		quantifiedVars: [],
+		quantifiedVars: ['a', 'b'],
 	});
 
 	// Effectful functions - I/O and logging
@@ -139,7 +139,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 			typeVariable('a'),
 			new Set(['write'])
 		),
-		quantifiedVars: [],
+		quantifiedVars: ['a'],
 	});
 
 	newEnv.set('println', {
@@ -148,7 +148,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 			typeVariable('a'),
 			new Set(['write'])
 		),
-		quantifiedVars: [],
+		quantifiedVars: ['a'],
 	});
 
 	newEnv.set('readFile', {
@@ -249,7 +249,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 			listTypeWithElement(typeVariable('a')),
 			boolType()
 		),
-		quantifiedVars: [],
+		quantifiedVars: ['a'],
 	});
 	newEnv.set('append', {
 		type: createBinaryFunctionType(
@@ -257,7 +257,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 			listTypeWithElement(typeVariable('a')),
 			listTypeWithElement(typeVariable('a'))
 		),
-		quantifiedVars: [],
+		quantifiedVars: ['a'],
 	});
 
 	// Math utilities (pure)
@@ -281,7 +281,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	});
 	newEnv.set('toString', {
 		type: createUnaryFunctionType(typeVariable('a'), stringType()),
-		quantifiedVars: [],
+		quantifiedVars: ['a'],
 	});
 
 	// Record utilities
@@ -295,7 +295,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 			typeVariable('a'),
 			boolType()
 		),
-		quantifiedVars: [],
+		quantifiedVars: ['a'],
 	});
 	newEnv.set('set', {
 		type: functionType(
@@ -306,7 +306,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 			],
 			recordType({})
 		),
-		quantifiedVars: [],
+		quantifiedVars: ['accessor', 'a'],
 	});
 
 	// Tuple operations - only keep sound ones
@@ -319,24 +319,6 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		{ type: functionType([tupleType([])], boolType()), quantifiedVars: [] } // Any tuple -> Bool
 	);
 
-	// Built-in ADT constructors
-	// Option type constructors
-	const optionType = (elementType: Type): Type => ({
-		kind: 'variant',
-		name: 'Option',
-		args: [elementType],
-	});
-
-	newEnv.set('Some', {
-		type: functionType([typeVariable('a')], optionType(typeVariable('a'))),
-		quantifiedVars: ['a'],
-	});
-
-	newEnv.set('None', {
-		type: optionType(typeVariable('a')),
-		quantifiedVars: ['a'],
-	});
-
 	// head function is now self-hosted in stdlib.noo
 
 	// Minimal built-in for self-hosted functions
@@ -348,81 +330,5 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a'],
 	});
 
-	// Result type constructors
-	const resultType = (successType: Type, errorType: Type): Type => ({
-		kind: 'variant',
-		name: 'Result',
-		args: [successType, errorType],
-	});
-
-	newEnv.set('Ok', {
-		type: functionType(
-			[typeVariable('a')],
-			resultType(typeVariable('a'), typeVariable('b'))
-		),
-		quantifiedVars: ['a', 'b'],
-	});
-
-	newEnv.set('Err', {
-		type: functionType(
-			[typeVariable('b')],
-			resultType(typeVariable('a'), typeVariable('b'))
-		),
-		quantifiedVars: ['a', 'b'],
-	});
-
-	// Register ADTs in the registry
-	const newRegistry = new Map(state.adtRegistry);
-
-	newRegistry.set('Option', {
-		typeParams: ['a'],
-		constructors: new Map([
-			['Some', [typeVariable('a')]],
-			['None', []],
-		]),
-	});
-
-	newRegistry.set('Result', {
-		typeParams: ['a', 'b'],
-		constructors: new Map([
-			['Ok', [typeVariable('a')]],
-			['Err', [typeVariable('b')]],
-		]),
-	});
-
-	// Utility functions for Option and Result
-	// Option utilities
-	newEnv.set('isSome', {
-		type: functionType([optionType(typeVariable('a'))], boolType()),
-		quantifiedVars: ['a'],
-	});
-
-	newEnv.set('isNone', {
-		type: functionType([optionType(typeVariable('a'))], boolType()),
-		quantifiedVars: ['a'],
-	});
-
-	newEnv.set('unwrap', {
-		type: functionType([optionType(typeVariable('a'))], typeVariable('a')),
-		quantifiedVars: ['a'],
-	});
-
-	// Result utilities
-	newEnv.set('isOk', {
-		type: functionType(
-			[resultType(typeVariable('a'), typeVariable('b'))],
-			boolType()
-		),
-		quantifiedVars: ['a', 'b'],
-	});
-
-	newEnv.set('isErr', {
-		type: functionType(
-			[resultType(typeVariable('a'), typeVariable('b'))],
-			boolType()
-		),
-		quantifiedVars: ['a', 'b'],
-	});
-
-	return { ...state, environment: newEnv, adtRegistry: newRegistry };
+	return { ...state, environment: newEnv };
 };

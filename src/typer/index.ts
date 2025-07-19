@@ -20,7 +20,7 @@ export {
 } from './types';
 
 // Re-export createTypeState from type-operations module
-export { createTypeState } from './type-operations';
+export { createTypeState, cleanSubstitutions } from './type-operations';
 
 // Re-export freshTypeVariable from type-operations module
 export { freshTypeVariable } from './type-operations';

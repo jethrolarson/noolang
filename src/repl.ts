@@ -4,10 +4,11 @@ import * as path from "node:path";
 import { Lexer } from "./lexer";
 import { parse } from "./parser/parser";
 import { Evaluator, type Value, isNativeFunction } from "./evaluator";
-import { createTypeState, loadStdlib } from './typer/type-operations';
+import { createTypeState, loadStdlib, cleanSubstitutions } from './typer/type-operations';
 import { initializeBuiltins } from './typer/builtins';
 import { typeToString } from './typer/helpers';
 import type { TypeState } from './typer/types';
+import { typeExpression, unionEffects, emptyEffects } from './typer';
 import type {
 	Expression,
 	FieldExpression,
@@ -81,17 +82,36 @@ export class REPL {
 				this.typeState
 			);
 
+			// Also type check to get effects using our persistent state
+			let currentState = this.typeState;
+			let finalType = null;
+			let allEffects = emptyEffects();
+
+			for (const statement of program.statements) {
+				const result = typeExpression(statement, currentState);
+				currentState = result.state;
+				finalType = result.type;
+				allEffects = unionEffects(allEffects, result.effects);
+			}
+
 			// Update the persistent type state for next REPL input
-			this.typeState = state;
-			const finalType =
-				decoratedProgram.statements[decoratedProgram.statements.length - 1]
-					?.type;
+			// Clean substitutions to prevent type pollution between evaluations
+			this.typeState = cleanSubstitutions(state);
 
 			// Evaluate the decorated program (with type information)
 			const programResult = this.evaluator.evaluateProgram(decoratedProgram);
 
 			// Note: The evaluator's environment should already be updated by evaluateProgram
 			// No need to manually copy the environment back
+
+			// Format effects for display
+			const formatEffects = (effects: Set<string>): string => {
+				if (effects.size === 0) {
+					return '';
+				}
+				const effectsList = Array.from(effects).sort().map(e => `!${e}`).join(' ');
+				return ` ${colorize.error(effectsList)}`;
+			};
 
 			// Print final result prominently
 			log(
@@ -101,7 +121,7 @@ export class REPL {
 					finalType
 						? colorize.type(typeToString(finalType, state.substitution))
 						: 'unknown'
-				}`
+				}${formatEffects(allEffects)}`
 			);
 
 			// Show execution trace for debugging (LLM-friendly)

@@ -206,61 +206,61 @@ export class Evaluator {
 		private initializeBuiltins(): void {
 			// Arithmetic operations
 			this.environment.set(
-				"+",
-				createNativeFunction("+", (a: Value) => (b: Value) => {
+				'+',
+				createNativeFunction('+', (a: Value) => (b: Value) => {
 					if (isNumber(a) && isNumber(b))
 						return createNumber(a.value + b.value);
 					throw new Error(
-						`Cannot add ${a?.tag || "unit"} and ${b?.tag || "unit"}`,
+						`Cannot add ${a?.tag || 'unit'} and ${b?.tag || 'unit'}`
 					);
-				}),
+				})
 			);
 			this.environment.set(
-				"-",
-				createNativeFunction("-", (a: Value) => (b: Value) => {
+				'-',
+				createNativeFunction('-', (a: Value) => (b: Value) => {
 					if (isNumber(a) && isNumber(b))
 						return createNumber(a.value - b.value);
 					throw new Error(
-						`Cannot subtract ${b?.tag || "unit"} from ${a?.tag || "unit"}`,
+						`Cannot subtract ${b?.tag || 'unit'} from ${a?.tag || 'unit'}`
 					);
-				}),
+				})
 			);
 			this.environment.set(
-				"*",
-				createNativeFunction("*", (a: Value) => (b: Value) => {
+				'*',
+				createNativeFunction('*', (a: Value) => (b: Value) => {
 					if (isNumber(a) && isNumber(b))
 						return createNumber(a.value * b.value);
 					throw new Error(
-						`Cannot multiply ${a?.tag || "unit"} and ${b?.tag || "unit"}`,
+						`Cannot multiply ${a?.tag || 'unit'} and ${b?.tag || 'unit'}`
 					);
-				}),
+				})
 			);
 			this.environment.set(
-				"/",
-				createNativeFunction("/", (a: Value) => (b: Value) => {
+				'/',
+				createNativeFunction('/', (a: Value) => (b: Value) => {
 					if (isNumber(a) && isNumber(b)) {
 						if (b.value === 0) {
 							const error = createError(
-								"RuntimeError",
-								"Division by zero",
+								'RuntimeError',
+								'Division by zero',
 								undefined,
 								`${a.value} / ${b.value}`,
-								"Check that the divisor is not zero before dividing",
+								'Check that the divisor is not zero before dividing'
 							);
 							throw error;
 						}
 						return createNumber(a.value / b.value);
 					}
 					throw new Error(
-						`Cannot divide ${a?.tag || "unit"} by ${b?.tag || "unit"}`,
+						`Cannot divide ${a?.tag || 'unit'} by ${b?.tag || 'unit'}`
 					);
-				}),
+				})
 			);
 
 			// Comparison operations
 			this.environment.set(
-				"==",
-				createNativeFunction("==", (a: Value) => (b: Value) => {
+				'==',
+				createNativeFunction('==', (a: Value) => (b: Value) => {
 					if (isNumber(a) && isNumber(b)) {
 						return createBool(a.value === b.value);
 					} else if (isString(a) && isString(b)) {
@@ -273,11 +273,11 @@ export class Evaluator {
 						return createFalse();
 					}
 					return createFalse();
-				}),
+				})
 			);
 			this.environment.set(
-				"!=",
-				createNativeFunction("!=", (a: Value) => (b: Value) => {
+				'!=',
+				createNativeFunction('!=', (a: Value) => (b: Value) => {
 					if (isNumber(a) && isNumber(b)) {
 						return createBool(a.value !== b.value);
 					} else if (isString(a) && isString(b)) {
@@ -290,140 +290,142 @@ export class Evaluator {
 						return createTrue();
 					}
 					return createTrue();
-				}),
+				})
 			);
 			this.environment.set(
-				"<",
-				createNativeFunction("<", (a: Value) => (b: Value) => {
+				'<',
+				createNativeFunction('<', (a: Value) => (b: Value) => {
 					if (isNumber(a) && isNumber(b)) return createBool(a.value < b.value);
 					throw new Error(`Cannot compare ${typeof a} and ${typeof b}`);
-				}),
+				})
 			);
 			this.environment.set(
-				">",
-				createNativeFunction(">", (a: Value) => (b: Value) => {
+				'>',
+				createNativeFunction('>', (a: Value) => (b: Value) => {
 					if (isNumber(a) && isNumber(b)) return createBool(a.value > b.value);
 					throw new Error(`Cannot compare ${typeof a} and ${typeof b}`);
-				}),
+				})
 			);
 			this.environment.set(
-				"<=",
-				createNativeFunction("<=", (a: Value) => (b: Value) => {
+				'<=',
+				createNativeFunction('<=', (a: Value) => (b: Value) => {
 					if (isNumber(a) && isNumber(b)) return createBool(a.value <= b.value);
 					throw new Error(`Cannot compare ${typeof a} and ${typeof b}`);
-				}),
+				})
 			);
 			this.environment.set(
-				">=",
-				createNativeFunction(">=", (a: Value) => (b: Value) => {
+				'>=',
+				createNativeFunction('>=', (a: Value) => (b: Value) => {
 					if (isNumber(a) && isNumber(b)) return createBool(a.value >= b.value);
 					throw new Error(`Cannot compare ${typeof a} and ${typeof b}`);
-				}),
+				})
 			);
 
 			// Pipeline operator
 			this.environment.set(
-				"|",
-				createNativeFunction("|", (value: Value) => (func: Value) => {
+				'|',
+				createNativeFunction('|', (value: Value) => (func: Value) => {
 					if (isFunction(func)) return func.fn(value);
 					throw new Error(
-						`Cannot apply non-function in thrush: ${func?.tag || "unit"}`,
+						`Cannot apply non-function in thrush: ${func?.tag || 'unit'}`
 					);
-				}),
+				})
 			);
 
 			// Left-to-right composition
 			this.environment.set(
-				"|>",
-				createNativeFunction("|>", (f: Value) => (g: Value) => {
+				'|>',
+				createNativeFunction('|>', (f: Value) => (g: Value) => {
 					if (isFunction(f) && isFunction(g)) {
 						return createFunction((x: Value) => g.fn(f.fn(x)));
 					}
 					throw new Error(
-						`Cannot compose non-functions: ${f?.tag || "unit"} and ${
-							g?.tag || "unit"
-						}`,
+						`Cannot compose non-functions: ${f?.tag || 'unit'} and ${
+							g?.tag || 'unit'
+						}`
 					);
-				}),
+				})
 			);
 
 			// Right-to-left composition
 			this.environment.set(
-				"<|",
-				createNativeFunction("<|", (f: Value) => (g: Value) => {
+				'<|',
+				createNativeFunction('<|', (f: Value) => (g: Value) => {
 					if (isFunction(f) && isFunction(g)) {
 						return createFunction((x: Value) => f.fn(g.fn(x)));
 					}
 					throw new Error(
-						`Cannot compose non-functions: ${f?.tag || "unit"} and ${
-							g?.tag || "unit"
-						}`,
+						`Cannot compose non-functions: ${f?.tag || 'unit'} and ${
+							g?.tag || 'unit'
+						}`
 					);
-				}),
+				})
 			);
 
 			// Semicolon operator
 			this.environment.set(
-				";",
-				createNativeFunction(";", (_left: Value) => (right: Value) => right),
+				';',
+				createNativeFunction(';', (_left: Value) => (right: Value) => right)
 			);
 
 			// Dollar operator (low precedence function application)
 			this.environment.set(
-				"$",
-				createNativeFunction("$", (func: Value) => (arg: Value) => {
+				'$',
+				createNativeFunction('$', (func: Value) => (arg: Value) => {
 					if (isFunction(func)) return func.fn(arg);
 					if (isNativeFunction(func)) return func.fn(arg);
 					throw new Error(
-						`Cannot apply non-function in dollar operator: ${func?.tag || "unit"}`,
+						`Cannot apply non-function in dollar operator: ${
+							func?.tag || 'unit'
+						}`
 					);
-				}),
+				})
 			);
 
 			// List operations - minimal built-ins for self-hosted functions
 			this.environment.set(
-				"list_get",
-				createNativeFunction("list_get", (index: Value) => (list: Value) => {
+				'list_get',
+				createNativeFunction('list_get', (index: Value) => (list: Value) => {
 					if (isNumber(index) && isList(list)) {
 						const idx = index.value;
 						if (idx >= 0 && idx < list.values.length) {
 							return list.values[idx];
 						}
 					}
-					throw new Error("list_get: invalid index or not a list");
-				}),
+					throw new Error('list_get: invalid index or not a list');
+				})
 			);
 
 			// List operations
 			this.environment.set(
-				"tail",
-				createNativeFunction("tail", (list: Value) => {
+				'tail',
+				createNativeFunction('tail', (list: Value) => {
 					if (isList(list) && list.values.length > 0)
 						return createList(list.values.slice(1));
-					throw new Error("Cannot get tail of empty list or non-list");
-				}),
+					throw new Error('Cannot get tail of empty list or non-list');
+				})
 			);
 			this.environment.set(
-				"cons",
-				createNativeFunction("cons", (head: Value) => (tail: Value) => {
+				'cons',
+				createNativeFunction('cons', (head: Value) => (tail: Value) => {
 					if (isList(tail)) return createList([head, ...tail.values]);
-					throw new Error("Second argument to cons must be a list");
-				}),
+					throw new Error('Second argument to cons must be a list');
+				})
 			);
 
 			// List utility functions
 			this.environment.set(
-				"map",
-				createNativeFunction("map", (func: Value) => (list: Value) => {
+				'map',
+				createNativeFunction('map', (func: Value) => (list: Value) => {
 					if (isFunction(func) && isList(list)) {
 						return createList(list.values.map((item: Value) => func.fn(item)));
 					}
-					throw new Error("map requires a function and a list");
-				}),
+					throw new Error('map requires a function and a list');
+				})
 			);
 			this.environment.set(
-				"filter",
-				createNativeFunction("filter", (pred: Value) => (list: Value) => {
+				'filter',
+				createNativeFunction('filter', (pred: Value) => (list: Value) => {
 					if (isFunction(pred) && isList(list)) {
 						return createList(
 							list.values.filter((item: Value) => {
@@ -433,16 +435,16 @@ export class Evaluator {
 								}
 								// For non-boolean results, treat as truthy/falsy
 								return !isUnit(result);
-							}),
+							})
 						);
 					}
-					throw new Error("filter requires a predicate function and a list");
-				}),
+					throw new Error('filter requires a predicate function and a list');
+				})
 			);
 			this.environment.set(
-				"reduce",
+				'reduce',
 				createNativeFunction(
-					"reduce",
+					'reduce',
 					(func: Value) => (initial: Value) => (list: Value) => {
 						if (isFunction(func) && isList(list)) {
 							return list.values.reduce((acc: Value, item: Value) => {
@@ -456,206 +458,303 @@ export class Evaluator {
 							}, initial);
 						}
 						throw new Error(
-							"reduce requires a function, initial value, and a list",
+							'reduce requires a function, initial value, and a list'
 						);
-					},
-				),
+					}
+				)
 			);
 			this.environment.set(
-				"length",
-				createNativeFunction("length", (list: Value) => {
+				'length',
+				createNativeFunction('length', (list: Value) => {
 					if (isList(list)) return createNumber(list.values.length);
-					throw new Error("length requires a list");
-				}),
+					throw new Error('length requires a list');
+				})
 			);
 			this.environment.set(
-				"isEmpty",
-				createNativeFunction("isEmpty", (list: Value) => {
+				'isEmpty',
+				createNativeFunction('isEmpty', (list: Value) => {
 					if (isList(list)) return createBool(list.values.length === 0);
-					throw new Error("isEmpty requires a list");
-				}),
+					throw new Error('isEmpty requires a list');
+				})
 			);
 			this.environment.set(
-				"append",
-				createNativeFunction("append", (list1: Value) => (list2: Value) => {
+				'append',
+				createNativeFunction('append', (list1: Value) => (list2: Value) => {
 					if (isList(list1) && isList(list2))
 						return createList([...list1.values, ...list2.values]);
-					throw new Error("append requires two lists");
-				}),
+					throw new Error('append requires two lists');
+				})
 			);
 
 			// Math utilities
 			this.environment.set(
-				"abs",
-				createNativeFunction("abs", (n: Value) => {
+				'abs',
+				createNativeFunction('abs', (n: Value) => {
 					if (isNumber(n)) return createNumber(Math.abs(n.value));
-					throw new Error("abs requires a number");
-				}),
+					throw new Error('abs requires a number');
+				})
 			);
 			this.environment.set(
-				"max",
-				createNativeFunction("max", (a: Value) => (b: Value) => {
+				'max',
+				createNativeFunction('max', (a: Value) => (b: Value) => {
 					if (isNumber(a) && isNumber(b))
 						return createNumber(Math.max(a.value, b.value));
-					throw new Error("max requires two numbers");
-				}),
+					throw new Error('max requires two numbers');
+				})
 			);
 			this.environment.set(
-				"min",
-				createNativeFunction("min", (a: Value) => (b: Value) => {
+				'min',
+				createNativeFunction('min', (a: Value) => (b: Value) => {
 					if (isNumber(a) && isNumber(b))
 						return createNumber(Math.min(a.value, b.value));
-					throw new Error("min requires two numbers");
-				}),
+					throw new Error('min requires two numbers');
+				})
 			);
 
 			// Effectful functions
 			this.environment.set(
-				"print",
-				createNativeFunction("print", (value: Value) => {
+				'print',
+				createNativeFunction('print', (value: Value) => {
 					console.log(formatValue(value));
 					return value; // Return the value that was printed
-				}),
+				})
 			);
 
 			// String utilities
 			this.environment.set(
-				"concat",
-				createNativeFunction("concat", (a: Value) => (b: Value) => {
+				'concat',
+				createNativeFunction('concat', (a: Value) => (b: Value) => {
 					if (isString(a) && isString(b))
 						return createString(a.value + b.value);
-					throw new Error("concat requires two strings");
-				}),
+					throw new Error('concat requires two strings');
+				})
 			);
 			this.environment.set(
-				"toString",
-				createNativeFunction("toString", (value: Value) =>
-					createString(valueToString(value)),
-				),
+				'toString',
+				createNativeFunction('toString', (value: Value) =>
+					createString(valueToString(value))
+				)
 			);
 
 			// Record utilities
 			this.environment.set(
-				"hasKey",
-				createNativeFunction("hasKey", (record: Value) => (key: Value) => {
+				'hasKey',
+				createNativeFunction('hasKey', (record: Value) => (key: Value) => {
 					if (isRecord(record) && isString(key)) {
 						return createBool(key.value in record.fields);
 					}
-					throw new Error("hasKey requires a record and a string key");
-				}),
+					throw new Error('hasKey requires a record and a string key');
+				})
 			);
 			this.environment.set(
-				"hasValue",
-				createNativeFunction("hasValue", (record: Value) => (value: Value) => {
+				'hasValue',
+				createNativeFunction('hasValue', (record: Value) => (value: Value) => {
 					if (isRecord(record)) {
 						return createBool(Object.values(record.fields).includes(value));
 					}
-					throw new Error("hasValue requires a record");
-				}),
+					throw new Error('hasValue requires a record');
+				})
 			);
 			this.environment.set(
-				"set",
+				'set',
 				createNativeFunction(
-					"set",
+					'set',
 					(accessor: Value) => (record: Value) => (newValue: Value) => {
 						if (isNativeFunction(accessor) && isRecord(record)) {
 							// For now, just handle simple field accessors
-							const field = accessor.name?.replace("@", "");
+							const field = accessor.name?.replace('@', '');
 							if (field) {
 								return createRecord({ ...record.fields, [field]: newValue });
 							}
 						}
-						throw new Error("set requires an accessor, record, and new value");
-					},
-				),
+						throw new Error('set requires an accessor, record, and new value');
+					}
+				)
 			);
 
 			// Tuple operations
 			this.environment.set(
-				"tupleLength",
-				createNativeFunction("tupleLength", (tuple: Value) => {
+				'tupleLength',
+				createNativeFunction('tupleLength', (tuple: Value) => {
 					if (isTuple(tuple)) {
 						return createNumber(tuple.values.length);
 					}
-					throw new Error("tupleLength requires a tuple");
-				}),
+					throw new Error('tupleLength requires a tuple');
+				})
 			);
 			this.environment.set(
-				"tupleIsEmpty",
-				createNativeFunction("tupleIsEmpty", (tuple: Value) => {
+				'tupleIsEmpty',
+				createNativeFunction('tupleIsEmpty', (tuple: Value) => {
 					if (isTuple(tuple)) {
 						return createBool(tuple.values.length === 0);
 					}
-					throw new Error("tupleIsEmpty requires a tuple");
-				}),
+					throw new Error('tupleIsEmpty requires a tuple');
+				})
 			);
 
 			// Built-in ADT constructors are now self-hosted in stdlib.noo
 
 			// Option utility functions
 			this.environment.set(
-				"isSome",
-				createNativeFunction("isSome", (option: Value) => {
-					if (isConstructor(option) && option.name === "Some") {
+				'isSome',
+				createNativeFunction('isSome', (option: Value) => {
+					if (isConstructor(option) && option.name === 'Some') {
 						return createTrue();
-					} else if (isConstructor(option) && option.name === "None") {
+					} else if (isConstructor(option) && option.name === 'None') {
 						return createFalse();
 					}
-					throw new Error("isSome requires an Option value");
-				}),
+					throw new Error('isSome requires an Option value');
+				})
 			);
 
 			this.environment.set(
-				"isNone",
-				createNativeFunction("isNone", (option: Value) => {
-					if (isConstructor(option) && option.name === "None") {
+				'isNone',
+				createNativeFunction('isNone', (option: Value) => {
+					if (isConstructor(option) && option.name === 'None') {
 						return createTrue();
-					} else if (isConstructor(option) && option.name === "Some") {
+					} else if (isConstructor(option) && option.name === 'Some') {
 						return createFalse();
 					}
-					throw new Error("isNone requires an Option value");
-				}),
+					throw new Error('isNone requires an Option value');
+				})
 			);
 
 			this.environment.set(
-				"unwrap",
-				createNativeFunction("unwrap", (option: Value) => {
+				'unwrap',
+				createNativeFunction('unwrap', (option: Value) => {
 					if (
 						isConstructor(option) &&
-						option.name === "Some" &&
+						option.name === 'Some' &&
 						option.args.length === 1
 					) {
 						return option.args[0];
-					} else if (isConstructor(option) && option.name === "None") {
-						throw new Error("Cannot unwrap None value");
+					} else if (isConstructor(option) && option.name === 'None') {
+						throw new Error('Cannot unwrap None value');
 					}
-					throw new Error("unwrap requires a Some value");
-				}),
+					throw new Error('unwrap requires a Some value');
+				})
 			);
 
 			// Result utility functions
 			this.environment.set(
-				"isOk",
-				createNativeFunction("isOk", (result: Value) => {
-					if (isConstructor(result) && result.name === "Ok") {
+				'isOk',
+				createNativeFunction('isOk', (result: Value) => {
+					if (isConstructor(result) && result.name === 'Ok') {
 						return createTrue();
-					} else if (isConstructor(result) && result.name === "Err") {
+					} else if (isConstructor(result) && result.name === 'Err') {
 						return createFalse();
 					}
-					throw new Error("isOk requires a Result value");
-				}),
+					throw new Error('isOk requires a Result value');
+				})
 			);
 
 			this.environment.set(
-				"isErr",
-				createNativeFunction("isErr", (result: Value) => {
-					if (isConstructor(result) && result.name === "Err") {
+				'isErr',
+				createNativeFunction('isErr', (result: Value) => {
+					if (isConstructor(result) && result.name === 'Err') {
 						return createTrue();
-					} else if (isConstructor(result) && result.name === "Ok") {
+					} else if (isConstructor(result) && result.name === 'Ok') {
 						return createFalse();
 					}
-					throw new Error("isErr requires a Result value");
-				}),
+					throw new Error('isErr requires a Result value');
+				})
+			);
+
+			// Missing builtin implementations
+			this.environment.set(
+				'println',
+				createNativeFunction('println', (value: Value) => {
+					console.log(valueToString(value));
+					return value;
+				})
+			);
+
+			this.environment.set(
+				'readFile',
+				createNativeFunction('readFile', (path: Value) => {
+					if (!isString(path)) {
+						throw new Error('readFile requires a string path');
+					}
+					try {
+						const content = this.fs.readFileSync(path.value, 'utf-8');
+						return createString(content);
+					} catch (error) {
+						throw new Error(`Failed to read file: ${error}`);
+					}
+				})
+			);
+
+			this.environment.set(
+				'writeFile',
+				createNativeFunction('writeFile', (path: Value) => (content: Value) => {
+					if (!isString(path)) {
+						throw new Error('writeFile requires a string path');
+					}
+					if (!isString(content)) {
+						throw new Error('writeFile requires string content');
+					}
+					try {
+						this.fs.writeFileSync(path.value, content.value);
+						return createUnit();
+					} catch (error) {
+						throw new Error(`Failed to write file: ${error}`);
+					}
+				})
+			);
+
+			this.environment.set(
+				'log',
+				createNativeFunction('log', (message: Value) => {
+					if (!isString(message)) {
+						throw new Error('log requires a string message');
+					}
+					console.log(`[LOG] ${message.value}`);
+					return createUnit();
+				})
+			);
+
+			this.environment.set(
+				'random',
+				createNativeFunction('random', () => {
+					return createNumber(
+						Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)
+					);
+				})
+			);
+
+			this.environment.set(
+				'randomRange',
+				createNativeFunction('randomRange', (min: Value) => (max: Value) => {
+					if (!isNumber(min) || !isNumber(max)) {
+						throw new Error('randomRange requires number arguments');
+					}
+					const minVal = Math.min(min.value, max.value);
+					const maxVal = Math.max(min.value, max.value);
+					return createNumber(
+						Math.floor(Math.random() * (maxVal - minVal + 1)) + minVal
+					);
+				})
+			);
+
+			this.environment.set(
+				'mutSet',
+				createNativeFunction('mutSet', (ref: Value) => (value: Value) => {
+					if (!isCell(ref)) {
+						throw new Error('mutSet requires a mutable reference');
+					}
+					ref.value = value;
+					return createUnit();
+				})
+			);
+
+			this.environment.set(
+				'mutGet',
+				createNativeFunction('mutGet', (ref: Value) => {
+					if (!isCell(ref)) {
+						throw new Error('mutGet requires a mutable reference');
+					}
+					return ref.value;
+				})
 			);
 		}
 

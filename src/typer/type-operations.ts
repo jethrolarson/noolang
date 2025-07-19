@@ -277,3 +277,11 @@ export const createTypeState = (): TypeState => ({
 	adtRegistry: new Map(),
 	accessorCache: new Map(),
 });
+
+// Clean substitutions from type state while preserving environment and other state
+// This is used in REPL to prevent type pollution between evaluations
+export const cleanSubstitutions = (state: TypeState): TypeState => ({
+	...state,
+	substitution: new Map(), // Clear substitutions but keep environment
+	constraints: [], // Clear constraints as well
+});
