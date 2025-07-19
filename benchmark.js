@@ -30,7 +30,7 @@ function runBenchmark(benchmarkFile) {
 	const start = process.hrtime.bigint();
 
 	try {
-		execSync(`npm run start -- --benchmark ${benchmarkFile}`, {
+		execSync(`node dist/cli.js --benchmark ${benchmarkFile}`, {
 			stdio: 'pipe',
 			timeout: 30000, // 30 second timeout
 		});
@@ -44,7 +44,7 @@ function runBenchmark(benchmarkFile) {
 
 function runDetailedBenchmark(benchmarkFile) {
 	try {
-		const output = execSync(`npm run start -- --benchmark ${benchmarkFile}`, {
+		const output = execSync(`node dist/cli.js --benchmark ${benchmarkFile}`, {
 			encoding: 'utf8',
 			stdio: 'pipe',
 			timeout: 30000,
