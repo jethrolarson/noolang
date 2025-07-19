@@ -23,6 +23,12 @@ head = fn list => if (length list) == 0
   then None 
   else Some (list_get 0 list);
 
+# Join list elements with a separator
+# Example: join ", " [1, 2, 3] -> "1, 2, 3"
+join = fn separator list =>
+  reduce (fn acc x => if acc == "" then x else concat acc (concat separator x)) "" list;
+
+
 # ========================================
 # UTILITY FUNCTIONS
 # ========================================
