@@ -91,6 +91,11 @@ impl LanguageServer for Backend {
             .map(|item| CompletionItem::new_simple(item, "Noolang keyword".to_string()))
             .collect();
             
+        // Log completion request for debugging
+        self.client
+            .log_message(MessageType::INFO, format!("Completion requested for: {}", file_path))
+            .await;
+            
         Ok(Some(CompletionResponse::Array(items)))
     }
 

@@ -1,0 +1,8 @@
+# Test file to trigger Noolang LSP extension
+# This should activate the extension when opened
+
+x = 42;
+y = "hello";
+
+# This should show syntax highlighting
+# And potentially LSP features if working 

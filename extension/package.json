@@ -1,0 +1,67 @@
+{
+  "name": "noolang-lsp",
+  "displayName": "Noolang Language Server",
+  "description": "LSP support for Noolang programming language",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:noolang"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "noolang",
+        "aliases": [
+          "Noolang",
+          "noolang"
+        ],
+        "extensions": [
+          ".noo"
+        ],
+        "configuration": "../language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "noolang",
+        "scopeName": "source.noolang",
+        "path": "../syntaxes/noolang.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "Noolang LSP",
+      "properties": {
+        "noolang.languageServerPath": {
+          "type": "string",
+          "default": "./lsp/target/release/noolang-lsp",
+          "description": "Path to the Noolang LSP server binary"
+        },
+        "noolang.enableLanguageServer": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Noolang language server"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "^16.11.7",
+    "typescript": "^4.5.5"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^8.0.0",
+    "vscode-languageserver": "^8.0.0"
+  }
+}
