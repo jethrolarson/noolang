@@ -1,1 +1,0 @@
-console.log('Testing stdlib loading...'); const { Evaluator } = require('./dist/evaluator'); const e = new Evaluator(); console.log('Environment size:', e.environment.size); console.log('Has True:', e.environment.has('True'));

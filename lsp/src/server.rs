@@ -18,10 +18,23 @@ impl TypeScriptBridge {
     fn get_completions(&self, _file_path: &str) -> AnyhowResult<Vec<String>> {
         // TODO: Implement completion logic using TypeScript interpreter
         Ok(vec![
+            // Keywords
             "fn".to_string(),
             "if".to_string(), 
             "match".to_string(),
             "type".to_string(),
+            "mut".to_string(),
+            "mut!".to_string(),
+            "with".to_string(),
+            "then".to_string(),
+            "else".to_string(),
+            // ADT constructors from stdlib
+            "True".to_string(),
+            "False".to_string(),
+            "None".to_string(),
+            "Some".to_string(),
+            "Ok".to_string(),
+            "Err".to_string(),
         ])
     }
 }

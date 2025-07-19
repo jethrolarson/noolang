@@ -23,15 +23,7 @@
         ],
         "extensions": [
           ".noo"
-        ],
-        "configuration": "../language-configuration.json"
-      }
-    ],
-    "grammars": [
-      {
-        "language": "noolang",
-        "scopeName": "source.noolang",
-        "path": "../syntaxes/noolang.tmLanguage.json"
+        ]
       }
     ],
     "configuration": {
