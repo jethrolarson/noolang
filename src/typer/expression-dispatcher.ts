@@ -2,7 +2,7 @@ import {
 	type Expression,
 	unitType,
 } from '../ast';
-import { type TypeState, type TypeResult } from './types';
+import { type TypeState, type TypeResult, createPureTypeResult } from './types';
 import {
 	typeLiteral,
 	typeVariableExpr,
@@ -145,7 +145,7 @@ export const typeExpression = (
 			return typeWhere(expr, state);
 
 		case 'unit':
-			return { type: unitType(), state };
+			return createPureTypeResult(unitType(), state);
 
 		case 'typed':
 			return typeTyped(expr, state);

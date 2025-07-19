@@ -49,7 +49,14 @@ import {
 	typeToString,
 	propagateConstraintToTypeVariable,
 } from './helpers';
-import { type TypeState, type TypeResult } from './types';
+import { 
+	type TypeState, 
+	type TypeResult, 
+	createPureTypeResult, 
+	createTypeResult, 
+	unionEffects, 
+	emptyEffects 
+} from './types';
 import {
 	satisfiesConstraint,
 	solveConstraint,
@@ -72,11 +79,11 @@ export const typeLiteral = (
 	const value = expr.value;
 
 	if (typeof value === 'number') {
-		return { type: intType(), state };
+		return createPureTypeResult(intType(), state);
 	} else if (typeof value === 'string') {
-		return { type: stringType(), state };
+		return createPureTypeResult(stringType(), state);
 	} else {
-		return { type: unknownType(), state };
+		return createPureTypeResult(unknownType(), state);
 	}
 };
 
@@ -95,7 +102,7 @@ export const typeVariableExpr = (
 
 	const [instantiatedType, newState] = instantiate(scheme, state);
 
-	return { type: instantiatedType, state: newState };
+	return createPureTypeResult(instantiatedType, newState);
 };
 
 // Helper function to count parameters in a function type
@@ -285,7 +292,7 @@ export const typeFunction = (
 		}
 	}
 
-	return { type: funcType, state: currentState };
+	return createTypeResult(funcType, bodyResult.effects, currentState);
 };
 
 // Type inference for definitions
@@ -341,7 +348,7 @@ export const typeDefinition = (
 		new Map(),
 		currentState
 	);
-	return { type: finalType, state: finalState };
+	return createTypeResult(finalType, valueResult.effects, finalState);
 };
 
 // Type inference for if expressions
@@ -379,7 +386,7 @@ export const typeIf = (expr: IfExpression, state: TypeState): TypeResult => {
 	// Apply substitution to get final type
 	const finalType = substitute(thenResult.type, currentState.substitution);
 
-	return { type: finalType, state: currentState };
+	return createTypeResult(finalType, unionEffects(conditionResult.effects, thenResult.effects, elseResult.effects), currentState);
 };
 
 // Type inference for binary expressions
@@ -393,14 +400,16 @@ export const typeBinary = (
 		const statements = flattenStatements(expr);
 		let currentState = state;
 		let finalType = null;
+		let allEffects = emptyEffects();
 		
 		for (const statement of statements) {
 			const result = typeExpression(statement, currentState);
 			currentState = result.state;
 			finalType = result.type;
+			allEffects = unionEffects(allEffects, result.effects);
 		}
 		
-		return { type: finalType || unitType(), state: currentState };
+		return createTypeResult(finalType || unitType(), allEffects, currentState);
 	}
 
 	let currentState = state;
@@ -438,7 +447,7 @@ export const typeBinary = (
 		);
 
 		// Return the function's return type
-		return { type: rightResult.type.return, state: currentState };
+		return createTypeResult(rightResult.type.return, unionEffects(leftResult.effects, rightResult.effects), currentState);
 	}
 
 	// Get operator type from environment
@@ -488,7 +497,7 @@ export const typeBinary = (
 		currentState
 	);
 
-	return { type: finalResultType, state: finalResultState };
+	return createTypeResult(finalResultType, unionEffects(leftResult.effects, rightResult.effects), finalResultState);
 };
 
 // Type inference for mutable definitions
@@ -502,10 +511,11 @@ export const typeMutableDefinition = (
 		type: valueResult.type,
 		quantifiedVars: [],
 	});
-	return {
-		type: valueResult.type,
-		state: { ...valueResult.state, environment: newEnv },
-	};
+	return createTypeResult(
+		valueResult.type, 
+		valueResult.effects, 
+		{ ...valueResult.state, environment: newEnv }
+	);
 };
 
 // Type inference for mutations
@@ -530,7 +540,7 @@ export const typeMutation = (
 		getExprLocation(expr)
 	);
 
-	return { type: unitType(), state: newState }; // Mutations return unit
+	return createTypeResult(unitType(), valueResult.effects, newState); // Mutations return unit
 };
 
 // Type inference for imports
@@ -539,7 +549,7 @@ export const typeImport = (
 	state: TypeState
 ): TypeResult => {
 	// For now, assume imports return a record type
-	return { type: recordType({}), state };
+	return createPureTypeResult(recordType({}), state);
 };
 
 // Type inference for records
@@ -556,7 +566,7 @@ export const typeRecord = (
 		currentState = fieldResult.state;
 	}
 
-	return { type: recordType(fields), state: currentState };
+	return createPureTypeResult(recordType(fields), currentState);
 };
 
 // Type inference for accessors
@@ -568,7 +578,7 @@ export const typeAccessor = (
 	const fieldName = expr.field;
 	const cachedType = state.accessorCache.get(fieldName);
 	if (cachedType) {
-		return { type: cachedType, state };
+		return createPureTypeResult(cachedType, state);
 	}
 
 	// Accessors return functions that take any record with the required field and return the field type
@@ -592,10 +602,7 @@ export const typeAccessor = (
 		accessorCache: new Map(finalState.accessorCache).set(fieldName, funcType),
 	};
 
-	return {
-		type: funcType,
-		state: resultState,
-	};
+	return createPureTypeResult(funcType, resultState);
 };
 
 // Type inference for tuples
@@ -612,7 +619,7 @@ export const typeTuple = (
 		currentState = elementResult.state;
 	}
 
-	return { type: tupleType(elements), state: currentState };
+	return createPureTypeResult(tupleType(elements), currentState);
 };
 
 // Type inference for lists
@@ -622,7 +629,7 @@ export const typeList = (
 ): TypeResult => {
 	if (expr.elements.length === 0) {
 		// Empty list - we can't infer the element type
-		return { type: listTypeWithElement(typeVariable('a')), state };
+		return createPureTypeResult(listTypeWithElement(typeVariable('a')), state);
 	}
 
 	// Infer the type from the first element
@@ -630,11 +637,13 @@ export const typeList = (
 	const firstElementResult = typeExpression(expr.elements[0], currentState);
 	currentState = firstElementResult.state;
 	const firstElementType = firstElementResult.type;
+	let allEffects = firstElementResult.effects;
 
 	// Check that all elements have the same type
 	for (let i = 1; i < expr.elements.length; i++) {
 		const elementResult = typeExpression(expr.elements[i], currentState);
 		currentState = elementResult.state;
+		allEffects = unionEffects(allEffects, elementResult.effects);
 		currentState = unify(firstElementType, elementResult.type, currentState, {
 			line: expr.location?.start.line || 1,
 			column: expr.location?.start.column || 1,
@@ -646,10 +655,11 @@ export const typeList = (
 		firstElementType,
 		currentState.substitution
 	);
-	return {
-		type: listTypeWithElement(resolvedElementType),
-		state: currentState,
-	};
+	return createTypeResult(
+		listTypeWithElement(resolvedElementType),
+		allEffects,
+		currentState
+	);
 };
 
 // Type inference for where expressions
@@ -697,7 +707,7 @@ export const typeWhere = (
 	// Type the main expression
 	const resultResult = typeExpression(expr.main, currentState);
 
-	return { type: resultResult.type, state: resultResult.state };
+	return createTypeResult(resultResult.type, resultResult.effects, resultResult.state);
 };
 
 // Type inference for typed expressions
@@ -719,7 +729,7 @@ export const typeTyped = (
 		}
 	);
 
-	return { type: explicitType, state: newState }; // Use the explicit type
+	return createTypeResult(explicitType, inferredResult.effects, newState); // Use the explicit type
 };
 
 // Type inference for constrained expressions
@@ -747,5 +757,5 @@ export const typeConstrained = (
 	// The constraint will be handled at the function level
 
 	// Return the explicit type without constraints applied
-	return { type: explicitType, state: currentState };
+	return createTypeResult(explicitType, inferredResult.effects, currentState);
 };

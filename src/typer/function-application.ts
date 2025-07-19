@@ -18,7 +18,12 @@ import {
 	typeToString,
 	propagateConstraintToTypeVariable,
 } from './helpers';
-import { type TypeState, type TypeResult } from './types';
+import { 
+	type TypeState, 
+	type TypeResult, 
+	createTypeResult, 
+	unionEffects 
+} from './types';
 import { satisfiesConstraint } from './constraints';
 import { substitute } from './substitute';
 import { unify } from './unify';
@@ -98,12 +103,14 @@ export const typeApplication = (
 	currentState = funcResult.state;
 	const funcType = funcResult.type;
 
-	// Type each argument
+	// Type each argument and collect effects
 	const argTypes: Type[] = [];
+	let allEffects = funcResult.effects;
 	for (const arg of expr.args) {
 		const argResult = typeExpression(arg, currentState);
 		argTypes.push(argResult.type);
 		currentState = argResult.state;
+		allEffects = unionEffects(allEffects, argResult.effects);
 	}
 
 	// Handle function application by checking if funcType is a function
@@ -375,7 +382,7 @@ export const typeApplication = (
 				}
 			}
 
-			return { type: finalReturnType, state: currentState };
+			return createTypeResult(finalReturnType, allEffects, currentState);
 		} else {
 			// Partial application - return a function with remaining parameters
 			const remainingParams = funcType.params.slice(argTypes.length);
@@ -411,12 +418,12 @@ export const typeApplication = (
 				}
 			}
 
-			return { type: partialFunctionType, state: currentState };
+			return createTypeResult(partialFunctionType, allEffects, currentState);
 		}
 	} else if (funcType.kind === 'variable') {
 		// If it's a type variable, create a function type and unify
 		if (argTypes.length === 0) {
-			return { type: funcType, state: currentState };
+			return createTypeResult(funcType, allEffects, currentState);
 		}
 
 		const [paramType, newState] = freshTypeVariable(currentState);
@@ -434,10 +441,11 @@ export const typeApplication = (
 			column: expr.location?.start.column || 1,
 		});
 
-		return {
-			type: substitute(returnType, currentState.substitution),
-			state: currentState,
-		};
+		return createTypeResult(
+			substitute(returnType, currentState.substitution),
+			allEffects,
+			currentState
+		);
 	} else {
 		throw new Error(
 			formatTypeError(
@@ -466,11 +474,13 @@ export const typePipeline = (
 	let currentState = state;
 	let composedType = typeExpression(expr.steps[0], currentState);
 	currentState = composedType.state;
+	let allEffects = composedType.effects;
 
 	// Compose with each subsequent function type
 	for (let i = 1; i < expr.steps.length; i++) {
 		const nextFuncType = typeExpression(expr.steps[i], currentState);
 		currentState = nextFuncType.state;
+		allEffects = unionEffects(allEffects, nextFuncType.effects);
 
 		if (
 			composedType.type.kind === 'function' &&
@@ -505,13 +515,14 @@ export const typePipeline = (
 			);
 
 			// The composed function takes the input of the first function and returns the output of the last function
-			composedType = {
-				type: functionType(
+			composedType = createTypeResult(
+				functionType(
 					[composedType.type.params[0]],
 					nextFuncType.type.return
 				),
-				state: currentState,
-			};
+				allEffects,
+				currentState
+			);
 		} else {
 			throw new Error(
 				`Cannot compose non-function types in pipeline: ${typeToString(
@@ -521,8 +532,9 @@ export const typePipeline = (
 		}
 	}
 
-	return {
-		type: substitute(composedType.type, currentState.substitution),
-		state: currentState,
-	};
+	return createTypeResult(
+		substitute(composedType.type, currentState.substitution),
+		allEffects,
+		currentState
+	);
 };

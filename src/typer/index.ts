@@ -1,7 +1,7 @@
-import { type Program, type Type, unitType } from '../ast';
+import { type Program, type Type, unitType, type Effect } from '../ast';
 import { formatTypeError, createTypeError } from './type-errors';
 import { typeToString } from './helpers';
-import { type TypeState, type TypeResult } from './types';
+import { type TypeState, type TypeResult, createPureTypeResult, unionEffects } from './types';
 import { satisfiesConstraint, validateAllSubstitutionConstraints } from './constraints';
 import { substitute } from './substitute';
 import { createTypeState, loadStdlib } from './type-operations';
@@ -9,8 +9,15 @@ import { typeExpression } from './expression-dispatcher';
 import { typeAndDecorate } from './decoration';
 import { initializeBuiltins } from './builtins';
 
-// Re-export TypeResult from types module
-export { type TypeResult } from './types';
+// Re-export TypeResult and effect helpers from types module
+export { 
+	type TypeResult,
+	emptyEffects,
+	singleEffect,
+	unionEffects,
+	createTypeResult,
+	createPureTypeResult
+} from './types';
 
 // Re-export createTypeState from type-operations module
 export { createTypeState } from './type-operations';
@@ -85,16 +92,18 @@ export const typeProgram = (program: Program): TypeResult => {
 	state = loadStdlib(state);
 
 	let finalType: Type | null = null;
+	let allEffects = new Set<Effect>();
 
 	for (const statement of program.statements) {
 		const result = typeExpression(statement, state);
 		state = result.state;
 		finalType = result.type;
+		allEffects = unionEffects(allEffects, result.effects);
 	}
 
 	if (!finalType) {
 		finalType = unitType();
 	}
 
-	return { type: finalType, state };
+	return { type: finalType, effects: allEffects, state };
 };

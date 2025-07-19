@@ -10,7 +10,13 @@ import {
 	intType,
 	stringType,
 } from '../ast';
-import { type TypeState, type TypeResult } from './types';
+import { 
+	type TypeState, 
+	type TypeResult, 
+	createTypeResult, 
+	createPureTypeResult, 
+	unionEffects 
+} from './types';
 import { substitute } from './substitute';
 import { unify } from './unify';
 import { freshTypeVariable } from './type-operations';
@@ -84,10 +90,10 @@ export const typeTypeDefinition = (
 	});
 
 	// Type definitions return unit and update state
-	return {
-		type: unitType(),
-		state: { ...state, adtRegistry: finalRegistry },
-	};
+	return createPureTypeResult(
+		unitType(),
+		{ ...state, adtRegistry: finalRegistry }
+	);
 };
 
 // Type inference for match expressions
@@ -112,6 +118,7 @@ export const typeMatch = (
 	);
 	currentState = firstCaseResult.state;
 	let resultType = firstCaseResult.type;
+	let allEffects = unionEffects(exprResult.effects, firstCaseResult.effects);
 
 	// Type remaining cases and unify with result type
 	for (let i = 1; i < expr.cases.length; i++) {
@@ -121,6 +128,7 @@ export const typeMatch = (
 			currentState,
 		);
 		currentState = caseResult.state;
+		allEffects = unionEffects(allEffects, caseResult.effects);
 
 		// Unify case result type with overall result type
 		currentState = unify(
@@ -132,7 +140,7 @@ export const typeMatch = (
 		resultType = substitute(resultType, currentState.substitution);
 	}
 
-	return { type: resultType, state: currentState };
+	return createTypeResult(resultType, allEffects, currentState);
 };
 
 // Type a single match case
