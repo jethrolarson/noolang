@@ -656,39 +656,39 @@ describe("Top-level definitions with type annotations", () => {
 	// Phase 1: Effect parsing tests
 	describe("Effect parsing", () => {
 		test("should parse function type with single effect", () => {
-			const lexer = new Lexer("Int -> Int !io");
+			const lexer = new Lexer("Int -> Int !write");
 			const tokens = lexer.tokenize();
 			const result = parseTypeExpression(tokens);
 			
 			assertParseSuccess(result);
 			assertFunctionType(result.value);
 		const funcType = result.value;
-			expect([...funcType.effects]).toEqual(["io"]);
+			expect([...funcType.effects]).toEqual(["write"]);
 			expect(funcType.params).toHaveLength(1);
 			expect(funcType.params[0].kind).toBe("primitive");
 			expect(funcType.return.kind).toBe("primitive");
 		});
 
 		test("should parse function type with multiple effects", () => {
-			const lexer = new Lexer("Int -> String !io !log");
+			const lexer = new Lexer("Int -> String !write !log");
 			const tokens = lexer.tokenize();
 			const result = parseTypeExpression(tokens);
 			
 			assertParseSuccess(result);
 			assertFunctionType(result.value);
 		const funcType = result.value;
-			expect([...funcType.effects].sort()).toEqual(["io", "log"]);
+			expect([...funcType.effects].sort()).toEqual(["log", "write"]);
 		});
 
 		test("should parse function type with all valid effects", () => {
-			const lexer = new Lexer("Int -> Int !io !log !mut !rand !err");
+			const lexer = new Lexer("Int -> Int !log !read !write !state !time !rand !ffi !async");
 			const tokens = lexer.tokenize();
 			const result = parseTypeExpression(tokens);
 			
 			assertParseSuccess(result);
 			assertFunctionType(result.value);
 		const funcType = result.value;
-			expect([...funcType.effects].sort()).toEqual(["err", "io", "log", "mut", "rand"]);
+			expect([...funcType.effects].sort()).toEqual(["async", "ffi", "log", "rand", "read", "state", "time", "write"]);
 		});
 
 		test("should parse function type with no effects", () => {
@@ -703,14 +703,14 @@ describe("Top-level definitions with type annotations", () => {
 		});
 
 		test("should parse multi-parameter function with effects", () => {
-			const lexer = new Lexer("Int -> String -> Bool !io");
+			const lexer = new Lexer("Int -> String -> Bool !read");
 			const tokens = lexer.tokenize();
 			const result = parseTypeExpression(tokens);
 			
 			assertParseSuccess(result);
 			assertFunctionType(result.value);
 		const funcType = result.value;
-			expect([...funcType.effects]).toEqual(["io"]);
+			expect([...funcType.effects]).toEqual(["read"]);
 			expect(funcType.params).toHaveLength(1);
 			expect(funcType.return.kind).toBe("function");
 		});
@@ -734,12 +734,12 @@ describe("Top-level definitions with type annotations", () => {
 		});
 
 		test("should parse typed expression with effects", () => {
-			const result = parseDefinition("x : Int -> Int !io");
+			const result = parseDefinition("x : Int -> Int !state");
 			expect(result.statements).toHaveLength(1);
 			const typed = assertTypedExpression(result.statements[0]);
 			assertFunctionType(typed.type);
 		const funcType = typed.type;
-			expect([...funcType.effects]).toEqual(["io"]);
+			expect([...funcType.effects]).toEqual(["state"]);
 		});
 
 		test("should parse function definition with effect annotation", () => {
@@ -753,15 +753,15 @@ describe("Top-level definitions with type annotations", () => {
 		});
 
 		test("should automatically deduplicate effects", () => {
-			const lexer = new Lexer("Int -> Int !io !log !io");
+			const lexer = new Lexer("Int -> Int !write !log !write");
 			const tokens = lexer.tokenize();
 			const result = parseTypeExpression(tokens);
 			
 			assertParseSuccess(result);
 			assertFunctionType(result.value);
 		const funcType = result.value;
-			// Set automatically deduplicates, so !io !log !io becomes {io, log}
-			expect([...funcType.effects].sort()).toEqual(["io", "log"]);
+			// Set automatically deduplicates, so !write !log !write becomes {log, write}
+			expect([...funcType.effects].sort()).toEqual(["log", "write"]);
 			expect(funcType.effects.size).toBe(2);
 		});
 	});

@@ -205,26 +205,26 @@ type ExpressionResult = {
 add = fn x y => x + y : (Int) -> (Int) -> Int
 
 # Effectful expressions - explicit effect annotations  
-readFile = fn path => ... : String !io
+readFile = fn path => ... : String !read
 logLine = fn msg => log msg : Unit !log
-getUserInput = fn prompt => ... : String !io !log
+getUserInput = fn prompt => ... : String !read !log
 ```
 
 #### **Effect Composition Rules**
 
-* **Union Composition**: `!io !read + !log !read = !io !read !log`
+* **Union Composition**: `!write !read + !log !read = !write !read !log`
 * **Explicit Effects**: Keep all effects visible rather than unifying to most permissive
 * **Effect Propagation**: Effects must propagate through function composition
 
 ```noolang
 # Effect composition examples
 fileLogger = fn msg => (
-  content = readFile "log.txt" : String !io;
-  logLine (content + msg) : Unit !log  
-) : Unit !io !log  # Both effects required
+  content = readFile "log.txt" : String !read;
+  logLine (content + msg) : {} !log  
+) : Unit !read !log  # Both effects required
 
 # Function composition preserves effects
-safeFileLog = compose fileLogger  # Still requires !io !log
+safeFileLog = compose fileLogger  # Still requires !read !log
 ```
 
 #### **Implementation Plan**
@@ -255,7 +255,7 @@ safeFileLog = compose fileLogger  # Still requires !io !log
 * **✅ Parser Support**: Functions can be typed with effects using `!effect` syntax
 * **✅ Set-based Storage**: Effects stored as `Set<Effect>` for automatic deduplication
 * **✅ Comprehensive Testing**: Phase 2 (31/31), Phase 3 (32/41) tests passing
-* **✅ Built-in Functions**: Complete set of effectful functions (I/O, logging, random, mutation)
+* **✅ Built-in Functions**: Complete set of effectful functions (read/write, logging, random, state mutation)
 * **✅ Effect Propagation**: Automatic effect collection through function composition and data structures
 
 #### **Rules**
@@ -267,11 +267,18 @@ safeFileLog = compose fileLogger  # Still requires !io !log
 
 #### **Planned Core Effects**
 
-* `!io` – input/output
-* `!log` – logging or console output
-* `!mut` – local mutation
-* `!rand` – nondeterminism
-* `!err` – error throwing (if introduced; currently `Result` is preferred)
+| Effect   | Purpose                                   | Why include it                                          |
+| -------- | ----------------------------------------- | ------------------------------------------------------- |
+| `!log`   | Logging, tracing, debugging output        | Ubiquitous and benign, but useful to track              |
+| `!read`  | External reads (file, network, env)       | Non-deterministic input                                 |
+| `!write` | External writes (file, network, env)      | Side effects / state mutation                           |
+| `!state` | Mutable internal state (refs, cells, etc) | Tracks impurity without implying I/O                    |
+| `!time`  | Access to clocks or timers                | Invisible side effects and determinism risk             |
+| `!rand`  | RNG or anything entropy-based             | Non-determinism / fuzzing risk                          |
+| `!ffi`   | Calls to native or foreign functions      | Black-box behavior, may implicitly wrap other effects   |
+| `!async` | Execution that may suspend or defer       | Time non-locality; may delay evaluation or resume later |
+
+
 
 ---
 

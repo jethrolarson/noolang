@@ -328,7 +328,7 @@ export const parseTypeExpression: C.Parser<Type> = (tokens) => {
       const effectName = effectRest[0].value;
       
       // Validate effect name
-      const validEffects: Effect[] = ["io", "log", "mut", "rand", "err"];
+      const validEffects: Effect[] = ["log", "read", "write", "state", "time", "rand", "ffi", "async"];
       if (!validEffects.includes(effectName as Effect)) {
         return {
           success: false,

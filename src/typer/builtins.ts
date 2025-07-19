@@ -137,7 +137,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		type: functionType(
 			[typeVariable('a')],
 			typeVariable('a'),
-			new Set(['log'])
+			new Set(['write'])
 		),
 		quantifiedVars: [],
 	});
@@ -146,17 +146,13 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		type: functionType(
 			[typeVariable('a')],
 			typeVariable('a'),
-			new Set(['log'])
+			new Set(['write'])
 		),
 		quantifiedVars: [],
 	});
 
 	newEnv.set('readFile', {
-		type: functionType(
-			[stringType()],
-			stringType(),
-			new Set(['io'])
-		),
+		type: functionType([stringType()], stringType(), new Set(['read'])),
 		quantifiedVars: [],
 	});
 
@@ -164,17 +160,13 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		type: functionType(
 			[stringType(), stringType()],
 			unitType(),
-			new Set(['io'])
+			new Set(['write'])
 		),
 		quantifiedVars: [],
 	});
 
 	newEnv.set('log', {
-		type: functionType(
-			[stringType()],
-			unitType(),
-			new Set(['log'])
-		),
+		type: functionType([stringType()], unitType(), new Set(['log'])),
 		quantifiedVars: [],
 	});
 
@@ -182,34 +174,20 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	newEnv.set('random', {
 		type: intType(), // For now, treat as a value with effects
 		quantifiedVars: [],
-		effects: new Set(['rand'] as Effect[])  // Store effects separately
+		effects: new Set(['rand'] as Effect[]), // Store effects separately
 	});
 
 	newEnv.set('randomRange', {
-		type: functionType(
-			[intType(), intType()],
-			intType(),
-			new Set(['rand'])
-		),
+		type: functionType([intType(), intType()], intType(), new Set(['rand'])),
 		quantifiedVars: [],
 	});
 
-	// Error throwing (throws exceptions)
-	newEnv.set('throw', {
-		type: functionType(
-			[stringType()],
-			typeVariable('a'),
-			new Set(['err'])
-		),
-		quantifiedVars: ['a'],
-	});
-
-	// Mutation effects for future mutable data structures
+	// Mutable state operations
 	newEnv.set('mutSet', {
 		type: functionType(
 			[typeVariable('ref'), typeVariable('a')],
 			unitType(),
-			new Set(['mut'])
+			new Set(['state'])
 		),
 		quantifiedVars: ['ref', 'a'],
 	});
@@ -218,7 +196,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		type: functionType(
 			[typeVariable('ref')],
 			typeVariable('a'),
-			new Set(['mut'])
+			new Set(['state'])
 		),
 		quantifiedVars: ['ref', 'a'],
 	});

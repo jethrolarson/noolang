@@ -22,21 +22,21 @@ describe('Effects Phase 2: Separated Effects Architecture', () => {
 		});
 
 		test('singleEffect creates single effect set', () => {
-			const effects = singleEffect('io');
+			const effects = singleEffect('read');
 			expect(effects.size).toBe(1);
-			expect(effects.has('io')).toBe(true);
+			expect(effects.has('read')).toBe(true);
 		});
 
 		test('unionEffects combines multiple effect sets', () => {
-			const effects1 = singleEffect('io' as Effect);
+			const effects1 = singleEffect('read' as Effect);
 			const effects2 = singleEffect('log' as Effect);
-			const effects3 = new Set(['mut', 'io'] as Effect[]); // includes duplicate 'io'
+			const effects3 = new Set(['state', 'read'] as Effect[]); // includes duplicate 'read'
 			
 			const combined = unionEffects(effects1, effects2, effects3);
 			expect(combined.size).toBe(3);
-			expect(combined.has('io')).toBe(true);
+			expect(combined.has('read')).toBe(true);
 			expect(combined.has('log')).toBe(true);
-			expect(combined.has('mut')).toBe(true);
+			expect(combined.has('state')).toBe(true);
 		});
 	});
 

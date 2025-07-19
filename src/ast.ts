@@ -11,7 +11,7 @@ export type Location = {
 };
 
 // Type system
-export type Effect = "io" | "log" | "mut" | "rand" | "err";
+export type Effect = "log" | "read" | "write" | "state" | "time" | "rand" | "ffi" | "async";
 
 // Type constraints for constrained polymorphism
 export type Constraint =

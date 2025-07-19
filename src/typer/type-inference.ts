@@ -561,14 +561,16 @@ export const typeRecord = (
 ): TypeResult => {
 	const fields: { [key: string]: Type } = {};
 	let currentState = state;
+	let allEffects = emptyEffects();
 
 	for (const field of expr.fields) {
 		const fieldResult = typeExpression(field.value, currentState);
 		fields[field.name] = fieldResult.type;
 		currentState = fieldResult.state;
+		allEffects = unionEffects(allEffects, fieldResult.effects);
 	}
 
-	return createPureTypeResult(recordType(fields), currentState);
+	return createTypeResult(recordType(fields), allEffects, currentState);
 };
 
 // Type inference for accessors
@@ -614,14 +616,16 @@ export const typeTuple = (
 ): TypeResult => {
 	const elements: Type[] = [];
 	let currentState = state;
+	let allEffects = emptyEffects();
 
 	for (const element of expr.elements) {
 		const elementResult = typeExpression(element, currentState);
 		elements.push(elementResult.type);
 		currentState = elementResult.state;
+		allEffects = unionEffects(allEffects, elementResult.effects);
 	}
 
-	return createPureTypeResult(tupleType(elements), currentState);
+	return createTypeResult(tupleType(elements), allEffects, currentState);
 };
 
 // Type inference for lists

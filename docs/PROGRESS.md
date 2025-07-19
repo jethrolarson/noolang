@@ -68,7 +68,7 @@ src/
 - **Effect System Phase 3**: ✅ Complete - Effect validation and propagation implemented
 - **Parser**: ✅ Supports `!effect` syntax for function types (e.g., `Int -> Int !io !log`)
 - **Type System**: ✅ Effects stored as `Set<Effect>` with proper propagation through all expressions
-- **Built-in Functions**: ✅ Comprehensive set of effectful functions (I/O, logging, random, mutation)
+- **Built-in Functions**: ✅ Comprehensive set of effectful functions (read/write, logging, random, state mutation)
 - **Testing**: ✅ Comprehensive test suites (Phase 2: 31/31, Phase 3: 32/41 tests passing)
 - **Effect Validation**: ✅ Effect propagation through function composition, data structures, and control flow
 
@@ -134,3 +134,6 @@ noolang/
 * Imports aren't being inferred correctly
 * What if we have a way for the llm to ask what the type at a particular point in the program is? maybe with a `^` character? Similar to how users can hover over code with the mouse. or maybe just supporting LSP will do that?
 * Need module paths. Having to load everything via relative paths is troublesome
+* we're using both camelCase and snake. Everything should be snake.
+* Need to audit built-in effects
+* print should be : a -> a given a is Show (maybe log too, or can we just leave that with dumb encoding inferred in host language?)
