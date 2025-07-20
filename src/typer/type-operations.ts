@@ -9,7 +9,7 @@ import {
 } from '../ast';
 import { parse } from '../parser/parser';
 import { Lexer } from '../lexer';
-import { type TypeState, type TypeEnvironment, type TypeScheme } from './types';
+import { type TypeState, type TypeEnvironment, type TypeScheme, createConstraintRegistry } from './types';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
 import { constraintsEqual } from './helpers';
@@ -276,6 +276,7 @@ export const createTypeState = (): TypeState => ({
 	constraints: [],
 	adtRegistry: new Map(),
 	accessorCache: new Map(),
+	constraintRegistry: createConstraintRegistry(),
 });
 
 // Clean substitutions from type state while preserving environment and other state

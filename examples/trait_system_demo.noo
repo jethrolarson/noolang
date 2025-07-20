@@ -1,0 +1,56 @@
+# Trait System Demo - Noolang Enhanced Type System with Traits
+
+# Define a Monad constraint/trait
+constraint Monad m (
+  bind a b : m a -> (a -> m b) -> m b,
+  pure a : a -> m a
+);
+
+# Define a Show constraint/trait  
+constraint Show a (
+  show : a -> String
+);
+
+# Instance of Monad for List
+instance Monad List (
+  bind = fn xs f => flatMap f xs,
+  pure = fn x => [x]
+);
+
+# Instance of Monad for Option
+instance Monad Option (
+  bind = fn opt f => match opt (
+    None => None,
+    Some x => f x
+  ),
+  pure = fn x => Some x
+);
+
+# Instance of Show for Int
+instance Show Int (
+  show = fn x => toString x
+);
+
+# Instance of Show for List (if elements are showable)
+instance Show (List a) given Show a (
+  show = fn xs => "[" + (join ", " (map show xs)) + "]"
+);
+
+# Generic function using Monad constraint
+doMonadic = fn m => 
+  bind m (fn x => pure (x + 1)) : Monad m => m Int -> m Int;
+
+# Generic function using Show constraint  
+printValue = fn x =>
+  print (show x) : Show a => a -> Unit !log;
+
+# Example usage
+numbers = [1, 2, 3];
+result = doMonadic numbers;  # Should work with List Monad instance
+
+# Show example
+value = 42;
+printValue value;  # Should work with Int Show instance
+printValue numbers; # Should work with List Show instance
+
+result

@@ -112,7 +112,9 @@ export type Expression =
   | ListExpression
   | WhereExpression
   | TypeDefinitionExpression
-  | MatchExpression;
+  | MatchExpression
+  | ConstraintDefinitionExpression
+  | InstanceDefinitionExpression;
 
 export interface LiteralExpression {
   kind: "literal";
@@ -314,6 +316,39 @@ export interface MatchExpression {
   expression: Expression;
   cases: MatchCase[];
   type?: Type;
+  location: Location;
+}
+
+// Constraint definition for trait system
+export interface ConstraintDefinitionExpression {
+  kind: "constraint-definition";
+  name: string;
+  typeParam: string;
+  functions: ConstraintFunction[];
+  type?: Type;
+  location: Location;
+}
+
+export interface ConstraintFunction {
+  name: string;
+  typeParams: string[];
+  type: Type;
+  location: Location;
+}
+
+// Instance definition for trait system
+export interface InstanceDefinitionExpression {
+  kind: "instance-definition";
+  constraintName: string;
+  typeName: string;
+  implementations: InstanceImplementation[];
+  type?: Type;
+  location: Location;
+}
+
+export interface InstanceImplementation {
+  name: string;
+  value: Expression;
   location: Location;
 }
 

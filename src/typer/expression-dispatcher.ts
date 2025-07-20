@@ -20,6 +20,8 @@ import {
 	typeWhere,
 	typeTyped,
 	typeConstrained,
+	typeConstraintDefinition,
+	typeInstanceDefinition,
 } from './type-inference';
 import {
 	typeApplication,
@@ -158,6 +160,12 @@ export const typeExpression = (
 
 		case 'match':
 			return typeMatch(expr, state);
+
+		case 'constraint-definition':
+			return typeConstraintDefinition(expr, state);
+
+		case 'instance-definition':
+			return typeInstanceDefinition(expr, state);
 
 		default:
 			throw new Error(
