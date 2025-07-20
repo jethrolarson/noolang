@@ -117,7 +117,7 @@ constraint Show a (
 
 # Constraint with multiple functions
 constraint Monad m (
-  bind a b : m a -> (a -> m b) -> m b,
+  bind a b : m a -> (a -> m b) -> m b;
   pure a : a -> m a
 );
 
@@ -136,12 +136,12 @@ implement Show Int (
 
 # Implementation with dependencies (future feature)
 implement Show (List a) given Show a (
-  show = fn xs => "[" + (join ", " (map show xs)) + "]"
+  show = fn xs => "[" + (join "; " (map show xs)) + "]"
 );
 
 # Complex implementation
 implement Monad List (
-  bind = fn xs f => flatMap f xs,
+  bind = fn xs f => flatMap f xs;
   pure = fn x => [x]
 );
 ```
@@ -276,22 +276,22 @@ logValue = fn x =>
 ```noolang
 # Define the Monad constraint
 constraint Monad m (
-  bind a b : m a -> (a -> m b) -> m b,
+  bind a b : m a -> (a -> m b) -> m b;
   pure a : a -> m a
 );
 
 # Implement for List
 implement Monad List (
-  bind = fn xs f => flatMap f xs,
+  bind = fn xs f => flatMap f xs;
   pure = fn x => [x]
 );
 
 # Implement for Option
 implement Monad Option (
   bind = fn opt f => match opt (
-    None => None,
+    None => None;
     Some x => f x
-  ),
+  );
   pure = fn x => Some x
 );
 

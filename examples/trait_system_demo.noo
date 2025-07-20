@@ -2,7 +2,7 @@
 
 # Define a Monad constraint/trait
 constraint Monad m (
-  bind a b : m a -> (a -> m b) -> m b,
+  bind a b : m a -> (a -> m b) -> m b;
   pure a : a -> m a
 );
 
@@ -13,16 +13,16 @@ constraint Show a (
 
 # Implement Monad for List
 implement Monad List (
-  bind = fn xs f => flatMap f xs,
+  bind = fn xs f => flatMap f xs;
   pure = fn x => [x]
 );
 
 # Implement Monad for Option
 implement Monad Option (
   bind = fn opt f => match opt (
-    None => None,
+    None => None;
     Some x => f x
-  ),
+  );
   pure = fn x => Some x
 );
 
@@ -33,7 +33,7 @@ implement Show Int (
 
 # Implement Show for List (if elements are showable)
 implement Show (List a) given Show a (
-  show = fn xs => "[" + (join ", " (map show xs)) + "]"
+  show = fn xs => "[" + (join "; " (map show xs)) + "]"
 );
 
 # Generic function using Monad constraint
