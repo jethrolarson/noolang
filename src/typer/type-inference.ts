@@ -64,6 +64,7 @@ import {
 	getConstraintSignature,
 	type ConstraintSignature,
 	type ConstraintImplementation,
+	type TypeScheme,
 } from './types';
 import {
 	satisfiesConstraint,
