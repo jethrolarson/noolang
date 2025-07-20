@@ -34,6 +34,10 @@ import {
 	type UnitExpression,
 	type RecordExpression,
 	type TupleExpression,
+	type ConstraintDefinitionExpression,
+	type ImplementDefinitionExpression,
+	type ConstraintFunction,
+	type ImplementationFunction,
 } from "../ast";
 import * as C from "./combinators";
 
@@ -1370,6 +1374,74 @@ const parseTypeDefinition: C.Parser<TypeDefinitionExpression> = C.map(
   })
 );
 
+// --- Constraint Function ---
+const parseConstraintFunction: C.Parser<ConstraintFunction> = C.map(
+  C.seq(
+    C.identifier(),
+    C.many(C.identifier()), // type parameters like "a b" in "bind a b"
+    C.operator(":"),
+    C.lazy(() => parseTypeExpression)
+  ),
+  ([name, typeParams, colon, type]): ConstraintFunction => ({
+    name: name.value,
+    typeParams: typeParams.map((p: any) => p.value),
+    type,
+    location: createLocation(name.location.start, colon.location.end),
+  })
+);
+
+// --- Constraint Definition ---
+const parseConstraintDefinition: C.Parser<ConstraintDefinitionExpression> = C.map(
+  C.seq(
+    C.keyword("constraint"),
+    C.identifier(), // constraint name like "Monad"
+    C.identifier(), // type parameter like "m"
+    C.punctuation("("),
+    C.sepBy(parseConstraintFunction, C.punctuation(";")),
+    C.punctuation(")")
+  ),
+  ([constraintKeyword, name, typeParam, openParen, functions, closeParen]): ConstraintDefinitionExpression => ({
+    kind: "constraint-definition",
+    name: name.value,
+    typeParam: typeParam.value,
+    functions,
+    location: createLocation(constraintKeyword.location.start, closeParen.location.end),
+  })
+);
+
+// --- Implementation Function ---
+const parseImplementationFunction: C.Parser<ImplementationFunction> = C.map(
+  C.seq(
+    C.identifier(),
+    C.operator("="),
+    C.lazy(() => parseSequenceTerm)
+  ),
+  ([name, equals, value]): ImplementationFunction => ({
+    name: name.value,
+    value,
+    location: createLocation(name.location.start, value.location.end),
+  })
+);
+
+// --- Implement Definition ---
+const parseImplementDefinition: C.Parser<ImplementDefinitionExpression> = C.map(
+  C.seq(
+    C.keyword("implement"),
+    C.identifier(), // constraint name like "Monad"
+    C.identifier(), // type name like "List"
+    C.punctuation("("),
+    C.sepBy(parseImplementationFunction, C.punctuation(";")),
+    C.punctuation(")")
+  ),
+  ([implementKeyword, constraintName, typeName, openParen, implementations, closeParen]): ImplementDefinitionExpression => ({
+    kind: "implement-definition",
+    constraintName: constraintName.value,
+    typeName: typeName.value,
+    implementations,
+    location: createLocation(implementKeyword.location.start, closeParen.location.end),
+  })
+);
+
 // --- Pattern Parsing ---
 // Basic pattern parsing for constructor arguments (no nested constructors with args)
 const parseBasicPattern: C.Parser<Pattern> = C.choice(
@@ -1537,6 +1609,8 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
 
 // --- Sequence term: everything else ---
 const parseSequenceTerm: C.Parser<Expression> = C.choice(
+  parseConstraintDefinition, // constraint definitions
+  parseImplementDefinition, // implement definitions
   parseTypeDefinition, // ADT type definitions
   parseMatchExpression, // ADT pattern matching
   parseDefinitionWithType, // allow definitions with type annotations
@@ -1554,6 +1628,8 @@ const parseSequenceTerm: C.Parser<Expression> = C.choice(
 
 // Version without records to avoid circular dependency
 const parseSequenceTermExceptRecord: C.Parser<Expression> = C.choice(
+  parseConstraintDefinition, // constraint definitions
+  parseImplementDefinition, // implement definitions
   parseTypeDefinition, // ADT type definitions
   parseMatchExpression, // ADT pattern matching
   parseDefinition,
