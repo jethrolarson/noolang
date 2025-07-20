@@ -105,7 +105,7 @@ describe('Trait System Infrastructure', () => {
     const showImpl = {
       type: functionType([intType()], stringType()),
       quantifiedVars: [],
-      effects: new Set()
+      effects: new Set<import('../../ast').Effect>()
     };
     const implementation: ConstraintImplementation = {
       functions: new Map([['show', showImpl]])
