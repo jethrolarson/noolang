@@ -114,7 +114,7 @@ export type Expression =
   | TypeDefinitionExpression
   | MatchExpression
   | ConstraintDefinitionExpression
-  | InstanceDefinitionExpression;
+  | ImplementDefinitionExpression;
 
 export interface LiteralExpression {
   kind: "literal";
@@ -336,17 +336,17 @@ export interface ConstraintFunction {
   location: Location;
 }
 
-// Instance definition for trait system
-export interface InstanceDefinitionExpression {
-  kind: "instance-definition";
+// Implement definition for trait system
+export interface ImplementDefinitionExpression {
+  kind: "implement-definition";
   constraintName: string;
   typeName: string;
-  implementations: InstanceImplementation[];
+  implementations: ImplementationFunction[];
   type?: Type;
   location: Location;
 }
 
-export interface InstanceImplementation {
+export interface ImplementationFunction {
   name: string;
   value: Expression;
   location: Location;

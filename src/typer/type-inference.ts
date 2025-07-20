@@ -20,7 +20,7 @@ import {
 	type ConstraintExpr,
 	type PipelineExpression,
 	type ConstraintDefinitionExpression,
-	type InstanceDefinitionExpression,
+	type ImplementDefinitionExpression,
 	type Type,
 	type Constraint,
 	intType,
@@ -856,9 +856,9 @@ export const typeConstraintDefinition = (
 	return createPureTypeResult(unitType(), state);
 };
 
-// Type instance definition  
-export const typeInstanceDefinition = (
-	expr: InstanceDefinitionExpression,
+// Type implement definition  
+export const typeImplementDefinition = (
+	expr: ImplementDefinitionExpression,
 	state: TypeState,
 ): TypeResult => {
 	const { constraintName, typeName, implementations } = expr;
@@ -900,7 +900,7 @@ export const typeInstanceDefinition = (
 	// Check that all required functions are implemented
 	for (const [funcName] of constraintSig.functions) {
 		if (!implementationMap.has(funcName)) {
-			throw new Error(`Missing implementation for '${funcName}' in instance of '${constraintName}' for '${typeName}'`);
+			throw new Error(`Missing implementation for '${funcName}' in implementation of '${constraintName}' for '${typeName}'`);
 		}
 	}
 	
@@ -918,9 +918,9 @@ export const typeInstanceDefinition = (
 	);
 	
 	if (!success) {
-		throw new Error(`Failed to add instance of '${constraintName}' for '${typeName}'`);
+		throw new Error(`Failed to add implementation of '${constraintName}' for '${typeName}'`);
 	}
 	
-	// Instance definitions have unit type
+	// Implement definitions have unit type
 	return createTypeResult(unitType(), allEffects, currentState);
 };

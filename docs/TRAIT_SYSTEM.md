@@ -36,18 +36,18 @@ export interface ConstraintFunction {
 }
 ```
 
-#### Instance Definition
+#### Implement Definition
 ```typescript
-export interface InstanceDefinitionExpression {
-  kind: "instance-definition";
+export interface ImplementDefinitionExpression {
+  kind: "implement-definition";
   constraintName: string;              // e.g., "Monad"
   typeName: string;                    // e.g., "List"
-  implementations: InstanceImplementation[];
+  implementations: ImplementationFunction[];
   type?: Type;
   location: Location;
 }
 
-export interface InstanceImplementation {
+export interface ImplementationFunction {
   name: string;       // e.g., "bind"
   value: Expression;  // Implementation function
   location: Location;
@@ -127,20 +127,20 @@ constraint Functor f (
 );
 ```
 
-### Instance Definitions
+### Implement Definitions
 ```noolang
-# Simple instance
-instance Show Int (
+# Simple implementation
+implement Show Int (
   show = fn x => toString x
 );
 
-# Instance with dependencies (future feature)
-instance Show (List a) given Show a (
+# Implementation with dependencies (future feature)
+implement Show (List a) given Show a (
   show = fn xs => "[" + (join ", " (map show xs)) + "]"
 );
 
-# Complex instance
-instance Monad List (
+# Complex implementation
+implement Monad List (
   bind = fn xs f => flatMap f xs,
   pure = fn x => [x]
 );
@@ -165,13 +165,13 @@ compareAndShow = fn x y =>
 3. Add to `ConstraintRegistry` with empty implementations map
 4. Return `Unit` type for the definition expression
 
-### Phase 2: Instance Definition Processing  
-1. Parse instance definition syntax
+### Phase 2: Implement Definition Processing  
+1. Parse implement definition syntax
 2. Verify constraint exists in registry
 3. Type-check each implementation function
 4. Verify all required functions are implemented
 5. Add `ConstraintImplementation` to registry
-6. Return `Unit` type for the instance expression
+6. Return `Unit` type for the implement expression
 
 ### Phase 3: Constraint Usage Resolution
 1. When type-checking constraint function call (e.g., `show x`)
@@ -207,7 +207,7 @@ const decorateConstraintCall = (
 
 ### Environment Population
 ```typescript
-// During instance definition processing
+// During implement definition processing
 const specializedName = `__${constraintName}_${functionName}_${typeName}`;
 environment.set(specializedName, implementationTypeScheme);
 ```
@@ -238,7 +238,7 @@ constraint Logger a (
   log : a -> Unit !log
 );
 
-instance Logger String (
+implement Logger String (
   log = fn msg => print msg
 );
 
@@ -250,22 +250,22 @@ logValue = fn x =>
 ## Implementation Status
 
 ### ✅ Completed
-- [x] AST extensions for constraint and instance definitions
+- [x] AST extensions for constraint and implement definitions
 - [x] Type system registry infrastructure
 - [x] Basic constraint resolution helpers
 - [x] Type state enhancement with constraint registry
 - [x] Integration with expression dispatcher
 
 ### 🚧 In Progress  
-- [ ] Parser syntax for `constraint` and `instance` keywords
-- [ ] Type inference implementation for constraint/instance definitions
+- [ ] Parser syntax for `constraint` and `implement` keywords
+- [ ] Type inference implementation for constraint/implement definitions
 - [ ] Constraint function call resolution during type checking
 - [ ] Specialized function name generation and environment decoration
 
 ### 📋 Planned
 - [ ] Constraint dependency resolution (`given` clause)
-- [ ] Orphan instance checking and coherence guarantees
-- [ ] Better error messages for missing instances
+- [ ] Orphan implementation checking and coherence guarantees
+- [ ] Better error messages for missing implementations
 - [ ] Integration with import/export system
 - [ ] Constraint inference for polymorphic functions
 - [ ] Higher-kinded type support for advanced constraints
@@ -281,13 +281,13 @@ constraint Monad m (
 );
 
 # Implement for List
-instance Monad List (
+implement Monad List (
   bind = fn xs f => flatMap f xs,
   pure = fn x => [x]
 );
 
 # Implement for Option
-instance Monad Option (
+implement Monad Option (
   bind = fn opt f => match opt (
     None => None,
     Some x => f x

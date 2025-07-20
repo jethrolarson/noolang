@@ -21,7 +21,7 @@ import {
 	typeTyped,
 	typeConstrained,
 	typeConstraintDefinition,
-	typeInstanceDefinition,
+	typeImplementDefinition,
 } from './type-inference';
 import {
 	typeApplication,
@@ -164,8 +164,8 @@ export const typeExpression = (
 		case 'constraint-definition':
 			return typeConstraintDefinition(expr, state);
 
-		case 'instance-definition':
-			return typeInstanceDefinition(expr, state);
+		case 'implement-definition':
+			return typeImplementDefinition(expr, state);
 
 		default:
 			throw new Error(

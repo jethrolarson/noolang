@@ -11,14 +11,14 @@ constraint Show a (
   show : a -> String
 );
 
-# Instance of Monad for List
-instance Monad List (
+# Implement Monad for List
+implement Monad List (
   bind = fn xs f => flatMap f xs,
   pure = fn x => [x]
 );
 
-# Instance of Monad for Option
-instance Monad Option (
+# Implement Monad for Option
+implement Monad Option (
   bind = fn opt f => match opt (
     None => None,
     Some x => f x
@@ -26,13 +26,13 @@ instance Monad Option (
   pure = fn x => Some x
 );
 
-# Instance of Show for Int
-instance Show Int (
+# Implement Show for Int
+implement Show Int (
   show = fn x => toString x
 );
 
-# Instance of Show for List (if elements are showable)
-instance Show (List a) given Show a (
+# Implement Show for List (if elements are showable)
+implement Show (List a) given Show a (
   show = fn xs => "[" + (join ", " (map show xs)) + "]"
 );
 
@@ -46,11 +46,11 @@ printValue = fn x =>
 
 # Example usage
 numbers = [1, 2, 3];
-result = doMonadic numbers;  # Should work with List Monad instance
+result = doMonadic numbers;  # Should work with List Monad implementation
 
 # Show example
 value = 42;
-printValue value;  # Should work with Int Show instance
-printValue numbers; # Should work with List Show instance
+printValue value;  # Should work with Int Show implementation
+printValue numbers; # Should work with List Show implementation
 
 result
