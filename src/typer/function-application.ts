@@ -193,11 +193,68 @@ export const typeApplication = (
 		allEffects = unionEffects(allEffects, argResult.effects);
 	}
 
-	// TODO: Constraint resolution temporarily disabled to isolate ADT issue
 	// Check if this is a constraint function call that needs resolution
-	// if (expr.func.kind === 'variable' && currentState.constraintRegistry.size > 0) {
-	//   ... constraint resolution code ...
-	// }
+	// ONLY apply to functions that are explicitly defined in constraints
+	if (expr.func.kind === 'variable' && currentState.constraintRegistry.size > 0) {
+		// Only check constraint resolution if the function is explicitly in a constraint
+		let isDefinedInConstraint = false;
+		for (const [, constraintInfo] of currentState.constraintRegistry) {
+			if (constraintInfo.signature.functions.has(expr.func.name)) {
+				isDefinedInConstraint = true;
+				break;
+			}
+		}
+		
+		// ONLY apply constraint resolution to explicitly defined constraint functions
+		// This excludes ADT constructors like Point, Rectangle, etc.
+		if (isDefinedInConstraint) {
+			const constraintResolution = tryResolveConstraintFunction(
+				expr.func.name,
+				expr.args,
+				argTypes,
+				currentState
+			);
+			
+			if (constraintResolution.resolved && constraintResolution.specializedName) {
+				// This is a constraint function call with a concrete resolution
+				// Look up the specialized function in the environment
+				const decoratedState = decorateEnvironmentWithConstraintFunctions(currentState);
+				const specializedScheme = decoratedState.environment.get(constraintResolution.specializedName);
+				
+				if (specializedScheme) {
+					// Use the specialized implementation
+					const [instantiatedType, newState] = instantiate(specializedScheme, decoratedState);
+					
+					// The specialized function should match the call pattern
+					if (instantiatedType.kind === 'function') {
+						// Continue with normal function application using the specialized type
+						const specializedFuncType = instantiatedType;
+						// Replace funcType with specializedFuncType for the rest of the function
+						return continueWithSpecializedFunction(
+							expr, 
+							specializedFuncType, 
+							argTypes, 
+							allEffects, 
+							newState
+						);
+					}
+				} else {
+					// Could not resolve - generate helpful error
+					const firstArgType = argTypes.length > 0 ? substitute(argTypes[0], currentState.substitution) : null;
+					if (firstArgType && firstArgType.kind !== 'variable') {
+						// We have a concrete type but no implementation
+						const errorMessage = generateConstraintError(
+							expr.func.name, // This should be parsed differently, but for now using function name
+							expr.func.name,
+							firstArgType,
+							currentState
+						);
+						throw new Error(errorMessage);
+					}
+				}
+			}
+		}
+	}
 
 	// Handle function application by checking if funcType is a function
 	if (funcType.kind === 'function') {
