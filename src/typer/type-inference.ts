@@ -560,24 +560,65 @@ export const typeBinary = (
 			);
 		}
 
-		// Create a synthetic function application: bind(left)(right)
-		const { typeApplication } = require('./function-application');
-		
-		const bindVar: import('../ast').VariableExpression = {
-			kind: 'variable',
-			name: 'bind',
-			location: expr.location
-		};
-		
-		const syntheticApp: import('../ast').ApplicationExpression = {
-			kind: 'application',
-			func: bindVar,
-			args: [expr.left, expr.right],
-			location: expr.location
-		};
-		
-		// This will trigger constraint resolution for 'bind'
-		return typeApplication(syntheticApp, currentState);
+		// Try constraint resolution first, fall back to direct implementation
+		try {
+			// Create a synthetic function application: bind(left)(right)
+			const { typeApplication } = require('./function-application');
+			
+			const bindVar: import('../ast').VariableExpression = {
+				kind: 'variable',
+				name: 'bind',
+				location: expr.location
+			};
+			
+			const syntheticApp: import('../ast').ApplicationExpression = {
+				kind: 'application',
+				func: bindVar,
+				args: [expr.left, expr.right],
+				location: expr.location
+			};
+			
+			// This will trigger constraint resolution for 'bind'
+			return typeApplication(syntheticApp, currentState);
+		} catch (error) {
+			// If constraint resolution fails, fall back to direct implementation for known monads
+			if (leftResult.type.kind === 'variant' && leftResult.type.args.length >= 1) {
+				const monadName = leftResult.type.name;
+				const innerType = leftResult.type.args[0];
+				
+				if (monadName === 'Option' || monadName === 'Result') {
+					// Unify the function parameter with the inner type
+					currentState = unify(
+						rightResult.type.params[0],
+						innerType,
+						currentState,
+						getExprLocation(expr)
+					);
+
+					// The result type follows monadic bind semantics
+					let resultType: Type;
+					if (rightResult.type.return.kind === 'variant' && rightResult.type.return.name === monadName) {
+						// Function returns same monad type -> bind flattens
+						resultType = rightResult.type.return;
+					} else {
+						// Function returns T -> wrap in the monad
+						if (monadName === 'Option') {
+							resultType = variantType('Option', [rightResult.type.return]);
+						} else if (monadName === 'Result' && leftResult.type.args.length === 2) {
+							// Preserve error type for Result
+							resultType = variantType('Result', [rightResult.type.return, leftResult.type.args[1]]);
+						} else {
+							resultType = variantType(monadName, [rightResult.type.return]);
+						}
+					}
+					
+					return createTypeResult(resultType, unionEffects(leftResult.effects, rightResult.effects), currentState);
+				}
+			}
+			
+			// Re-throw the original error if we can't handle it
+			throw error;
+		}
 	}
 
 	// Get operator type from environment

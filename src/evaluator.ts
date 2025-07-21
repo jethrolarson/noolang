@@ -1249,9 +1249,50 @@ export class Evaluator {
 					);
 				}
 			} else if (expr.operator === "|?") {
-				// The |? operator should have been desugared to a bind call by the type checker
-				// If we reach here, something went wrong in the type checking phase
-				throw new Error("Safe thrush operator (|?) should have been desugared to a bind call during type checking");
+				// The |? operator should be desugared to a bind call by the type checker
+				// However, if constraint resolution failed, we might still see |? here
+				// Fall back to calling the stdlib bind function directly
+				const left = this.evaluateExpression(expr.left);
+				const right = this.evaluateExpression(expr.right);
+
+				// Check that right operand is a function
+				if (!isFunction(right) && !isNativeFunction(right)) {
+					throw new Error(
+						`Cannot apply non-function in safe thrush: ${valueToString(right)}`
+					);
+				}
+
+				// Try to call the stdlib bind function directly as fallback
+				let bindFunction = this.environment.get('bind');
+				if (bindFunction) {
+					// Handle Cell wrapper
+					if (isCell(bindFunction)) {
+						bindFunction = bindFunction.value;
+					}
+					
+					if (isFunction(bindFunction)) {
+						const partiallyApplied = bindFunction.fn(left);
+						if (isFunction(partiallyApplied)) {
+							const result = partiallyApplied.fn(right);
+							// Check if result needs to be wrapped in the monad
+							return this.ensureMonadicResult(result, left);
+						} else if (isNativeFunction(partiallyApplied)) {
+							const result = partiallyApplied.fn(right);
+							return this.ensureMonadicResult(result, left);
+						}
+					} else if (isNativeFunction(bindFunction)) {
+						const partiallyApplied = bindFunction.fn(left);
+						if (isFunction(partiallyApplied)) {
+							const result = partiallyApplied.fn(right);
+							return this.ensureMonadicResult(result, left);
+						} else if (isNativeFunction(partiallyApplied)) {
+							const result = partiallyApplied.fn(right);
+							return this.ensureMonadicResult(result, left);
+						}
+					}
+				}
+				
+				throw new Error("Safe thrush operator (|?) failed: no bind function available");
 			} else if (expr.operator === "$") {
 				// Handle dollar operator (low precedence function application)
 				const left = this.evaluateExpression(expr.left);
@@ -1758,6 +1799,29 @@ export class Evaluator {
 			}
 		}
 
+		// Helper to ensure the result is properly wrapped in the same monad type as the input
+		private ensureMonadicResult(result: Value, originalMonad: Value): Value {
+			if (!isConstructor(originalMonad)) {
+				return result;
+			}
+
+			// If result is already a constructor (likely already wrapped), return as-is
+			if (isConstructor(result)) {
+				return result;
+			}
+
+			// Otherwise, wrap the result in the same monad type
+			if (originalMonad.name === "Some" || originalMonad.name === "None") {
+				// Option monad: wrap in Some
+				return createConstructor("Some", [result]);
+			} else if (originalMonad.name === "Ok" || originalMonad.name === "Err") {
+				// Result monad: wrap in Ok
+				return createConstructor("Ok", [result]);
+			}
+
+			// For other types, just return the result unwrapped
+			return result;
+		}
 
 	}
 
