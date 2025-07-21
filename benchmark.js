@@ -7,6 +7,11 @@ const path = require('path');
 // Benchmark configuration
 const WARMUP_RUNS = 3;
 const MEASUREMENT_RUNS = 5;
+const PERFORMANCE_THRESHOLDS = {
+  simple: { max: 50, warning: 30 },     // Max 50ms, warn at 30ms
+  medium: { max: 60, warning: 35 },     // Max 60ms, warn at 35ms
+  complex: { max: 80, warning: 50 }     // Max 80ms, warn at 50ms
+};
 const BENCHMARKS = [
   { name: 'simple', file: 'benchmarks/simple.noo', description: 'Basic language features' },
   { name: 'medium', file: 'benchmarks/medium.noo', description: 'Complex types and pattern matching' },
@@ -174,6 +179,20 @@ function measureBenchmark(benchmark) {
 				phase: 'eval',
 			};
 
+			// Check performance thresholds
+			const threshold = PERFORMANCE_THRESHOLDS[benchmark.name];
+			if (threshold) {
+				if (avg > threshold.max) {
+					log(colors.error, `   ❌ PERFORMANCE REGRESSION: Average ${avg.toFixed(1)}ms exceeds maximum threshold of ${threshold.max}ms`);
+					result.status = 'failed';
+				} else if (avg > threshold.warning) {
+					log(colors.warning, `   ⚠️  Performance warning: Average ${avg.toFixed(1)}ms exceeds warning threshold of ${threshold.warning}ms`);
+					result.status = 'warning';
+				} else {
+					result.status = 'passed';
+				}
+			}
+
 			log(
 				colors.success,
 				`   ✅ Results (evaluation time - actual computation):`
@@ -274,6 +293,12 @@ async function main() {
 			replBenchmark.printSummary(results);
 			replBenchmark.saveBenchmarkResults(results);
 			log(colors.success, '\n🎉 REPL benchmarking complete!');
+			
+			// Exit with error if no REPL benchmarks succeeded
+			if (results.length === 0) {
+				log(colors.error, '\n❌ No REPL benchmarks completed successfully');
+				process.exit(1);
+			}
 		} catch (error) {
 			log(colors.error, `\n💥 REPL benchmark failed: ${error.message}`);
 			process.exit(1);
@@ -297,6 +322,30 @@ async function main() {
 
 	printSummary(results);
 	saveBenchmarkResults(results);
+
+	// Check if any benchmarks failed
+	const successfulResults = results.filter(r => r !== null);
+	const failedResults = successfulResults.filter(r => r.status === 'failed');
+	const warningResults = successfulResults.filter(r => r.status === 'warning');
+	
+	if (successfulResults.length === 0) {
+		log(colors.error, '\n❌ All benchmarks failed');
+		process.exit(1);
+	} else if (failedResults.length > 0) {
+		log(colors.error, `\n❌ ${failedResults.length} benchmark(s) exceeded performance thresholds`);
+		for (const result of failedResults) {
+			console.log(`   - ${result.benchmark}: ${result.avg}ms (limit: ${PERFORMANCE_THRESHOLDS[result.benchmark]?.max}ms)`);
+		}
+		process.exit(1);
+	} else if (warningResults.length > 0) {
+		log(colors.warning, `\n⚠️  ${warningResults.length} benchmark(s) triggered performance warnings`);
+		for (const result of warningResults) {
+			console.log(`   - ${result.benchmark}: ${result.avg}ms (warning: ${PERFORMANCE_THRESHOLDS[result.benchmark]?.warning}ms)`);
+		}
+	} else if (successfulResults.length < results.length) {
+		const failedCount = results.length - successfulResults.length;
+		log(colors.warning, `\n⚠️  ${failedCount} benchmark(s) failed, but ${successfulResults.length} succeeded`);
+	}
 
 	log(colors.success, '\n🎉 Benchmarking complete!');
 }

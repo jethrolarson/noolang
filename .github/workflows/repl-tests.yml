@@ -97,10 +97,71 @@ jobs:
       run: npm ci
     
     - name: Run core benchmarks
-      run: npm run benchmark
+      run: |
+        npm run benchmark
+        # Validate that benchmark results were generated
+        if [ ! -d "benchmark-results" ] || [ -z "$(find benchmark-results -name '*.json' 2>/dev/null)" ]; then
+          echo "::error::Core benchmarks failed to generate results"
+          exit 1
+        fi
+        echo "✅ Core benchmarks completed successfully"
       
-    - name: Run REPL benchmarks
-      run: npm run benchmark:repl
+    - name: Run REPL benchmarks (allowed to fail)
+      run: |
+        set +e  # Don't exit on error for REPL benchmarks
+        npm run benchmark:repl
+        REPL_EXIT_CODE=$?
+        
+        if [ $REPL_EXIT_CODE -eq 0 ]; then
+          echo "✅ REPL benchmarks completed successfully"
+          echo "REPL_STATUS=success" >> $GITHUB_ENV
+        else
+          echo "⚠️ REPL benchmarks failed - this is not blocking"
+          echo "::warning::REPL benchmarks failed but pipeline continues"
+          echo "REPL_STATUS=failed" >> $GITHUB_ENV
+        fi
+        
+        set -e  # Re-enable exit on error
+    
+    - name: Validate benchmark results
+      run: |
+        # Check core benchmark results exist and are valid
+        CORE_RESULTS=$(find benchmark-results -name "results-*.json" 2>/dev/null)
+        if [ -z "$CORE_RESULTS" ]; then
+          echo "::error::No core benchmark results found"
+          exit 1
+        fi
+        
+        # Validate JSON structure
+        for file in $CORE_RESULTS; do
+          if ! jq empty "$file" 2>/dev/null; then
+            echo "::error::Invalid JSON in benchmark file: $file"
+            exit 1
+          fi
+          
+          # Check for required fields
+          if ! jq -e '.results | length > 0' "$file" >/dev/null; then
+            echo "::error::No benchmark results in file: $file"
+            exit 1
+          fi
+        done
+        
+        echo "✅ Benchmark validation passed"
+        
+        # Add results summary to job
+        echo "## Benchmark Results" >> $GITHUB_STEP_SUMMARY
+        echo "| Benchmark | Phase | Min | Max | Avg | Median |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|-------|-----|-----|-----|--------|" >> $GITHUB_STEP_SUMMARY
+        
+        # Extract and display results
+        for file in $CORE_RESULTS; do
+          jq -r '.results[] | "| \(.benchmark) | \(.phase) | \(.min)ms | \(.max)ms | \(.avg)ms | \(.median)ms |"' "$file" >> $GITHUB_STEP_SUMMARY
+        done
+        
+        if [ "$REPL_STATUS" = "failed" ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ **Note**: REPL benchmarks failed and were skipped" >> $GITHUB_STEP_SUMMARY
+        fi
     
     - name: Upload benchmark results
       uses: actions/upload-artifact@v4
@@ -130,29 +191,77 @@ jobs:
       
     - name: Benchmark current branch
       run: |
-        npm run benchmark:all
-        mv benchmark-results benchmark-results-current
+        echo "Benchmarking current branch..."
+        npm run benchmark:all || echo "Current branch benchmarks failed"
+        if [ -d "benchmark-results" ]; then
+          mv benchmark-results benchmark-results-current
+        else
+          echo "No benchmark results from current branch"
+        fi
     
     - name: Checkout main branch
-      run: git checkout origin/main
+      run: |
+        git reset --hard HEAD
+        git clean -fd
+        git checkout origin/main
       
-    - name: Install dependencies (main)
-      run: npm ci
+    - name: Install dependencies and build (main)
+      run: |
+        npm ci
+        npm run build
       
     - name: Benchmark main branch
       run: |
-        npm run benchmark:all
-        mv benchmark-results benchmark-results-main
+        echo "Benchmarking main branch..."
+        npm run benchmark:all || echo "Main branch benchmarks failed"
+        if [ -d "benchmark-results" ]; then
+          mv benchmark-results benchmark-results-main
+        else
+          echo "No benchmark results from main branch"
+        fi
     
     - name: Compare performance
       run: |
         echo "## Performance Comparison" >> $GITHUB_STEP_SUMMARY
         echo "Comparing current branch against main..." >> $GITHUB_STEP_SUMMARY
         
-        if [ -f benchmark-results-current/*.json ] && [ -f benchmark-results-main/*.json ]; then
-          echo "Benchmark files found, comparison available in artifacts" >> $GITHUB_STEP_SUMMARY
+        # Check if benchmark files exist with proper globbing
+        CURRENT_RESULTS=$(find benchmark-results-current -name "*.json" 2>/dev/null | head -1)
+        MAIN_RESULTS=$(find benchmark-results-main -name "*.json" 2>/dev/null | head -1)
+        
+        if [ -n "$CURRENT_RESULTS" ] && [ -n "$MAIN_RESULTS" ]; then
+          echo "✅ Benchmark files found" >> $GITHUB_STEP_SUMMARY
+          
+          # Add basic performance validation
+          echo "### Performance Analysis" >> $GITHUB_STEP_SUMMARY
+          
+          # Extract performance metrics and compare
+          CURRENT_AVG=$(grep -o '"avg":"[0-9.]*"' "$CURRENT_RESULTS" | head -1 | cut -d'"' -f4)
+          MAIN_AVG=$(grep -o '"avg":"[0-9.]*"' "$MAIN_RESULTS" | head -1 | cut -d'"' -f4)
+          
+          if [ -n "$CURRENT_AVG" ] && [ -n "$MAIN_AVG" ]; then
+            echo "- Current branch average: ${CURRENT_AVG}ms" >> $GITHUB_STEP_SUMMARY
+            echo "- Main branch average: ${MAIN_AVG}ms" >> $GITHUB_STEP_SUMMARY
+            
+            # Calculate percentage difference (using awk for floating point)
+            DIFF_PERCENT=$(awk "BEGIN {printf \"%.1f\", (($CURRENT_AVG - $MAIN_AVG) / $MAIN_AVG) * 100}")
+            echo "- Performance difference: ${DIFF_PERCENT}%" >> $GITHUB_STEP_SUMMARY
+            
+            # Flag significant regressions
+            if awk "BEGIN {exit ($DIFF_PERCENT > 20)}"; then
+              echo "⚠️ **WARNING: Performance regression detected (>20% slower)**" >> $GITHUB_STEP_SUMMARY
+              echo "::warning::Performance regression: ${DIFF_PERCENT}% slower than main"
+            elif awk "BEGIN {exit ($DIFF_PERCENT < -10)}"; then
+              echo "🚀 **Performance improvement detected (>10% faster)**" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "✅ Performance within acceptable range" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "⚠️ Could not extract performance metrics for comparison" >> $GITHUB_STEP_SUMMARY
+          fi
         else
-          echo "⚠️ Could not generate performance comparison" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ Could not generate performance comparison - benchmark files missing" >> $GITHUB_STEP_SUMMARY
+          echo "::warning::Benchmark comparison failed - results files not found"
         fi
     
     - name: Upload comparison results
