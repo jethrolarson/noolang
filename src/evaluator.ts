@@ -1246,6 +1246,64 @@ export class Evaluator {
 						`Cannot apply non-function in thrush: ${valueToString(right)}`,
 					);
 				}
+			} else if (expr.operator === "|?") {
+				// Handle safe thrush operator for Option types
+				const left = this.evaluateExpression(expr.left);
+				const right = this.evaluateExpression(expr.right);
+
+				// Check if left is None
+				if (isConstructor(left) && left.name === "None") {
+					return left; // Return None unchanged
+				}
+
+				// Check if left is Some
+				if (isConstructor(left) && left.name === "Some") {
+					const someValue = left.args[0]; // Extract value from Some
+					if (isFunction(right)) {
+						const result = right.fn(someValue);
+						// If the function returns an Option, return it directly (monadic bind behavior)
+						if (isConstructor(result) && (result.name === "Some" || result.name === "None")) {
+							return result;
+						}
+						// If the function returns a non-Option value, wrap it in Some
+						return createConstructor("Some", [result]);
+					} else if (isNativeFunction(right)) {
+						const result = right.fn(someValue);
+						// If the function returns an Option, return it directly (monadic bind behavior)
+						if (isConstructor(result) && (result.name === "Some" || result.name === "None")) {
+							return result;
+						}
+						// If the function returns a non-Option value, wrap it in Some
+						return createConstructor("Some", [result]);
+					} else {
+						throw new Error(
+							`Cannot apply non-function in safe thrush: ${valueToString(right)}`,
+						);
+					}
+				}
+
+				// If left is not an Option type, wrap it in Some and proceed
+				if (isFunction(right)) {
+					const result = right.fn(left);
+					// If the function returns an Option, return it directly
+					if (isConstructor(result) && (result.name === "Some" || result.name === "None")) {
+						return result;
+					}
+					// If the function returns a non-Option value, wrap it in Some
+					return createConstructor("Some", [result]);
+				} else if (isNativeFunction(right)) {
+					const result = right.fn(left);
+					// If the function returns an Option, return it directly
+					if (isConstructor(result) && (result.name === "Some" || result.name === "None")) {
+						return result;
+					}
+					// If the function returns a non-Option value, wrap it in Some
+					return createConstructor("Some", [result]);
+				} else {
+					throw new Error(
+						`Cannot apply non-function in safe thrush: ${valueToString(right)}`,
+					);
+				}
 			} else if (expr.operator === "$") {
 				// Handle dollar operator (low precedence function application)
 				const left = this.evaluateExpression(expr.left);

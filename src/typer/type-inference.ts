@@ -33,6 +33,7 @@ import {
 	listTypeWithElement,
 	tupleType,
 	recordType,
+	variantType,
 	isConstraint,
 	hasFieldConstraint,
 } from '../ast';
@@ -517,6 +518,58 @@ export const typeBinary = (
 
 		// Return the function's return type
 		return createTypeResult(rightResult.type.return, unionEffects(leftResult.effects, rightResult.effects), currentState);
+	}
+
+	// Special handling for safe thrush operator (|?) - option monadic application
+	if (expr.operator === '|?') {
+		// Safe thrush: a |? b means option_map b a for Some values, returns None for None values
+		if (rightResult.type.kind !== 'function') {
+			throwTypeError(
+				location => nonFunctionApplicationError(rightResult.type, location),
+				getExprLocation(expr)
+			);
+		}
+
+		// Check that the function can take one parameter
+		if (rightResult.type.params.length !== 1) {
+			throw new Error(
+				`Safe thrush operator requires function with exactly one parameter, got ${rightResult.type.params.length}`
+			);
+		}
+
+		// The left operand should be Option a, but we'll be flexible and allow non-Option types too
+		// If it's Option a, extract the inner type for the function application
+		// If it's not Option, treat it as Some(a)
+		
+		let innerType: Type;
+		if (leftResult.type.kind === 'variant' && leftResult.type.name === 'Option' && leftResult.type.args.length === 1) {
+			// Left is Option a, extract a
+			innerType = leftResult.type.args[0];
+		} else {
+			// Left is not Option, treat as Some(a), so inner type is the type itself
+			innerType = leftResult.type;
+		}
+
+		// Unify the function parameter with the inner type
+		currentState = unify(
+			rightResult.type.params[0],
+			innerType,
+			currentState,
+			getExprLocation(expr)
+		);
+
+		// The result type depends on what the function returns
+		let resultType: Type;
+		if (rightResult.type.return.kind === 'variant' && 
+		    rightResult.type.return.name === 'Option') {
+			// If function returns Option T, result is Option T (monadic bind)
+			resultType = rightResult.type.return;
+		} else {
+			// If function returns T, result is Option T (functor map)
+			resultType = variantType('Option', [rightResult.type.return]);
+		}
+		
+		return createTypeResult(resultType, unionEffects(leftResult.effects, rightResult.effects), currentState);
 	}
 
 	// Get operator type from environment

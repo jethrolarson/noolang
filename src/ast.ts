@@ -167,6 +167,7 @@ export interface BinaryExpression {
     | "<="
     | ">="
     | "|"
+    | "|?"
     | "|>"
     | "<|"
     | ";"

@@ -26,7 +26,7 @@ An expression-based, LLM-friendly programming language designed for linear, decl
 - **Type Constraints** - expressive constraint system for safe generic programming
 - **Trait system** - constraint definitions and implementations with type-directed dispatch
 - **Functional programming** idioms and patterns
-- **Pipeline operator** (`|>`) for function composition
+- **Pipeline and function application operators** (`|>`, `|`, `|?`, `$`) for composition and safe chaining
 - **Records and accessors** for structured data
 - **Built-in primitives**: Int, String, Bool, List, Record, Unit
 - **REPL** for interactive development with comprehensive debugging tools
@@ -230,6 +230,27 @@ Applies the right function to the left value:
 ```noolang
 # Apply function: x | f means f(x)
 [1, 2, 3] | map (fn x => x * 2)
+```
+
+#### Safe Thrush Operator (`|?`) - Option Monadic Chaining
+Safely applies functions to Option values, implementing monadic bind behavior:
+```noolang
+# Safe application to Some values
+Some 42 |? (fn x => x + 10)     # Some 52
+
+# None values short-circuit
+None |? (fn x => x + 10)         # None
+
+# Non-Option values get wrapped in Some
+42 |? (fn x => x + 10)           # Some 52
+
+# Monadic bind: functions returning Options don't get double-wrapped
+safe_divide = fn x => if x == 0 then None else Some (100 / x);
+Some 10 |? safe_divide           # Some 10 (not Some Some 10)
+
+# Chaining operations with short-circuiting
+Some 10 |? (fn x => x + 5) |? (fn x => x * 2) |? safe_divide  # Some 1
+Some 0 |? (fn x => x + 5) |? (fn x => x * 2) |? safe_divide   # None
 ```
 
 #### Dollar Operator (`$`) - Low-Precedence Function Application

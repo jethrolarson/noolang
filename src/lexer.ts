@@ -187,6 +187,7 @@ export class Lexer {
 
     // Multi-character operators (must have spaces around them)
     const operators = [
+      "|?",
       "|>",
       "<|",
       "==",

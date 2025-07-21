@@ -1,0 +1,106 @@
+# Safe Thrush Operator (|?) Demonstration
+# The |? operator provides safe, monadic chaining for Option types
+
+# ========================================
+# 1. BASIC USAGE
+# ========================================
+
+# Simple function application with Some
+some_value = Some 42;
+add_ten = fn x => x + 10;
+result1 = some_value |? add_ten;  # Some 52
+
+# Function application with None (short-circuits)
+none_value = None;
+result2 = none_value |? add_ten;  # None
+
+# Non-Option values get wrapped in Some
+regular_value = 42;
+result3 = regular_value |? add_ten;  # Some 52
+
+# ========================================
+# 2. MONADIC BIND BEHAVIOR  
+# ========================================
+
+# Functions that return Option don't get double-wrapped
+safe_divide = fn x => if x == 0 then None else Some (100 / x);
+
+# These return Option Int, not Option Option Int
+bind_result1 = Some 10 |? safe_divide;  # Some 10
+bind_result2 = Some 0 |? safe_divide;   # None
+
+# ========================================
+# 3. CHAINING OPERATIONS
+# ========================================
+
+# Chain multiple operations
+double = fn x => x * 2;
+subtract_five = fn x => x - 5;
+
+chained = Some 10 |? add_ten |? double |? subtract_five;  # Some 35
+
+# Chaining with Option-returning functions
+safe_sqrt = fn x => if x < 0 then None else Some x;
+
+chain_with_options = Some 100 |? safe_divide |? safe_sqrt;  # Some 1
+chain_fails = Some 0 |? safe_divide |? safe_sqrt;          # None (short-circuits)
+
+# ========================================
+# 4. REAL-WORLD EXAMPLES
+# ========================================
+
+# Parsing and validation pipeline
+parse_int = fn s => if s == "42" then Some 42 else None;
+validate_positive = fn x => if x > 0 then Some x else None;
+format_result = fn x => concat "Result: " (toString x);
+
+# Safe pipeline that can fail at any step
+user_input = "42";
+processed = Some user_input |? parse_int |? validate_positive |? format_result;
+# Result: Some "Result: 42"
+
+# Pipeline with invalid input
+bad_input = "invalid";
+failed = Some bad_input |? parse_int |? validate_positive |? format_result;
+# Result: None
+
+# ========================================
+# 5. COMPARISON WITH REGULAR OPERATORS
+# ========================================
+
+# Regular thrush operator (|) would fail with None
+# none_value | add_ten;  # ERROR: Cannot apply function to None
+
+# Safe thrush operator (|?) handles None gracefully
+safe_none = none_value |? add_ten;  # None
+
+# ========================================
+# 6. INTEGRATION WITH PATTERN MATCHING
+# ========================================
+
+handle_option = fn opt => match opt with (
+  Some value => concat "Got: " (toString value);
+  None => "Nothing"
+);
+
+# Use |? in combination with other Option operations
+pipeline_result = Some 5 |? add_ten |? double;
+final_message = handle_option pipeline_result;  # "Got: 30"
+
+# ========================================
+# FINAL RESULT
+# ========================================
+
+{
+  @basic_some result1,
+  @basic_none result2,
+  @basic_wrap result3,
+  @bind_success bind_result1,
+  @bind_fail bind_result2,
+  @chained chained,
+  @chain_options_success chain_with_options,
+  @chain_options_fail chain_fails,
+  @parse_success processed,
+  @parse_fail failed,
+  @pattern_match final_message
+}
