@@ -1093,8 +1093,8 @@ describe("Additional Coverage Tests", () => {
 
   describe("Advanced Features Coverage", () => {
     test("should handle print function returning value", () => {
-      const result = runCode('print "hello"');
-      expect(unwrapValue(result.finalResult)).toBe("hello");
+      const result = runCode('print "print test"');
+			expect(unwrapValue(result.finalResult)).toBe('print test');
     });
 
     test("should handle semicolon operator returning rightmost value", () => {

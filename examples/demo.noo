@@ -87,7 +87,7 @@ composed_reverse_result = 10 | composed_reverse;
 complex_without_dollar = map (fn x => x * 2) (filter (fn x => x > 5) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
 # With $ - much cleaner and more readable
-# complex_with_dollar = map (fn x => x * 2) $ filter (fn x => x > 5) $ [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+complex_with_dollar = map (fn x => x * 2) $ filter (fn x => x > 5) $ [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 # ========================================
 # 8. MUTATION (LOCAL MUTATION)
