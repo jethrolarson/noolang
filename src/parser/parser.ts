@@ -25,6 +25,7 @@ import {
 	recordType,
 	tupleType,
 	tupleTypeConstructor,
+	variantType,
 	type ConstraintExpr,
 	type TypeDefinitionExpression,
 	type MatchExpression,
@@ -75,7 +76,7 @@ const parseTypeName: C.Parser<Token> = (tokens: Token[]) => {
 // --- Helper: parse a single type atom (primitive, variable, record, tuple, list) ---
 function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
   // Try primitive types first
-  const primitiveTypes = ["Int", "Number", "String", "Unit"];
+  const primitiveTypes = ["Int", "Number", "String", "Unit", "List"];
   for (const typeName of primitiveTypes) {
     const result = C.keyword(typeName)(tokens);
     if (result.success) {
@@ -99,23 +100,54 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
             value: unitType(),
             remaining: result.remaining,
           };
+        case "List":
+          return {
+            success: true as const,
+            value: listTypeWithElement(typeVariable("a")), // List with generic element
+            remaining: result.remaining,
+          };
       }
     }
   }
 
-  // Try type variable
-  if (
-    tokens.length > 0 &&
-    tokens[0].type === "IDENTIFIER" &&
-    /^[a-z]/.test(tokens[0].value)
-  ) {
-    const varResult = C.identifier()(tokens);
-    if (varResult.success) {
-      return {
-        success: true as const,
-        value: typeVariable(varResult.value.value),
-        remaining: varResult.remaining,
-      };
+  // Try type constructor application or type variable
+  if (tokens.length > 0 && tokens[0].type === "IDENTIFIER") {
+    const name = tokens[0].value;
+    
+    // Type variable (lowercase)
+    if (/^[a-z]/.test(name)) {
+      const varResult = C.identifier()(tokens);
+      if (varResult.success) {
+        return {
+          success: true as const,
+          value: typeVariable(varResult.value.value),
+          remaining: varResult.remaining,
+        };
+      }
+    }
+    
+    // Type constructor (uppercase) - potentially with arguments
+    if (/^[A-Z]/.test(name)) {
+      const constructorResult = C.identifier()(tokens);
+      if (constructorResult.success) {
+        // Try to parse type arguments
+        const argsResult = C.many(C.lazy(() => parseTypeAtom))(constructorResult.remaining);
+        if (argsResult.success && argsResult.value.length > 0) {
+          // Type constructor application
+          return {
+            success: true as const,
+            value: variantType(constructorResult.value.value, argsResult.value),
+            remaining: argsResult.remaining,
+          };
+        } else {
+          // Just a type constructor with no arguments
+          return {
+            success: true as const,
+            value: variantType(constructorResult.value.value, []),
+            remaining: constructorResult.remaining,
+          };
+        }
+      }
     }
   }
 
