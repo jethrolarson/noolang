@@ -1888,7 +1888,7 @@ export const parse = (tokens: Token[]): Program => {
       rest = rest.slice(1);
     }
     if (rest.length === 0) break;
-    const result = parseExpr(rest);
+    const result = parseSequenceTermWithIf(rest);
     if (!result.success) {
       // Include line and column information in parse error
       const errorLocation =
