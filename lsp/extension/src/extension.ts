@@ -15,7 +15,7 @@ export function activate(context: ExtensionContext) {
 	const config = workspace.getConfiguration('noolang');
 	const serverPath = config.get<string>(
 		'languageServerPath',
-		'./lsp/target/release/noolang-lsp'
+		'./target/release/noolang-lsp'
 	);
 	const enableLSP = config.get<boolean>('enableLanguageServer', true);
 

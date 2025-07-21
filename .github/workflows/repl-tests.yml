@@ -1,15 +1,14 @@
-name: REPL Automated Tests
+name: Comprehensive Test Suite
 
 on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'src/repl.ts'
-      - 'src/evaluator.ts'
-      - 'src/typer/**'
-      - 'test/repl*.test.ts'
-      - 'scripts/test-repl-automation.ts'
+      - 'src/**'
+      - 'test/**'
+      - 'scripts/**'
       - 'benchmarks/**'
+      - 'lsp/**'
       - 'jest.config*.js'
       - 'package.json'
       - 'tsconfig*.json'
@@ -17,12 +16,11 @@ on:
   pull_request:
     branches: [ main ]
     paths:
-      - 'src/repl.ts'
-      - 'src/evaluator.ts'
-      - 'src/typer/**'
-      - 'test/repl*.test.ts'
-      - 'scripts/test-repl-automation.ts'
+      - 'src/**'
+      - 'test/**'
+      - 'scripts/**'
       - 'benchmarks/**'
+      - 'lsp/**'
       - 'jest.config*.js'
       - 'package.json'
       - 'tsconfig*.json'
@@ -80,7 +78,24 @@ jobs:
           jest-cache-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
           jest-cache-${{ runner.os }}-
     
-    - name: Run all tests (including REPL)
+    - name: Setup Rust (for LSP tests)
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+    
+    - name: Cache Rust dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          lsp/target
+        key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          rust-${{ runner.os }}-
+    
+    - name: Run all tests (including REPL and LSP)
       run: npm run test:all
     
     - name: Upload test results
@@ -123,6 +138,66 @@ jobs:
           repl-test-*.log
           test-automation-*.json
           test-results/
+        retention-days: 14
+
+  lsp-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Setup Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+    
+    - name: Cache Rust dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          lsp/target
+        key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          rust-${{ runner.os }}-
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build TypeScript project
+      run: npm run build
+    
+    - name: Build LSP server
+      run: |
+        cd lsp
+        cargo build --release
+    
+    - name: Run LSP unit tests
+      run: |
+        cd lsp
+        cargo test
+    
+    - name: Test LSP integration
+      run: |
+        cd lsp
+        ./test_enhanced_lsp.sh
+    
+    - name: Upload LSP test artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: lsp-test-artifacts
+        path: |
+          lsp/target/release/noolang-lsp
+          lsp/test-*.log
         retention-days: 14
 
   benchmarks:

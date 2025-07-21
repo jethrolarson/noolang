@@ -1,0 +1,5 @@
+# Test file for LSP
+add = fn x y => x + y;
+result = add 2 3;
+user = { @name "Alice", @age 30 };
+name = user | @name

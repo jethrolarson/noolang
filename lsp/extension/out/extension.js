@@ -9,7 +9,7 @@ function activate(context) {
     console.log('🎯 Noolang LSP Extension ACTIVATED!');
     // Get the LSP server path from configuration
     const config = vscode_1.workspace.getConfiguration('noolang');
-    const serverPath = config.get('languageServerPath', './lsp/target/release/noolang-lsp');
+    const serverPath = config.get('languageServerPath', './target/release/noolang-lsp');
     const enableLSP = config.get('enableLanguageServer', true);
     if (!enableLSP) {
         console.log('❌ Noolang LSP is disabled');

@@ -1,6 +1,7 @@
 use tower_lsp::{LspService, Server};
 
 mod server;
+mod parser;
 
 #[tokio::main]
 async fn main() {
