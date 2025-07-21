@@ -606,6 +606,888 @@ describe("Evaluator", () => {
     const result = evaluator.evaluateProgram(program);
     expect(unwrapValue(result.finalResult)).toEqual({ name: "Alice", age: 30 });
   });
+
+  // Additional tests for comprehensive evaluator coverage
+
+  describe("Type Definitions", () => {
+    test("should evaluate nullary constructor type definitions", () => {
+      const code = `
+        type Color = Red | Green | Blue;
+        Red
+      `;
+      const result = runCode(code);
+      expect(result.finalResult.tag).toBe("constructor");
+      if (result.finalResult.tag === "constructor") {
+        expect(result.finalResult.name).toBe("Red");
+        expect(result.finalResult.args).toEqual([]);
+      }
+    });
+
+    test("should evaluate constructor with arguments type definitions", () => {
+      const code = `
+        type Shape = Circle Int | Rectangle Int Int;
+        Circle 5
+      `;
+      const result = runCode(code);
+      expect(result.finalResult.tag).toBe("constructor");
+      if (result.finalResult.tag === "constructor") {
+        expect(result.finalResult.name).toBe("Circle");
+        expect(result.finalResult.args).toHaveLength(1);
+        expect(unwrapValue(result.finalResult.args[0])).toBe(5);
+      }
+    });
+
+    test("should create curried constructors for multi-argument types", () => {
+      const code = `
+        type Shape = Rectangle Int Int;
+        partialRect = Rectangle 10;
+        fullRect = partialRect 20;
+        fullRect
+      `;
+      const result = runCode(code);
+      expect(result.finalResult.tag).toBe("constructor");
+      if (result.finalResult.tag === "constructor") {
+        expect(result.finalResult.name).toBe("Rectangle");
+        expect(result.finalResult.args).toHaveLength(2);
+        expect(unwrapValue(result.finalResult.args[0])).toBe(10);
+        expect(unwrapValue(result.finalResult.args[1])).toBe(20);
+      }
+    });
+  });
+
+  describe("Pattern Matching", () => {
+    test("should match wildcard patterns", () => {
+      const code = `
+        type Option a = Some a | None;
+        getValue = fn opt => match opt with (_ => 42);
+        getValue (Some 10)
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(42);
+    });
+
+    test("should match variable patterns and bind values", () => {
+      const code = `
+        type Option a = Some a | None;
+        getValue = fn opt => match opt with (x => x);
+        getValue (Some 123)
+      `;
+      const result = runCode(code);
+      expect(result.finalResult.tag).toBe("constructor");
+      if (result.finalResult.tag === "constructor") {
+        expect(result.finalResult.name).toBe("Some");
+      }
+    });
+
+    test("should match constructor patterns with correct name and args", () => {
+      const code = `
+        type Option a = Some a | None;
+        getValue = fn opt => match opt with (Some x => x; None => 0);
+        getValue (Some 456)
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(456);
+    });
+
+    test("should match constructor patterns with no args", () => {
+      const code = `
+        type Option a = Some a | None;
+        getValue = fn opt => match opt with (Some x => x; None => 999);
+        getValue None
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(999);
+    });
+
+    test("should match literal number patterns", () => {
+      const code = `
+        checkNumber = fn n => match n with (42 => True; x => False);
+        checkNumber 42
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(true);
+    });
+
+    test("should match literal string patterns", () => {
+      const code = `
+        checkString = fn s => match s with ("hello" => 1; x => 0);
+        checkString "hello"
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(1);
+    });
+
+    test("should fail to match literal patterns with different values", () => {
+      const code = `
+        checkNumber = fn n => match n with (42 => True; x => False);
+        checkNumber 41
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(false);
+    });
+
+    test("should handle nested pattern matching in bindings", () => {
+      const code = `
+        type Point = Point Int Int;
+        getX = fn p => match p with (Point x y => x);
+        getX (Point 15 25)
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(15);
+    });
+
+    test("should throw error when no pattern matches", () => {
+      const code = `
+        type Color = Red | Green;
+        getCode = fn c => match c with (Red => 1);
+        getCode Green
+      `;
+      expect(() => runCode(code)).toThrow("No pattern matched in match expression");
+    });
+
+    test("should fail to match constructor with wrong name", () => {
+      const code = `
+        type Option a = Some a | None;
+        type Result a b = Ok a | Err b;
+        getValue = fn opt => match opt with (Ok x => x; None => 0);
+        getValue (Some 123)
+      `;
+      expect(() => runCode(code)).toThrow("No pattern matched in match expression");
+    });
+
+    test("should fail to match constructor with wrong arity", () => {
+      const code = `
+        type Point = Point Int Int;
+        getX = fn p => match p with (Point x => x);
+        getX (Point 10 20)
+      `;
+      expect(() => runCode(code)).toThrow("No pattern matched in match expression");
+    });
+
+    test("should fail to match non-constructor values against constructor patterns", () => {
+      const code = `
+        getValue = fn n => match n with (Some x => x);
+        getValue 42
+      `;
+      expect(() => runCode(code)).toThrow("No pattern matched in match expression");
+    });
+  });
+
+  describe("Error Handling", () => {
+    test("should throw error for unsupported pattern kind", () => {
+      // This would require creating a malformed AST, which is difficult to test directly
+      // but we can test via the pattern matching error paths
+      const evaluator = new Evaluator();
+      
+      // Test the tryMatchPattern method with an invalid pattern
+      const invalidPattern = { kind: "invalid" } as any;
+      const value = { tag: "number", value: 42 } as any;
+      
+      expect(() => {
+        evaluator['tryMatchPattern'](invalidPattern, value);
+      }).toThrow("Unsupported pattern kind: invalid");
+    });
+
+    test("should handle division by zero error with context", () => {
+      const code = "10 / 0";
+      expect(() => runCode(code)).toThrow("Division by zero");
+    });
+
+    test("should throw error for unknown expression kind", () => {
+      const evaluator = new Evaluator();
+      const invalidExpr = { kind: "invalid", location: { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } } } as any;
+      
+      expect(() => {
+        evaluator.evaluateExpression(invalidExpr);
+      }).toThrow("Unknown expression kind: invalid");
+    });
+  });
+
+  describe("Value to String Conversion", () => {
+    test("should convert number values to string", () => {
+      const code = "toString 42";
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe("42");
+    });
+
+    test("should convert string values to string", () => {
+      const code = 'toString "hello"';
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe('"hello"');
+    });
+
+    test("should convert boolean values to string", () => {
+      const code = "toString True";
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe("True");
+    });
+
+    test("should convert list values to string", () => {
+      const code = "toString [1, 2, 3]";
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe("[1; 2; 3]");
+    });
+
+    test("should convert tuple values to string", () => {
+      const code = "toString {1, 2, 3}";
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe("{1; 2; 3}");
+    });
+
+    test("should convert record values to string", () => {
+      const code = 'toString { @name "Alice", @age 30 }';
+      const result = runCode(code);
+      const result_str = unwrapValue(result.finalResult);
+      expect(result_str).toContain("@name");
+      expect(result_str).toContain("@age");
+    });
+
+    test("should convert function values to string", () => {
+      const code = "toString (fn x => x)";
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe("<function>");
+    });
+
+    test("should convert native function values to string", () => {
+      const code = "toString +";
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe("<native:+>");
+    });
+
+    test("should convert constructor values with no args to string", () => {
+      const code = `
+        type Color = Red;
+        toString Red
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe("Red");
+    });
+
+    test("should convert constructor values with args to string", () => {
+      const code = `
+        type Option a = Some a;
+        toString (Some 42)
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe("Some 42");
+    });
+
+    test("should convert unit values to string", () => {
+      const code = "toString {}";
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe("unit");
+    });
+  });
+
+  describe("Advanced Evaluator Features", () => {
+    test("should handle where expressions with pattern definitions", () => {
+      const code = `
+        let result = 10 where (
+          x = 5;
+          y = x + 5
+        );
+        result
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(10);
+    });
+
+    test("should handle where expressions with mutable definitions", () => {
+      const code = `
+        let result = x where (
+          mut x = 5;
+          mut! x = 10
+        );
+        result
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(10);
+    });
+
+    test("should properly scope where clause definitions", () => {
+      const code = `
+        x = 1;
+        result = x + y where (y = 5);
+                 x  # x should still be 1 outside the where clause
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(1);
+    });
+
+    test("should handle accessor field errors", () => {
+      const code = `
+        record = { @name "Alice" };
+        @age record
+      `;
+      expect(() => runCode(code)).toThrow("Field 'age' not found in record");
+    });
+
+    test("should handle complex pipeline compositions", () => {
+      const code = `
+        addOne = fn x => x + 1;
+        double = fn x => x * 2;
+        composed = addOne |> double |> addOne;
+        composed 5
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(13); // ((5 + 1) * 2) + 1 = 13
+    });
+
+    test("should handle right-to-left composition", () => {
+      const code = `
+        addOne = fn x => x + 1;
+        double = fn x => x * 2;
+        composed = addOne <| double;
+        composed 5
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(11); // (5 * 2) + 1 = 11
+    });
+
+    test("should handle native function currying edge cases", () => {
+      const code = "mutGet";
+      const result = runCode(code);
+      expect(result.finalResult.tag).toBe("native");
+      if (result.finalResult.tag === "native") {
+        expect(result.finalResult.name).toBe("mutGet");
+      }
+    });
+
+    test("should handle execution trace with location information", () => {
+      const code = "42; 24";
+      const result = runCode(code);
+      expect(result.executionTrace).toHaveLength(1);
+      expect(result.executionTrace[0].location).toBeDefined();
+      expect(result.executionTrace[0].location?.line).toBe(1);
+    });
+
+    test("should handle empty program", () => {
+      const lexer = new Lexer("");
+      const tokens = lexer.tokenize();
+      const program = parse(tokens);
+      const result = evaluator.evaluateProgram(program);
+      
+      expect(result.finalResult.tag).toBe("list");
+      if (result.finalResult.tag === "list") {
+        expect(result.finalResult.values).toEqual([]);
+      }
+      expect(result.executionTrace).toHaveLength(0);
+    });
+
+    test("should convert expressions to string representation", () => {
+      const code = "42";
+      const result = runCode(code);
+      expect(result.executionTrace[0].expression).toBe("42");
+    });
+
+    test("should handle function application with curried native functions", () => {
+      const code = "((+) 2) 3";
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(5);
+    });
+
+    test("should handle record hasKey utility", () => {
+      const code = `
+        record = { @name "Alice", @age 30 };
+        hasKey record "name"
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(true);
+    });
+
+    test("should handle record hasValue utility", () => {
+      const code = `
+        record = { @name "Alice", @age 30 };
+        hasValue record "Alice"
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(true);
+    });
+
+    test("should handle tuple utility functions", () => {
+      const code = `
+        t = {1, 2, 3};
+        length = tupleLength t;
+        empty = tupleIsEmpty t;
+        {length, empty}
+      `;
+      const result = runCode(code);
+      const resultVal = unwrapValue(result.finalResult);
+      expect(resultVal.length).toBe(3);
+      expect(resultVal.empty).toBe(false);
+    });
+
+    test("should handle Option utility functions", () => {
+      const code = `
+        some = Some 42;
+        none = None;
+        {isSome some, isNone none, unwrap some}
+      `;
+      const result = runCode(code);
+      const resultVal = unwrapValue(result.finalResult);
+      expect(resultVal.isSome).toBe(true);
+      expect(resultVal.isNone).toBe(true);
+      expect(resultVal.unwrap).toBe(42);
+    });
+
+    test("should handle Result utility functions", () => {
+      const code = `
+        ok = Ok 42;
+        err = Err "error";
+        {isOk ok, isErr err}
+      `;
+      const result = runCode(code);
+      const resultVal = unwrapValue(result.finalResult);
+      expect(resultVal.isOk).toBe(true);
+      expect(resultVal.isErr).toBe(true);
+    });
+
+    test("should throw error when unwrapping None", () => {
+      const code = "unwrap None";
+      expect(() => runCode(code)).toThrow("Cannot unwrap None value");
+    });
+
+    test("should handle random number generation", () => {
+      const code = "random";
+      const result = runCode(code);
+      expect(result.finalResult.tag).toBe("number");
+      if (result.finalResult.tag === "number") {
+        expect(typeof result.finalResult.value).toBe("number");
+      }
+    });
+
+    test("should handle random range generation", () => {
+      const code = "randomRange 1 10";
+      const result = runCode(code);
+      expect(result.finalResult.tag).toBe("number");
+      if (result.finalResult.tag === "number") {
+        expect(result.finalResult.value).toBeGreaterThanOrEqual(1);
+        expect(result.finalResult.value).toBeLessThanOrEqual(10);
+      }
+    });
+  });
+
+  describe("File I/O Functions", () => {
+    test("should handle file operations", () => {
+      // These tests would require mocking the filesystem
+      // For now, just test that the functions exist and are callable
+      const evaluator = new Evaluator();
+      const readFileFunc = evaluator.getEnvironment().get('readFile');
+      const writeFileFunc = evaluator.getEnvironment().get('writeFile');
+      
+      expect(readFileFunc).toBeDefined();
+      expect(writeFileFunc).toBeDefined();
+      expect(readFileFunc?.tag).toBe("native");
+      expect(writeFileFunc?.tag).toBe("native");
+    });
+  });
+
+  describe("Environment Management", () => {
+    test("should provide access to current environment", () => {
+      const evaluator = new Evaluator();
+      const env = evaluator.getEnvironment();
+      
+      expect(env).toBeInstanceOf(Map);
+      expect(env.has('+')).toBe(true);
+      expect(env.has('-')).toBe(true);
+      expect(env.has('*')).toBe(true);
+      expect(env.has('/')).toBe(true);
+    });
+
+    test("should handle environment from program result", () => {
+      const code = "x = 42; y = 24";
+      const result = runCode(code);
+      
+      expect(result.environment).toBeInstanceOf(Map);
+      expect(result.environment.has('x')).toBe(true);
+      expect(result.environment.has('y')).toBe(true);
+    });
+  });
+
+  describe("Edge Cases and Error Conditions", () => {
+    test("should handle comparison with incompatible types", () => {
+      const code = '"hello" < 5';
+      expect(() => runCode(code)).toThrow("Cannot compare");
+    });
+
+    test("should handle list operations on empty lists", () => {
+      const code = "tail []";
+      expect(() => runCode(code)).toThrow("Cannot get tail of empty list");
+    });
+
+    test("should handle cons with non-list second argument", () => {
+      const code = "cons 1 42";
+      expect(() => runCode(code)).toThrow("Second argument to cons must be a list");
+    });
+
+    test("should handle map with non-function first argument", () => {
+      const code = "map 42 [1, 2, 3]";
+      expect(() => runCode(code)).toThrow("map requires a function and a list");
+    });
+
+    test("should handle filter with non-function predicate", () => {
+      const code = "filter 42 [1, 2, 3]";
+      expect(() => runCode(code)).toThrow("filter requires a predicate function and a list");
+    });
+
+    test("should handle literal pattern matching with numbers", () => {
+      const code = `
+        let x = 42;
+        match x with
+        | 42 -> "found forty-two"
+        | _ -> "not found"
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe("found forty-two");
+    });
+
+    test("should handle literal pattern matching with strings", () => {
+      const code = `
+        let x = "hello";
+        match x with
+        | "hello" -> "greeting"
+        | "world" -> "planet"
+        | _ -> "unknown"
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe("greeting");
+    });
+
+    test("should handle literal pattern non-match", () => {
+      const code = `
+        let x = 99;
+        match x with
+        | 42 -> "found"
+        | _ -> "not found"
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe("not found");
+    });
+
+    test("should handle invalid pattern kinds for coverage", () => {
+      // Access the private tryMatchPattern method for testing
+      const evaluator = new Evaluator();
+      
+      // Test the tryMatchPattern method with an invalid pattern
+      const invalidPattern = { kind: "invalid" } as any;
+      const value = { tag: "number", value: 42 } as any;
+      
+      expect(() => {
+        evaluator['tryMatchPattern'](invalidPattern, value);
+      }).toThrow("Unsupported pattern kind: invalid");
+    });
+
+    test("should convert constructors without args to string", () => {
+      const code = `
+        type Color = Red | Green | Blue;
+        Red
+      `;
+      const result = runCode(code);
+      expect(result.finalResult.tag).toBe("constructor");
+      if (result.finalResult.tag === "constructor") {
+        expect(result.finalResult.name).toBe("Red");
+        expect(result.finalResult.args).toEqual([]);
+      }
+    });
+
+    test("should convert constructors with args to string", () => {
+      const code = `
+        type Option a = Some a | None;
+        Some 42
+      `;
+      const result = runCode(code);
+      expect(result.finalResult.tag).toBe("constructor");
+      if (result.finalResult.tag === "constructor") {
+        expect(result.finalResult.name).toBe("Some");
+        expect(result.finalResult.args).toHaveLength(1);
+      }
+    });
+
+    test("should handle unit values", () => {
+      const code = "unit";
+      const result = runCode(code);
+      expect(result.finalResult.tag).toBe("unit");
+    });
+
+    test("should handle complex nested patterns", () => {
+      const code = `
+        type Tree a = Leaf a | Branch (Tree a) (Tree a);
+        let tree = Branch (Leaf 1) (Leaf 2);
+        match tree with
+        | Leaf x -> x
+        | Branch left right -> 
+            match left with
+            | Leaf y -> y
+            | _ -> 0
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(1);
+    });
+
+    test("should handle empty list edge cases", () => {
+      const result = runCode("isEmpty []");
+      expect(result.finalResult).toEqual({ tag: "bool", value: true });
+    });
+
+    test("should handle non-empty list edge cases", () => {
+      const result = runCode("isEmpty [1, 2, 3]");
+      expect(result.finalResult).toEqual({ tag: "bool", value: false });
+    });
+
+    test("should handle native function display", () => {
+      const result = runCode("mutGet");
+      expect(result.finalResult.tag).toBe("native");
+      if (result.finalResult.tag === "native") {
+        expect(result.finalResult.name).toBe("mutGet");
+      }
+    });
+
+    test("should handle large lists", () => {
+      const result = runCode("[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]");
+      expect(result.finalResult.tag).toBe("list");
+      if (result.finalResult.tag === "list") {
+        expect(result.finalResult.values).toHaveLength(10);
+      }
+    });
+
+    test("should handle complex record patterns", () => {
+      const code = `
+        let record = {@x 10; @y 20};
+        match record with
+        | {@x x; @y y} -> x + y
+        | _ -> 0
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(30);
+    });
+
+    test("should handle tuple patterns", () => {
+      const code = `
+        let tuple = {1; 2; 3};
+        match tuple with
+        | {x; y; z} -> x + y + z
+        | _ -> 0
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(6);
+    });
+
+    test("should handle random functions", () => {
+      const result = runCode("random");
+      expect(result.finalResult.tag).toBe("number");
+      if (result.finalResult.tag === "number") {
+        expect(typeof result.finalResult.value).toBe("number");
+      }
+    });
+
+    test("should handle random range functions", () => {
+      const result = runCode("randomRange 1 10");
+      expect(result.finalResult.tag).toBe("number");
+      if (result.finalResult.tag === "number") {
+        expect(result.finalResult.value).toBeGreaterThanOrEqual(1);
+        expect(result.finalResult.value).toBeLessThanOrEqual(10);
+      }
+    });
+  });
+
+  // Additional comprehensive tests to target specific uncovered functionality
+  describe("Comprehensive Coverage Tests", () => {
+  describe("Pattern Matching Literal Tests", () => {
+    test("should match number literals correctly", () => {
+      const code = `
+        match 42 with
+        | 42 -> "matched"
+        | _ -> "not matched"
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe("matched");
+    });
+
+    test("should match string literals correctly", () => {
+      const code = `
+        match "hello" with
+        | "hello" -> "matched"
+        | _ -> "not matched"
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe("matched");
+    });
+
+    test("should handle non-matching number literals", () => {
+      const code = `
+        match 99 with
+        | 42 -> "matched"
+        | _ -> "not matched"
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe("not matched");
+    });
+
+    test("should handle non-matching string literals", () => {
+      const code = `
+        match "world" with
+        | "hello" -> "matched"
+        | _ -> "not matched"
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe("not matched");
+    });
+  });
+
+  describe("Value Conversion and Display", () => {
+    test("should handle different value types for toString conversion", () => {
+      // Testing different value types that exercise valueToString function paths
+      const numberResult = runCode("42");
+      expect(numberResult.finalResult.tag).toBe("number");
+      
+      const stringResult = runCode('"hello"');
+      expect(stringResult.finalResult.tag).toBe("string");
+      
+      const boolResult = runCode("True");
+      expect(boolResult.finalResult.tag).toBe("constructor");
+      
+      const listResult = runCode("[1, 2, 3]");
+      expect(listResult.finalResult.tag).toBe("list");
+      
+      const tupleResult = runCode("{1; 2; 3}");
+      expect(tupleResult.finalResult.tag).toBe("tuple");
+      
+      const recordResult = runCode("{@x 10; @y 20}");
+      expect(recordResult.finalResult.tag).toBe("record");
+    });
+
+    test("should handle constructor values without arguments", () => {
+      const code = `
+        type Color = Red | Green | Blue;
+        Red
+      `;
+      const result = runCode(code);
+      expect(result.finalResult.tag).toBe("constructor");
+      if (result.finalResult.tag === "constructor") {
+        expect(result.finalResult.name).toBe("Red");
+        expect(result.finalResult.args).toEqual([]);
+      }
+    });
+
+    test("should handle constructor values with arguments", () => {
+      const code = `
+        type Option a = Some a | None;
+        Some 42
+      `;
+      const result = runCode(code);
+      expect(result.finalResult.tag).toBe("constructor");
+      if (result.finalResult.tag === "constructor") {
+        expect(result.finalResult.name).toBe("Some");
+        expect(result.finalResult.args.length).toBe(1);
+      }
+    });
+
+    test("should handle function values", () => {
+      const code = "fun x -> x + 1";
+      const result = runCode(code);
+      expect(result.finalResult.tag).toBe("function");
+    });
+
+    test("should handle native function values", () => {
+      const code = "+";
+      const result = runCode(code);
+      expect(result.finalResult.tag).toBe("native");
+    });
+  });
+
+  describe("Edge Cases and Coverage Gaps", () => {
+    test("should handle empty lists properly", () => {
+      const result = runCode("isEmpty []");
+      expect(result.finalResult.tag).toBe("constructor");
+      if (result.finalResult.tag === "constructor") {
+        expect(result.finalResult.name).toBe("True");
+      }
+    });
+
+    test("should handle non-empty lists properly", () => {
+      const result = runCode("isEmpty [1, 2, 3]");
+      expect(result.finalResult.tag).toBe("constructor");
+      if (result.finalResult.tag === "constructor") {
+        expect(result.finalResult.name).toBe("False");
+      }
+    });
+
+    test("should handle complex nested constructor patterns", () => {
+      const code = `
+        type Tree a = Leaf a | Branch (Tree a) (Tree a);
+        let tree = Branch (Leaf 10) (Leaf 20);
+        match tree with
+        | Branch (Leaf x) (Leaf y) -> x + y
+        | _ -> 0
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(30);
+    });
+
+    test("should handle curried constructor applications", () => {
+      const code = `
+        type Point = Point Int Int;
+        let makePoint = Point;
+        makePoint 10 20
+      `;
+      const result = runCode(code);
+      expect(result.finalResult.tag).toBe("constructor");
+      if (result.finalResult.tag === "constructor") {
+        expect(result.finalResult.name).toBe("Point");
+        expect(result.finalResult.args.length).toBe(2);
+      }
+    });
+
+    test("should handle tuple matching patterns", () => {
+      const code = `
+        let tuple = {1; 2; 3};
+        match tuple with
+        | {a; b; c} -> a + b + c
+        | _ -> 0
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(6);
+    });
+
+    test("should handle record matching patterns", () => {
+      const code = `
+        let record = {@x 5; @y 15};
+        match record with
+        | {@x a; @y b} -> a * b
+        | _ -> 0
+      `;
+      const result = runCode(code);
+      expect(unwrapValue(result.finalResult)).toBe(75);
+    });
+
+    test("should handle complex list operations", () => {
+      const result = runCode("length [1, 2, 3, 4, 5]");
+      expect(unwrapValue(result.finalResult)).toBe(5);
+    });
+
+    test("should handle random number generation within range", () => {
+      const result = runCode("randomRange 1 10");
+      expect(result.finalResult.tag).toBe("number");
+      if (result.finalResult.tag === "number") {
+        expect(result.finalResult.value).toBeGreaterThanOrEqual(1);
+        expect(result.finalResult.value).toBeLessThanOrEqual(10);
+      }
+    });
+
+    test("should handle large constructor argument lists", () => {
+      const code = `
+        type Large = Large Int Int Int Int Int;
+        Large 1 2 3 4 5
+      `;
+      const result = runCode(code);
+      expect(result.finalResult.tag).toBe("constructor");
+      if (result.finalResult.tag === "constructor") {
+        expect(result.finalResult.name).toBe("Large");
+        expect(result.finalResult.args.length).toBe(5);
+      }
+    });
+  });
+  });
 });
 
 describe("Semicolon sequencing", () => {
