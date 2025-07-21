@@ -4,9 +4,9 @@ An expression-based, LLM-friendly programming language designed for linear, decl
 
 ## Current Status (July 2024)
 - **All core features implemented:** parser, evaluator, type inference, REPL, CLI, and debugging tools
-- **All tests passing** (373/373 tests) ✅ - parser, evaluator, typer, ADTs, constraints, recursion, effects, trait system
+- **All tests passing** (555+ tests) ✅ - parser, evaluator, typer, ADTs, constraints, recursion, effects, trait system
 - **Complete effect system**: 3-phase implementation with effect validation and propagation
-- **Trait system with constraint resolution**: Full implementation with type-directed dispatch
+- **Trait system with constraint resolution**: Full implementation with type-directed dispatch and top-level support
 - **Comma-separated data structures**: `[1, 2, 3]`, `{ @name "Alice", @age 30 }`
 - **Explicit effects**: Effects are tracked in the type system with granular effect taxonomy
 - **Strong type inference**: Powered by a functional Hindley-Milner type inference engine with let-polymorphism
@@ -653,7 +653,7 @@ Noolang has full VSCode syntax highlighting support:
 
 ## Trait System with Constraint Resolution
 
-Noolang features a **comprehensive trait system** that enables constraint-based polymorphism through constraint definitions, implementations, and automatic type-directed dispatch. This provides a foundation for advanced type system features similar to Haskell's type classes or Rust's traits.
+Noolang features a **comprehensive trait system** that enables constraint-based polymorphism through constraint definitions, implementations, and automatic type-directed dispatch. Constraint and implement statements work at the top level of programs. This provides a foundation for advanced type system features similar to Haskell's type classes or Rust's traits.
 
 ### Constraint Definitions
 
@@ -736,6 +736,33 @@ Clear error messages when implementations are missing:
 show someCustomType   # Error: No implementation of Show for CustomType
 ```
 
+### Complete Example
+
+Here's a complete example showing constraint definitions and usage at the top level:
+
+```noolang
+# Define constraints at top level
+constraint Show a ( show : a -> String );
+constraint Eq a ( 
+  equals : a -> a -> Bool; 
+  notEquals : a -> a -> Bool 
+);
+
+# Implement constraints for different types
+implement Show Int ( show = toString );
+implement Show String ( show = fn s => s );
+implement Eq Int ( 
+  equals = fn a b => a == b;
+  notEquals = fn a b => a != b
+);
+
+# Use constraint functions - they resolve automatically
+result1 = show 42;           # "42"
+result2 = show "hello";      # "hello"
+result3 = equals 1 2;        # False
+result4 = notEquals 1 2;     # True
+```
+
 ### Integration with Existing Features
 
 The trait system works seamlessly with all existing Noolang features:
@@ -759,7 +786,7 @@ implement Show (Option a) given Show a (
 
 ### Current Implementation Status
 
-- ✅ **Constraint Definitions**: Full parser and AST support for `constraint Name params (functions)`
+- ✅ **Constraint Definitions**: Full parser and AST support for `constraint Name params (functions)` at top level
 - ✅ **Constraint Implementations**: Complete `implement Name Type (functions)` with conditional constraints
 - ✅ **Type-Directed Dispatch**: Automatic resolution of constraint functions to implementations
 - ✅ **Multiple Functions**: Support for constraints with multiple function signatures
@@ -767,7 +794,8 @@ implement Show (Option a) given Show a (
 - ✅ **Error Handling**: Helpful error messages for missing implementations
 - ✅ **Parser Integration**: Full lexer and parser support for trait syntax
 - ✅ **Type System Integration**: Complete integration with type inference and checking
-- ✅ **Test Coverage**: Comprehensive test suite (14/14 trait system tests passing)
+- ✅ **Top-Level Support**: Constraint and implement statements work at program top level
+- ✅ **Test Coverage**: Comprehensive test suite (18/18 trait system tests passing)
 
 The trait system provides a solid foundation for advanced type system features and constraint-based programming patterns in Noolang.
 
