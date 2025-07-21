@@ -680,12 +680,13 @@ describe("Type annotation parsing", () => {
 		expect(funcType.params[0].kind).toBe("variant");
 		expect(funcType.params[0].name).toBe("m");
 		expect(funcType.params[0].args[0].name).toBe("a");
-		// Second parameter: (a -> m b) -> m b is a function type
-		expect(funcType.params[1].kind).toBe("function");
-		// Return type: m b
-		expect(funcType.return.kind).toBe("variant");
-		expect(funcType.return.name).toBe("m");
-		expect(funcType.return.args[0].name).toBe("b");
+		// Return type: (a -> m b) -> m b is a function type (right-associative)
+		expect(funcType.return.kind).toBe("function");
+		// The return function takes (a -> m b) and returns m b
+		expect(funcType.return.params[0].kind).toBe("function");
+		expect(funcType.return.return.kind).toBe("variant");
+		expect(funcType.return.return.name).toBe("m");
+		expect(funcType.return.return.args[0].name).toBe("b");
 	});
 
 	test("parses nested record type", () => {
@@ -697,7 +698,7 @@ describe("Type annotation parsing", () => {
 		expect(result.value.fields).toHaveProperty("person");
 		expect(result.value.fields).toHaveProperty("active");
 		expect(result.value.fields.person.kind).toBe("record");
-		expect(result.value.fields.active.kind).toBe("variant");
+		expect(result.value.fields.active.kind).toBe("variable");
 	});
 });
 
