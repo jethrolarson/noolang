@@ -1,0 +1,47 @@
+# Safe Thrush Operator (|?) Demo
+# Demonstrates monadic chaining with Option types
+
+# Helper functions
+add_ten = fn x => x + 10;
+multiply_two = fn x => x * 2;
+safe_divide = fn x => if x == 0 then None else Some (100 / x);
+
+# Basic usage with Some values
+print "=== Basic Usage ===";
+Some 5 |? add_ten |> print; # Some 15
+
+# Short-circuiting with None
+None |? add_ten |> print; # None
+
+# Monadic bind - function returning Option
+print "\n=== Monadic Bind ===";
+Some 10 |? safe_divide |> print; # Some 10 (100/10)
+Some 0 |? safe_divide |> print;  # None (division by zero)
+
+# Chaining operations
+print "\n=== Chaining Operations ===";
+Some 10 |? add_ten |? multiply_two |> print; # Some 40
+
+# Chain with short-circuit
+Some 0 |? add_ten |? safe_divide |> print; # None (stops at safe_divide)
+
+# Chain with successful operations
+Some 5 |? add_ten |? multiply_two |? safe_divide |> print; # Some 3.33 (100/30)
+
+# Practical example: Safe string processing
+print "\n=== Practical Example ===";
+safe_parse_int = fn s => 
+  if s == "0" then Some 0
+  else if s == "1" then Some 1 
+  else if s == "2" then Some 2
+  else if s == "3" then Some 3
+  else if s == "4" then Some 4
+  else if s == "5" then Some 5
+  else None;
+
+process_number = fn n => 
+  Some n |? (fn x => x * x) |? safe_divide;
+
+Some "5" |? safe_parse_int |? process_number |> print; # Some 4 (100/25)
+Some "0" |? safe_parse_int |? process_number |> print; # None (division by zero)
+Some "invalid" |? safe_parse_int |? process_number |> print; # None (parse error)

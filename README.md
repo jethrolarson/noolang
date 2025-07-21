@@ -8,7 +8,7 @@ An functional, expression-based, LLM-friendly programming language designed for 
 - **Type Constraints** - expressive constraint system for safe generic programming
 - **Trait system** - constraint definitions and implementations with type-directed dispatch
 - **Functional programming** idioms and patterns
-- **Convenient operators for piping and composition** `|>` and `<|` for function composition and `|` to pipe values into partially applied functions. 
+- **Pipeline and function application operators** (`|>`, `|`, `|?`, `$`) for composition and safe chaining. 
 - **Composable accessors for Records** for immutably reading and writing structured data.
 - **REPL** for interactive development with comprehensive debugging tools
 - **Explicit effects**: Effects are tracked in the type system and visible in function types
@@ -219,7 +219,7 @@ curried_add 2 3
 
 ### Pipeline and Function Application Operators
 
-Noolang provides three operators for function composition and application:
+Noolang provides several operators for function composition and application:
 
 #### Pipeline Operator (`|>`) - Function Composition
 Composes functions from left to right (like Unix pipes):
@@ -233,6 +233,27 @@ Applies the right function to the left value:
 ```noolang
 # Apply function: x | f means f(x)
 [1, 2, 3] | map (fn x => x * 2)
+```
+
+#### Safe Thrush Operator (`|?`) - Monadic Chaining
+Safely applies functions to monadic values (like Option), implementing smart monadic bind behavior:
+```noolang
+# Safe application to Some values
+Some 42 |? (fn x => x + 10)     # Some 52
+
+# None values short-circuit  
+None |? (fn x => x + 10)         # None
+
+# Monadic bind: functions returning Options don't get double-wrapped
+safe_divide = fn x => if x == 0 then None else Some (100 / x);
+Some 10 |? safe_divide           # Some 10 (not Some Some 10)
+
+# Functions returning regular values get automatically wrapped
+Some 5 |? (fn x => x * 2)        # Some 10
+
+# Chaining operations with short-circuiting
+Some 10 |? (fn x => x + 5) |? (fn x => x * 2) |? safe_divide  # Some 6
+Some 0 |? (fn x => x + 5) |? (fn x => x * 2) |? safe_divide   # None
 ```
 
 #### Dollar Operator (`$`) - Low-Precedence Function Application
@@ -361,6 +382,7 @@ Noolang provides a comprehensive set of built-in functions organized by category
 
 #### Function Application and Composition (Pure)
 - **`|`** - Thrush operator (function application): `a -> (a -> b) -> b`
+- **`|?`** - Safe thrush operator (monadic chaining): `m a -> (a -> m b) -> m b`
 - **`|>`** - Pipeline operator (left-to-right composition): `(a -> b) -> (b -> c) -> (a -> c)`
 - **`<|`** - Compose operator (right-to-left composition): `(b -> c) -> (a -> b) -> (a -> c)`
 - **`$`** - Dollar operator (low precedence function application): `(a -> b) -> a -> b`

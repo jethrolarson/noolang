@@ -40,6 +40,42 @@ id = fn x => x;
 compose = fn f g => fn x => f (g x);
 
 # ========================================
+# MONAD CONSTRAINT AND IMPLEMENTATIONS
+# ========================================
+
+# For now, define bind and return as regular functions
+# TODO: Use proper Monad constraint when type application parsing is fixed
+# constraint Monad m (
+#   bind : m a -> (a -> m b) -> m b;
+#   return : a -> m a
+# );
+
+# TODO: Use proper implementations when constraints work
+# implement Monad Option (
+#   bind = fn opt f => match opt with (
+#     Some value => f value;
+#     None => None
+#   );
+#   return = fn x => Some x
+# );
+
+# implement Monad (Result e) (
+#   bind = fn res f => match res with (
+#     Ok value => f value;
+#     Err error => Err error
+#   );
+#   return = fn x => Ok x
+# );
+
+# Define bind and return as regular functions for Option type
+bind = fn opt f => match opt with (
+  Some value => f value;
+  None => None
+);
+
+return = fn x => Some x;
+
+# ========================================
 # BOOLEAN OPERATIONS
 # ========================================
 
@@ -62,11 +98,8 @@ option_get_or = fn default opt => match opt with (
   None => default
 );
 
-# Map over Option
-option_map = fn f opt => match opt with (
-  Some value => Some (f value);
-  None => None
-);
+# Map over Option (using Monad constraint)
+option_map = fn f opt => bind opt (fn x => return (f x));
 
 # ========================================
 # RESULT UTILITIES
@@ -78,8 +111,5 @@ result_get_or = fn default res => match res with (
   Err error => default
 );
 
-# Map over Result value
-result_map = fn f res => match res with (
-  Ok value => Ok (f value);
-  Err error => Err error
-);
+# Map over Result value (using Monad constraint) 
+result_map = fn f res => bind res (fn x => return (f x));
