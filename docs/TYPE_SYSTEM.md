@@ -84,6 +84,73 @@ Noolang now supports **type constraints** for more expressive and safe generic p
 * **✅ Constraint Validation**: Type checker enforces constraints during unification
 * **✅ Error Reporting**: Clear error messages when constraints are violated
 
+### ✅ **IMPLEMENTED: Trait System with Constraint Resolution**
+
+Noolang now features a **complete trait system** that enables constraint-based polymorphism through constraint definitions, implementations, and automatic type-directed dispatch.
+
+#### **Trait System Features**
+
+* **✅ Constraint Definitions**: Full parser and AST support for defining constraints
+* **✅ Constraint Implementations**: Complete implementation system with conditional constraints  
+* **✅ Type-Directed Dispatch**: Automatic resolution of constraint functions to implementations
+* **✅ Multiple Functions**: Support for constraints with multiple function signatures
+* **✅ Conditional Constraints**: `given` clauses for dependent implementations
+* **✅ Error Handling**: Helpful error messages for missing implementations
+* **✅ Parser Integration**: Full lexer and parser support for trait syntax
+* **✅ Type System Integration**: Complete integration with type inference and checking
+* **✅ Test Coverage**: Comprehensive test suite (14/14 trait system tests passing)
+
+#### **Constraint Definition Syntax**
+
+```noolang
+# Simple constraint with one function
+constraint Show a ( show : a -> String );
+
+# Constraint with multiple functions
+constraint Eq a ( 
+  equals : a -> a -> Bool; 
+  notEquals : a -> a -> Bool 
+);
+
+# Complex constraint with generic functions
+constraint Monad m (
+  return : a -> m a;
+  bind : m a -> (a -> m b) -> m b
+);
+```
+
+#### **Implementation Syntax**
+
+```noolang
+# Basic implementation
+implement Show Int ( show = intToString );
+
+# Implementation with multiple functions
+implement Eq String ( 
+  equals = stringEquals;
+  notEquals = fn a b => not (stringEquals a b)
+);
+
+# Conditional implementation
+implement Show (List a) given Show a (
+  show = fn list => "[" + (joinStrings ", " (map show list)) + "]"
+);
+```
+
+#### **Type-Directed Dispatch**
+
+Constraint functions automatically resolve to the correct implementation based on argument types:
+
+```noolang
+# These calls automatically resolve to the right implementation
+show 42              # Uses Show Int implementation
+show "hello"         # Uses Show String implementation  
+show [1, 2, 3]       # Uses Show (List a) implementation with Show Int
+
+equals 1 2           # Uses Eq Int implementation
+equals "a" "b"       # Uses Eq String implementation
+```
+
 #### **Current Constraint Syntax**
 
 Constraints are currently embedded in function types and propagated automatically:
@@ -97,23 +164,32 @@ length : List a -> Number given a is Collection
 # Constraint propagation works through composition
 compose = fn f g => fn x => f (g x)
 safeHead = compose head  # Constraint 'a is Collection' is preserved
+
+# User-defined constraints with trait system
+constraint Show a ( show : a -> String );
+implement Show Int ( show = intToString );
+showValue = show 42  # Automatically resolves to Int implementation
 ```
 
-#### **Constraint System Features**
+#### **Integration with Existing Features**
 
-* **Automatic Propagation**: Constraints flow through function composition
-* **Built-in Constraints**: Predefined constraints for common type classes
-* **Constraint Checking**: Violations are caught during type inference
-* **Error Messages**: Clear feedback when constraints are not satisfied
-
-#### **Example: Constraint Violation**
+The trait system works seamlessly with all existing Noolang features:
 
 ```noolang
-# This will throw a type error because Int does not satisfy Collection constraint
-compose = fn f g => fn x => f (g x)
-safeHead = compose head
-listId = fn x => x
-result = safeHead listId [1, 2, 3]  # ❌ Error: Int does not satisfy Collection constraint
+# With higher-order functions
+showAll = map show    # Automatically constrains to Show a => List a -> List String
+
+# With pipeline operators
+result = [1, 2, 3] |> map show |> joinStrings ", "
+
+# With ADTs and pattern matching
+type Option a = Some a | None;
+implement Show (Option a) given Show a (
+  show = fn opt => match opt with (
+    Some x => "Some(" + show x + ")";
+    None => "None"
+  )
+);
 ```
 
 ---

@@ -1,56 +1,188 @@
-# Trait System Demo - Noolang Enhanced Type System with Traits
+# Trait System Demo - Comprehensive Examples
 
-# Define a Monad constraint/trait
-constraint Monad m (
-  bind a b : m a -> (a -> m b) -> m b;
-  pure a : a -> m a
-);
+# 1. SIMPLE CONSTRAINT DEFINITIONS
+constraint Show a ( show : a -> String );
+constraint Eq a ( equals : a -> a -> Bool );
 
-# Define a Show constraint/trait  
-constraint Show a (
-  show : a -> String
-);
+# 2. BASIC IMPLEMENTATIONS
+implement Show Int ( show = intToString );
+implement Show String ( show = fn s => "\"" + s + "\"" );
+implement Eq Int ( equals = fn a b => a == b );
+implement Eq String ( equals = fn a b => a == b );
 
-# Implement Monad for List
-implement Monad List (
-  bind = fn xs f => flatMap f xs;
-  pure = fn x => [x]
-);
-
-# Implement Monad for Option
-implement Monad Option (
-  bind = fn opt f => match opt (
-    None => None;
-    Some x => f x
-  );
-  pure = fn x => Some x
-);
-
-# Implement Show for Int
-implement Show Int (
-  show = fn x => toString x
-);
-
-# Implement Show for List (if elements are showable)
+# 3. CONDITIONAL IMPLEMENTATIONS
+# Show for List only if elements are showable
 implement Show (List a) given Show a (
-  show = fn xs => "[" + (join "; " (map show xs)) + "]"
+  show = fn list => "[" + (joinStrings ", " (map show list)) + "]"
 );
 
-# Generic function using Monad constraint
-doMonadic = fn m => 
-  bind m (fn x => pure (x + 1)) : Monad m => m Int -> m Int;
+# Eq for List only if elements are comparable
+implement Eq (List a) given Eq a (
+  equals = fn list1 list2 => 
+    if (length list1) != (length list2) 
+    then False 
+    else listEquals list1 list2
+);
 
-# Generic function using Show constraint  
-printValue = fn x =>
-  print (show x) : Show a => a -> Unit !log;
+# 4. MULTIPLE FUNCTION CONSTRAINTS
+constraint Ord a ( 
+  compare : a -> a -> Int;
+  lessThan : a -> a -> Bool;
+  greaterThan : a -> a -> Bool
+);
 
-# Example usage
-numbers = [1, 2, 3];
-result = doMonadic numbers;  # Should work with List Monad implementation
+implement Ord Int (
+  compare = fn a b => if a < b then -1 else if a > b then 1 else 0;
+  lessThan = fn a b => a < b;
+  greaterThan = fn a b => a > b
+);
 
-# Show example
-value = 42;
-printValue value;  # Should work with Int Show implementation
-printValue numbers; # Should work with List Show implementation
+# 5. COMPLEX CONSTRAINT WITH GENERIC FUNCTIONS
+constraint Functor f (
+  fmap : (a -> b) -> f a -> f b
+);
 
-result
+# Implement Functor for List
+implement Functor List (
+  fmap = map  # Use built-in map function
+);
+
+# 6. MONAD CONSTRAINT (ADVANCED)
+constraint Monad m (
+  return : a -> m a;
+  bind : m a -> (a -> m b) -> m b
+);
+
+# Note: Monad implementation would require Option/Result types
+# This demonstrates the syntax for advanced constraints
+
+# 7. TYPE-DIRECTED DISPATCH EXAMPLES
+
+# Basic usage - automatically resolves implementations
+demo_basic = (
+  intValue = show 42;           # Uses Show Int
+  stringValue = show "hello";   # Uses Show String
+  listValue = show [1, 2, 3];   # Uses Show (List a) with Show Int
+  
+  # Comparison examples
+  intEquals = equals 1 1;       # Uses Eq Int
+  stringEquals = equals "a" "a"; # Uses Eq String
+  listEquals = equals [1, 2] [1, 2]; # Uses Eq (List a) with Eq Int
+  
+  { @intValue intValue, @stringValue stringValue, @listValue listValue }
+);
+
+# 8. HIGHER-ORDER FUNCTIONS WITH CONSTRAINTS
+
+# Function that works with any showable type
+showAndPrint = fn x => (
+  result = show x;
+  print result;
+  result
+);
+
+# Function that works with any comparable type  
+findEquals = fn target list => filter (fn x => equals x target) list;
+
+# Function that works with ordered types
+sortList = fn list => list; # Would use Ord constraint for actual sorting
+
+# 9. PIPELINE OPERATIONS WITH TRAITS
+
+pipeline_demo = (
+  numbers = [1, 2, 3, 4, 5];
+  
+  # Show all numbers in a list
+  numberStrings = numbers |> map show;
+  
+  # Find equal numbers
+  equalToThree = numbers |> findEquals 3;
+  
+  # Chain operations
+  result = numbers 
+    |> map (fn x => x * 2)
+    |> map show 
+    |> show;  # Show the list of strings
+    
+  result
+);
+
+# 10. INTEGRATION WITH EXISTING FEATURES
+
+# With ADTs (once pattern matching is available)
+type Option a = Some a | None;
+
+# Show implementation for Option
+implement Show (Option a) given Show a (
+  show = fn opt => match opt with (
+    Some x => "Some(" + show x + ")";
+    None => "None"
+  )
+);
+
+# With records
+person_demo = (
+  person = { @name "Alice", @age 30, @city "NYC" };
+  
+  # If we had Show for records:
+  # personString = show person;
+  
+  # For now, manual showing
+  nameString = show (@name person);
+  ageString = show (@age person);
+  
+  "Person: " + nameString + ", age " + ageString
+);
+
+# 11. ERROR HANDLING DEMONSTRATION
+
+# This would cause a compile-time error if CustomType doesn't have Show:
+# bad_show = show someCustomType;  # Error: No implementation of Show for CustomType
+
+# 12. DEMONSTRATION OF AUTOMATIC CONSTRAINT PROPAGATION
+
+# This function automatically gets constrained to Show a
+showTwice = fn x => show x + " " + show x;
+
+# This function gets constrained to Eq a  
+areEqual = fn x y => equals x y;
+
+# These work because the types have implementations
+result_demo = (
+  twice42 = showTwice 42;           # "42 42"
+  twiceHello = showTwice "hello";   # "\"hello\" \"hello\""
+  equal = areEqual 1 1;             # True
+  notEqual = areEqual "a" "b";      # False
+  
+  { @twice42 twice42, @equal equal }
+);
+
+# 13. FINAL DEMONSTRATION - PUTTING IT ALL TOGETHER
+
+main_demo = (
+  # Create some data
+  numbers = [1, 2, 3];
+  strings = ["hello", "world"];
+  
+  # Use trait system for display
+  numbersShown = show numbers;      # "[1, 2, 3]"
+  stringsShown = show strings;      # "[\"hello\", \"world\"]"
+  
+  # Use trait system for comparison
+  sameNumbers = equals numbers [1, 2, 3];  # True
+  sameStrings = equals strings ["hello", "world"]; # True
+  
+  # Combine with higher-order functions
+  allShown = map show [numbers, strings];  # Would need Show (List String)
+  
+  # Return a summary
+  {
+    @numbersShown numbersShown,
+    @stringsShown stringsShown,
+    @sameNumbers sameNumbers,
+    @sameStrings sameStrings
+  }
+);
+
+# Execute the main demo
+main_demo
