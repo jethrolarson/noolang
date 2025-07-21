@@ -31,6 +31,7 @@ import {
 	listTypeWithElement,
 	tupleType,
 	recordType,
+	variantType,
 	hasFieldConstraint,
 } from '../ast';
 import {
@@ -534,6 +535,62 @@ export const typeBinary = (
 		};
 		
 		return typeApplication(syntheticApp, currentState);
+	}
+
+	// Special handling for safe thrush operator (|?) - monadic bind via constraints
+	if (expr.operator === '|?') {
+		// Safe thrush: a |? b desugars to: bind a b
+		// This uses constraint resolution to find the appropriate bind implementation
+		
+		if (rightResult.type.kind !== 'function') {
+			throwTypeError(
+				location => nonFunctionApplicationError(rightResult.type, location),
+				getExprLocation(expr)
+			);
+		}
+
+		// Check that the function can take one parameter
+		if (rightResult.type.params.length !== 1) {
+			throw new Error(
+				`Safe thrush operator requires function with exactly one parameter, got ${rightResult.type.params.length}`
+			);
+		}
+
+		// For proper constraint-based implementation, we would:
+		// 1. Check that leftResult.type implements Monad
+		// 2. Resolve the bind function for that type
+		// 3. Type it as: bind : m a -> (a -> m b) -> m b
+		
+		// For now, implement specific handling for Option type
+		if (leftResult.type.kind === 'variant' && leftResult.type.name === 'Option' && leftResult.type.args.length === 1) {
+			const innerType = leftResult.type.args[0];
+			
+			// Unify the function parameter with the inner type
+			currentState = unify(
+				rightResult.type.params[0],
+				innerType,
+				currentState,
+				getExprLocation(expr)
+			);
+
+			// The result type is always Option of the function's return type
+			// This follows monadic bind semantics where bind flattens nested monads
+			let resultType: Type;
+			if (rightResult.type.return.kind === 'variant' && rightResult.type.return.name === 'Option') {
+				// Function returns Option T -> result is Option T (bind flattens)
+				resultType = rightResult.type.return;
+			} else {
+				// Function returns T -> result is Option T (wrapped)
+				resultType = variantType('Option', [rightResult.type.return]);
+			}
+			
+			return createTypeResult(resultType, unionEffects(leftResult.effects, rightResult.effects), currentState);
+		} else {
+			// TODO: Implement full constraint resolution for other monadic types
+			throw new Error(
+				`Safe thrush operator (|?) currently only supports Option types, got ${typeToString(leftResult.type, currentState.substitution)}`
+			);
+		}
 	}
 
 	// Get operator type from environment

@@ -1161,16 +1161,16 @@ const parseCompose: C.Parser<Expression> = (tokens) => {
   return parsePostfixFromResult(compResult.value, compResult.remaining);
 };
 
-// --- Thrush (|) ---
+// --- Thrush (|) and Safe Thrush (|?) ---
 const parseThrush: C.Parser<Expression> = (tokens) => {
   const thrushResult = C.map(
-    C.seq(parseDollar, C.many(C.seq(C.operator("|"), parseDollar))),
+    C.seq(parseDollar, C.many(C.seq(C.choice(C.operator("|"), C.operator("|?")), parseDollar))),
     ([left, rest]) => {
       let result = left;
       for (const [op, right] of rest) {
         result = {
           kind: "binary",
-          operator: "|",
+          operator: op.value as "|" | "|?",
           left: result,
           right,
           location: result.location,
