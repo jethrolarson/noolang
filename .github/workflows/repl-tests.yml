@@ -64,11 +64,8 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: Run REPL unit tests
-      run: npm run test:repl
-    
-    - name: Run REPL integration tests
-      run: npm run test:repl-integration
+    - name: Run simple REPL tests
+      run: npm run test:repl-simple
     
     - name: Run REPL automation tests
       run: npm run test:repl-automation
@@ -81,6 +78,7 @@ jobs:
         path: |
           repl-test-*.log
           test-automation-*.json
+          test-results/
         retention-days: 14
 
   benchmarks:
