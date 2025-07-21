@@ -96,4 +96,7 @@ Thumbs.db
 
 # Test outputs
 test-results/
-playwright-report/ 
+playwright-report/
+
+# Jest cache (build artifacts)
+.jest-cache/ 
