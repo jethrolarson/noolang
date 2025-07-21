@@ -1,51 +1,51 @@
 #!/usr/bin/env node
-import { Lexer } from "./lexer";
-import { parse } from "./parser/parser";
-import { Evaluator } from "./evaluator";
+import { Lexer } from './lexer';
+import { parse } from './parser/parser';
+import { Evaluator } from './evaluator';
 import { typeAndDecorate } from './typer/index';
 import { typeToString } from './typer/helpers';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { formatValue } from "./format";
-import { colorize } from "./colors";
+import { formatValue } from './format';
+import { colorize } from './colors';
 
 function printUsage() {
-  console.log(colorize.section("Usage: noo <file.noo>"));
-  console.log(`       ${colorize.command("noo --eval <expr>")}`);
-  console.log(`       ${colorize.command("noo -e <expr>")}`);
-  console.log(`       ${colorize.command("noo --tokens <expr>")}`);
-  console.log(`       ${colorize.command("noo --ast <expr>")}`);
-  console.log(`       ${colorize.command("noo --tokens-file <file>")}`);
-  console.log(`       ${colorize.command("noo --ast-file <file>")}`);
-  console.log(`       ${colorize.command("noo --types <expr>")}`);
-  console.log(`       ${colorize.command("noo --types-file <file>")}`);
-  console.log(`       ${colorize.command("noo --types-detailed <expr>")}`);
-  console.log(`       ${colorize.command("noo --types-env <expr>")}`);
-  console.log(`       ${colorize.command("noo --types-ast <expr>")}`);
-  console.log("");
-  console.log(colorize.section("Examples:"));
-  console.log(`  ${colorize.identifier("noo my_program.noo")}`);
-  console.log(`  ${colorize.identifier("noo examples/basic.noo")}`);
-  console.log(`  ${colorize.identifier('noo --eval "1 + 2 * 3"')}`);
-  console.log(`  ${colorize.identifier('noo -e "x = 10; x * 2"')}`);
-  console.log(
-    `  ${colorize.identifier('noo --tokens "{ @add fn x y => x + y }"')}`,
-  );
-  console.log(
-    `  ${colorize.identifier('noo --ast "if x > 0 then x else -x"')}`,
-  );
-  console.log(`  ${colorize.identifier("noo --tokens-file std/math.noo")}`);
-  console.log(`  ${colorize.identifier("noo --ast-file std/math.noo")}`);
-  console.log(`  ${colorize.identifier('noo --types "fn x => x + 1"')}`);
-  console.log(`  ${colorize.identifier("noo --types-file std/math.noo")}`);
-  console.log(
-    `  ${colorize.identifier('noo --types-detailed "fn x => x + 1"')}`,
-  );
-  console.log(`  ${colorize.identifier('noo --types-env "fn x => x + 1"')}`);
-  console.log(`  ${colorize.identifier('noo --types-ast "fn x => x + 1"')}`);
-  console.log("");
-  console.log(colorize.section("Or use the REPL:"));
-  console.log(`  ${colorize.identifier("noo")}`);
+	console.log(colorize.section('Usage: noo <file.noo>'));
+	console.log(`       ${colorize.command('noo --eval <expr>')}`);
+	console.log(`       ${colorize.command('noo -e <expr>')}`);
+	console.log(`       ${colorize.command('noo --tokens <expr>')}`);
+	console.log(`       ${colorize.command('noo --ast <expr>')}`);
+	console.log(`       ${colorize.command('noo --tokens-file <file>')}`);
+	console.log(`       ${colorize.command('noo --ast-file <file>')}`);
+	console.log(`       ${colorize.command('noo --types <expr>')}`);
+	console.log(`       ${colorize.command('noo --types-file <file>')}`);
+	console.log(`       ${colorize.command('noo --types-detailed <expr>')}`);
+	console.log(`       ${colorize.command('noo --types-env <expr>')}`);
+	console.log(`       ${colorize.command('noo --types-ast <expr>')}`);
+	console.log('');
+	console.log(colorize.section('Examples:'));
+	console.log(`  ${colorize.identifier('noo my_program.noo')}`);
+	console.log(`  ${colorize.identifier('noo examples/basic.noo')}`);
+	console.log(`  ${colorize.identifier('noo --eval "1 + 2 * 3"')}`);
+	console.log(`  ${colorize.identifier('noo -e "x = 10; x * 2"')}`);
+	console.log(
+		`  ${colorize.identifier('noo --tokens "{ @add fn x y => x + y }"')}`
+	);
+	console.log(
+		`  ${colorize.identifier('noo --ast "if x > 0 then x else -x"')}`
+	);
+	console.log(`  ${colorize.identifier('noo --tokens-file std/math.noo')}`);
+	console.log(`  ${colorize.identifier('noo --ast-file std/math.noo')}`);
+	console.log(`  ${colorize.identifier('noo --types "fn x => x + 1"')}`);
+	console.log(`  ${colorize.identifier('noo --types-file std/math.noo')}`);
+	console.log(
+		`  ${colorize.identifier('noo --types-detailed "fn x => x + 1"')}`
+	);
+	console.log(`  ${colorize.identifier('noo --types-env "fn x => x + 1"')}`);
+	console.log(`  ${colorize.identifier('noo --types-ast "fn x => x + 1"')}`);
+	console.log('');
+	console.log(colorize.section('Or use the REPL:'));
+	console.log(`  ${colorize.identifier('noo')}`);
 }
 
 async function main() {

@@ -18,26 +18,26 @@ import {
 	typeToString,
 	propagateConstraintToTypeVariable,
 } from './helpers';
-import { 
-	type TypeState, 
-	type TypeResult, 
-	createTypeResult, 
-	unionEffects 
+import {
+	type TypeState,
+	type TypeResult,
+	createTypeResult,
+	unionEffects,
 } from './types';
-import { 
-	validateFunctionCall, 
+import {
+	validateFunctionCall,
 	areEffectsCompatible,
-	mergeEffects 
+	mergeEffects,
 } from './effect-validation';
 import { satisfiesConstraint } from './constraints';
 import { substitute } from './substitute';
 import { unify } from './unify';
 import { freshTypeVariable, instantiate } from './type-operations';
 import { typeExpression } from './expression-dispatcher';
-import { 
-	tryResolveConstraintFunction, 
+import {
+	tryResolveConstraintFunction,
 	generateConstraintError,
-	decorateEnvironmentWithConstraintFunctions 
+	decorateEnvironmentWithConstraintFunctions,
 } from './constraint-resolution';
 
 // Helper function to continue function application with a specialized constraint function
@@ -49,7 +49,7 @@ function continueWithSpecializedFunction(
 	state: TypeState
 ): TypeResult {
 	let currentState = state;
-	
+
 	if (specializedFuncType.kind !== 'function') {
 		throwTypeError(
 			location => nonFunctionApplicationError(specializedFuncType, location),
@@ -97,11 +97,15 @@ function continueWithSpecializedFunction(
 
 	// Determine the result type
 	let resultType = funcType.return;
-	
+
 	// If not all arguments were provided, create a partial application
 	if (argTypes.length < funcType.params.length) {
 		const remainingParams = funcType.params.slice(argTypes.length);
-		resultType = functionType(remainingParams, funcType.return, funcType.effects);
+		resultType = functionType(
+			remainingParams,
+			funcType.return,
+			funcType.effects
+		);
 	}
 
 	// Merge effects from function type and arguments
@@ -195,7 +199,10 @@ export const typeApplication = (
 
 	// Check if this is a constraint function call that needs resolution
 	// ONLY apply to functions that are explicitly defined in constraints
-	if (expr.func.kind === 'variable' && currentState.constraintRegistry.size > 0) {
+	if (
+		expr.func.kind === 'variable' &&
+		currentState.constraintRegistry.size > 0
+	) {
 		// Only check constraint resolution if the function is explicitly in a constraint
 		let isDefinedInConstraint = false;
 		for (const [, constraintInfo] of currentState.constraintRegistry) {
@@ -204,7 +211,7 @@ export const typeApplication = (
 				break;
 			}
 		}
-		
+
 		// ONLY apply constraint resolution to explicitly defined constraint functions
 		// This excludes ADT constructors like Point, Rectangle, etc.
 		if (isDefinedInConstraint) {
@@ -214,33 +221,45 @@ export const typeApplication = (
 				argTypes,
 				currentState
 			);
-			
-			if (constraintResolution.resolved && constraintResolution.specializedName) {
+
+			if (
+				constraintResolution.resolved &&
+				constraintResolution.specializedName
+			) {
 				// This is a constraint function call with a concrete resolution
 				// Look up the specialized function in the environment
-				const decoratedState = decorateEnvironmentWithConstraintFunctions(currentState);
-				const specializedScheme = decoratedState.environment.get(constraintResolution.specializedName);
-				
+				const decoratedState =
+					decorateEnvironmentWithConstraintFunctions(currentState);
+				const specializedScheme = decoratedState.environment.get(
+					constraintResolution.specializedName
+				);
+
 				if (specializedScheme) {
 					// Use the specialized implementation
-					const [instantiatedType, newState] = instantiate(specializedScheme, decoratedState);
-					
+					const [instantiatedType, newState] = instantiate(
+						specializedScheme,
+						decoratedState
+					);
+
 					// The specialized function should match the call pattern
 					if (instantiatedType.kind === 'function') {
 						// Continue with normal function application using the specialized type
 						const specializedFuncType = instantiatedType;
 						// Replace funcType with specializedFuncType for the rest of the function
 						return continueWithSpecializedFunction(
-							expr, 
-							specializedFuncType, 
-							argTypes, 
-							allEffects, 
+							expr,
+							specializedFuncType,
+							argTypes,
+							allEffects,
 							newState
 						);
 					}
 				} else {
 					// Could not resolve - generate helpful error
-					const firstArgType = argTypes.length > 0 ? substitute(argTypes[0], currentState.substitution) : null;
+					const firstArgType =
+						argTypes.length > 0
+							? substitute(argTypes[0], currentState.substitution)
+							: null;
 					if (firstArgType && firstArgType.kind !== 'variable') {
 						// We have a concrete type but no implementation
 						const errorMessage = generateConstraintError(
@@ -533,7 +552,11 @@ export const typeApplication = (
 		} else {
 			// Partial application - return a function with remaining parameters
 			const remainingParams = funcType.params.slice(argTypes.length);
-			const partialFunctionType = functionType(remainingParams, returnType, funcType.effects);
+			const partialFunctionType = functionType(
+				remainingParams,
+				returnType,
+				funcType.effects
+			);
 
 			// CRITICAL FIX: Handle partial application of compose
 			if (
@@ -663,10 +686,7 @@ export const typePipeline = (
 
 			// The composed function takes the input of the first function and returns the output of the last function
 			composedType = createTypeResult(
-				functionType(
-					[composedType.type.params[0]],
-					nextFuncType.type.return
-				),
+				functionType([composedType.type.params[0]], nextFuncType.type.return),
 				allEffects,
 				currentState
 			);

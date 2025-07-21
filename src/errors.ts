@@ -1,23 +1,23 @@
 export type ErrorType =
-  | "ParseError"
-  | "TypeError"
-  | "RuntimeError"
-  | "ImportError"
-  | "LexerError";
+	| 'ParseError'
+	| 'TypeError'
+	| 'RuntimeError'
+	| 'ImportError'
+	| 'LexerError';
 
 export interface ErrorLocation {
-  line: number;
-  column: number;
-  start?: number;
-  end?: number;
+	line: number;
+	column: number;
+	start?: number;
+	end?: number;
 }
 
 export interface NoolangError {
-  type: ErrorType;
-  message: string;
-  location?: ErrorLocation;
-  context?: string;
-  suggestion?: string;
+	type: ErrorType;
+	message: string;
+	location?: ErrorLocation;
+	context?: string;
+	suggestion?: string;
 }
 
 export const createError = (
@@ -25,7 +25,7 @@ export const createError = (
 	message: string,
 	location?: ErrorLocation,
 	context?: string,
-	suggestion?: string,
+	suggestion?: string
 ): NoolangError => ({
 	type,
 	message,
@@ -35,21 +35,21 @@ export const createError = (
 });
 
 export function errorToString(error: NoolangError): string {
-  let result = `${error.type}: ${error.message}`;
+	let result = `${error.type}: ${error.message}`;
 
-  if (error.location) {
-    result += ` at line ${error.location.line}, column ${error.location.column}`;
-  }
+	if (error.location) {
+		result += ` at line ${error.location.line}, column ${error.location.column}`;
+	}
 
-  if (error.context) {
-    result += `\nContext: ${error.context}`;
-  }
+	if (error.context) {
+		result += `\nContext: ${error.context}`;
+	}
 
-  if (error.suggestion) {
-    result += `\nSuggestion: ${error.suggestion}`;
-  }
+	if (error.suggestion) {
+		result += `\nSuggestion: ${error.suggestion}`;
+	}
 
-  return result;
+	return result;
 }
 
 export const errorToJSON = (error: NoolangError): string =>

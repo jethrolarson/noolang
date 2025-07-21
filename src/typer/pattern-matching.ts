@@ -10,12 +10,12 @@ import {
 	intType,
 	stringType,
 } from '../ast';
-import { 
-	type TypeState, 
-	type TypeResult, 
-	createTypeResult, 
-	createPureTypeResult, 
-	unionEffects 
+import {
+	type TypeState,
+	type TypeResult,
+	createTypeResult,
+	createPureTypeResult,
+	unionEffects,
 } from './types';
 import { substitute } from './substitute';
 import { unify } from './unify';
@@ -26,7 +26,7 @@ import { isTypeKind, typeToString } from './helpers';
 // Type inference for ADT type definitions
 export const typeTypeDefinition = (
 	expr: TypeDefinitionExpression,
-	state: TypeState,
+	state: TypeState
 ): TypeResult => {
 	// Register the ADT in the registry first to enable recursive references
 	const constructorMap = new Map<string, Type[]>();
@@ -40,9 +40,9 @@ export const typeTypeDefinition = (
 
 	// Also add the ADT type constructor to the environment
 	const adtType = {
-		kind: "variant" as const,
+		kind: 'variant' as const,
 		name: expr.name,
-		args: expr.typeParams.map((param) => typeVariable(param)),
+		args: expr.typeParams.map(param => typeVariable(param)),
 	};
 	const envWithType = new Map(state.environment);
 	envWithType.set(expr.name, {
@@ -59,9 +59,9 @@ export const typeTypeDefinition = (
 		// Add constructor to environment as a function
 		// Constructor type: arg1 -> arg2 -> ... -> ADTType typeParams
 		const adtType: Type = {
-			kind: "variant",
+			kind: 'variant',
 			name: expr.name,
-			args: expr.typeParams.map((param) => typeVariable(param)),
+			args: expr.typeParams.map(param => typeVariable(param)),
 		};
 
 		let constructorType: Type;
@@ -90,16 +90,16 @@ export const typeTypeDefinition = (
 	});
 
 	// Type definitions return unit and update state
-	return createPureTypeResult(
-		unitType(),
-		{ ...state, adtRegistry: finalRegistry }
-	);
+	return createPureTypeResult(unitType(), {
+		...state,
+		adtRegistry: finalRegistry,
+	});
 };
 
 // Type inference for match expressions
 export const typeMatch = (
 	expr: MatchExpression,
-	state: TypeState,
+	state: TypeState
 ): TypeResult => {
 	// Type the expression being matched
 	const exprResult = typeExpression(expr.expression, state);
@@ -107,14 +107,14 @@ export const typeMatch = (
 
 	// Type each case and ensure they all return the same type
 	if (expr.cases.length === 0) {
-		throw new Error("Match expression must have at least one case");
+		throw new Error('Match expression must have at least one case');
 	}
 
 	// Type first case to get result type
 	const firstCaseResult = typeMatchCase(
 		expr.cases[0],
 		exprResult.type,
-		currentState,
+		currentState
 	);
 	currentState = firstCaseResult.state;
 	let resultType = firstCaseResult.type;
@@ -125,7 +125,7 @@ export const typeMatch = (
 		const caseResult = typeMatchCase(
 			expr.cases[i],
 			exprResult.type,
-			currentState,
+			currentState
 		);
 		currentState = caseResult.state;
 		allEffects = unionEffects(allEffects, caseResult.effects);
@@ -135,7 +135,7 @@ export const typeMatch = (
 			resultType,
 			caseResult.type,
 			currentState,
-			expr.cases[i].location.start,
+			expr.cases[i].location.start
 		);
 		resultType = substitute(resultType, currentState.substitution);
 	}
@@ -147,7 +147,7 @@ export const typeMatch = (
 const typeMatchCase = (
 	matchCase: MatchCase,
 	matchedType: Type,
-	state: TypeState,
+	state: TypeState
 ): TypeResult => {
 	// Type the pattern and get bindings
 	const patternResult = typePattern(matchCase.pattern, matchedType, state);
@@ -168,27 +168,27 @@ const typeMatchCase = (
 const typePattern = (
 	pattern: Pattern,
 	expectedType: Type,
-	state: TypeState,
+	state: TypeState
 ): { state: TypeState; bindings: Map<string, Type> } => {
 	const bindings = new Map<string, Type>();
 
 	switch (pattern.kind) {
-		case "wildcard":
+		case 'wildcard':
 			// Wildcard matches anything, no bindings
 			return { state, bindings };
 
-		case "variable":
+		case 'variable':
 			// Variable binds to the expected type
 			bindings.set(pattern.name, expectedType);
 			return { state, bindings };
 
-		case "constructor": {
+		case 'constructor': {
 			// Constructor pattern matching with type variable handling
 			let actualType = expectedType;
 			let currentState = state;
 
 			// If expected type is a type variable, we need to find the ADT from the constructor
-			if (isTypeKind(expectedType, "variable")) {
+			if (isTypeKind(expectedType, 'variable')) {
 				// Find which ADT this constructor belongs to
 				let foundAdt: string | null = null;
 				for (const [adtName, adtInfo] of state.adtRegistry) {
@@ -212,23 +212,23 @@ const typePattern = (
 					substitution.set(adtInfo.typeParams[i], freshVar);
 					currentState = nextState;
 				}
-				actualType = { kind: "variant", name: foundAdt, args: typeArgs };
+				actualType = { kind: 'variant', name: foundAdt, args: typeArgs };
 
 				// Unify the type variable with the ADT type
 				currentState = unify(expectedType, actualType, currentState, undefined);
-			} else if (!isTypeKind(expectedType, "variant")) {
+			} else if (!isTypeKind(expectedType, 'variant')) {
 				throw new Error(
 					`Pattern expects constructor but got ${typeToString(
 						expectedType,
-						state.substitution,
-					)}`,
+						state.substitution
+					)}`
 				);
 			}
 
 			// Look up constructor in ADT registry
-			if (!isTypeKind(actualType, "variant")) {
+			if (!isTypeKind(actualType, 'variant')) {
 				throw new Error(
-					`Internal error: actualType should be variant but got ${actualType.kind}`,
+					`Internal error: actualType should be variant but got ${actualType.kind}`
 				);
 			}
 			const adtInfo = state.adtRegistry.get(actualType.name);
@@ -239,7 +239,7 @@ const typePattern = (
 			const constructorArgs = adtInfo.constructors.get(pattern.name);
 			if (!constructorArgs) {
 				throw new Error(
-					`Unknown constructor: ${pattern.name} for ADT ${actualType.name}`,
+					`Unknown constructor: ${pattern.name} for ADT ${actualType.name}`
 				);
 			}
 
@@ -250,14 +250,14 @@ const typePattern = (
 			}
 
 			// Substitute type parameters with actual type arguments
-			const substitutedArgs = constructorArgs.map((arg) =>
-				substitute(arg, paramSubstitution),
+			const substitutedArgs = constructorArgs.map(arg =>
+				substitute(arg, paramSubstitution)
 			);
 
 			// Check argument count
 			if (pattern.args.length !== substitutedArgs.length) {
 				throw new Error(
-					`Constructor ${pattern.name} expects ${substitutedArgs.length} arguments but got ${pattern.args.length}`,
+					`Constructor ${pattern.name} expects ${substitutedArgs.length} arguments but got ${pattern.args.length}`
 				);
 			}
 
@@ -266,7 +266,7 @@ const typePattern = (
 				const argResult = typePattern(
 					pattern.args[i],
 					substitutedArgs[i],
-					currentState,
+					currentState
 				);
 				currentState = argResult.state;
 
@@ -279,12 +279,12 @@ const typePattern = (
 			return { state: currentState, bindings };
 		}
 
-		case "literal": {
+		case 'literal': {
 			// Literal patterns need to match the expected type
 			let literalType: Type;
-			if (typeof pattern.value === "number") {
+			if (typeof pattern.value === 'number') {
 				literalType = intType();
-			} else if (typeof pattern.value === "string") {
+			} else if (typeof pattern.value === 'string') {
 				literalType = stringType();
 			} else {
 				throw new Error(`Unsupported literal pattern: ${pattern.value}`);
@@ -294,7 +294,7 @@ const typePattern = (
 				expectedType,
 				literalType,
 				state,
-				pattern.location.start,
+				pattern.location.start
 			);
 			return { state: unifiedState, bindings };
 		}

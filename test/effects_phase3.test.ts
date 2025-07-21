@@ -10,7 +10,7 @@ const runNoolang = (code: string) => {
 	const lexer = new Lexer(code);
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	
+
 	return typeProgram(program);
 };
 

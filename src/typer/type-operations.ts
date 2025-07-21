@@ -1,5 +1,5 @@
-import * as fs from "node:fs";
-import * as path from "node:path";
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import {
 	type Type,
 	type Expression,
@@ -9,7 +9,12 @@ import {
 } from '../ast';
 import { parse } from '../parser/parser';
 import { Lexer } from '../lexer';
-import { type TypeState, type TypeEnvironment, type TypeScheme, createConstraintRegistry } from './types';
+import {
+	type TypeState,
+	type TypeEnvironment,
+	type TypeScheme,
+	createConstraintRegistry,
+} from './types';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
 import { constraintsEqual } from './helpers';
@@ -19,10 +24,13 @@ export const freshTypeVariable = (state: TypeState): [Type, TypeState] => {
 	const newCounter = state.counter + 1;
 	const newType = typeVariable(`α${newCounter}`);
 	// Avoid spreading the entire state object for better performance
-	return [newType, { 
-		...state, 
-		counter: newCounter 
-	}];
+	return [
+		newType,
+		{
+			...state,
+			counter: newCounter,
+		},
+	];
 };
 
 // Collect all free type variables in a type
@@ -124,8 +132,8 @@ export const freshenTypeVariables = (
 					if (type.constraints) {
 						for (const c of type.constraints) {
 							if (
-								!freshVar.constraints.some(
-									existing => constraintsEqual(existing, c)
+								!freshVar.constraints.some(existing =>
+									constraintsEqual(existing, c)
 								)
 							) {
 								freshVar.constraints.push(c);

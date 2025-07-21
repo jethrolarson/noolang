@@ -1,6 +1,6 @@
 /**
  * Phase 3 Effect Validation System
- * 
+ *
  * This module implements effect validation and checking for Noolang's effect system.
  * It ensures that functions with declared effects properly propagate those effects
  * and that effect annotations are enforced during type checking.
@@ -26,8 +26,8 @@ export const validateFunctionEffects = (
 				formatTypeError(
 					createTypeError(
 						`Function uses effect '${effect}' but does not declare it. ` +
-						`Declared effects: [${Array.from(declaredEffects).join(', ')}], ` +
-						`Required effects: [${Array.from(computedEffects).join(', ')}]`,
+							`Declared effects: [${Array.from(declaredEffects).join(', ')}], ` +
+							`Required effects: [${Array.from(computedEffects).join(', ')}]`,
 						{},
 						location || { line: 1, column: 1 }
 					)
@@ -35,7 +35,7 @@ export const validateFunctionEffects = (
 			);
 		}
 	}
-	
+
 	// Optional: Warn about unused declared effects (currently disabled)
 	// This could be enabled as a lint warning in the future
 	const unusedEffects = new Set<Effect>();
@@ -44,7 +44,7 @@ export const validateFunctionEffects = (
 			unusedEffects.add(effect);
 		}
 	}
-	
+
 	// For now, we allow over-declaration of effects (conservative approach)
 	// In the future, this could emit warnings for unused effects
 };
@@ -60,7 +60,7 @@ export const validateFunctionCall = (
 ): void => {
 	if (funcType.kind === 'function') {
 		const requiredEffects = funcType.effects;
-		
+
 		// Check that all function effects are allowed in current context
 		for (const effect of requiredEffects) {
 			if (!allowedEffects.has(effect)) {
@@ -68,8 +68,8 @@ export const validateFunctionCall = (
 					formatTypeError(
 						createTypeError(
 							`Cannot call function with effect '${effect}' in pure context. ` +
-							`Function requires effects: [${Array.from(requiredEffects).join(', ')}], ` +
-							`but only these effects are allowed: [${Array.from(allowedEffects).join(', ')}]`,
+								`Function requires effects: [${Array.from(requiredEffects).join(', ')}], ` +
+								`but only these effects are allowed: [${Array.from(allowedEffects).join(', ')}]`,
 							{},
 							location || { line: 1, column: 1 }
 						)
@@ -108,7 +108,7 @@ export const validateEffectDeclaration = (
 				formatTypeError(
 					createTypeError(
 						`Expression requires effect '${effect}' but it is not declared. ` +
-						`Add '!${effect}' to the type annotation.`,
+							`Add '!${effect}' to the type annotation.`,
 						{},
 						location || { line: 1, column: 1 }
 					)
@@ -145,9 +145,11 @@ export const areEffectsCompatible = (
  */
 export const effectsToString = (effects: Set<Effect>): string => {
 	if (effects.size === 0) {
-		return "pure";
+		return 'pure';
 	}
-	return Array.from(effects).map(e => `!${e}`).join(' ');
+	return Array.from(effects)
+		.map(e => `!${e}`)
+		.join(' ');
 };
 
 /**

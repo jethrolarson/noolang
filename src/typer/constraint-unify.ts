@@ -1,6 +1,6 @@
 /**
  * Drop-in replacement for unify() that uses constraint solving internally
- * 
+ *
  * This provides the same interface as the existing unify function but uses
  * the constraint solver for better performance and extensibility.
  */
@@ -23,53 +23,57 @@ export const constraintBasedUnify = (
 ): TypeState => {
 	const unifyStart = Date.now();
 	unifyCallCount++;
-	
+
 	// Create a constraint solver
 	const solver = new ConstraintSolver();
-	
+
 	// Add the unification constraint
 	const constraint: UnificationConstraint = {
 		kind: 'equal',
 		type1: t1,
 		type2: t2,
-		location
+		location,
 	};
-	
+
 	solver.addConstraint(constraint);
-	
+
 	// Solve the constraints
 	const result = solver.solve();
-	
+
 	if (!result.success) {
 		// Throw the first error - this matches the existing unify behavior
 		throw new Error(result.errors[0] || 'Unification failed');
 	}
-	
+
 	// Merge the new substitutions into the existing state
 	const newSubstitution = new Map(state.substitution);
 	for (const [typeVar, type] of result.substitution) {
 		newSubstitution.set(typeVar, type);
 	}
-	
+
 	const unifyTime = Date.now() - unifyStart;
 	totalUnifyTime += unifyTime;
-	
+
 	// Report slow individual unify calls
 	if (unifyTime > 5) {
-		console.warn(`SLOW UNIFY: ${unifyTime}ms for ${t1.kind}:${t1.kind === 'variable' ? t1.name : '?'} = ${t2.kind}:${t2.kind === 'variable' ? t2.name : '?'} (${result.substitution.size} subs)`);
+		console.warn(
+			`SLOW UNIFY: ${unifyTime}ms for ${t1.kind}:${t1.kind === 'variable' ? t1.name : '?'} = ${t2.kind}:${t2.kind === 'variable' ? t2.name : '?'} (${result.substitution.size} subs)`
+		);
 	}
-	
+
 	// Report every 1000 calls
 	if (unifyCallCount % 1000 === 0) {
 		const now = Date.now();
 		const elapsed = now - lastReportTime;
-		console.warn(`Constraint unify: ${unifyCallCount} calls, ${totalUnifyTime}ms total, last 1000 in ${elapsed}ms`);
+		console.warn(
+			`Constraint unify: ${unifyCallCount} calls, ${totalUnifyTime}ms total, last 1000 in ${elapsed}ms`
+		);
 		lastReportTime = now;
 	}
-	
+
 	return {
 		...state,
-		substitution: newSubstitution
+		substitution: newSubstitution,
 	};
 };
 
@@ -77,11 +81,11 @@ export const constraintBasedUnify = (
 export const testConstraintUnify = () => {
 	const { typeVariable, intType } = require('../ast');
 	const { createTypeState } = require('./type-operations');
-	
+
 	const state = createTypeState();
 	const t1 = typeVariable('a');
 	const t2 = intType();
-	
+
 	try {
 		const result = constraintBasedUnify(t1, t2, state);
 		console.log('Constraint unify test passed:', result.substitution.get('a'));

@@ -16,20 +16,28 @@ import { functionApplicationError } from './type-errors';
 // Performance tracking
 let unifyCallCount = 0;
 let totalUnifyTime = 0;
-let slowUnifyCalls: Array<{type1: string, type2: string, time: number}> = [];
+let slowUnifyCalls: Array<{ type1: string; type2: string; time: number }> = [];
 let unifyCallSources = new Map<string, number>(); // Track where unify calls come from
 let unifyTypePatterns = new Map<string, number>(); // Track what types are being unified
 
 const typeToPattern = (t: Type): string => {
 	switch (t.kind) {
-		case 'variable': return `var:${t.name}`;
-		case 'primitive': return `prim:${t.name}`;
-		case 'function': return `fn:${t.params.length}p`;
-		case 'list': return `list`;
-		case 'record': return `rec:${Object.keys(t.fields).length}f`;
-		case 'tuple': return `tup:${t.elements.length}e`;
-		case 'variant': return `var:${t.name}:${t.args.length}a`;
-		default: return t.kind;
+		case 'variable':
+			return `var:${t.name}`;
+		case 'primitive':
+			return `prim:${t.name}`;
+		case 'function':
+			return `fn:${t.params.length}p`;
+		case 'list':
+			return `list`;
+		case 'record':
+			return `rec:${Object.keys(t.fields).length}f`;
+		case 'tuple':
+			return `tup:${t.elements.length}e`;
+		case 'variant':
+			return `var:${t.name}:${t.args.length}a`;
+		default:
+			return t.kind;
 	}
 };
 
@@ -137,46 +145,50 @@ export const unify = (
 ): TypeState => {
 	const start = Date.now();
 	unifyCallCount++;
-	
+
 	// Track call sources using stack trace
 	const stack = new Error().stack || '';
 	const caller = stack.split('\n')[2] || 'unknown';
-	const source = caller.includes('at ') ? caller.split('at ')[1].split(' ')[0] : 'unknown';
+	const source = caller.includes('at ')
+		? caller.split('at ')[1].split(' ')[0]
+		: 'unknown';
 	unifyCallSources.set(source, (unifyCallSources.get(source) || 0) + 1);
-	
+
 	// Track type patterns being unified
 	const pattern = `${typeToPattern(t1)} = ${typeToPattern(t2)}`;
 	unifyTypePatterns.set(pattern, (unifyTypePatterns.get(pattern) || 0) + 1);
-	
+
 	const result = unifyInternal(t1, t2, state, location, context);
-	
+
 	const time = Date.now() - start;
 	totalUnifyTime += time;
-	
+
 	if (time > 10) {
 		slowUnifyCalls.push({
 			type1: `${t1.kind}:${t1.kind === 'variable' ? t1.name : '?'}`,
 			type2: `${t2.kind}:${t2.kind === 'variable' ? t2.name : '?'}`,
-			time
+			time,
 		});
 	}
-	
+
 	if (unifyCallCount % 5000 === 0) {
-		console.warn(`Unify: ${unifyCallCount} calls, ${totalUnifyTime}ms total, ${slowUnifyCalls.length} slow calls`);
-		
+		console.warn(
+			`Unify: ${unifyCallCount} calls, ${totalUnifyTime}ms total, ${slowUnifyCalls.length} slow calls`
+		);
+
 		// Show top call sources
 		const topSources = Array.from(unifyCallSources.entries())
 			.sort((a, b) => b[1] - a[1])
 			.slice(0, 5);
 		console.warn('Top unify call sources:', topSources);
-		
+
 		// Show most repeated type patterns
 		const topPatterns = Array.from(unifyTypePatterns.entries())
 			.sort((a, b) => b[1] - a[1])
 			.slice(0, 5);
 		console.warn('Most repeated unifications:', topPatterns);
 	}
-	
+
 	return result;
 };
 
@@ -343,14 +355,21 @@ function unifyFunction(
 	if (!isTypeKind(s1, 'function') || !isTypeKind(s2, 'function')) {
 		throw new Error('unifyFunction called with non-function types');
 	}
-	
+
 	functionUnifyCount++;
 	const pattern = `${s1.params.length}p_${s2.params.length}p`;
-	functionUnifyPatterns.set(pattern, (functionUnifyPatterns.get(pattern) || 0) + 1);
-	
+	functionUnifyPatterns.set(
+		pattern,
+		(functionUnifyPatterns.get(pattern) || 0) + 1
+	);
+
 	if (functionUnifyCount % 1000 === 0) {
-		console.warn(`Function unify: ${functionUnifyCount} calls, top patterns:`, 
-			Array.from(functionUnifyPatterns.entries()).sort((a,b) => b[1] - a[1]).slice(0,3));
+		console.warn(
+			`Function unify: ${functionUnifyCount} calls, top patterns:`,
+			Array.from(functionUnifyPatterns.entries())
+				.sort((a, b) => b[1] - a[1])
+				.slice(0, 3)
+		);
 	}
 
 	if (s1.params.length !== s2.params.length)
@@ -388,20 +407,27 @@ function unifyFunction(
 		// Skip expensive constraint propagation for non-variables
 		const s1var = s1.params[i];
 		const s2var = s2.params[i];
-		if (isTypeKind(s1var, 'variable') && isTypeKind(s2var, 'variable') && 
-		    (s1var.constraints?.length || s2var.constraints?.length)) {
+		if (
+			isTypeKind(s1var, 'variable') &&
+			isTypeKind(s2var, 'variable') &&
+			(s1var.constraints?.length || s2var.constraints?.length)
+		) {
 			s1var.constraints = s1var.constraints || [];
 			s2var.constraints = s2var.constraints || [];
 			// Optimized constraint merging using efficient comparison
 			// Propagate s1 -> s2
 			for (const c of s1var.constraints) {
-				if (!s2var.constraints.some(existing => constraintsEqual(c, existing))) {
+				if (
+					!s2var.constraints.some(existing => constraintsEqual(c, existing))
+				) {
 					s2var.constraints.push(c);
 				}
 			}
 			// Propagate s2 -> s1
 			for (const c of s2var.constraints) {
-				if (!s1var.constraints.some(existing => constraintsEqual(c, existing))) {
+				if (
+					!s1var.constraints.some(existing => constraintsEqual(c, existing))
+				) {
 					s1var.constraints.push(c);
 				}
 			}
