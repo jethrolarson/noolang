@@ -2,9 +2,10 @@
 import { 
 	type Expression, 
 	type Type,
-	type Effect
+	type Effect,
+	unitType
 } from '../ast';
-import { TypeState, TypeResult } from './types';
+import { TypeState, TypeResult, createPureTypeResult } from './types';
 import {
 	typeLiteral,
 	typeVariableExpr,
@@ -60,6 +61,9 @@ export const typeExpression = (
 
 		case 'definition':
 			return typeDefinition(expr, state);
+
+		case 'unit':
+			return createPureTypeResult(unitType(), state);
 
 		case 'type-definition':
 			return typeTypeDefinition(expr, state);
