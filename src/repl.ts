@@ -196,12 +196,7 @@ export class REPL {
 		log(`  ${colorize.command('.exit')}     - Exit the REPL`);
 		log('');
 		log(colorize.section('Environment Commands:'));
-		log(`  ${colorize.command('.env')}      - Show current environment`);
-		log(
-			`  ${colorize.command(
-				'.env-detail'
-			)} - Show detailed environment with types`
-		);
+		log(`  ${colorize.command('.env')}      - Show current environment with types`);
 		log(`  ${colorize.command('.env-json')} - Show environment as JSON`);
 		log(`  ${colorize.command('.clear-env')} - Clear environment`);
 		log(`  ${colorize.command('.types')}    - Show type environment`);
@@ -237,10 +232,18 @@ export class REPL {
 
 	private showEnvironment(): void {
 		const env = this.evaluator.getEnvironment();
+		const typeEnv = this.typeState.environment;
+
 		log(colorize.section('Current Environment:'));
 		for (const [name, value] of env) {
+			// Get type information from type environment
+			const typeScheme = typeEnv.get(name);
+			const typeStr = typeScheme 
+				? typeToString(typeScheme.type, this.typeState.substitution)
+				: 'unknown';
+			
 			log(
-				`  ${colorize.identifier(name)}: ${colorize.value(formatValue(value))}`
+				`  ${colorize.identifier(name)}: ${colorize.value(formatValue(value))} ${colorize.section(':')} ${colorize.type(typeStr)}`
 			);
 		}
 	}
@@ -260,10 +263,6 @@ export class REPL {
 
 			case '.env':
 				this.showEnvironment();
-				break;
-
-			case '.env-detail':
-				this.showDetailedEnvironment();
 				break;
 
 			case '.env-json':
@@ -312,29 +311,21 @@ export class REPL {
 		}
 	}
 
-	private showDetailedEnvironment(): void {
-		const env = this.evaluator.getEnvironment();
-
-		log(colorize.section('Detailed Environment:'));
-		for (const [name, value] of env) {
-			log(`  ${colorize.identifier(name)}:`);
-			log(
-				`    ${colorize.section('Value:')} ${colorize.value(
-					this.valueToString(value)
-				)}`
-			);
-			log(`    ${colorize.section('Type:')} ${colorize.type('unknown')}`);
-		}
-	}
-
 	private showEnvironmentAsJSON(): void {
 		const env = this.evaluator.getEnvironment();
+		const typeEnv = this.typeState.environment;
 
 		const envObj: Record<string, { value: string; type: string }> = {};
 		for (const [name, value] of env) {
+			// Get type information from type environment
+			const typeScheme = typeEnv.get(name);
+			const typeStr = typeScheme 
+				? typeToString(typeScheme.type, this.typeState.substitution)
+				: 'unknown';
+				
 			envObj[name] = {
 				value: this.valueToString(value),
-				type: 'unknown',
+				type: typeStr,
 			};
 		}
 
@@ -343,6 +334,9 @@ export class REPL {
 
 	private clearEnvironment(): void {
 		this.evaluator = new Evaluator();
+		this.typeState = createTypeState();
+		this.typeState = initializeBuiltins(this.typeState);
+		this.typeState = loadStdlib(this.typeState);
 		log(colorize.success('Environment cleared'));
 	}
 
@@ -660,7 +654,14 @@ export class REPL {
 
 	private showTypeEnvironment(): void {
 		log(colorize.section('Type Environment:'));
-		log(colorize.warning('Type environment not available in functional typer'));
+		for (const [name, typeScheme] of this.typeState.environment) {
+			const typeStr = typeScheme.type 
+				? typeToString(typeScheme.type, this.typeState.substitution)
+				: 'unknown';
+			log(
+				`  ${colorize.identifier(name)}: ${colorize.type(typeStr)}`
+			);
+		}
 	}
 }
 
