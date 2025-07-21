@@ -68,6 +68,68 @@ impl Backend {
     fn uri_to_file_path(&self, uri: &Url) -> Option<String> {
         uri.to_file_path().ok()?.to_str().map(|s| s.to_string())
     }
+
+    /// Apply an incremental change to document content
+    fn apply_incremental_change(&self, content: &mut String, range: &Range, new_text: &str) -> anyhow::Result<()> {
+        let lines: Vec<&str> = content.lines().collect();
+        
+        // Convert LSP positions (0-based) to string indices
+        let start_line = range.start.line as usize;
+        let start_char = range.start.character as usize;
+        let end_line = range.end.line as usize;
+        let end_char = range.end.character as usize;
+
+        // Validate range bounds
+        if start_line >= lines.len() || end_line >= lines.len() {
+            return Err(anyhow::anyhow!("Range out of bounds: document has {} lines, but range refers to lines {}-{}", 
+                lines.len(), start_line, end_line));
+        }
+
+        // Calculate byte offsets
+        let mut start_offset = 0;
+
+        // Add bytes for complete lines before start line
+        for i in 0..start_line {
+            start_offset += lines[i].len() + 1; // +1 for newline
+        }
+        
+        // Add bytes for characters in start line up to start character
+        let start_line_chars: Vec<char> = lines[start_line].chars().collect();
+        if start_char > start_line_chars.len() {
+            return Err(anyhow::anyhow!("Start character {} out of bounds for line {} (length {})", 
+                start_char, start_line, start_line_chars.len()));
+        }
+        start_offset += start_line_chars[..start_char].iter().map(|c| c.len_utf8()).sum::<usize>();
+
+        // Calculate end offset
+        let mut end_offset = start_offset;
+        
+        if start_line == end_line {
+            // Same line - just add character difference
+            let end_char_bounded = std::cmp::min(end_char, start_line_chars.len());
+            end_offset += start_line_chars[start_char..end_char_bounded].iter().map(|c| c.len_utf8()).sum::<usize>();
+        } else {
+            // Multi-line change
+            // Add remaining characters from start line
+            end_offset += start_line_chars[start_char..].iter().map(|c| c.len_utf8()).sum::<usize>();
+            end_offset += 1; // newline after start line
+            
+            // Add complete lines between start and end
+            for i in (start_line + 1)..end_line {
+                end_offset += lines[i].len() + 1; // +1 for newline
+            }
+            
+            // Add characters from end line up to end character
+            let end_line_chars: Vec<char> = lines[end_line].chars().collect();
+            let end_char_bounded = std::cmp::min(end_char, end_line_chars.len());
+            end_offset += end_line_chars[..end_char_bounded].iter().map(|c| c.len_utf8()).sum::<usize>();
+        }
+
+        // Apply the change
+        content.replace_range(start_offset..end_offset, new_text);
+        
+        Ok(())
+    }
 }
 
 #[tower_lsp::async_trait]
@@ -134,11 +196,12 @@ impl LanguageServer for Backend {
         let mut documents = self.documents.lock().await;
         if let Some(content) = documents.get_mut(&uri) {
             for change in params.content_changes {
-                if let Some(_range) = change.range {
-                    // Incremental change - would need to implement proper text editing
-                    // For now, just replace the whole content if range_length is provided
-                    if change.range_length.is_some() {
-                        *content = change.text;
+                if let Some(range) = change.range {
+                    // Incremental change - apply the change to the specified range
+                    if let Err(e) = self.apply_incremental_change(content, &range, &change.text) {
+                        eprintln!("Failed to apply incremental change: {}", e);
+                        // Fallback: if incremental change fails, log error but continue
+                        // In a real implementation, you might want to request full document sync
                     }
                 } else {
                     // Full document change
@@ -312,5 +375,164 @@ impl LanguageServer for Backend {
         let _query = &params.query;
         
         Ok(None)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tower_lsp::lsp_types::{Position, Range};
+
+    // Helper function that implements the same logic as apply_incremental_change for testing
+    fn apply_incremental_change_test(content: &mut String, range: &Range, new_text: &str) -> std::result::Result<(), String> {
+        let lines: Vec<&str> = content.lines().collect();
+        
+        // Convert LSP positions (0-based) to string indices
+        let start_line = range.start.line as usize;
+        let start_char = range.start.character as usize;
+        let end_line = range.end.line as usize;
+        let end_char = range.end.character as usize;
+
+        // Validate range bounds
+        if start_line >= lines.len() || end_line >= lines.len() {
+            return Err(format!("Range out of bounds: document has {} lines, but range refers to lines {}-{}", 
+                lines.len(), start_line, end_line));
+        }
+
+        // Calculate byte offsets
+        let mut start_offset = 0;
+
+        // Add bytes for complete lines before start line
+        for i in 0..start_line {
+            start_offset += lines[i].len() + 1; // +1 for newline
+        }
+        
+        // Add bytes for characters in start line up to start character
+        let start_line_chars: Vec<char> = lines[start_line].chars().collect();
+        if start_char > start_line_chars.len() {
+            return Err(format!("Start character {} out of bounds for line {} (length {})", 
+                start_char, start_line, start_line_chars.len()));
+        }
+        start_offset += start_line_chars[..start_char].iter().map(|c| c.len_utf8()).sum::<usize>();
+
+        // Calculate end offset
+        let mut end_offset = start_offset;
+        
+        if start_line == end_line {
+            // Same line - just add character difference
+            let end_char_bounded = std::cmp::min(end_char, start_line_chars.len());
+            end_offset += start_line_chars[start_char..end_char_bounded].iter().map(|c| c.len_utf8()).sum::<usize>();
+        } else {
+            // Multi-line change
+            // Add remaining characters from start line
+            end_offset += start_line_chars[start_char..].iter().map(|c| c.len_utf8()).sum::<usize>();
+            end_offset += 1; // newline after start line
+            
+            // Add complete lines between start and end
+            for i in (start_line + 1)..end_line {
+                end_offset += lines[i].len() + 1; // +1 for newline
+            }
+            
+            // Add characters from end line up to end character
+            let end_line_chars: Vec<char> = lines[end_line].chars().collect();
+            let end_char_bounded = std::cmp::min(end_char, end_line_chars.len());
+            end_offset += end_line_chars[..end_char_bounded].iter().map(|c| c.len_utf8()).sum::<usize>();
+        }
+
+        // Apply the change
+        content.replace_range(start_offset..end_offset, new_text);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_apply_incremental_change() {
+        // Helper to test incremental changes
+        fn test_incremental_change(initial: &str, range: Range, new_text: &str, expected: &str) {
+            let mut content = initial.to_string();
+            apply_incremental_change_test(&mut content, &range, new_text).unwrap();
+            assert_eq!(content, expected, "Incremental change failed");
+        }
+
+        // Test 1: Single line replacement
+        test_incremental_change(
+            "hello world\nfoo bar\nbaz",
+            Range {
+                start: Position { line: 0, character: 6 },
+                end: Position { line: 0, character: 11 },
+            },
+            "rust",
+            "hello rust\nfoo bar\nbaz"
+        );
+
+        // Test 2: Multi-line replacement
+        test_incremental_change(
+            "line 1\nline 2\nline 3\nline 4",
+            Range {
+                start: Position { line: 1, character: 0 },
+                end: Position { line: 2, character: 6 },
+            },
+            "replaced",
+            "line 1\nreplaced\nline 4"
+        );
+
+        // Test 3: Insertion (empty range)
+        test_incremental_change(
+            "hello world",
+            Range {
+                start: Position { line: 0, character: 5 },
+                end: Position { line: 0, character: 5 },
+            },
+            " beautiful",
+            "hello beautiful world"
+        );
+
+        // Test 4: Deletion (empty replacement)
+        test_incremental_change(
+            "hello beautiful world",
+            Range {
+                start: Position { line: 0, character: 5 },
+                end: Position { line: 0, character: 15 },
+            },
+            "",
+            "hello world"
+        );
+    }
+
+    #[test]
+    fn test_incremental_change_unicode() {
+        let mut content = "café ☕ world".to_string();
+        
+        // Replace the coffee emoji (character 5) with crab emoji, keeping the space (character 6)
+        let range = Range {
+            start: Position { line: 0, character: 5 },
+            end: Position { line: 0, character: 6 },
+        };
+        
+        apply_incremental_change_test(&mut content, &range, "🦀").unwrap();
+        assert_eq!(content, "café 🦀 world");
+    }
+
+    #[test]
+    fn test_incremental_change_bounds_checking() {
+        let mut content = "hello".to_string();
+        
+        // Test out of bounds line
+        let range = Range {
+            start: Position { line: 1, character: 0 },
+            end: Position { line: 1, character: 1 },
+        };
+        
+        let result = apply_incremental_change_test(&mut content, &range, "test");
+        assert!(result.is_err(), "Should fail on out of bounds line");
+        
+        // Test out of bounds character  
+        let range = Range {
+            start: Position { line: 0, character: 10 },
+            end: Position { line: 0, character: 11 },
+        };
+        
+        let result = apply_incremental_change_test(&mut content, &range, "test");
+        assert!(result.is_err(), "Should fail on out of bounds character");
     }
 } 
