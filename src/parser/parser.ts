@@ -1164,7 +1164,7 @@ const parseCompose: C.Parser<Expression> = (tokens) => {
 // --- Thrush (|) ---
 const parseThrush: C.Parser<Expression> = (tokens) => {
   const thrushResult = C.map(
-    C.seq(parseCompose, C.many(C.seq(C.operator("|"), parseCompose))),
+    C.seq(parseDollar, C.many(C.seq(C.operator("|"), parseDollar))),
     ([left, rest]) => {
       let result = left;
       for (const [op, right] of rest) {
@@ -1188,7 +1188,7 @@ const parseThrush: C.Parser<Expression> = (tokens) => {
 
 // --- Dollar ($) - Low precedence function application (right-associative) ---
 const parseDollar: C.Parser<Expression> = (tokens) => {
-  const leftResult = parseThrush(tokens);
+  const leftResult = parseCompose(tokens);
   if (!leftResult.success) return leftResult;
   
   // Check for $ operator
@@ -1667,7 +1667,7 @@ const parseSequenceTerm: C.Parser<Expression> = C.choice(
   parseDefinitionWithType, // allow definitions with type annotations
   parseDefinition, // fallback to regular definitions  
   parseWhereExpression,
-  parseDollar, // full expression hierarchy (includes all primaries and type annotations)
+  parseThrush, // full expression hierarchy (includes all primaries and type annotations)
   parseRecord,
   parseThrush,
   parseLambdaExpression
@@ -1816,7 +1816,7 @@ const parseExprWithType: C.Parser<Expression> = C.choice(
   // Expression with type and constraints: expr : type given constraintExpr
   C.map(
     C.seq(
-      parseDollar, // Use parseDollar to support full expression hierarchy
+      parseThrush, // Use parseThrush to support full expression hierarchy
       C.punctuation(":"),
       C.lazy(() => parseTypeExpression),
       C.keyword("given"),
@@ -1833,7 +1833,7 @@ const parseExprWithType: C.Parser<Expression> = C.choice(
   // Expression with just type: expr : type
   C.map(
     C.seq(
-      parseDollar, // Use parseDollar to support full expression hierarchy
+      parseThrush, // Use parseThrush to support full expression hierarchy
       C.punctuation(":"),
       C.lazy(() => parseTypeExpression)
     ),
@@ -1844,7 +1844,7 @@ const parseExprWithType: C.Parser<Expression> = C.choice(
       location: expr.location,
     })
   ),
-  parseDollar // Fallback to regular expressions
+  parseThrush // Fallback to regular expressions
 );
 
 // --- Sequence (semicolon) ---
