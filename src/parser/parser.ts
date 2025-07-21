@@ -15,7 +15,6 @@ import {
 	intType,
 	stringType,
 	unitType,
-	boolType,
 	listTypeWithElement,
 	functionType,
 	typeVariable,
@@ -78,7 +77,7 @@ const parseTypeName: C.Parser<Token> = (tokens: Token[]) => {
 // This function parses ONLY atomic types, no type application
 function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
   // Try primitive types first
-  const primitiveTypes = ["Int", "Number", "String", "Unit", "Bool"];
+  const primitiveTypes = ["Int", "Number", "String", "Unit"];
   for (const typeName of primitiveTypes) {
     const result = C.keyword(typeName)(tokens);
     if (result.success) {
@@ -100,12 +99,6 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
           return {
             success: true as const,
             value: unitType(),
-            remaining: result.remaining,
-          };
-        case "Bool":
-          return {
-            success: true as const,
-            value: boolType(),
             remaining: result.remaining,
           };
       }

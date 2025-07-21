@@ -667,7 +667,7 @@ describe("Type annotation parsing", () => {
 		expect(funcType.params[0].kind).toBe("variant");
 		expect(funcType.params[0].name).toBe("Option");
 		expect(funcType.params[0].args).toHaveLength(1);
-		expect(funcType.return.kind).toBe("variant");
+		expect(funcType.return.kind).toBe("variable");
 		expect(funcType.return.name).toBe("Bool");
 	});
 
