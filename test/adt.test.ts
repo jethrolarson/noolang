@@ -183,6 +183,20 @@ describe('Algebraic Data Types (ADTs)', () => {
 			expect(result.finalValue).toEqual({ tag: 'number', value: 1 });
 		});
 
+		/**
+		 * RECURSIVE ADT LIMITATION
+		 * 
+		 * The following tests are skipped because recursive ADTs (like List and Tree)
+		 * require fundamental type system enhancements that are not yet implemented.
+		 * 
+		 * REQUIRED LANGUAGE IMPROVEMENTS:
+		 * 1. Self-referential type definitions in the type system
+		 * 2. Recursive type unification and checking  
+		 * 3. Proper handling of infinite type expansion
+		 * 
+		 * These represent core type system features that need to be implemented
+		 * before these ADT patterns can be supported.
+		 */
 		it.skip('should handle recursive ADTs', () => {
 			// Skipped: Recursive ADTs need additional type system work for self-references
 			const result = runNoolang(`

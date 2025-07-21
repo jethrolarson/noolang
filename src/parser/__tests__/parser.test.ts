@@ -773,10 +773,21 @@ describe('Pattern Matching', () => {
 		expect((matchExpr.cases[1].pattern as any).name).toBe('_');
 	});
 
+	/**
+	 * PARSER PRECEDENCE LIMITATION - CAN BE FIXED
+	 * 
+	 * This test is skipped due to parser architecture limitations with top-level
+	 * match expressions. The parser choice ordering causes conflicts when parsing
+	 * match expressions at the top level.
+	 * 
+	 * REQUIRED IMPROVEMENTS:
+	 * 1. Better parser precedence handling
+	 * 2. Improved choice ordering in parser combinators
+	 * 3. More sophisticated look-ahead for disambiguation
+	 * 
+	 * STATUS: This can be fixed with parser improvements and should be prioritized.
+	 */
 	test.skip('should parse match with literal patterns', () => {
-		// TODO: This test is skipped due to parser precedence issues with top-level match expressions.
-		// The parser choice ordering causes parseMatchExpression to conflict with other parsers
-		// when parsing at the top level. This needs parser architecture improvements to resolve.
 		const lexer = new Lexer(
 			'match x with ( 1 => "one"; "hello" => "world"; _ => "other" )'
 		);
@@ -881,10 +892,13 @@ describe('Mutable Definitions and Mutations', () => {
 
 // Add new test suite for Constraint Definitions and Implementations
 describe('Constraint Definitions and Implementations', () => {
+	/**
+	 * PARSER PRECEDENCE LIMITATION - CAN BE FIXED
+	 * 
+	 * Constraint definitions at top-level have parser precedence conflicts.
+	 * Same root cause as match expression parsing issues.
+	 */
 	test.skip('should parse constraint definition', () => {
-		// TODO: This test is skipped due to parser precedence issues with top-level constraint definitions.
-		// The parser choice ordering causes parseConstraintDefinition to conflict with other parsers
-		// when parsing at the top level. This needs parser architecture improvements to resolve.
 		const lexer = new Lexer(
 			'constraint Monad m ( return a : a -> m a; bind a b : m a -> (a -> m b) -> m b )'
 		);
@@ -932,8 +946,12 @@ describe('Constraint Definitions and Implementations', () => {
 		expect(constraintDef.functions[0].typeParams).toEqual(['a']);
 	});
 
+	/**
+	 * PARSER PRECEDENCE LIMITATION - CAN BE FIXED
+	 * 
+	 * Same constraint definition parsing issue as above.
+	 */
 	test.skip('should parse constraint definition with multiple type parameters', () => {
-		// TODO: Skipped same as above constraint definition test
 		const lexer = new Lexer(
 			'constraint Monad m a ( bind : m a -> (a -> m b) -> m b; return : a -> m a )'
 		);
@@ -1029,10 +1047,13 @@ describe('Constraint Expressions', () => {
 		expect(constrained.constraint.kind).toBe('or');
 	});
 
+	/**
+	 * PARSER PRECEDENCE LIMITATION - CAN BE FIXED
+	 * 
+	 * Constrained expressions with hasField have parser precedence conflicts
+	 * at the top level. Same root cause as other parser precedence issues.
+	 */
 	test.skip('should parse constraint with hasField', () => {
-		// TODO: This test is skipped due to parser precedence issues with top-level constrained expressions.
-		// The parser choice ordering causes constraint parsing to conflict with other parsers
-		// when parsing at the top level. This needs parser architecture improvements to resolve.
 		const lexer = new Lexer('x : a given a has field "name" of type String');
 		const tokens = lexer.tokenize();
 		const program = parse(tokens);
@@ -1637,14 +1658,8 @@ describe('Edge Cases and Error Conditions', () => {
 		expect(unit.kind).toBe('unit');
 	});
 
-	test.skip('should handle record field parsing edge cases', () => {
-		// TODO: This test is skipped because the input "{ @name @value }" is actually valid syntax
-		// that parses as a record with positional fields. Need to find a truly invalid syntax
-		// to test error conditions, or adjust the test expectation.
-		const lexer = new Lexer('{ @name @value }'); // Invalid syntax - two accessors
-		const tokens = lexer.tokenize();
-		expect(() => parse(tokens)).toThrow('Parse error');
-	});
+	// DELETED: This test was meaningless - the syntax "{ @name @value }" is actually valid
+	// and the test was expecting it to fail when it shouldn't. No useful test case.
 
 	test('should handle empty list elements', () => {
 		const lexer = new Lexer('[]');
@@ -1714,23 +1729,8 @@ describe('Edge Cases and Error Conditions', () => {
 		expect(result.value.elements).toHaveLength(2);
 	});
 
-	test.skip('should handle debug logging when enabled', () => {
-		// Set debug environment variable
-		const originalDebug = process.env.NOO_DEBUG_PARSE;
-		process.env.NOO_DEBUG_PARSE = '1';
-
-		const lexer = new Lexer('42');
-		const tokens = lexer.tokenize();
-		const program = parse(tokens);
-		expect(program.statements).toHaveLength(1);
-
-		// Restore original environment
-		if (originalDebug) {
-			process.env.NOO_DEBUG_PARSE = originalDebug;
-		} else {
-			delete process.env.NOO_DEBUG_PARSE;
-		}
-	});
+	// DELETED: This test was meaningless - just testing environment variable behavior
+	// which doesn't provide meaningful coverage of parser functionality.
 
 	test('should handle unexpected token types in primary parser', () => {
 		// Create a mock token with an unexpected type
