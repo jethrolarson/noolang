@@ -193,17 +193,23 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
   }
 
   // Try Tuple type constructor: Tuple T1 T2 T3
-  const tupleConstructorResult = C.seq(
-    C.keyword("Tuple"),
-    C.many(C.lazy(() => parseTypeExpression))
-  )(tokens);
-  if (tupleConstructorResult.success) {
-    const elementTypes = tupleConstructorResult.value[1];
-    return {
-      success: true as const,
-      value: tupleTypeConstructor(elementTypes),
-      remaining: tupleConstructorResult.remaining,
-    };
+  if (
+    tokens.length > 0 &&
+    tokens[0].type === "IDENTIFIER" &&
+    tokens[0].value === "Tuple"
+  ) {
+    const tupleConstructorResult = C.seq(
+      C.identifier(),
+      C.many(C.lazy(() => parseTypeExpression))
+    )(tokens);
+    if (tupleConstructorResult.success) {
+      const elementTypes = tupleConstructorResult.value[1];
+      return {
+        success: true as const,
+        value: tupleTypeConstructor(elementTypes),
+        remaining: tupleConstructorResult.remaining,
+      };
+    }
   }
 
   // Try parenthesized type: (Type)
@@ -1579,7 +1585,7 @@ const parseMatchCase: C.Parser<MatchCase> = C.map(
   C.seq(
     parsePattern,
     C.operator("=>"),
-    C.lazy(() => parseSequenceTermWithIfExceptRecord)
+    C.lazy(() => parseThrush) // Use simpler expression parser to avoid circular dependency
   ),
   ([pattern, arrow, expression]): MatchCase => ({
     pattern,
@@ -1592,7 +1598,7 @@ const parseMatchCase: C.Parser<MatchCase> = C.map(
 const parseMatchExpression: C.Parser<MatchExpression> = C.map(
   C.seq(
     C.keyword("match"),
-    C.lazy(() => parseSequenceTermWithIfExceptRecord),
+    C.lazy(() => parseThrush), // Use a simpler expression parser to avoid circular dependency
     C.keyword("with"),
     C.punctuation("("),
     C.sepBy(parseMatchCase, C.punctuation(";")),
@@ -1634,17 +1640,19 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
 
 // --- Sequence term: everything else ---
 const parseSequenceTerm: C.Parser<Expression> = C.choice(
-  parseTypeDefinition, // ADT type definitions (keep original high priority)
-  parseMatchExpression, // ADT pattern matching
+  // Parse keyword-based expressions first to avoid identifier conflicts
+  parseMatchExpression, // ADT pattern matching (starts with "match")
+  parseTypeDefinition, // ADT type definitions (starts with "type")
+  parseConstraintDefinition, // constraint definitions (starts with "constraint")
+  parseImplementDefinition, // implement definitions (starts with "implement")
+  parseMutableDefinition, // starts with "mut"
+  parseMutation, // starts with "mut!"
+  parseImportExpression, // starts with "import"
+  parseIfAfterDollar, // if expressions (starts with "if")
+  // Then parse identifier-based expressions
   parseDefinitionWithType, // allow definitions with type annotations
-  parseDefinition, // fallback to regular definitions
-  parseMutableDefinition,
-  parseMutation,
-  parseConstraintDefinition, // constraint definitions (moved after core definitions)
-  parseImplementDefinition, // implement definitions (moved after core definitions)
+  parseDefinition, // fallback to regular definitions  
   parseWhereExpression,
-  parseImportExpression,
-  parseIfAfterDollar, // if expressions with postfix support
   parseDollar, // full expression hierarchy (includes all primaries and type annotations)
   parseRecord,
   parseThrush,
@@ -1653,14 +1661,16 @@ const parseSequenceTerm: C.Parser<Expression> = C.choice(
 
 // Version without records to avoid circular dependency
 const parseSequenceTermExceptRecord: C.Parser<Expression> = C.choice(
-  parseTypeDefinition, // ADT type definitions (keep original high priority)
+  // Parse keyword-based expressions first
   parseMatchExpression, // ADT pattern matching
-  parseDefinition,
-  parseConstraintDefinition, // constraint definitions (moved after core definitions)
-  parseImplementDefinition, // implement definitions (moved after core definitions)
+  parseTypeDefinition, // ADT type definitions
+  parseConstraintDefinition, // constraint definitions
+  parseImplementDefinition, // implement definitions
   parseMutableDefinition,
   parseMutation,
   parseImportExpression,
+  // Then identifier-based expressions
+  parseDefinition, // Regular definitions
   parseThrush,
   parseLambdaExpression,
   parseNumber,
