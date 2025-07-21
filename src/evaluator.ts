@@ -1249,7 +1249,7 @@ export class Evaluator {
 					);
 				}
 			} else if (expr.operator === "|?") {
-				// Handle safe thrush operator - smart monadic application using constraint system
+				// Handle safe thrush operator - use type-checker resolved bind function
 				const left = this.evaluateExpression(expr.left);
 				const right = this.evaluateExpression(expr.right);
 
@@ -1260,8 +1260,9 @@ export class Evaluator {
 					);
 				}
 
-				// Use constraint system to find appropriate bind function
-				return this.applyMonadicBindViaConstraints(left, right);
+				// The type checker should have decorated the AST with the resolved bind function
+				// For now, look for specialized bind functions in the environment
+				return this.callResolvedBind(left, right, expr);
 			} else if (expr.operator === "$") {
 				// Handle dollar operator (low precedence function application)
 				const left = this.evaluateExpression(expr.left);
@@ -1768,12 +1769,9 @@ export class Evaluator {
 			}
 		}
 
-		// Apply monadic bind using constraint system
-		private applyMonadicBindViaConstraints(monad: Value, func: Value): Value {
-			// Try to find a specialized bind function first (resolved at type-check time)
-			// The type checker should have generated specialized bind functions like:
-			// __Monad_bind_Option, __Monad_bind_Result, etc.
-			
+		// Call the bind function resolved by the type checker
+		private callResolvedBind(monad: Value, func: Value, expr: BinaryExpression): Value {
+			// Try constraint-resolved specialized bind function first
 			if (isConstructor(monad)) {
 				const monadType = this.getMonadType(monad);
 				if (monadType) {
@@ -1781,31 +1779,40 @@ export class Evaluator {
 					let specializedBind = this.environment.get(specializedBindName);
 					
 					if (specializedBind) {
-						// Found constraint-resolved bind function, use it
+						// Found constraint-resolved bind function
 						if (isCell(specializedBind)) specializedBind = specializedBind.value;
-						
-						if (isFunction(specializedBind)) {
-							// Apply: specializedBind(monad)(func)
-							const partiallyApplied = specializedBind.fn(monad);
-							if (isFunction(partiallyApplied)) {
-								return partiallyApplied.fn(func);
-							} else if (isNativeFunction(partiallyApplied)) {
-								return partiallyApplied.fn(func);
-							}
-						} else if (isNativeFunction(specializedBind)) {
-							const partiallyApplied = specializedBind.fn(monad);
-							if (isFunction(partiallyApplied)) {
-								return partiallyApplied.fn(func);
-							} else if (isNativeFunction(partiallyApplied)) {
-								return partiallyApplied.fn(func);
-							}
-						}
+						return this.applyBindFunction(specializedBind, monad, func);
 					}
 				}
 			}
 			
-			// Fall back to TypeScript implementation if constraint resolution fails
+			// Fall back to TypeScript implementation for known monad types
 			return this.performMonadicBind(monad, func);
+		}
+
+		// Helper to apply a bind function consistently
+		private applyBindFunction(bindFunction: Value, monad: Value, func: Value): Value {
+			if (isFunction(bindFunction)) {
+				const partiallyApplied = bindFunction.fn(monad);
+				if (isFunction(partiallyApplied)) {
+					return partiallyApplied.fn(func);
+				} else if (isNativeFunction(partiallyApplied)) {
+					return partiallyApplied.fn(func);
+				} else {
+					throw new Error(`bind function did not return a function after first application: ${valueToString(partiallyApplied)}`);
+				}
+			} else if (isNativeFunction(bindFunction)) {
+				const partiallyApplied = bindFunction.fn(monad);
+				if (isFunction(partiallyApplied)) {
+					return partiallyApplied.fn(func);
+				} else if (isNativeFunction(partiallyApplied)) {
+					return partiallyApplied.fn(func);
+				} else {
+					throw new Error(`bind function did not return a function after first application: ${valueToString(partiallyApplied)}`);
+				}
+			} else {
+				throw new Error(`'bind' is not a function: ${valueToString(bindFunction)}`);
+			}
 		}
 
 		// TypeScript implementation of monadic bind supporting multiple monads
