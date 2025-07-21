@@ -4,11 +4,9 @@ module.exports = {
   // Performance optimizations
   maxWorkers: "50%", // Use half the available CPU cores
   
-  // Enable TypeScript isolation for faster compilation
+  // Use SWC for ultra-fast TypeScript compilation
   transform: {
-    "^.+\.(ts|tsx)$": ["ts-jest", {
-      useESM: false,
-    }],
+    "^.+\\.(ts|tsx)$": "@swc/jest",
   },
   
   moduleFileExtensions: ["ts", "tsx", "js", "json", "node"],

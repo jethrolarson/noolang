@@ -10,6 +10,10 @@ on:
       - 'test/repl*.test.ts'
       - 'scripts/test-repl-automation.ts'
       - 'benchmarks/**'
+      - 'jest.config*.js'
+      - 'package.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/repl-tests.yml'
   pull_request:
     branches: [ main ]
     paths:
@@ -19,8 +23,39 @@ on:
       - 'test/repl*.test.ts'
       - 'scripts/test-repl-automation.ts'
       - 'benchmarks/**'
+      - 'jest.config*.js'
+      - 'package.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/repl-tests.yml'
 
 jobs:
+  fast-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run fast Jest tests (SWC)
+      run: npm run test:fast
+      
+    - name: Cache Jest transform cache
+      uses: actions/cache@v4
+      with:
+        path: .jest-cache
+        key: jest-cache-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('src/**/*.ts', 'test/**/*.ts') }}
+        restore-keys: |
+          jest-cache-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
+          jest-cache-${{ runner.os }}-
+
   full-test-suite:
     runs-on: ubuntu-latest
     
@@ -35,6 +70,15 @@ jobs:
     
     - name: Install dependencies
       run: npm ci
+      
+    - name: Cache Jest transform cache
+      uses: actions/cache@v4
+      with:
+        path: .jest-cache
+        key: jest-cache-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('src/**/*.ts', 'test/**/*.ts') }}
+        restore-keys: |
+          jest-cache-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
+          jest-cache-${{ runner.os }}-
     
     - name: Run all tests (including REPL)
       run: npm run test:all
@@ -188,6 +232,15 @@ jobs:
     
     - name: Install dependencies
       run: npm ci
+      
+    - name: Cache Jest transform cache
+      uses: actions/cache@v4
+      with:
+        path: .jest-cache
+        key: jest-cache-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('src/**/*.ts', 'test/**/*.ts') }}
+        restore-keys: |
+          jest-cache-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
+          jest-cache-${{ runner.os }}-
       
     - name: Benchmark current branch
       run: |
