@@ -354,6 +354,10 @@ async function main() {
 		const typeTime = performance.now();
 
 		const evaluator = new Evaluator();
+		
+		// Transfer specialized constraint functions to evaluator
+		evaluator.addConstraintFunctions(state);
+		
 		const finalResult = evaluator.evaluateProgram(decoratedProgram);
 		const evalTime = performance.now();
 

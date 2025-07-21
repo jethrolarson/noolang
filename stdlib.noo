@@ -1,11 +1,10 @@
-# Noolang Standard Library
-# This file defines the global default environment that's automatically loaded
+# Minimal Noolang Standard Library for Testing Modernization
 
 # ========================================
 # CORE ALGEBRAIC DATA TYPES
 # ========================================
 
-# Boolean type - replaces primitive Bool
+# Boolean type
 type Bool = True | False;
 
 # Option type for handling nullable values
@@ -23,12 +22,6 @@ head = fn list => if (length list) == 0
   then None 
   else list_get 0 list;
 
-# Join list elements with a separator
-# Example: join ", " [1, 2, 3] -> "1, 2, 3"
-join = fn separator list =>
-  reduce (fn acc x => if acc == "" then x else concat acc (concat separator x)) "" list;
-
-
 # ========================================
 # UTILITY FUNCTIONS
 # ========================================
@@ -39,62 +32,12 @@ id = fn x => x;
 # Function composition
 compose = fn f g => fn x => f (g x);
 
-# Helper function for list equality - simplified for now
-listEqualsInt = fn list1 list2 => (length list1) == (length list2);
-
-# ========================================
-# MODERNIZED BUILT-INS (without full trait system for now)
-# ========================================
-
-# Show-like functions for basic types (until trait system is fully implemented)
-showInt = toString;  # Use built-in toString for now
-showString = fn s => s;
-showBool = fn b => match b with (True => "True"; False => "False");
-
-# Show for Option 
-showOption = fn showElement opt => match opt with (
-  Some x => "Some(" + (showElement x) + ")";
-  None => "None"
-);
-
-# Show for Result
-showResult = fn showOk showErr res => match res with (
-  Ok x => "Ok(" + (showOk x) + ")";
-  Err e => "Err(" + (showErr e) + ")"
-);
-
-# Eq-like functions for basic types
-equalsInt = primitive_int_eq;
-equalsString = primitive_string_eq;
-equalsBool = fn a b => match a with (
-  True => match b with (True => True; False => False);
-  False => match b with (True => False; False => True)
-);
-
-# ========================================
-# MONAD CONSTRAINT AND IMPLEMENTATIONS  
-# ========================================
-
-# Bind and return functions for Option types (as before)
-bind = fn opt f => match opt with (
-  Some value => f value;
-  None => None
-);
-
-return = fn x => Some x;
-
 # ========================================
 # BOOLEAN OPERATIONS
 # ========================================
 
 # Boolean negation
 not = fn b => match b with (True => False; False => True);
-
-# Boolean AND
-bool_and = fn a b => match a with (True => b; False => False);
-
-# Boolean OR  
-bool_or = fn a b => match a with (True => True; False => b);
 
 # ========================================
 # OPTION UTILITIES
@@ -105,19 +48,3 @@ option_get_or = fn default opt => match opt with (
   Some value => value;
   None => default
 );
-
-# Map over Option (using Monad constraint)
-option_map = fn f opt => bind opt (fn x => return (f x));
-
-# ========================================
-# RESULT UTILITIES
-# ========================================
-
-# Extract value from Result with default for errors
-result_get_or = fn default res => match res with (
-  Ok value => value;
-  Err error => default
-);
-
-# Map over Result value (using Monad constraint) 
-result_map = fn f res => bind res (fn x => return (f x));
