@@ -890,7 +890,7 @@ describe("Constraint Definitions and Implementations", () => {
 		expect(program.statements).toHaveLength(1);
 		const implDef = assertImplementDefinitionExpression(program.statements[0]);
 		expect(implDef.constraintName).toBe("Monad");
-		    expect(implDef.typeExpr.kind).toBe("variable");
+		    expect(implDef.typeExpr.kind).toBe("variant");
     expect((implDef.typeExpr as any).name).toBe("Option");
 		expect(implDef.implementations).toHaveLength(2);
 		expect(implDef.implementations[0].name).toBe("return");
