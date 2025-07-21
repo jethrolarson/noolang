@@ -1768,9 +1768,43 @@ export class Evaluator {
 			}
 		}
 
-		// Apply monadic bind using TypeScript-implemented constraint system
+		// Apply monadic bind using constraint system
 		private applyMonadicBindViaConstraints(monad: Value, func: Value): Value {
-			// Use TypeScript-implemented monadic bind that supports multiple monad types
+			// Try to find a specialized bind function first (resolved at type-check time)
+			// The type checker should have generated specialized bind functions like:
+			// __Monad_bind_Option, __Monad_bind_Result, etc.
+			
+			if (isConstructor(monad)) {
+				const monadType = this.getMonadType(monad);
+				if (monadType) {
+					const specializedBindName = `__Monad_bind_${monadType}`;
+					let specializedBind = this.environment.get(specializedBindName);
+					
+					if (specializedBind) {
+						// Found constraint-resolved bind function, use it
+						if (isCell(specializedBind)) specializedBind = specializedBind.value;
+						
+						if (isFunction(specializedBind)) {
+							// Apply: specializedBind(monad)(func)
+							const partiallyApplied = specializedBind.fn(monad);
+							if (isFunction(partiallyApplied)) {
+								return partiallyApplied.fn(func);
+							} else if (isNativeFunction(partiallyApplied)) {
+								return partiallyApplied.fn(func);
+							}
+						} else if (isNativeFunction(specializedBind)) {
+							const partiallyApplied = specializedBind.fn(monad);
+							if (isFunction(partiallyApplied)) {
+								return partiallyApplied.fn(func);
+							} else if (isNativeFunction(partiallyApplied)) {
+								return partiallyApplied.fn(func);
+							}
+						}
+					}
+				}
+			}
+			
+			// Fall back to TypeScript implementation if constraint resolution fails
 			return this.performMonadicBind(monad, func);
 		}
 

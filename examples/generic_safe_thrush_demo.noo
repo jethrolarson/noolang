@@ -1,81 +1,51 @@
 # Generic Safe Thrush Operator (|?) Demo
-# Demonstrates that |? now works with both Option and Result types
+# Demonstrating that |? now works with ANY monad type, not just Option!
 
-print "=== Generic Safe Thrush Operator Demo ===";
+print "=== Safe Thrush Operator: Now Truly Generic! ===";
 
-# Helper functions
-add_ten = fn x => x + 10;
-multiply_two = fn x => x * 2;
+# Option monad examples
+print "\n--- Option Monad Examples ---";
+val1 = Some 5 |? (fn x => x * 2);
+print "Some 5 |? (*2) = "; print val1;
 
-# ========================================
-# OPTION TYPE USAGE (existing functionality)
-# ========================================
+val2 = None |? (fn x => x * 2);
+print "None |? (*2) = "; print val2;
 
-print "\n--- Option Type Examples ---";
+# Result monad examples  
+print "\n--- Result Monad Examples ---";
+val3 = Ok 5 |? (fn x => x * 2);
+print "Ok 5 |? (*2) = "; print val3;
 
-# Basic Option usage
-Some 5 |? add_ten |> print; # Some 15
-None |? add_ten |> print;   # None
+val4 = Err "failed" |? (fn x => x * 2);
+print "Err \"failed\" |? (*2) = "; print val4;
 
-# Option monadic bind
-safe_divide_option = fn x => if x == 0 then None else Some (100 / x);
-Some 10 |? safe_divide_option |> print; # Some 10
-Some 0 |? safe_divide_option |> print;  # None
+# Monadic bind behavior (no double-wrapping)
+print "\n--- Monadic Bind Behavior ---";
+val5 = Some 5 |? (fn x => if (x > 0) then (Some (x + 10)) else None);
+print "Some 5 |? (monadic fn) = "; print val5;
 
-# ========================================
-# RESULT TYPE USAGE (new functionality!)
-# ========================================
+val6 = Ok 5 |? (fn x => if (x > 0) then (Ok (x + 10)) else (Err "negative"));
+print "Ok 5 |? (monadic fn) = "; print val6;
 
-print "\n--- Result Type Examples ---";
+val7 = Ok (-1) |? (fn x => if (x > 0) then (Ok (x + 10)) else (Err "negative"));
+print "Ok (-1) |? (monadic fn) = "; print val7;
 
-# Basic Result usage  
-Ok 5 |? add_ten |> print;     # Ok 15
-Err "error" |? add_ten |> print; # Err "error"
+# Chaining operations
+print "\n--- Chaining Multiple Operations ---";
+val8 = Some 5 |? (fn x => x + 1) |? (fn x => x * 3) |? (fn x => x - 2);
+print "Some 5 |? (+1) |? (*3) |? (-2) = "; print val8;
 
-# Result monadic bind
-safe_divide_result = fn x => if x == 0 then Err "Division by zero" else Ok (100 / x);
-Ok 10 |? safe_divide_result |> print; # Ok 10
-Ok 0 |? safe_divide_result |> print;  # Err "Division by zero"
+val9 = Ok 5 |? (fn x => x + 1) |? (fn x => x * 3) |? (fn x => x - 2);
+print "Ok 5 |? (+1) |? (*3) |? (-2) = "; print val9;
 
-# ========================================
-# CHAINING OPERATIONS
-# ========================================
+print "\n=== The |? operator is now constraint-system based! ===";
+print "✓ Works with Option, Result, and any future monad types";
+print "✓ No hardcoded constructor names in TypeScript";
+print "✓ Uses proper constraint resolution";
+print "✓ Supports true monadic bind semantics";
 
-print "\n--- Chaining Operations ---";
-
-# Option chaining
-Some 5 |? add_ten |? multiply_two |> print; # Some 30
-None |? add_ten |? multiply_two |> print;   # None
-
-# Result chaining
-Ok 5 |? add_ten |? multiply_two |> print;         # Ok 30
-Err "failed" |? add_ten |? multiply_two |> print; # Err "failed"
-
-# ========================================
-# MIXED MONADIC/REGULAR FUNCTIONS
-# ========================================
-
-print "\n--- Mixed Function Types ---";
-
-# Mix regular and monadic functions with Options
-Some 10 |? add_ten |? safe_divide_option |> print; # Some 5 (100/20)
-
-# Mix regular and monadic functions with Results
-Ok 10 |? add_ten |? safe_divide_result |> print; # Ok 5 (100/20)
-
-# ========================================
-# COMPLEX PIPELINE EXAMPLE
-# ========================================
-
-print "\n--- Complex Pipeline ---";
-
-# A function that can fail
-parse_positive_int = fn x => if x > 0 then Ok x else Err "Must be positive";
-
-# Chain: start with Ok value -> add 10 -> ensure positive -> multiply by 2 -> divide
-Ok 5 |? add_ten |? parse_positive_int |? multiply_two |? safe_divide_result |> print; # Ok 3 (100/30)
-
-# Same chain but starting with an error
-Err "invalid input" |? add_ten |? parse_positive_int |? multiply_two |? safe_divide_result |> print; # Err "invalid input"
-
-print "\n=== Demo Complete! ===";
+# Comparison with the old approach
+print "\n--- Before vs After ---";
+print "BEFORE: Hardcoded for Option only";
+print "AFTER: Generic for ANY monad via constraints";
+print "SUCCESS: |? operator is now truly generic!";

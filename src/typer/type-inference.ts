@@ -64,6 +64,10 @@ import {
 } from './types';
 import { validateConstraintName } from './constraints';
 import { freshTypeVariable, generalize, instantiate, freshenTypeVariables, flattenStatements } from './type-operations';
+import { 
+	tryResolveConstraintFunction,
+	decorateEnvironmentWithConstraintFunctions
+} from './constraint-resolution';
 
 // Note: Main typeExpression is now in expression-dispatcher.ts
 // This file only contains the individual type inference functions
@@ -556,56 +560,8 @@ export const typeBinary = (
 			);
 		}
 
-		// For proper constraint-based implementation, we would:
-		// 1. Check that leftResult.type implements Monad
-		// 2. Resolve the bind function for that type
-		// 3. Type it as: bind : m a -> (a -> m b) -> m b
-		
-		// For now, implement specific handling for Option and Result types
-		if (leftResult.type.kind === 'variant' && leftResult.type.args.length >= 1) {
-			const monadName = leftResult.type.name;
-			const innerType = leftResult.type.args[0]; // First type parameter is the value type
-			
-			// Check if this is a supported monad type
-			if (monadName === 'Option' || monadName === 'Result') {
-				// Unify the function parameter with the inner type
-				currentState = unify(
-					rightResult.type.params[0],
-					innerType,
-					currentState,
-					getExprLocation(expr)
-				);
-
-				// The result type follows monadic bind semantics where bind flattens nested monads
-				let resultType: Type;
-				if (rightResult.type.return.kind === 'variant' && rightResult.type.return.name === monadName) {
-					// Function returns same monad type -> result is that type (bind flattens)
-					resultType = rightResult.type.return;
-				} else {
-					// Function returns T -> result is wrapped in the monad
-					if (monadName === 'Option') {
-						resultType = variantType('Option', [rightResult.type.return]);
-					} else if (monadName === 'Result' && leftResult.type.args.length === 2) {
-						// Result has error type as second parameter, preserve it
-						resultType = variantType('Result', [rightResult.type.return, leftResult.type.args[1]]);
-					} else {
-						// Generic fallback for other monads
-						resultType = variantType(monadName, [rightResult.type.return]);
-					}
-				}
-				
-				return createTypeResult(resultType, unionEffects(leftResult.effects, rightResult.effects), currentState);
-			} else {
-				// TODO: Implement full constraint resolution for other monadic types
-				throw new Error(
-					`Safe thrush operator (|?) currently only supports Option and Result types, got ${typeToString(leftResult.type, currentState.substitution)}`
-				);
-			}
-		} else {
-			throw new Error(
-				`Safe thrush operator (|?) requires a monadic type (Option, Result, etc.), got ${typeToString(leftResult.type, currentState.substitution)}`
-			);
-		}
+		// Use constraint resolution to find the bind function for the left operand's type
+		return typeMonadicBindViaConstraints(leftResult, rightResult, expr, currentState);
 	}
 
 	// Get operator type from environment
@@ -1034,3 +990,100 @@ export const typeImplementDefinition = (
 	// Implement definitions have unit type
 	return createTypeResult(unitType(), allEffects, currentState);
 };
+
+// Helper function for typing monadic bind using constraint resolution
+function typeMonadicBindViaConstraints(
+	leftResult: TypeResult,
+	rightResult: TypeResult, 
+	expr: BinaryExpression,
+	currentState: TypeState
+): TypeResult {
+	// Try to resolve bind function using constraint system
+	const bindResolution = tryResolveConstraintFunction(
+		'bind',
+		[expr.left, expr.right],
+		[leftResult.type, rightResult.type],
+		currentState
+	);
+	
+	if (bindResolution.resolved && bindResolution.specializedName && bindResolution.typeScheme) {
+		// Found a constraint-resolved bind function
+		const decoratedState = decorateEnvironmentWithConstraintFunctions(currentState);
+		const [bindType, newState] = instantiate(bindResolution.typeScheme, decoratedState);
+		
+		if (bindType.kind === 'function' && bindType.params.length === 2) {
+			// bind : m a -> (a -> m b) -> m b
+			// Unify leftResult.type with first parameter (m a)
+			let unifiedState = unify(leftResult.type, bindType.params[0], newState, getExprLocation(expr));
+			
+			// Unify rightResult.type with second parameter (a -> m b)  
+			unifiedState = unify(rightResult.type, bindType.params[1], unifiedState, getExprLocation(expr));
+			
+			// Result type is the bind return type (m b)
+			const resultType = substitute(bindType.return, unifiedState.substitution);
+			
+			return createTypeResult(resultType, unionEffects(leftResult.effects, rightResult.effects), unifiedState);
+		} else {
+			throw new Error(`Invalid bind function type: expected function with 2 parameters, got ${typeToString(bindType, currentState.substitution)}`);
+		}
+	} else {
+		// Fall back to hardcoded support for common monads if no constraint found
+		return typeFallbackMonadicBind(leftResult, rightResult, expr, currentState);
+	}
+}
+
+// Fallback implementation for common monads when constraint resolution fails
+function typeFallbackMonadicBind(
+	leftResult: TypeResult,
+	rightResult: TypeResult,
+	expr: BinaryExpression, 
+	currentState: TypeState
+): TypeResult {
+	// Handle well-known monad types directly
+	if (leftResult.type.kind === 'variant' && leftResult.type.args.length >= 1) {
+		const monadName = leftResult.type.name;
+		const innerType = leftResult.type.args[0];
+		
+		if (monadName === 'Option' || monadName === 'Result') {
+			// Ensure right operand is a function type
+			if (rightResult.type.kind !== 'function') {
+				throw new Error(`Safe thrush operator (|?) requires a function on the right, got ${typeToString(rightResult.type, currentState.substitution)}`);
+			}
+			
+			// Unify the function parameter with the inner type
+			currentState = unify(
+				rightResult.type.params[0],
+				innerType,
+				currentState,
+				getExprLocation(expr)
+			);
+
+			// The result type follows monadic bind semantics
+			let resultType: Type;
+			if (rightResult.type.return.kind === 'variant' && rightResult.type.return.name === monadName) {
+				// Function returns same monad type -> bind flattens
+				resultType = rightResult.type.return;
+			} else {
+				// Function returns T -> wrap in the monad
+				if (monadName === 'Option') {
+					resultType = variantType('Option', [rightResult.type.return]);
+				} else if (monadName === 'Result' && leftResult.type.args.length === 2) {
+					// Preserve error type for Result
+					resultType = variantType('Result', [rightResult.type.return, leftResult.type.args[1]]);
+				} else {
+					resultType = variantType(monadName, [rightResult.type.return]);
+				}
+			}
+			
+			return createTypeResult(resultType, unionEffects(leftResult.effects, rightResult.effects), currentState);
+		} else {
+			throw new Error(
+				`Safe thrush operator (|?) requires a type with a Monad constraint or a built-in monad (Option, Result), got ${typeToString(leftResult.type, currentState.substitution)}`
+			);
+		}
+	} else {
+		throw new Error(
+			`Safe thrush operator (|?) requires a monadic type, got ${typeToString(leftResult.type, currentState.substitution)}`
+		);
+	}
+}
