@@ -25,7 +25,6 @@ import {
 	recordType,
 	tupleType,
 	tupleTypeConstructor,
-	variantType,
 	type ConstraintExpr,
 	type TypeDefinitionExpression,
 	type MatchExpression,
@@ -39,7 +38,7 @@ import {
 	type ImplementDefinitionExpression,
 	type ConstraintFunction,
 	type ImplementationFunction,
-} from "../ast";
+} from '../ast';
 import * as C from "./combinators";
 
 // --- Helper: parse type name (IDENTIFIER or type-related KEYWORD) ---

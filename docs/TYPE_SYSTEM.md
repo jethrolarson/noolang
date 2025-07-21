@@ -354,7 +354,156 @@ safeFileLog = compose fileLogger  # Still requires !read !log
 | `!ffi`   | Calls to native or foreign functions      | Black-box behavior, may implicitly wrap other effects   |
 | `!async` | Execution that may suspend or defer       | Time non-locality; may delay evaluation or resume later |
 
+---
 
+### 🚧 **PLANNED: Unknown Type and Dynamic Values**
+
+Noolang will support an `Unknown` type for values whose types cannot be statically determined, primarily for FFI integration and gradual typing scenarios.
+
+#### **Unknown Type Design**
+
+* **Purpose**: Represent dynamically typed values from FFI calls or explicit dynamic behavior
+* **Safety**: Type refinement through pattern matching ensures safe usage
+* **Explicit Opt-in**: `forget` operation to convert any type to `Unknown`
+
+#### **Type Refinement Pattern Matching**
+
+Pattern matching on `Unknown` values refines them to concrete types:
+
+```noolang
+# FFI returns Unknown
+result = ffi "node" "fs.readFileSync";
+
+# Pattern matching refines the type
+content = match result with (
+  String s => "got string: " + s;
+  Error e => "got error";
+  Function f => "got function";
+  _ => "got something unexpected"
+);
+```
+
+#### **forget Operation**
+
+Explicit conversion from any type to `Unknown`:
+
+```noolang
+myNumber = 42;                    # myNumber: Int
+dynamic = forget myNumber;        # dynamic: Unknown
+refined = match dynamic with (
+  Int n => n * 2;
+  _ => 0
+);
+```
+
+#### **Design Principles**
+
+* **Explicit Boundaries**: Clear distinction between statically and dynamically typed code
+* **Type Safety**: Pattern matching ensures all cases are handled
+* **Gradual Typing**: Smooth interop between typed and untyped worlds
+* **FFI Integration**: Natural representation for foreign function results
+
+---
+
+### 🚧 **PLANNED: Trait/Typeclass System**
+
+Noolang will implement a trait system for clean polymorphism and principled abstraction over types.
+
+#### **Design Philosophy**
+
+* **Foundational Feature**: Enables clean implementation of monadic operations, collections, and other abstractions
+* **Principled Polymorphism**: No ad-hoc overloading - all polymorphism through explicit traits
+* **Monadic Integration**: Natural support for `Option`, `Result`, `IO`, and other monadic types
+
+#### **Trait Syntax (Proposed)**
+
+```noolang
+# Trait definition
+trait Monad m where
+  bind : m a -> (a -> m b) -> m b
+  pure : a -> m a
+
+# Trait instances  
+instance Monad Option where
+  bind = option_bind
+  pure = Some
+
+instance Monad (Result e) where
+  bind = result_bind
+  pure = Ok
+```
+
+#### **Monadic Operators**
+
+The `|?` operator will be introduced as "optional chaining" but implemented as proper monadic bind:
+
+```noolang
+# Introduced as optional chaining
+user |? getProfile |? getSettings |? formatData
+
+# Actually implemented as monadic bind
+# user >>= getProfile >>= getSettings >>= formatData
+```
+
+#### **Benefits**
+
+* **Clean Abstractions**: Unified interface for different monadic types
+* **Extensibility**: User-defined traits and instances
+* **Type Safety**: Compiler-enforced trait bounds
+* **Familiar Patterns**: Based on proven Haskell/Rust designs
+
+#### **Implementation Requirements**
+
+1. **Trait Definitions**: Syntax for defining traits with associated types/functions
+2. **Instance Declarations**: Syntax for implementing traits for specific types
+3. **Trait Bounds**: Constrained polymorphic functions with trait requirements
+4. **Resolution**: Automatic instance resolution during type checking
+5. **Coherence**: Ensure unique instance resolution (no overlapping instances)
+
+---
+
+### 🚧 **PLANNED: FFI System Integration**
+
+The Foreign Function Interface will integrate with the trait and Unknown type systems to provide safe, principled interop.
+
+#### **FFI Type Flow**
+
+```noolang
+# FFI calls return Unknown by default
+fs = ffi "node" "fs";               # fs: Unknown
+
+# Optional accessors for safe property access  
+readFile = fs |? @readFileSync?;    # readFile: Option Unknown
+
+# Monadic chaining with |? operator
+result = readFile |? fn f => f ["file.txt"] |? processContent;
+
+# Type refinement through pattern matching
+content = match result with (
+  Some (String s) => s;
+  _ => "failed to read file"
+);
+```
+
+#### **Platform Adapters**
+
+FFI adapters interpret platform-specific paths and provide optional type information:
+
+```noolang
+# Node.js adapter knows about common APIs
+readFileSync = ffi "node" "fs.readFileSync";  # Could return typed function
+log = ffi "node" "console.log";               # Could return String -> Unit !log
+
+# Unknown adapters default to Unknown
+custom = ffi "myplatform" "some.api";         # Returns Unknown
+```
+
+#### **Design Benefits**
+
+* **Platform Agnostic**: Adapters handle platform-specific details
+* **Type Safety**: Unknown type with refinement prevents runtime errors
+* **Extensibility**: Easy to add new platform adapters
+* **Principled**: Builds on solid trait and type system foundations
 
 ---
 
@@ -381,12 +530,31 @@ safeFileLog = compose fileLogger  # Still requires !read !log
 
 ### 🎯 Next Implementation Priorities
 
-1. **Effect System Phase 2**: Refactor type system to use (Type, Effects) pairs instead of embedded effects
-2. **Effect System Phase 3**: Add effect validation and propagation through function composition
-3. **Record Type Annotations**: Support `{@name String, @age Number}` syntax  
-4. **Type Constructors**: Implement `List T`, `Tuple T1 T2` syntax
-5. **Constraint Annotations**: Add `given` syntax for explicit constraint declarations
-6. **VSCode Integration**: Language Server Protocol (LSP) for intellisense and hover type information
+1. **Trait/Typeclass System**: Foundational feature for clean polymorphism and monadic operations
+   - Trait definition syntax (`trait Name where ...`)
+   - Instance declaration syntax (`instance Trait Type where ...`)
+   - Trait resolution and instance lookup in type checker
+   - Coherence checking to prevent overlapping instances
+
+2. **Unknown Type and Type Refinement**: Support for dynamically typed values
+   - `Unknown` type for FFI integration and gradual typing
+   - Pattern matching for type refinement of Unknown values
+   - `forget` operation to convert any type to Unknown
+
+3. **Monadic Operators**: `|?` operator for clean optional chaining
+   - Implement as monadic bind using trait system
+   - Support for Option, Result, and other monadic types
+   - Introduce as "optional chaining" for approachability
+
+4. **Optional Accessors**: `@field?` syntax for safe field access
+   - Return Option types for missing fields
+   - Chain naturally with `|?` operator
+   - Work uniformly on records and Unknown values
+
+5. **FFI System**: Foreign function interface (after foundational features)
+   - Platform adapter architecture
+   - Integration with Unknown type system
+   - Effect tracking for foreign function calls
 
 ---
 

@@ -202,7 +202,7 @@ function saveBenchmarkResults(results) {
 
 	const filename = path.join(
 		resultsDir,
-		`results-${timestamp.split('T')[0]}.json`
+		`results-${timestamp.replace(/[:.]/g, '-').replace('T', '_').slice(0, -5)}.json`
 	);
 
 	const data = {
