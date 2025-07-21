@@ -53,14 +53,14 @@ showBool = fn b => match b with (True => "True"; False => "False");
 
 # Show for Option 
 showOption = fn showElement opt => match opt with (
-  Some x => "Some(" + (showElement x) + ")";
+  Some x => concat "Some(" (concat (showElement x) ")");
   None => "None"
 );
 
 # Show for Result
 showResult = fn showOk showErr res => match res with (
-  Ok x => "Ok(" + (showOk x) + ")";
-  Err e => "Err(" + (showErr e) + ")"
+  Ok x => concat "Ok(" (concat (showOk x) ")");
+  Err e => concat "Err(" (concat (showErr e) ")")
 );
 
 # Eq-like functions for basic types

@@ -284,6 +284,16 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		type: createUnaryFunctionType(typeVariable('a'), stringType()),
 		quantifiedVars: ['a'],
 	});
+	
+	// Primitive comparison functions (pure)
+	newEnv.set('primitive_int_eq', {
+		type: createBinaryFunctionType(intType(), intType(), boolType()),
+		quantifiedVars: [],
+	});
+	newEnv.set('primitive_string_eq', {
+		type: createBinaryFunctionType(stringType(), stringType(), boolType()),
+		quantifiedVars: [],
+	});
 
 	// Record utilities
 	newEnv.set('hasKey', {
