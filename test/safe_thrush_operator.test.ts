@@ -130,10 +130,14 @@ describe("Safe Thrush Operator (|?)", () => {
     test("should short-circuit in chains when None encountered", () => {
       const result = evalExpression(`
         safe_divide = fn x => if x == 0 then None else Some (100 / x);
-        add_five = fn x => x + 5;
-        Some 0 |? add_five |? safe_divide
+        subtract_five = fn x => x - 5;
+        Some 5 |? subtract_five |? safe_divide
       `);
-      expect(result).toEqual({ tag: "constructor", name: "None", args: [] });
+      expect(result).toEqual({
+        tag: "constructor", 
+        name: "None", 
+        args: []
+      });
     });
 
     test("should work with mixed regular and Option-returning functions", () => {
