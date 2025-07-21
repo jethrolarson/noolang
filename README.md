@@ -39,60 +39,6 @@ Or run the compiled version:
 npm start
 ```
 
-### CLI Debugging Tools
-
-The CLI provides extensive debugging capabilities for development:
-
-```bash
-# Execute expressions
-npm run start -- --eval "1 + 2 * 3"
-npm run start -- -e "x = 10; x * 2"
-
-# Debug tokenization
-npm run start -- --tokens "fn x => x + 1"
-npm run start -- --tokens-file examples/demo.noo
-
-# Debug parsing (AST)
-npm run start -- --ast "if x > 0 then x else -x"
-npm run start -- --ast-file examples/demo.noo
-
-# Debug type inference
-npm run start -- --types "fn x => x + 1"
-npm run start -- --types-file examples/demo.noo
-npm run start -- --types-detailed "fn x => x + 1"
-npm run start -- --types-env "fn x => x + 1"
-npm run start -- --types-ast "fn x => x + 1"
-
-# Run files
-npm run start -- examples/demo.noo
-```
-
-#### REPL Debugging Commands
-
-The REPL includes comprehensive debugging tools:
-
-```bash
-# Basic commands
-.help                    # Show help
-.quit                    # Exit REPL
-
-# Environment inspection
-.env                     # Show current environment
-.env-detail              # Show detailed environment with types
-.env-json                # Show environment as JSON
-.clear-env               # Clear environment
-.types                   # Show type environment
-
-# Debugging commands
-.tokens (expr)           # Show tokens for expression
-.tokens-file file.noo    # Show tokens for file
-.ast (expr)              # Show AST for expression
-.ast-file file.noo       # Show AST for file
-.ast-json (expr)         # Show AST as JSON
-```
-
-**Note**: REPL Commands use `.` prefix and parentheses `(expr)` for expressions to avoid conflicts with future type annotations.
-
 ### Examples
 
 ```noolang
@@ -882,7 +828,7 @@ Constraints automatically propagate through function composition:
 
 ```noolang
 # Compose functions while preserving constraints
-compose = fn f g => fn x => f (g x)
+compose = fn f g x => f (g x)
 
 # head has constraint: a is Collection
 # compose preserves this constraint
@@ -945,7 +891,7 @@ bad_access = @nonexistent person;  # ❌ Error if field doesn't exist
 
 ```noolang
 # Compose functions while maintaining constraint safety
-compose = fn f g => fn x => f (g x)
+compose = fn f g x => f (g x)
 
 # Create safe list operations
 safeHead = compose head;
@@ -958,6 +904,61 @@ rest = safeTail [1, 2, 3];   # ✅ Type: List Int
 # These fail because constraints are enforced
 bad_first = safeHead 42;     # ❌ Error: Int does not satisfy Collection
 ```
+
+
+### CLI Debugging Tools
+
+The CLI provides extensive debugging capabilities for development:
+
+```bash
+# Execute expressions
+npm run start -- --eval "1 + 2 * 3"
+npm run start -- -e "x = 10; x * 2"
+
+# Debug tokenization
+npm run start -- --tokens "fn x => x + 1"
+npm run start -- --tokens-file examples/demo.noo
+
+# Debug parsing (AST)
+npm run start -- --ast "if x > 0 then x else -x"
+npm run start -- --ast-file examples/demo.noo
+
+# Debug type inference
+npm run start -- --types "fn x => x + 1"
+npm run start -- --types-file examples/demo.noo
+npm run start -- --types-detailed "fn x => x + 1"
+npm run start -- --types-env "fn x => x + 1"
+npm run start -- --types-ast "fn x => x + 1"
+
+# Run files
+npm run start -- examples/demo.noo
+```
+
+#### REPL Debugging Commands
+
+The REPL includes comprehensive debugging tools:
+
+```bash
+# Basic commands
+.help                    # Show help
+.quit                    # Exit REPL
+
+# Environment inspection
+.env                     # Show current environment
+.env-detail              # Show detailed environment with types
+.env-json                # Show environment as JSON
+.clear-env               # Clear environment
+.types                   # Show type environment
+
+# Debugging commands
+.tokens (expr)           # Show tokens for expression
+.tokens-file file.noo    # Show tokens for file
+.ast (expr)              # Show AST for expression
+.ast-file file.noo       # Show AST for file
+.ast-json (expr)         # Show AST as JSON
+```
+
+**Note**: REPL Commands use `.` prefix and parentheses `(expr)` for expressions to avoid conflicts with future type annotations.
 
 ### Current Implementation Status
 
