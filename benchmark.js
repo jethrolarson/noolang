@@ -261,6 +261,27 @@ function printSummary(results) {
 
 // Main execution
 async function main() {
+	const isREPLOnly = process.argv.includes('--repl');
+	
+	if (isREPLOnly) {
+		// Run only REPL benchmarks
+		log(colors.header, '🚀 Noolang REPL Performance Benchmarks');
+		const { REPLBenchmark } = require('./benchmarks/repl-scenarios.js');
+		const replBenchmark = new REPLBenchmark();
+		
+		try {
+			const results = await replBenchmark.runAll();
+			replBenchmark.printSummary(results);
+			replBenchmark.saveBenchmarkResults(results);
+			log(colors.success, '\n🎉 REPL benchmarking complete!');
+		} catch (error) {
+			log(colors.error, `\n💥 REPL benchmark failed: ${error.message}`);
+			process.exit(1);
+		}
+		return;
+	}
+
+	// Standard file-based benchmarks
 	log(colors.header, '🚀 Noolang Performance Benchmarks');
 	console.log(
 		`Warmup runs: ${WARMUP_RUNS}, Measurement runs: ${MEASUREMENT_RUNS}`

@@ -13,8 +13,11 @@
     "test:repl": "jest test/repl.test.ts",
     "test:repl-integration": "jest test/repl-integration.test.ts",
     "test:repl-automation": "ts-node scripts/test-repl-automation.ts",
-    "test:all-repl": "npm run test:repl && npm run test:repl-automation",
+    "test:all": "jest && npm run test:repl-automation",
+    "test:all-repl": "npm run test:repl && npm run test:repl-integration && npm run test:repl-automation",
     "benchmark": "npm run build && node benchmark.js",
+    "benchmark:repl": "npm run build && node benchmark.js --repl",
+    "benchmark:all": "npm run build && node benchmark.js && npm run benchmark:repl",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"*.ts\" \"*.js\" \"*.json\"",
     "vscode:package": "vsce package",
     "vscode:publish": "vsce publish"
