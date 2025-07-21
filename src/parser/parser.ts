@@ -1580,12 +1580,20 @@ const parsePattern: C.Parser<Pattern> = C.choice(
   })
 );
 
+// --- Match Case Expression Parser ---
+// This parser supports expressions in match cases, including nested match expressions
+const parseMatchCaseExpression: C.Parser<Expression> = C.choice(
+  C.lazy(() => parseMatchExpression), // Support nested match expressions
+  parseIfExpression, // Support if expressions  
+  C.lazy(() => parseExprWithType) // Support all other expressions including type annotations
+);
+
 // --- Match Case ---
 const parseMatchCase: C.Parser<MatchCase> = C.map(
   C.seq(
     parsePattern,
     C.operator("=>"),
-    C.lazy(() => parseThrush) // Use simpler expression parser to avoid circular dependency
+    C.lazy(() => parseMatchCaseExpression) // Use dedicated parser for match case expressions
   ),
   ([pattern, arrow, expression]): MatchCase => ({
     pattern,
