@@ -110,43 +110,29 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
     }
   }
 
-  // Try type constructor application or type variable
+  // Try type application (any identifier can potentially be applied to arguments)
   if (tokens.length > 0 && tokens[0].type === "IDENTIFIER") {
-    const name = tokens[0].value;
-    
-    // Type variable (lowercase)
-    if (/^[a-z]/.test(name)) {
-      const varResult = C.identifier()(tokens);
-      if (varResult.success) {
+    const identifierResult = C.identifier()(tokens);
+    if (identifierResult.success) {
+      const name = identifierResult.value.value;
+      
+      // Try to parse type arguments
+      const argsResult = C.many(C.lazy(() => parseTypeAtom))(identifierResult.remaining);
+      
+      if (argsResult.success && argsResult.value.length > 0) {
+        // Type application: identifier applied to arguments
         return {
           success: true as const,
-          value: typeVariable(varResult.value.value),
-          remaining: varResult.remaining,
+          value: variantType(name, argsResult.value),
+          remaining: argsResult.remaining,
         };
-      }
-    }
-    
-    // Type constructor (uppercase) - potentially with arguments
-    if (/^[A-Z]/.test(name)) {
-      const constructorResult = C.identifier()(tokens);
-      if (constructorResult.success) {
-        // Try to parse type arguments
-        const argsResult = C.many(C.lazy(() => parseTypeAtom))(constructorResult.remaining);
-        if (argsResult.success && argsResult.value.length > 0) {
-          // Type constructor application
-          return {
-            success: true as const,
-            value: variantType(constructorResult.value.value, argsResult.value),
-            remaining: argsResult.remaining,
-          };
-        } else {
-          // Just a type constructor with no arguments
-          return {
-            success: true as const,
-            value: variantType(constructorResult.value.value, []),
-            remaining: constructorResult.remaining,
-          };
-        }
+      } else {
+        // Just a type variable or nullary type constructor
+        return {
+          success: true as const,
+          value: typeVariable(name),
+          remaining: identifierResult.remaining,
+        };
       }
     }
   }
