@@ -1,0 +1,38 @@
+# LSP Test File with Various Noolang Features
+
+# Function definitions
+add = fn x y => x + y;
+multiply = fn a b => a * b;
+
+# Variables and function calls
+result = add 2 3;
+product = multiply result 4;
+
+# Records and accessors
+user = { @name "Alice", @age 30, @email "alice@example.com" };
+name = user | @name;
+age = user | @age;
+
+# Lists and higher-order functions
+numbers = [1, 2, 3, 4, 5];
+doubled = map (fn x => x * 2) numbers;
+evens = filter (fn x => x % 2 == 0) numbers;
+
+# Conditional expressions
+status = if age > 18 then "adult" else "minor";
+
+# Pattern matching with ADTs
+option_value = Some 42;
+unwrapped = match option_value with (Some x => x; None => 0);
+
+# Type annotations
+typed_function = fn x => x + 1 : (Int) -> Int;
+
+# Effects (should cause warnings/errors if not properly annotated)
+# print_message = fn msg => print msg;
+
+# Pipeline operators
+final_result = numbers 
+  | map (fn x => x * 2)
+  | filter (fn x => x > 5)
+  | head;
