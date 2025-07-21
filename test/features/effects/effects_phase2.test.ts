@@ -1,15 +1,15 @@
 // Phase 2 Effects System Tests
 // Testing separated effects in TypeResult and effect composition
 
-import { Lexer } from '../src/lexer';
-import { parse } from '../src/parser/parser';
+import { Lexer } from '../../../src/lexer';
+import { parse } from '../../../src/parser/parser';
 import {
 	typeProgram,
 	emptyEffects,
 	singleEffect,
 	unionEffects,
-} from '../src/typer';
-import type { Effect } from '../src/ast';
+} from '../../../src/typer';
+import type { Effect } from '../../../src/ast';
 
 const runNoolang = (code: string) => {
 	const lexer = new Lexer(code);

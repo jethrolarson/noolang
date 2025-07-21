@@ -1,6 +1,6 @@
-import { Lexer } from '../src/lexer';
-import { parse } from '../src/parser/parser';
-import { typeAndDecorate } from '../src/typer/decoration';
+import { Lexer } from '../../../src/lexer';
+import { parse } from '../../../src/parser/parser';
+import { typeAndDecorate } from '../../../src/typer/decoration';
 
 describe('Top-level Constraint and Implement Definitions', () => {
 	const runConstraintCode = (code: string) => {
