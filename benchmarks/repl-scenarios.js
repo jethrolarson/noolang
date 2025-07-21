@@ -64,7 +64,21 @@ class REPLBenchmark {
 
   async startREPL() {
     return new Promise((resolve, reject) => {
-      this.process = spawn('npx', ['ts-node', 'src/repl.ts'], {
+      // Try built version first, then fall back to ts-node
+      const replPath = path.join(process.cwd(), 'dist', 'repl.js');
+      let command, args;
+      
+      if (fs.existsSync(replPath)) {
+        command = 'node';
+        args = ['dist/repl.js'];
+        console.log('   Using built REPL...');
+      } else {
+        command = 'npx';
+        args = ['ts-node', 'src/repl.ts'];
+        console.log('   Using ts-node for REPL...');
+      }
+
+      this.process = spawn(command, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
         cwd: process.cwd()
       });
@@ -74,7 +88,8 @@ class REPLBenchmark {
 
       this.process.stdout.on('data', (data) => {
         output += data.toString();
-        if (output.includes('noo>') && !isReady) {
+        // Look for the actual REPL prompt format
+        if ((output.includes('noolang>') || output.includes('Welcome to Noolang!')) && !isReady) {
           isReady = true;
           resolve();
         }
@@ -82,13 +97,21 @@ class REPLBenchmark {
 
       this.process.stderr.on('data', (data) => {
         const error = data.toString();
+        console.error('REPL stderr:', error);
         if (!isReady) {
           reject(new Error(`REPL startup failed: ${error}`));
         }
       });
 
+      this.process.on('error', (error) => {
+        if (!isReady) {
+          reject(new Error(`REPL process error: ${error.message}`));
+        }
+      });
+
       setTimeout(() => {
         if (!isReady) {
+          console.error('REPL output so far:', output);
           reject(new Error('REPL startup timeout'));
         }
       }, 10000);
@@ -103,7 +126,8 @@ class REPLBenchmark {
 
       const onData = (data) => {
         output += data.toString();
-        if (output.includes('noo>')) {
+        // Look for the actual REPL prompt
+        if (output.includes('noolang>')) {
           if (!responseReceived) {
             responseReceived = true;
             const end = process.hrtime.bigint();
@@ -146,7 +170,7 @@ class REPLBenchmark {
         measurements.push({
           input,
           duration: result.duration,
-          output: result.output.split('noo>')[0].trim()
+          output: result.output.split('noolang>')[0].trim()
         });
         totalTime += result.duration;
       }
@@ -263,6 +287,22 @@ class REPLBenchmark {
 }
 
 async function main() {
+  // First, verify the build completed successfully
+  const distPath = path.join(process.cwd(), 'dist');
+  const replPath = path.join(distPath, 'repl.js');
+  
+  if (!fs.existsSync(distPath)) {
+    log(colors.error, '\n💥 Build directory not found. Please run "npm run build" first.');
+    process.exit(1);
+  }
+  
+  if (!fs.existsSync(replPath)) {
+    log(colors.warning, '\n⚠️  REPL build not found, trying TypeScript directly...');
+    // Continue with ts-node approach
+  } else {
+    log(colors.success, '\n✅ Build verification passed');
+  }
+
   const benchmark = new REPLBenchmark();
   
   try {
