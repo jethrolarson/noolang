@@ -38,6 +38,66 @@ export type Value =
 	| { tag: "constructor"; name: string; args: Value[] }
 	| { tag: "unit" };
 
+// Monad metadata for generic monad operations
+type MonadInfo = {
+	name: string;
+	successConstructors: string[];
+	failureConstructors: string[];
+	createSuccess: (value: Value) => Value;
+	createFailure: (error: Value) => Value;
+};
+
+// Registry of supported monads
+const MONAD_REGISTRY: MonadInfo[] = [
+	{
+		name: "Option",
+		successConstructors: ["Some"],
+		failureConstructors: ["None"],
+		createSuccess: (value: Value) => createConstructor("Some", [value]),
+		createFailure: () => createConstructor("None", [])
+	},
+	{
+		name: "Result", 
+		successConstructors: ["Ok"],
+		failureConstructors: ["Err"],
+		createSuccess: (value: Value) => createConstructor("Ok", [value]),
+		createFailure: (error: Value) => createConstructor("Err", [error])
+	}
+];
+
+// Helper functions for working with monads generically
+function getMonadInfo(constructorName: string): MonadInfo | null {
+	return MONAD_REGISTRY.find(monad => 
+		monad.successConstructors.includes(constructorName) || 
+		monad.failureConstructors.includes(constructorName)
+	) || null;
+}
+
+function isMonadValue(value: Value): boolean {
+	return isConstructor(value) && getMonadInfo(value.name) !== null;
+}
+
+function isSuccessValue(value: Value): boolean {
+	if (!isConstructor(value)) return false;
+	const monadInfo = getMonadInfo(value.name);
+	return monadInfo ? monadInfo.successConstructors.includes(value.name) : false;
+}
+
+function isFailureValue(value: Value): boolean {
+	if (!isConstructor(value)) return false;
+	const monadInfo = getMonadInfo(value.name);
+	return monadInfo ? monadInfo.failureConstructors.includes(value.name) : false;
+}
+
+function getCompatibleMonadInfo(value1: Value, value2: Value): MonadInfo | null {
+	if (!isConstructor(value1) || !isConstructor(value2)) return null;
+	
+	const monad1 = getMonadInfo(value1.name);
+	const monad2 = getMonadInfo(value2.name);
+	
+	return monad1 === monad2 ? monad1 : null;
+}
+
 // --- Mutable Cell type ---
 export type Cell = { cell: true; value: Value };
 export const isCell = (val: any): val is Cell =>
@@ -1769,27 +1829,7 @@ export class Evaluator {
 
 		// Check if two values are compatible monads (same monad type)
 		private isCompatibleMonad(result: Value, leftOperand: Value): boolean {
-			// Both values must be constructors to be monads
-			if (!isConstructor(result) || !isConstructor(leftOperand)) {
-				return false;
-			}
-
-			// Check if they're both Option types
-			if ((result.name === "Some" || result.name === "None") && 
-			    (leftOperand.name === "Some" || leftOperand.name === "None")) {
-				return true;
-			}
-
-			// Check if they're both Result types
-			if ((result.name === "Ok" || result.name === "Err") && 
-			    (leftOperand.name === "Ok" || leftOperand.name === "Err")) {
-				return true;
-			}
-
-			// TODO: Add more monad types here as they're implemented
-			// For now, we only support Option and Result
-
-			return false;
+			return getCompatibleMonadInfo(result, leftOperand) !== null;
 		}
 
 		// Apply monadic bind operation directly based on monad type
