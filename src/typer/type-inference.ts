@@ -19,6 +19,8 @@ import {
 	type ConstrainedExpression,
 	type ConstraintExpr,
 	type PipelineExpression,
+	type ConstraintDefinitionExpression,
+	type ImplementDefinitionExpression,
 	type Type,
 	type Constraint,
 	intType,
@@ -49,13 +51,28 @@ import {
 	typeToString,
 	propagateConstraintToTypeVariable,
 } from './helpers';
+import { unify } from './unify';
+import { substitute } from './substitute';
+import { typeExpression } from './expression-dispatcher';
+import { 
+	resolveConstraintVariable, 
+	createConstraintFunctionType,
+	decorateEnvironmentWithConstraintFunctions
+} from './constraint-resolution';
 import { 
 	type TypeState, 
 	type TypeResult, 
 	createPureTypeResult, 
 	createTypeResult, 
 	unionEffects, 
-	emptyEffects 
+	emptyEffects,
+	singleEffect,
+	addConstraintDefinition,
+	addConstraintImplementation,
+	getConstraintSignature,
+	type ConstraintSignature,
+	type ConstraintImplementation,
+	type TypeScheme,
 } from './types';
 import {
 	satisfiesConstraint,
@@ -63,10 +80,7 @@ import {
 	solveConstraints,
 	validateConstraintName,
 } from './constraints';
-import { substitute } from './substitute';
-import { unify } from './unify';
 import { freshTypeVariable, generalize, instantiate, freshenTypeVariables, flattenStatements } from './type-operations';
-import { typeExpression } from './expression-dispatcher';
 
 // Note: Main typeExpression is now in expression-dispatcher.ts
 // This file only contains the individual type inference functions
@@ -817,4 +831,102 @@ export const typeConstrained = (
 
 	// Return the explicit type without constraints applied
 	return createTypeResult(explicitType, inferredResult.effects, currentState);
+};
+
+// Type constraint definition
+export const typeConstraintDefinition = (
+	expr: ConstraintDefinitionExpression,
+	state: TypeState,
+): TypeResult => {
+	const { name, typeParam, functions } = expr;
+	
+	// Create constraint signature
+	const functionMap = new Map<string, Type>();
+	
+	for (const func of functions) {
+		// Type the function signature, substituting the constraint type parameter
+		const funcType = func.type;
+		functionMap.set(func.name, funcType);
+	}
+	
+	const signature: ConstraintSignature = {
+		name,
+		typeParam,
+		functions: functionMap,
+	};
+	
+	// Add to constraint registry
+	addConstraintDefinition(state.constraintRegistry, name, signature);
+	
+	// Constraint definitions have unit type
+	return createPureTypeResult(unitType(), state);
+};
+
+// Type implement definition  
+export const typeImplementDefinition = (
+	expr: ImplementDefinitionExpression,
+	state: TypeState,
+): TypeResult => {
+	const { constraintName, typeName, implementations } = expr;
+	
+	// Check if constraint exists
+	const constraintSig = getConstraintSignature(state.constraintRegistry, constraintName);
+	if (!constraintSig) {
+		throw new Error(`Constraint '${constraintName}' not defined`);
+	}
+	
+	// Type each implementation
+	const implementationMap = new Map<string, TypeScheme>();
+	let currentState = state;
+	let allEffects = emptyEffects();
+	
+	for (const impl of implementations) {
+		// Check if function is required by constraint
+		const requiredType = constraintSig.functions.get(impl.name);
+		if (!requiredType) {
+			throw new Error(`Function '${impl.name}' not required by constraint '${constraintName}'`);
+		}
+		
+		// Type the implementation
+		const implResult = typeExpression(impl.value, currentState);
+		currentState = implResult.state;
+		allEffects = unionEffects(allEffects, implResult.effects);
+		
+		// TODO: Check that implementation type matches required type
+		// For now, we'll trust the implementation
+		
+		// Store in implementation map
+		implementationMap.set(impl.name, {
+			type: implResult.type,
+			quantifiedVars: [], // TODO: compute quantified variables
+			effects: implResult.effects,
+		});
+	}
+	
+	// Check that all required functions are implemented
+	for (const [funcName] of constraintSig.functions) {
+		if (!implementationMap.has(funcName)) {
+			throw new Error(`Missing implementation for '${funcName}' in implementation of '${constraintName}' for '${typeName}'`);
+		}
+	}
+	
+	// Create constraint implementation
+	const implementation: ConstraintImplementation = {
+		functions: implementationMap,
+	};
+	
+	// Add to constraint registry
+	const success = addConstraintImplementation(
+		currentState.constraintRegistry, 
+		constraintName, 
+		typeName, 
+		implementation
+	);
+	
+	if (!success) {
+		throw new Error(`Failed to add implementation of '${constraintName}' for '${typeName}'`);
+	}
+	
+	// Implement definitions have unit type
+	return createTypeResult(unitType(), allEffects, currentState);
 };

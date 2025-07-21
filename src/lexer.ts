@@ -163,6 +163,8 @@ export class Lexer {
       "and",
       "or",
       "implements",
+      "constraint",
+      "implement",
       // Primitive type names
       "Int",
       "Number",

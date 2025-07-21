@@ -587,6 +587,112 @@ describe("Type annotation parsing", () => {
 		expect(result.value.name).toBe("a");
 	});
 
+	// Add comprehensive tests for type constructor application
+	test("parses simple type constructor application", () => {
+		const result = parseType("Option Int");
+		assertParseSuccess(result);
+		expect(result.value.kind).toBe("variant");
+		const variantType = result.value as any;
+		expect(variantType.name).toBe("Option");
+		expect(variantType.args).toHaveLength(1);
+		expect(variantType.args[0].kind).toBe("primitive");
+		expect(variantType.args[0].name).toBe("Int");
+	});
+
+	test("parses type constructor with type variable", () => {
+		const result = parseType("Option a");
+		assertParseSuccess(result);
+		expect(result.value.kind).toBe("variant");
+		const variantType = result.value as any;
+		expect(variantType.name).toBe("Option");
+		expect(variantType.args).toHaveLength(1);
+		expect(variantType.args[0].kind).toBe("variable");
+		expect(variantType.args[0].name).toBe("a");
+	});
+
+	test("parses type constructor with multiple arguments", () => {
+		const result = parseType("Either String Int");
+		assertParseSuccess(result);
+		expect(result.value.kind).toBe("variant");
+		const variantType = result.value as any;
+		expect(variantType.name).toBe("Either");
+		expect(variantType.args).toHaveLength(2);
+		expect(variantType.args[0].kind).toBe("primitive");
+		expect(variantType.args[0].name).toBe("String");
+		expect(variantType.args[1].kind).toBe("primitive");
+		expect(variantType.args[1].name).toBe("Int");
+	});
+
+	test("parses type constructor with mixed type arguments", () => {
+		const result = parseType("Map String a");
+		assertParseSuccess(result);
+		expect(result.value.kind).toBe("variant");
+		const variantType = result.value as any;
+		expect(variantType.name).toBe("Map");
+		expect(variantType.args).toHaveLength(2);
+		expect(variantType.args[0].kind).toBe("primitive");
+		expect(variantType.args[0].name).toBe("String");
+		expect(variantType.args[1].kind).toBe("variable");
+		expect(variantType.args[1].name).toBe("a");
+	});
+
+	test("parses nested type constructor application", () => {
+		const result = parseType("Option (Either String Int)");
+		assertParseSuccess(result);
+		expect(result.value.kind).toBe("variant");
+		const variantType = result.value as any;
+		expect(variantType.name).toBe("Option");
+		expect(variantType.args).toHaveLength(1);
+		expect(variantType.args[0].kind).toBe("variant");
+		expect(variantType.args[0].name).toBe("Either");
+		expect(variantType.args[0].args).toHaveLength(2);
+	});
+
+	test("parses single letter type constructor for constraints", () => {
+		// While the advanced `m a` syntax isn't currently supported,
+		// we should still be able to parse simple type variables for constraints
+		const result = parseType("m");
+		assertParseSuccess(result);
+		expect(result.value.kind).toBe("variable");
+		const varType = result.value as any;
+		expect(varType.name).toBe("m");
+		
+		// TODO: In the future, we should support `m a` syntax:
+		// const advancedResult = parseType("m a");
+		// expect(advancedResult.value.kind).toBe("variant");
+		// expect(advancedResult.value.name).toBe("m");
+		// expect(advancedResult.value.args).toHaveLength(1);
+	});
+
+	test("parses type constructor in function type", () => {
+		const result = parseType("Option a -> Bool");
+		assertParseSuccess(result);
+		expect(result.value.kind).toBe("function");
+		const funcType = result.value as any;
+		expect(funcType.params[0].kind).toBe("variant");
+		expect(funcType.params[0].name).toBe("Option");
+		expect(funcType.params[0].args).toHaveLength(1);
+		expect(funcType.return.kind).toBe("variant");
+		expect(funcType.return.name).toBe("Bool");
+	});
+
+	test("parses constraint function types", () => {
+		// Test simple constraint function
+		const result = parseType("a -> a");
+		assertParseSuccess(result);
+		expect(result.value.kind).toBe("function");
+		const funcType = result.value as any;
+		expect(funcType.params[0].kind).toBe("variable");
+		expect(funcType.params[0].name).toBe("a");
+		expect(funcType.return.kind).toBe("variable");
+		expect(funcType.return.name).toBe("a");
+		
+		// TODO: In the future, we should support more complex constraint functions:
+		// const complexResult = parseType("m a -> (a -> m b) -> m b");
+		// expect(complexResult.value.kind).toBe("function");
+		// This would be the monadic bind signature
+	});
+
 	test("parses nested record type", () => {
 		const result = parseType(
 			"{ person: { name: String, age: Number }, active: Bool }",
@@ -638,7 +744,9 @@ describe("Top-level definitions with type annotations", () => {
 		expect(def.name).toBe("numbers");
 		const typed = assertTypedExpression(def.value);
 		expect(typed.expression.kind).toBe("list");
-		expect(typed.type.kind).toBe("list");
+		expect(typed.type.kind).toBe("list"); // List types have kind "list"
+		expect((typed.type as any).element.kind).toBe("primitive"); // Number is a primitive type  
+		expect((typed.type as any).element.name).toBe("Int"); // Number maps to Int internally
 	});
 
 	test("parses multiple definitions with type annotations", () => {

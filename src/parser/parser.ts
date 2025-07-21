@@ -25,6 +25,7 @@ import {
 	recordType,
 	tupleType,
 	tupleTypeConstructor,
+	variantType,
 	type ConstraintExpr,
 	type TypeDefinitionExpression,
 	type MatchExpression,
@@ -34,6 +35,10 @@ import {
 	type UnitExpression,
 	type RecordExpression,
 	type TupleExpression,
+	type ConstraintDefinitionExpression,
+	type ImplementDefinitionExpression,
+	type ConstraintFunction,
+	type ImplementationFunction,
 } from "../ast";
 import * as C from "./combinators";
 
@@ -70,7 +75,7 @@ const parseTypeName: C.Parser<Token> = (tokens: Token[]) => {
 
 // --- Helper: parse a single type atom (primitive, variable, record, tuple, list) ---
 function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
-  // Try primitive types first
+  // Try primitive types first, but handle List as a parameterizable type constructor
   const primitiveTypes = ["Int", "Number", "String", "Unit"];
   for (const typeName of primitiveTypes) {
     const result = C.keyword(typeName)(tokens);
@@ -99,21 +104,29 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
     }
   }
 
-  // Try type variable
-  if (
-    tokens.length > 0 &&
-    tokens[0].type === "IDENTIFIER" &&
-    /^[a-z]/.test(tokens[0].value)
-  ) {
-    const varResult = C.identifier()(tokens);
-    if (varResult.success) {
+  // Try List as a parameterizable type constructor
+  const listKeywordResult = C.keyword("List")(tokens);
+  if (listKeywordResult.success) {
+    // Try to parse a type argument for List
+    const argResult = C.lazy(() => parseTypeAtom)(listKeywordResult.remaining);
+    if (argResult.success) {
+      // List with specific element type: List Number, List String, etc.
       return {
         success: true as const,
-        value: typeVariable(varResult.value.value),
-        remaining: varResult.remaining,
+        value: listTypeWithElement(argResult.value),
+        remaining: argResult.remaining,
+      };
+    } else {
+      // Just List (generic)
+      return {
+        success: true as const,
+        value: listTypeWithElement(typeVariable("a")),
+        remaining: listKeywordResult.remaining,
       };
     }
   }
+
+
 
   // Try record type
   const recordResult = C.seq(
@@ -207,7 +220,9 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
     };
   }
 
-  // Try user-defined type constructor: TypeName arg1 arg2 ...
+
+
+  // Try uppercase type constructor: TypeName arg1 arg2 ... (preserve original logic)
   if (
     tokens.length > 0 &&
     tokens[0].type === "IDENTIFIER" &&
@@ -233,12 +248,26 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
     }
   }
 
+  // Try type variable or simple identifier
+  if (tokens.length > 0 && tokens[0].type === "IDENTIFIER") {
+    const identifierResult = C.identifier()(tokens);
+    if (identifierResult.success) {
+      return {
+        success: true as const,
+        value: typeVariable(identifierResult.value.value),
+        remaining: identifierResult.remaining,
+      };
+    }
+  }
+
   return {
     success: false,
     error: "Expected type atom",
     position: tokens[0]?.location.start.line || 0,
   };
 }
+
+
 
 // --- Type Expression ---
 // Helper function to parse function types without top-level effects
@@ -1370,6 +1399,74 @@ const parseTypeDefinition: C.Parser<TypeDefinitionExpression> = C.map(
   })
 );
 
+// --- Constraint Function ---
+const parseConstraintFunction: C.Parser<ConstraintFunction> = C.map(
+  C.seq(
+    C.identifier(),
+    C.many(C.identifier()), // type parameters like "a b" in "bind a b"
+    C.punctuation(":"),
+    C.lazy(() => parseTypeExpression)
+  ),
+  ([name, typeParams, colon, type]): ConstraintFunction => ({
+    name: name.value,
+    typeParams: typeParams.map((p: any) => p.value),
+    type,
+    location: createLocation(name.location.start, colon.location.end),
+  })
+);
+
+// --- Constraint Definition ---
+const parseConstraintDefinition: C.Parser<ConstraintDefinitionExpression> = C.map(
+  C.seq(
+    C.keyword("constraint"),
+    C.identifier(), // constraint name like "Monad"
+    C.identifier(), // type parameter like "m"
+    C.punctuation("("),
+    C.sepBy(parseConstraintFunction, C.punctuation(";")),
+    C.punctuation(")")
+  ),
+  ([constraintKeyword, name, typeParam, openParen, functions, closeParen]): ConstraintDefinitionExpression => ({
+    kind: "constraint-definition",
+    name: name.value,
+    typeParam: typeParam.value,
+    functions,
+    location: createLocation(constraintKeyword.location.start, closeParen.location.end),
+  })
+);
+
+// --- Implementation Function ---
+const parseImplementationFunction: C.Parser<ImplementationFunction> = C.map(
+  C.seq(
+    C.identifier(),
+    C.operator("="),
+    C.lazy(() => parseSequenceTerm)
+  ),
+  ([name, equals, value]): ImplementationFunction => ({
+    name: name.value,
+    value,
+    location: createLocation(name.location.start, value.location.end),
+  })
+);
+
+// --- Implement Definition ---
+const parseImplementDefinition: C.Parser<ImplementDefinitionExpression> = C.map(
+  C.seq(
+    C.keyword("implement"),
+    C.identifier(), // constraint name like "Monad"
+    parseTypeName, // type name like "List" or "Int"
+    C.punctuation("("),
+    C.sepBy(parseImplementationFunction, C.punctuation(";")),
+    C.punctuation(")")
+  ),
+  ([implementKeyword, constraintName, typeName, openParen, implementations, closeParen]): ImplementDefinitionExpression => ({
+    kind: "implement-definition",
+    constraintName: constraintName.value,
+    typeName: typeName.value,
+    implementations,
+    location: createLocation(implementKeyword.location.start, closeParen.location.end),
+  })
+);
+
 // --- Pattern Parsing ---
 // Basic pattern parsing for constructor arguments (no nested constructors with args)
 const parseBasicPattern: C.Parser<Pattern> = C.choice(
@@ -1537,12 +1634,14 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
 
 // --- Sequence term: everything else ---
 const parseSequenceTerm: C.Parser<Expression> = C.choice(
-  parseTypeDefinition, // ADT type definitions
+  parseTypeDefinition, // ADT type definitions (keep original high priority)
   parseMatchExpression, // ADT pattern matching
   parseDefinitionWithType, // allow definitions with type annotations
   parseDefinition, // fallback to regular definitions
   parseMutableDefinition,
   parseMutation,
+  parseConstraintDefinition, // constraint definitions (moved after core definitions)
+  parseImplementDefinition, // implement definitions (moved after core definitions)
   parseWhereExpression,
   parseImportExpression,
   parseIfAfterDollar, // if expressions with postfix support
@@ -1554,9 +1653,11 @@ const parseSequenceTerm: C.Parser<Expression> = C.choice(
 
 // Version without records to avoid circular dependency
 const parseSequenceTermExceptRecord: C.Parser<Expression> = C.choice(
-  parseTypeDefinition, // ADT type definitions
+  parseTypeDefinition, // ADT type definitions (keep original high priority)
   parseMatchExpression, // ADT pattern matching
   parseDefinition,
+  parseConstraintDefinition, // constraint definitions (moved after core definitions)
+  parseImplementDefinition, // implement definitions (moved after core definitions)
   parseMutableDefinition,
   parseMutation,
   parseImportExpression,

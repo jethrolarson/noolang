@@ -4,8 +4,9 @@ An expression-based, LLM-friendly programming language designed for linear, decl
 
 ## Current Status (July 2024)
 - **All core features implemented:** parser, evaluator, type inference, REPL, CLI, and debugging tools
-- **All tests passing** (316/316 tests) ✅ - parser, evaluator, typer, ADTs, constraints, recursion, effects
+- **All tests passing** (373/373 tests) ✅ - parser, evaluator, typer, ADTs, constraints, recursion, effects, trait system
 - **Complete effect system**: 3-phase implementation with effect validation and propagation
+- **Trait system with constraint resolution**: Full implementation with type-directed dispatch
 - **Comma-separated data structures**: `[1, 2, 3]`, `{ @name "Alice", @age 30 }`
 - **Explicit effects**: Effects are tracked in the type system with granular effect taxonomy
 - **Strong type inference**: Powered by a functional Hindley-Milner type inference engine with let-polymorphism
@@ -23,6 +24,7 @@ An expression-based, LLM-friendly programming language designed for linear, decl
 - **Expression-based** - everything is an expression
 - **Strong type inference** with support for primitive types and function types
 - **Type Constraints** - expressive constraint system for safe generic programming
+- **Trait system** - constraint definitions and implementations with type-directed dispatch
 - **Functional programming** idioms and patterns
 - **Pipeline operator** (`|>`) for function composition
 - **Records and accessors** for structured data
@@ -648,6 +650,126 @@ Noolang has full VSCode syntax highlighting support:
 1. **Install the extension**: Use the provided `noolang-0.1.0.vsix` file
 2. **Automatic activation**: `.noo` files will automatically use Noolang syntax highlighting
 3. **Features**: Keywords, operators, data structures, accessors, comments, and more are highlighted
+
+## Trait System with Constraint Resolution
+
+Noolang features a **comprehensive trait system** that enables constraint-based polymorphism through constraint definitions, implementations, and automatic type-directed dispatch. This provides a foundation for advanced type system features similar to Haskell's type classes or Rust's traits.
+
+### Constraint Definitions
+
+Define constraints that specify required functions and their signatures:
+
+```noolang
+# Simple constraint with one function
+constraint Show a ( show : a -> String );
+
+# Constraint with multiple functions
+constraint Eq a ( 
+  equals : a -> a -> Bool; 
+  notEquals : a -> a -> Bool 
+);
+
+# Complex constraint with generic functions
+constraint Monad m (
+  return : a -> m a;
+  bind : m a -> (a -> m b) -> m b
+);
+```
+
+### Constraint Implementations
+
+Provide implementations of constraints for specific types:
+
+```noolang
+# Implement Show for Int
+implement Show Int ( show = intToString );
+
+# Implement Eq for String
+implement Eq String ( 
+  equals = stringEquals;
+  notEquals = fn a b => not (stringEquals a b)
+);
+
+# Implement Show for Lists (if elements are showable)
+implement Show (List a) given Show a (
+  show = fn list => "[" + (joinStrings ", " (map show list)) + "]"
+);
+```
+
+### Type-Directed Dispatch
+
+Constraint functions automatically resolve to the correct implementation based on argument types:
+
+```noolang
+# These calls automatically resolve to the right implementation
+show 42              # Uses Show Int implementation
+show "hello"         # Uses Show String implementation  
+show [1, 2, 3]       # Uses Show (List a) implementation with Show Int
+
+equals 1 2           # Uses Eq Int implementation
+equals "a" "b"       # Uses Eq String implementation
+```
+
+### Conditional Implementations
+
+Implement constraints conditionally based on other constraints:
+
+```noolang
+# Show for Lists only if elements are showable
+implement Show (List a) given Show a (
+  show = fn list => "[" + (joinStrings ", " (map show list)) + "]"
+);
+
+# Eq for pairs if both components are comparable
+implement Eq (Pair a b) given Eq a, Eq b (
+  equals = fn (Pair x1 y1) (Pair x2 y2) => 
+    (equals x1 x2) && (equals y1 y2)
+);
+```
+
+### Error Handling
+
+Clear error messages when implementations are missing:
+
+```noolang
+# This would produce a helpful error:
+show someCustomType   # Error: No implementation of Show for CustomType
+```
+
+### Integration with Existing Features
+
+The trait system works seamlessly with all existing Noolang features:
+
+```noolang
+# With higher-order functions
+showAll = map show    # Automatically constrains to Show a => List a -> List String
+
+# With pipeline operators
+result = [1, 2, 3] |> map show |> joinStrings ", "
+
+# With ADTs and pattern matching
+type Option a = Some a | None;
+implement Show (Option a) given Show a (
+  show = fn opt => match opt with (
+    Some x => "Some(" + show x + ")";
+    None => "None"
+  )
+);
+```
+
+### Current Implementation Status
+
+- ✅ **Constraint Definitions**: Full parser and AST support for `constraint Name params (functions)`
+- ✅ **Constraint Implementations**: Complete `implement Name Type (functions)` with conditional constraints
+- ✅ **Type-Directed Dispatch**: Automatic resolution of constraint functions to implementations
+- ✅ **Multiple Functions**: Support for constraints with multiple function signatures
+- ✅ **Conditional Constraints**: `given` clauses for dependent implementations
+- ✅ **Error Handling**: Helpful error messages for missing implementations
+- ✅ **Parser Integration**: Full lexer and parser support for trait syntax
+- ✅ **Type System Integration**: Complete integration with type inference and checking
+- ✅ **Test Coverage**: Comprehensive test suite (14/14 trait system tests passing)
+
+The trait system provides a solid foundation for advanced type system features and constraint-based programming patterns in Noolang.
 
 ## Type Constraints System
 

@@ -32,8 +32,83 @@ import {
 import { satisfiesConstraint } from './constraints';
 import { substitute } from './substitute';
 import { unify } from './unify';
-import { freshTypeVariable } from './type-operations';
+import { freshTypeVariable, instantiate } from './type-operations';
 import { typeExpression } from './expression-dispatcher';
+import { 
+	tryResolveConstraintFunction, 
+	generateConstraintError,
+	decorateEnvironmentWithConstraintFunctions 
+} from './constraint-resolution';
+
+// Helper function to continue function application with a specialized constraint function
+function continueWithSpecializedFunction(
+	expr: ApplicationExpression,
+	specializedFuncType: Type,
+	argTypes: Type[],
+	allEffects: Set<import('../ast').Effect>,
+	state: TypeState
+): TypeResult {
+	let currentState = state;
+	
+	if (specializedFuncType.kind !== 'function') {
+		throwTypeError(
+			location => nonFunctionApplicationError(specializedFuncType, location),
+			getExprLocation(expr)
+		);
+	}
+
+	const funcType = specializedFuncType;
+
+	// Check argument count
+	if (argTypes.length > funcType.params.length) {
+		throwTypeError(
+			location =>
+				functionApplicationError(
+					funcType.params[funcType.params.length - 1],
+					argTypes[funcType.params.length - 1],
+					funcType.params.length - 1,
+					undefined,
+					location
+				),
+			getExprLocation(expr)
+		);
+	}
+
+	// Unify each argument with the corresponding parameter type
+	for (let i = 0; i < argTypes.length; i++) {
+		currentState = unify(
+			funcType.params[i],
+			argTypes[i],
+			currentState,
+			getExprLocation(expr),
+			{
+				reason: 'constraint_function_application',
+				operation: `applying argument ${i + 1}`,
+				hint: `Argument ${i + 1} has type ${typeToString(
+					argTypes[i],
+					currentState.substitution
+				)} but the constraint function expects ${typeToString(
+					funcType.params[i],
+					currentState.substitution
+				)}.`,
+			}
+		);
+	}
+
+	// Determine the result type
+	let resultType = funcType.return;
+	
+	// If not all arguments were provided, create a partial application
+	if (argTypes.length < funcType.params.length) {
+		const remainingParams = funcType.params.slice(argTypes.length);
+		resultType = functionType(remainingParams, funcType.return, funcType.effects);
+	}
+
+	// Merge effects from function type and arguments
+	const finalEffects = unionEffects(allEffects, funcType.effects);
+
+	return createTypeResult(resultType, finalEffects, currentState);
+}
 
 // Comprehensive constraint validation
 export const validateConstraints = (
@@ -116,6 +191,69 @@ export const typeApplication = (
 		argTypes.push(argResult.type);
 		currentState = argResult.state;
 		allEffects = unionEffects(allEffects, argResult.effects);
+	}
+
+	// Check if this is a constraint function call that needs resolution
+	// ONLY apply to functions that are explicitly defined in constraints
+	if (expr.func.kind === 'variable' && currentState.constraintRegistry.size > 0) {
+		// Only check constraint resolution if the function is explicitly in a constraint
+		let isDefinedInConstraint = false;
+		for (const [, constraintInfo] of currentState.constraintRegistry) {
+			if (constraintInfo.signature.functions.has(expr.func.name)) {
+				isDefinedInConstraint = true;
+				break;
+			}
+		}
+		
+		// ONLY apply constraint resolution to explicitly defined constraint functions
+		// This excludes ADT constructors like Point, Rectangle, etc.
+		if (isDefinedInConstraint) {
+			const constraintResolution = tryResolveConstraintFunction(
+				expr.func.name,
+				expr.args,
+				argTypes,
+				currentState
+			);
+			
+			if (constraintResolution.resolved && constraintResolution.specializedName) {
+				// This is a constraint function call with a concrete resolution
+				// Look up the specialized function in the environment
+				const decoratedState = decorateEnvironmentWithConstraintFunctions(currentState);
+				const specializedScheme = decoratedState.environment.get(constraintResolution.specializedName);
+				
+				if (specializedScheme) {
+					// Use the specialized implementation
+					const [instantiatedType, newState] = instantiate(specializedScheme, decoratedState);
+					
+					// The specialized function should match the call pattern
+					if (instantiatedType.kind === 'function') {
+						// Continue with normal function application using the specialized type
+						const specializedFuncType = instantiatedType;
+						// Replace funcType with specializedFuncType for the rest of the function
+						return continueWithSpecializedFunction(
+							expr, 
+							specializedFuncType, 
+							argTypes, 
+							allEffects, 
+							newState
+						);
+					}
+				} else {
+					// Could not resolve - generate helpful error
+					const firstArgType = argTypes.length > 0 ? substitute(argTypes[0], currentState.substitution) : null;
+					if (firstArgType && firstArgType.kind !== 'variable') {
+						// We have a concrete type but no implementation
+						const errorMessage = generateConstraintError(
+							expr.func.name, // This should be parsed differently, but for now using function name
+							expr.func.name,
+							firstArgType,
+							currentState
+						);
+						throw new Error(errorMessage);
+					}
+				}
+			}
+		}
 	}
 
 	// Handle function application by checking if funcType is a function
