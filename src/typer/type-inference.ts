@@ -466,14 +466,14 @@ export const typeBinary = (
 		let currentState = state;
 		let finalType = null;
 		let allEffects = emptyEffects();
-		
+
 		for (const statement of statements) {
 			const result = typeExpression(statement, currentState);
 			currentState = result.state;
 			finalType = result.type;
 			allEffects = unionEffects(allEffects, result.effects);
 		}
-		
+
 		return createTypeResult(finalType || unitType(), allEffects, currentState);
 	}
 
@@ -497,10 +497,10 @@ export const typeBinary = (
 			);
 		}
 
-		// Check that the function can take the left value as an argument
-		if (rightResult.type.params.length !== 1) {
+		// Check that the function can take the left value as its first argument
+		if (rightResult.type.params.length < 1) {
 			throw new Error(
-				`Thrush operator requires function with exactly one parameter, got ${rightResult.type.params.length}`
+				`Thrush operator requires function with at least one parameter, got ${rightResult.type.params.length}`
 			);
 		}
 
@@ -511,8 +511,29 @@ export const typeBinary = (
 			getExprLocation(expr)
 		);
 
-		// Return the function's return type
-		return createTypeResult(rightResult.type.return, unionEffects(leftResult.effects, rightResult.effects), currentState);
+		// Return the function's return type (which may be a partially applied function)
+		return createTypeResult(
+			rightResult.type.return,
+			unionEffects(leftResult.effects, rightResult.effects),
+			currentState
+		);
+	}
+
+	// Special handling for dollar operator ($) - low precedence function application
+	if (expr.operator === '$') {
+		// Dollar: a $ b means a(b) - apply left function to right value
+		// Delegate to the same logic as regular function application
+		const { typeApplication } = require('./function-application');
+		
+		// Create a synthetic ApplicationExpression for a $ b
+		const syntheticApp: import('../ast').ApplicationExpression = {
+			kind: 'application',
+			func: expr.left,
+			args: [expr.right],
+			location: expr.location
+		};
+		
+		return typeApplication(syntheticApp, currentState);
 	}
 
 	// Get operator type from environment
@@ -562,7 +583,11 @@ export const typeBinary = (
 		currentState
 	);
 
-	return createTypeResult(finalResultType, unionEffects(leftResult.effects, rightResult.effects), finalResultState);
+	return createTypeResult(
+		finalResultType,
+		unionEffects(leftResult.effects, rightResult.effects),
+		finalResultState
+	);
 };
 
 // Type inference for mutable definitions
