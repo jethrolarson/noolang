@@ -10,6 +10,10 @@ on:
       - 'test/repl*.test.ts'
       - 'scripts/test-repl-automation.ts'
       - 'benchmarks/**'
+      - 'jest.config*.js'
+      - 'package.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/repl-tests.yml'
   pull_request:
     branches: [ main ]
     paths:
@@ -19,6 +23,10 @@ on:
       - 'test/repl*.test.ts'
       - 'scripts/test-repl-automation.ts'
       - 'benchmarks/**'
+      - 'jest.config*.js'
+      - 'package.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/repl-tests.yml'
 
 jobs:
   fast-tests:
