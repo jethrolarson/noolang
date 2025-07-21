@@ -1379,7 +1379,7 @@ const parseConstraintFunction: C.Parser<ConstraintFunction> = C.map(
   C.seq(
     C.identifier(),
     C.many(C.identifier()), // type parameters like "a b" in "bind a b"
-    C.operator(":"),
+    C.punctuation(":"),
     C.lazy(() => parseTypeExpression)
   ),
   ([name, typeParams, colon, type]): ConstraintFunction => ({
@@ -1428,7 +1428,7 @@ const parseImplementDefinition: C.Parser<ImplementDefinitionExpression> = C.map(
   C.seq(
     C.keyword("implement"),
     C.identifier(), // constraint name like "Monad"
-    C.identifier(), // type name like "List"
+    parseTypeName, // type name like "List" or "Int"
     C.punctuation("("),
     C.sepBy(parseImplementationFunction, C.punctuation(";")),
     C.punctuation(")")
