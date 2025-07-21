@@ -1,8 +1,8 @@
-import { Evaluator, Value } from '../src/evaluator';
-import { Lexer } from '../src/lexer';
-import { parse } from '../src/parser/parser';
-import { typeAndDecorate, typeProgram } from '../src/typer';
-import { typeToString } from '../src/typer/helpers';
+import { Evaluator, Value } from '../../../src/evaluator';
+import { Lexer } from '../../../src/lexer';
+import { parse } from '../../../src/parser/parser';
+import { typeAndDecorate, typeProgram } from '../../../src/typer';
+import { typeToString } from '../../../src/typer/helpers';
 
 function unwrapValue(val: Value): any {
 	if (val === null) return null;

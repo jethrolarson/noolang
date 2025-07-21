@@ -1,8 +1,8 @@
-import { Lexer } from '../src/lexer';
-import { parse } from '../src/parser/parser';
-import { typeAndDecorate } from '../src/typer';
-import { createTypeState } from '../src/typer/type-operations';
-import { initializeBuiltins } from '../src/typer/builtins';
+import { Lexer } from '../../src/lexer';
+import { parse } from '../../src/parser/parser';
+import { typeAndDecorate } from '../../src/typer';
+import { createTypeState } from '../../src/typer/type-operations';
+import { initializeBuiltins } from '../../src/typer/builtins';
 
 describe('Polymorphic Function Type Pollution', () => {
 	test('print should remain polymorphic between uses', () => {

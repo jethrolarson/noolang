@@ -1,5 +1,5 @@
-import { Lexer } from '../src/lexer';
-import * as C from '../src/parser/combinators';
+import { Lexer } from '../../src/lexer';
+import * as C from '../../src/parser/combinators';
 
 describe('Parser Combinators', () => {
 	// Helper function to create tokens for testing

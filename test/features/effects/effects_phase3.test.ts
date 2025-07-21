@@ -1,10 +1,10 @@
 // Phase 3 Effects System Tests
 // Testing effect validation, propagation, and built-in effectful functions
 
-import { Lexer } from '../src/lexer';
-import { parse } from '../src/parser/parser';
-import { typeProgram } from '../src/typer';
-import type { Effect } from '../src/ast';
+import { Lexer } from '../../../src/lexer';
+import { parse } from '../../../src/parser/parser';
+import { typeProgram } from '../../../src/typer';
+import type { Effect } from '../../../src/ast';
 
 const runNoolang = (code: string) => {
 	const lexer = new Lexer(code);

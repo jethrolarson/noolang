@@ -1,6 +1,6 @@
-import { Evaluator, Value } from '../src/evaluator';
-import { parse } from '../src/parser/parser';
-import { Lexer } from '../src/lexer';
+import { Evaluator, Value } from '../../src/evaluator';
+import { parse } from '../../src/parser/parser';
+import { Lexer } from '../../src/lexer';
 
 function unwrapValue(val: Value): any {
 	if (val === null) return null;

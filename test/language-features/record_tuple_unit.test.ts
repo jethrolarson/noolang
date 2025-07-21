@@ -1,5 +1,5 @@
-import { Lexer } from '../src/lexer';
-import { parse } from '../src/parser/parser';
+import { Lexer } from '../../src/lexer';
+import { parse } from '../../src/parser/parser';
 
 describe('Records, Tuples, and Unit', () => {
 	function parseNoo(src: string) {

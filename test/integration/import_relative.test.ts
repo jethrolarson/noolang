@@ -1,6 +1,6 @@
-import { Lexer } from '../src/lexer';
-import { parse } from '../src/parser/parser';
-import { Evaluator } from '../src/evaluator';
+import { Lexer } from '../../src/lexer';
+import { parse } from '../../src/parser/parser';
+import { Evaluator } from '../../src/evaluator';
 
 describe('File-relative imports', () => {
 	const mockFs = {
