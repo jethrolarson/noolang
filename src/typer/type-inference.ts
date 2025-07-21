@@ -90,6 +90,20 @@ export const typeVariableExpr = (
 ): TypeResult => {
 	const scheme = state.environment.get(expr.name);
 	if (!scheme) {
+		// Check if this is a constraint function before throwing error
+		const { resolveConstraintVariable, createConstraintFunctionType } = require('./constraint-resolution');
+		const constraintResult = resolveConstraintVariable(expr.name, state);
+		
+		if (constraintResult.resolved && constraintResult.needsResolution) {
+			// This is a constraint function - create its type
+			const constraintType = createConstraintFunctionType(
+				constraintResult.constraintName!,
+				constraintResult.functionName!,
+				state
+			);
+			return createPureTypeResult(constraintType, state);
+		}
+		
 		throwTypeError(
 			location => undefinedVariableError(expr.name, location),
 			getExprLocation(expr)
