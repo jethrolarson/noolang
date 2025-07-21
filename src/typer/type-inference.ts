@@ -522,33 +522,18 @@ export const typeBinary = (
 	// Special handling for dollar operator ($) - low precedence function application
 	if (expr.operator === '$') {
 		// Dollar: a $ b means a(b) - apply left function to right value
-		if (leftResult.type.kind !== 'function') {
-			throwTypeError(
-				location => nonFunctionApplicationError(leftResult.type, location),
-				getExprLocation(expr)
-			);
-		}
-
-		// Check that the function can take the right value as its first argument
-		if (leftResult.type.params.length < 1) {
-			throw new Error(
-				`Dollar operator requires function with at least one parameter, got ${leftResult.type.params.length}`
-			);
-		}
-
-		currentState = unify(
-			leftResult.type.params[0],
-			rightResult.type,
-			currentState,
-			getExprLocation(expr)
-		);
-
-		// Return the function's return type (which may be a partially applied function)
-		return createTypeResult(
-			leftResult.type.return,
-			unionEffects(leftResult.effects, rightResult.effects),
-			currentState
-		);
+		// Delegate to the same logic as regular function application
+		const { typeApplication } = require('./function-application');
+		
+		// Create a synthetic ApplicationExpression for a $ b
+		const syntheticApp: import('../ast').ApplicationExpression = {
+			kind: 'application',
+			func: expr.left,
+			args: [expr.right],
+			location: expr.location
+		};
+		
+		return typeApplication(syntheticApp, currentState);
 	}
 
 	// Get operator type from environment
