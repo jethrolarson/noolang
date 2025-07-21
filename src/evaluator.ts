@@ -1768,80 +1768,111 @@ export class Evaluator {
 			}
 		}
 
-		// Apply monadic bind using constraint system
+		// Apply monadic bind using TypeScript-implemented constraint system
 		private applyMonadicBindViaConstraints(monad: Value, func: Value): Value {
-			// Look up bind function from constraint system
-			// For now, fall back to the simple bind function until full constraint resolution is implemented
-			let bindFunction = this.environment.get("bind");
-			
-			if (!bindFunction) {
-				throw new Error(
-					"Safe thrush operator (|?) requires 'bind' function. Make sure Monad constraint is implemented."
-				);
+			// Use TypeScript-implemented monadic bind that supports multiple monad types
+			return this.performMonadicBind(monad, func);
+		}
+
+		// TypeScript implementation of monadic bind supporting multiple monads
+		private performMonadicBind(monad: Value, func: Value): Value {
+			// Check if monad is a constructor (all supported monads are constructors)
+			if (!isConstructor(monad)) {
+				throw new Error(`Safe thrush operator (|?) can only be used with monadic values, got ${valueToString(monad)}`);
 			}
 
-			// Handle cells (mutable references)
-			if (isCell(bindFunction)) bindFunction = bindFunction.value;
+			// Determine monad type and apply appropriate bind logic
+			const monadType = this.getMonadType(monad);
+			
+			switch (monadType) {
+				case "Option":
+					return this.bindOption(monad, func);
+				case "Result":
+					return this.bindResult(monad, func);
+				default:
+					throw new Error(`Safe thrush operator (|?) does not support monad type '${monad.name}'. Supported types: Option, Result`);
+			}
+		}
 
-			// Create a wrapper function that intelligently handles return types
-			const wrappedFunction = createFunction((x: Value) => {
-				let result: Value;
-				if (isFunction(func)) {
-					result = func.fn(x);
-				} else if (isNativeFunction(func)) {
-					result = func.fn(x);
-				} else {
-					throw new Error(`Cannot apply non-function in safe thrush: ${valueToString(func)}`);
-				}
+		// Determine what monad type a value belongs to
+		private getMonadType(value: Value): string | null {
+			if (!isConstructor(value)) return null;
+			
+			if (value.name === "Some" || value.name === "None") {
+				return "Option";
+			} else if (value.name === "Ok" || value.name === "Err") {
+				return "Result";
+			}
+			
+			return null;
+		}
 
-				// Check if result is already a monad (any constructor value)
-				// This is a generic check that works for any monad type
-				if (isConstructor(result)) {
-					return result; // Already monadic, return as-is
-				} else {
-					// Regular value, need to wrap it
-					// Look up return function for this monad type
-					let returnFunction = this.environment.get("return");
-					if (!returnFunction) {
-						throw new Error("Safe thrush operator (|?) requires 'return' function for wrapping values.");
-					}
-					if (isCell(returnFunction)) returnFunction = returnFunction.value;
-					
-					if (isFunction(returnFunction)) {
-						return returnFunction.fn(result);
-					} else if (isNativeFunction(returnFunction)) {
-						return returnFunction.fn(result);
-					} else {
-						throw new Error(`'return' is not a function: ${valueToString(returnFunction)}`);
-					}
-				}
-			});
+		// Option monad bind implementation
+		private bindOption(option: Value, func: Value): Value {
+			if (!isConstructor(option)) {
+				throw new Error("bindOption expects a constructor value");
+			}
 
-			// Apply bind with the wrapped function
-			if (isFunction(bindFunction)) {
-				const bindPartiallyApplied = bindFunction.fn(monad);
-				if (isFunction(bindPartiallyApplied)) {
-					return bindPartiallyApplied.fn(wrappedFunction);
-				} else {
-					throw new Error(
-						`bind function did not return a function after first application: ${valueToString(bindPartiallyApplied)}`
-					);
+			if (option.name === "Some") {
+				// Extract the value and apply the function
+				if (option.args.length !== 1) {
+					throw new Error(`Some constructor should have exactly one argument, got ${option.args.length}`);
 				}
-			} else if (isNativeFunction(bindFunction)) {
-				const bindPartiallyApplied = bindFunction.fn(monad);
-				if (isFunction(bindPartiallyApplied)) {
-					return bindPartiallyApplied.fn(wrappedFunction);
-				} else if (isNativeFunction(bindPartiallyApplied)) {
-					return bindPartiallyApplied.fn(wrappedFunction);
+				const value = option.args[0];
+				const result = this.applyFunction(func, value);
+
+				// If result is already an Option, return as-is (monadic bind behavior)
+				if (isConstructor(result) && (result.name === "Some" || result.name === "None")) {
+					return result;
 				} else {
-					throw new Error(
-						`bind function did not return a function after first application: ${valueToString(bindPartiallyApplied)}`
-					);
+					// Wrap regular value in Some
+					return createConstructor("Some", [result]);
 				}
+			} else if (option.name === "None") {
+				// Short-circuit: None |? f = None
+				return option;
 			} else {
-				throw new Error(
-					`'bind' is not a function: ${valueToString(bindFunction)}`
-				);
+				throw new Error(`bindOption expects Some or None, got ${option.name}`);
+			}
+		}
+
+		// Result monad bind implementation
+		private bindResult(result: Value, func: Value): Value {
+			if (!isConstructor(result)) {
+				throw new Error("bindResult expects a constructor value");
+			}
+
+			if (result.name === "Ok") {
+				// Extract the value and apply the function
+				if (result.args.length !== 1) {
+					throw new Error(`Ok constructor should have exactly one argument, got ${result.args.length}`);
+				}
+				const value = result.args[0];
+				const functionResult = this.applyFunction(func, value);
+
+				// If result is already a Result, return as-is (monadic bind behavior)
+				if (isConstructor(functionResult) && (functionResult.name === "Ok" || functionResult.name === "Err")) {
+					return functionResult;
+				} else {
+					// Wrap regular value in Ok
+					return createConstructor("Ok", [functionResult]);
+				}
+			} else if (result.name === "Err") {
+				// Short-circuit: Err e |? f = Err e
+				return result;
+			} else {
+				throw new Error(`bindResult expects Ok or Err, got ${result.name}`);
+			}
+		}
+
+		// Helper method to apply a function to a value
+		private applyFunction(func: Value, value: Value): Value {
+			if (isFunction(func)) {
+				return func.fn(value);
+			} else if (isNativeFunction(func)) {
+				return func.fn(value);
+			} else {
+				throw new Error(`Expected function, got ${valueToString(func)}`);
 			}
 		}
 	}

@@ -43,28 +43,12 @@ compose = fn f g => fn x => f (g x);
 # MONAD CONSTRAINT AND IMPLEMENTATIONS  
 # ========================================
 
-# Bind helper for Option types
-bind_option = fn opt f => match opt with (
+# Bind and return functions for Option types (as before)
+bind = fn opt f => match opt with (
   Some value => f value;
   None => None
 );
 
-# Bind helper for Result types  
-bind_result = fn res f => match res with (
-  Ok value => f value;
-  Err error => Err error
-);
-
-# Generic bind that dispatches to the right helper
-# This is a temporary solution until we have proper constraint resolution
-bind = fn m f => 
-  if (isSome m) then (bind_option m f)
-  else if (isNone m) then (bind_option m f)  
-  else if (isOk m) then (bind_result m f)
-  else if (isErr m) then (bind_result m f)
-  else m; # fallback for unknown types
-
-# Return function - defaults to Option for now
 return = fn x => Some x;
 
 # ========================================
