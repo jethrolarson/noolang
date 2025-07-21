@@ -110,32 +110,7 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
     }
   }
 
-  // Try type application (any identifier can potentially be applied to arguments)
-  if (tokens.length > 0 && tokens[0].type === "IDENTIFIER") {
-    const identifierResult = C.identifier()(tokens);
-    if (identifierResult.success) {
-      const name = identifierResult.value.value;
-      
-      // Try to parse type arguments
-      const argsResult = C.many(C.lazy(() => parseTypeAtom))(identifierResult.remaining);
-      
-      if (argsResult.success && argsResult.value.length > 0) {
-        // Type application: identifier applied to arguments
-        return {
-          success: true as const,
-          value: variantType(name, argsResult.value),
-          remaining: argsResult.remaining,
-        };
-      } else {
-        // Just a type variable or nullary type constructor
-        return {
-          success: true as const,
-          value: typeVariable(name),
-          remaining: identifierResult.remaining,
-        };
-      }
-    }
-  }
+
 
   // Try record type
   const recordResult = C.seq(
@@ -229,7 +204,9 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
     };
   }
 
-  // Try user-defined type constructor: TypeName arg1 arg2 ...
+
+
+  // Try uppercase type constructor: TypeName arg1 arg2 ... (preserve original logic)
   if (
     tokens.length > 0 &&
     tokens[0].type === "IDENTIFIER" &&
@@ -252,6 +229,18 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
           remaining: argsResult.remaining,
         };
       }
+    }
+  }
+
+  // Try type variable or simple identifier
+  if (tokens.length > 0 && tokens[0].type === "IDENTIFIER") {
+    const identifierResult = C.identifier()(tokens);
+    if (identifierResult.success) {
+      return {
+        success: true as const,
+        value: typeVariable(identifierResult.value.value),
+        remaining: identifierResult.remaining,
+      };
     }
   }
 
