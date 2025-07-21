@@ -1579,6 +1579,24 @@ const parsePattern: C.Parser<Pattern> = C.choice(
 			location: underscore.location,
 		})
 	),
+	// Literal pattern: number
+	C.map(
+		C.number(),
+		(num): Pattern => ({
+			kind: 'literal',
+			value: parseInt(num.value),
+			location: num.location,
+		})
+	),
+	// Literal pattern: string
+	C.map(
+		C.string(),
+		(str): Pattern => ({
+			kind: 'literal',
+			value: str.value,
+			location: str.location,
+		})
+	),
 	// Constructor pattern with arguments: Some x y
 	C.map(
 		C.seq(C.identifier(), C.many1(parseBasicPattern)),

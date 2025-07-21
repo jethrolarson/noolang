@@ -393,12 +393,25 @@ describe('Evaluator', () => {
 			expect(unwrapValue(result.finalResult)).toBe(6); // gcd(48, 18) = 6
 		});
 
+		/**
+		 * EVALUATOR PERFORMANCE LIMITATION - CAN BE OPTIMIZED
+		 * 
+		 * This test fails due to excessive JavaScript stack frame usage.
+		 * Each Noolang recursive call creates ~6 JavaScript stack frames:
+		 * evaluateApplication + withNewEnvironment + arrow function + 
+		 * evaluateExpression + evaluateIf + recursive call
+		 * 
+		 * PROBLEM: 1000 Noolang calls = ~6000 JS frames, exceeding typical 
+		 * stack limits (~10k frames).
+		 * 
+		 * POSSIBLE SOLUTIONS:
+		 * 1. Implement trampoline-style evaluation
+		 * 2. Reduce stack frame usage per call
+		 * 3. Add tail call optimization
+		 * 
+		 * STATUS: Can be fixed with evaluator optimization work.
+		 */
 		test.skip('should handle deep recursion without stack overflow', () => {
-			// TODO: This test currently fails due to excessive JavaScript stack frame usage.
-			// Each Noolang recursive call creates ~6 JavaScript stack frames:
-			// evaluateApplication + withNewEnvironment + arrow function + evaluateExpression + evaluateIf + recursive call
-			// So 1000 Noolang calls = ~6000 JS frames, exceeding typical stack limits (~10k frames).
-			// The evaluator needs optimization to reduce stack frame usage per call.
 			const code = `
         countDown = fn n => if n == 0 then 0 else countDown (n - 1);
         countDown 1000
