@@ -106,19 +106,6 @@ export const typeVariableExpr = (
 	expr: VariableExpression,
 	state: TypeState
 ): TypeResult => {
-	// First check if this is a constraint function
-	const constraintResolution = resolveConstraintVariable(expr.name, state);
-	
-	if (constraintResolution.resolved && constraintResolution.needsResolution) {
-		// This is a constraint function - return its type for later resolution
-		const constraintType = createConstraintFunctionType(
-			constraintResolution.constraintName!,
-			constraintResolution.functionName!,
-			state
-		);
-		return createPureTypeResult(constraintType, state);
-	}
-	
 	const scheme = state.environment.get(expr.name);
 	if (!scheme) {
 		throwTypeError(

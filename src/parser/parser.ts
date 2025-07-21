@@ -1634,14 +1634,14 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
 
 // --- Sequence term: everything else ---
 const parseSequenceTerm: C.Parser<Expression> = C.choice(
-  parseConstraintDefinition, // constraint definitions
-  parseImplementDefinition, // implement definitions
-  parseTypeDefinition, // ADT type definitions
+  parseTypeDefinition, // ADT type definitions (keep original high priority)
   parseMatchExpression, // ADT pattern matching
   parseDefinitionWithType, // allow definitions with type annotations
   parseDefinition, // fallback to regular definitions
   parseMutableDefinition,
   parseMutation,
+  parseConstraintDefinition, // constraint definitions (moved after core definitions)
+  parseImplementDefinition, // implement definitions (moved after core definitions)
   parseWhereExpression,
   parseImportExpression,
   parseIfAfterDollar, // if expressions with postfix support
@@ -1653,11 +1653,11 @@ const parseSequenceTerm: C.Parser<Expression> = C.choice(
 
 // Version without records to avoid circular dependency
 const parseSequenceTermExceptRecord: C.Parser<Expression> = C.choice(
-  parseConstraintDefinition, // constraint definitions
-  parseImplementDefinition, // implement definitions
-  parseTypeDefinition, // ADT type definitions
+  parseTypeDefinition, // ADT type definitions (keep original high priority)
   parseMatchExpression, // ADT pattern matching
   parseDefinition,
+  parseConstraintDefinition, // constraint definitions (moved after core definitions)
+  parseImplementDefinition, // implement definitions (moved after core definitions)
   parseMutableDefinition,
   parseMutation,
   parseImportExpression,
