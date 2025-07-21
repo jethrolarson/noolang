@@ -1,40 +1,20 @@
 # Noolang
 
-An expression-based, LLM-friendly programming language designed for linear, declarative code with explicit effects and strong type inference.
-
-## Current Status (July 2024)
-- **All core features implemented:** parser, evaluator, type inference, REPL, CLI, and debugging tools
-- **All tests passing** (555+ tests) ✅ - parser, evaluator, typer, ADTs, constraints, recursion, effects, trait system
-- **Complete effect system**: 3-phase implementation with effect validation and propagation
-- **Trait system with constraint resolution**: Full implementation with type-directed dispatch and top-level support
-- **Comma-separated data structures**: `[1, 2, 3]`, `{ @name "Alice", @age 30 }`
-- **Explicit effects**: Effects are tracked in the type system with granular effect taxonomy
-- **Strong type inference**: Powered by a functional Hindley-Milner type inference engine with let-polymorphism
-- **Type Constraints**: Full constraint system with automatic propagation and validation (9 built-in constraints)
-- **Algebraic Data Types**: Complete ADT implementation with type definitions, constructors, and pattern matching
-- **Recursion**: Full support for recursive functions with proper closure handling and type checking
-- **REPL and CLI**: Feature colorized output and advanced debugging commands (tokens, AST, types, environment, etc.)
-- **Robust error handling and debugging**: All foundational issues resolved
-- **VSCode syntax highlighting**: Full support for `.noo` files
-- **Performance optimized**: 30% improvement with comprehensive benchmarking system
+An functional, expression-based, LLM-friendly programming language designed for linear, declarative code with explicit effects and strong type inference.
 
 ## Features
-
-- **Whitespace-significant syntax** (like Python, but more rigorous)
 - **Expression-based** - everything is an expression
-- **Strong type inference** with support for primitive types and function types
+- **Strong type inference** 
 - **Type Constraints** - expressive constraint system for safe generic programming
 - **Trait system** - constraint definitions and implementations with type-directed dispatch
 - **Functional programming** idioms and patterns
-- **Pipeline operator** (`|>`) for function composition
-- **Records and accessors** for structured data
-- **Built-in primitives**: Int, String, Bool, List, Record, Unit
+- **Convenient operators for piping and composition** `|>` and `<|` for function composition and `|` to pipe values into partially applied functions. 
+- **Composable accessors for Records** for immutably reading and writing structured data.
 - **REPL** for interactive development with comprehensive debugging tools
-- **Unambiguous syntax** - comma-separated data structures prevent parsing traps
 - **Explicit effects**: Effects are tracked in the type system and visible in function types
-- **Recursion**: Full support for recursive functions with proper closure handling
-- **Mutation**: Local mutation with `mut` and `mut!` syntax
+- **Explicit Mutation**: mutable variables require special handling and can only be mutated lexically to increase safety.
 - **Algebraic Data Types (ADTs)**: Complete implementation with type definitions, constructors, pattern matching, and built-in Option/Result types
+
 
 ## Installation
 
@@ -111,7 +91,7 @@ The REPL includes comprehensive debugging tools:
 .ast-json (expr)         # Show AST as JSON
 ```
 
-**Note**: Commands use `.` prefix and parentheses `(expr)` for expressions to avoid conflicts with future type annotations.
+**Note**: REPL Commands use `.` prefix and parentheses `(expr)` for expressions to avoid conflicts with future type annotations.
 
 ### Examples
 
@@ -119,11 +99,33 @@ The REPL includes comprehensive debugging tools:
 # Function definition
 add = fn x y => x + y
 
-# Function application
+# Function application doesn't require parens and `,` is only used for separating items in data structures like `Tuple`, `Record` and `List`
 add 2 3
 
-# Pipeline operator
-[1, 2, 3] |> head
+# all functions are curried so if you pass less than their full number of arguments you get back a partially applied function
+increment = add 1;
+increment 2 #=> 3 : Int
+
+# to nest calls you may need parenthesis
+add 2 (add 3 2)
+
+# strictly speaking you never pass more than one argument
+add 1 2 
+# is actually 
+((add 1) 2)
+# in javascript this could be seen as `const add = x => y => x + y; add(1)(2);`
+
+# because nesting can get confusing fast noolang includes a few helpful opperators for reducing the need for parens such as the `|` operator:
+2 | add 3 | add 2
+
+[1, 2, 3] | map (add 1) # => [2, 3, 4]
+
+# the $ operator acts like a weak function application operator allowing you to often skip parens on the right hand expression:
+[1, 2, 3] | map $ add 1
+
+# can be written as
+
+
 
 # Conditional expressions
 if True then 1 else 2
@@ -161,12 +163,13 @@ x = match point with (Point x y => x)
 
 ### Program Structure
 
-**Files are single statements**: Each Noolang file contains exactly one top-level expression or statement.
+**Files are single expression**: Each Noolang file contains exactly one top-level expression. However...
 
-**Semicolon (`;`) is an expression separator, not a terminator**:
+**Semicolon (`;`) is an expression sequencer, not a terminator**:
 - Left side expression is evaluated and discarded
 - Right side expression is evaluated and returned
 - This allows for sequencing operations while only returning the final result
+- This is the most commonly used for defining variables but can also be used to sequence effects
 - **Program Evaluation**: When evaluating a program with multiple statements, only the result of the final statement is returned
 
 ```noolang
