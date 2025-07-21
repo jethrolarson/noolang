@@ -64,6 +64,10 @@ import {
 } from './types';
 import { validateConstraintName } from './constraints';
 import { freshTypeVariable, generalize, instantiate, freshenTypeVariables, flattenStatements } from './type-operations';
+import { 
+	tryResolveConstraintFunction,
+	decorateEnvironmentWithConstraintFunctions
+} from './constraint-resolution';
 
 // Note: Main typeExpression is now in expression-dispatcher.ts
 // This file only contains the individual type inference functions
@@ -537,10 +541,10 @@ export const typeBinary = (
 		return typeApplication(syntheticApp, currentState);
 	}
 
-	// Special handling for safe thrush operator (|?) - monadic bind via constraints
+	// Special handling for safe thrush operator (|?) - desugar to bind call
 	if (expr.operator === '|?') {
-		// Safe thrush: a |? b desugars to: bind a b
-		// This uses constraint resolution to find the appropriate bind implementation
+		// Safe thrush: a |? f desugars to: bind a f
+		// Transform this into a function application and let constraint resolution handle it
 		
 		if (rightResult.type.kind !== 'function') {
 			throwTypeError(
@@ -556,40 +560,64 @@ export const typeBinary = (
 			);
 		}
 
-		// For proper constraint-based implementation, we would:
-		// 1. Check that leftResult.type implements Monad
-		// 2. Resolve the bind function for that type
-		// 3. Type it as: bind : m a -> (a -> m b) -> m b
-		
-		// For now, implement specific handling for Option type
-		if (leftResult.type.kind === 'variant' && leftResult.type.name === 'Option' && leftResult.type.args.length === 1) {
-			const innerType = leftResult.type.args[0];
+		// Try constraint resolution first, fall back to direct implementation
+		try {
+			// Create a synthetic function application: bind(left)(right)
+			const { typeApplication } = require('./function-application');
 			
-			// Unify the function parameter with the inner type
-			currentState = unify(
-				rightResult.type.params[0],
-				innerType,
-				currentState,
-				getExprLocation(expr)
-			);
+			const bindVar: import('../ast').VariableExpression = {
+				kind: 'variable',
+				name: 'bind',
+				location: expr.location
+			};
+			
+			const syntheticApp: import('../ast').ApplicationExpression = {
+				kind: 'application',
+				func: bindVar,
+				args: [expr.left, expr.right],
+				location: expr.location
+			};
+			
+			// This will trigger constraint resolution for 'bind'
+			return typeApplication(syntheticApp, currentState);
+		} catch (error) {
+			// If constraint resolution fails, fall back to direct implementation for known monads
+			if (leftResult.type.kind === 'variant' && leftResult.type.args.length >= 1) {
+				const monadName = leftResult.type.name;
+				const innerType = leftResult.type.args[0];
+				
+				if (monadName === 'Option' || monadName === 'Result') {
+					// Unify the function parameter with the inner type
+					currentState = unify(
+						rightResult.type.params[0],
+						innerType,
+						currentState,
+						getExprLocation(expr)
+					);
 
-			// The result type is always Option of the function's return type
-			// This follows monadic bind semantics where bind flattens nested monads
-			let resultType: Type;
-			if (rightResult.type.return.kind === 'variant' && rightResult.type.return.name === 'Option') {
-				// Function returns Option T -> result is Option T (bind flattens)
-				resultType = rightResult.type.return;
-			} else {
-				// Function returns T -> result is Option T (wrapped)
-				resultType = variantType('Option', [rightResult.type.return]);
+					// The result type follows monadic bind semantics
+					let resultType: Type;
+					if (rightResult.type.return.kind === 'variant' && rightResult.type.return.name === monadName) {
+						// Function returns same monad type -> bind flattens
+						resultType = rightResult.type.return;
+					} else {
+						// Function returns T -> wrap in the monad
+						if (monadName === 'Option') {
+							resultType = variantType('Option', [rightResult.type.return]);
+						} else if (monadName === 'Result' && leftResult.type.args.length === 2) {
+							// Preserve error type for Result
+							resultType = variantType('Result', [rightResult.type.return, leftResult.type.args[1]]);
+						} else {
+							resultType = variantType(monadName, [rightResult.type.return]);
+						}
+					}
+					
+					return createTypeResult(resultType, unionEffects(leftResult.effects, rightResult.effects), currentState);
+				}
 			}
 			
-			return createTypeResult(resultType, unionEffects(leftResult.effects, rightResult.effects), currentState);
-		} else {
-			// TODO: Implement full constraint resolution for other monadic types
-			throw new Error(
-				`Safe thrush operator (|?) currently only supports Option types, got ${typeToString(leftResult.type, currentState.substitution)}`
-			);
+			// Re-throw the original error if we can't handle it
+			throw error;
 		}
 	}
 
@@ -916,7 +944,7 @@ export const typeConstraintDefinition = (
 	expr: ConstraintDefinitionExpression,
 	state: TypeState,
 ): TypeResult => {
-	const { name, typeParam, functions } = expr;
+	const { name, typeParams, functions } = expr;
 	
 	// Create constraint signature
 	const functionMap = new Map<string, Type>();
@@ -929,7 +957,7 @@ export const typeConstraintDefinition = (
 	
 	const signature: ConstraintSignature = {
 		name,
-		typeParam,
+		typeParams,
 		functions: functionMap,
 	};
 	
@@ -945,7 +973,18 @@ export const typeImplementDefinition = (
 	expr: ImplementDefinitionExpression,
 	state: TypeState,
 ): TypeResult => {
-	const { constraintName, typeName, implementations } = expr;
+	const { constraintName, typeExpr, implementations } = expr;
+	
+	// Extract type name from type expression for simple cases
+	let typeName: string;
+	if (typeExpr.kind === 'primitive') {
+		typeName = typeExpr.name;
+	} else if (typeExpr.kind === 'variable') {
+		typeName = typeExpr.name;
+	} else {
+		// For now, throw error for complex type expressions - we'll improve this later
+		throw new Error(`Complex type expressions in implement definitions not yet supported: ${JSON.stringify(typeExpr)}`);
+	}
 	
 	// Check if constraint exists
 	const constraintSig = getConstraintSignature(state.constraintRegistry, constraintName);
@@ -1008,3 +1047,4 @@ export const typeImplementDefinition = (
 	// Implement definitions have unit type
 	return createTypeResult(unitType(), allEffects, currentState);
 };
+

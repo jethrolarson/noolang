@@ -12,7 +12,7 @@ export type ADTRegistry = Map<
 // Constraint system types for trait support
 export type ConstraintSignature = {
 	name: string;
-	typeParam: string;
+	typeParams: string[];
 	functions: Map<string, Type>; // function name -> type signature
 };
 

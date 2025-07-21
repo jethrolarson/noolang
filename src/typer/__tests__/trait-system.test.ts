@@ -20,7 +20,7 @@ describe('Trait System Infrastructure', () => {
     
     const showSignature: ConstraintSignature = {
       name: 'Show',
-      typeParam: 'a',
+      typeParams: ['a'],
       functions: new Map([
         ['show', functionType([intType()], stringType())]
       ])
@@ -33,7 +33,7 @@ describe('Trait System Infrastructure', () => {
     
     const constraint = registry.get('Show');
     expect(constraint?.signature.name).toBe('Show');
-    expect(constraint?.signature.typeParam).toBe('a');
+    expect(constraint?.signature.typeParams).toEqual(['a']);
     expect(constraint?.implementations.size).toBe(0);
   });
 
@@ -43,7 +43,7 @@ describe('Trait System Infrastructure', () => {
     // Add constraint definition first
     const showSignature: ConstraintSignature = {
       name: 'Show',
-      typeParam: 'a', 
+      typeParams: ['a'], 
       functions: new Map([
         ['show', functionType([intType()], stringType())]
       ])
@@ -94,7 +94,7 @@ describe('Trait System Infrastructure', () => {
     // Set up constraint
     const showSignature: ConstraintSignature = {
       name: 'Show',
-      typeParam: 'a',
+      typeParams: ['a'],
       functions: new Map([
         ['show', functionType([intType()], stringType())]
       ])
@@ -132,7 +132,7 @@ describe('Trait System Infrastructure', () => {
     
     const showSignature: ConstraintSignature = {
       name: 'Show',
-      typeParam: 'a',
+      typeParams: ['a'],
       functions: new Map([
         ['show', functionType([intType()], stringType())]
       ])
@@ -143,7 +143,7 @@ describe('Trait System Infrastructure', () => {
     
     expect(retrieved).toBeTruthy();
     expect(retrieved?.name).toBe('Show');
-    expect(retrieved?.typeParam).toBe('a');
+    expect(retrieved?.typeParams).toEqual(['a']);
     expect(retrieved?.functions.get('show')).toEqual(functionType([intType()], stringType()));
   });
 
@@ -153,7 +153,7 @@ describe('Trait System Infrastructure', () => {
     // Define Monad constraint
     const monadSignature: ConstraintSignature = {
       name: 'Monad',
-      typeParam: 'm',
+      typeParams: ['m'],
       functions: new Map([
         ['bind', functionType([
           listTypeWithElement(intType()), 

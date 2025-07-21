@@ -21,7 +21,7 @@ describe('Constraint Resolution', () => {
     // Add Show constraint
     const showSignature: ConstraintSignature = {
       name: 'Show',
-      typeParam: 'a',
+      typeParams: ['a'],
       functions: new Map([
         ['show', functionType([intType()], stringType())]
       ])
@@ -60,7 +60,7 @@ describe('Constraint Resolution', () => {
     // Add Show constraint
     const showSignature: ConstraintSignature = {
       name: 'Show',
-      typeParam: 'a',
+      typeParams: ['a'],
       functions: new Map([
         ['show', functionType([intType()], stringType())]
       ])
@@ -82,7 +82,7 @@ describe('Constraint Resolution', () => {
     // Add Show constraint
     const showSignature: ConstraintSignature = {
       name: 'Show',
-      typeParam: 'a',
+      typeParams: ['a'],
       functions: new Map([
         ['show', functionType([intType()], stringType())]
       ])
@@ -106,7 +106,7 @@ describe('Constraint Resolution', () => {
     // Add Show constraint and implementation
     const showSignature: ConstraintSignature = {
       name: 'Show',
-      typeParam: 'a',
+      typeParams: ['a'],
       functions: new Map([
         ['show', functionType([intType()], stringType())]
       ])
@@ -142,7 +142,7 @@ describe('Constraint Resolution', () => {
     // Add Show constraint
     const showSignature: ConstraintSignature = {
       name: 'Show',
-      typeParam: 'a',
+      typeParams: ['a'],
       functions: new Map([
         ['show', functionType([intType()], stringType())]
       ])
@@ -152,7 +152,7 @@ describe('Constraint Resolution', () => {
     // Add Eq constraint
     const eqSignature: ConstraintSignature = {
       name: 'Eq',
-      typeParam: 'a',
+      typeParams: ['a'],
       functions: new Map([
         ['equals', functionType([intType(), intType()], stringType())]
       ])
@@ -199,7 +199,7 @@ describe('Constraint Resolution', () => {
     // Add Show constraint but no implementation
     const showSignature: ConstraintSignature = {
       name: 'Show',
-      typeParam: 'a',
+      typeParams: ['a'],
       functions: new Map([
         ['show', functionType([intType()], stringType())]
       ])

@@ -38,6 +38,8 @@ export type Value =
 	| { tag: "constructor"; name: string; args: Value[] }
 	| { tag: "unit" };
 
+
+
 // --- Mutable Cell type ---
 export type Cell = { cell: true; value: Value };
 export const isCell = (val: any): val is Cell =>
@@ -1247,96 +1249,50 @@ export class Evaluator {
 					);
 				}
 			} else if (expr.operator === "|?") {
-				// Handle safe thrush operator - smart monadic application
-				// For functions that return monads: a |? f becomes bind a f
-				// For functions that return regular values: a |? f becomes bind a (fn x => return (f x))
+				// The |? operator should be desugared to a bind call by the type checker
+				// However, if constraint resolution failed, we might still see |? here
+				// Fall back to calling the stdlib bind function directly
 				const left = this.evaluateExpression(expr.left);
 				const right = this.evaluateExpression(expr.right);
 
-				// Look up bind and return functions
-				let bindFunction = this.environment.get("bind");
-				let returnFunction = this.environment.get("return");
-
-				if (!bindFunction) {
-					throw new Error(
-						"Safe thrush operator (|?) requires 'bind' function. Make sure Monad constraint is implemented."
-					);
-				}
-				if (!returnFunction) {
-					throw new Error(
-						"Safe thrush operator (|?) requires 'return' function. Make sure Monad constraint is implemented."
-					);
-				}
-
-				// Handle cells (mutable references)
-				if (isCell(bindFunction)) bindFunction = bindFunction.value;
-				if (isCell(returnFunction)) returnFunction = returnFunction.value;
-
-				// First apply the function to see what it returns
-				let appliedResult: Value;
-				if (isFunction(right)) {
-					// Temporarily apply to a dummy value to check return type structure
-					// This is a heuristic - in practice we apply to the real value
-				} else if (isNativeFunction(right)) {
-					// Same for native functions
-				} else {
+				// Check that right operand is a function
+				if (!isFunction(right) && !isNativeFunction(right)) {
 					throw new Error(
 						`Cannot apply non-function in safe thrush: ${valueToString(right)}`
 					);
 				}
 
-				// Create a wrapper function that handles both cases
-				const wrappedFunction = createFunction((x: Value) => {
-					let result: Value;
-					if (isFunction(right)) {
-						result = right.fn(x);
-					} else if (isNativeFunction(right)) {
-						result = right.fn(x);
-					} else {
-						throw new Error(`Cannot apply non-function in safe thrush: ${valueToString(right)}`);
+				// Try to call the stdlib bind function directly as fallback
+				let bindFunction = this.environment.get('bind');
+				if (bindFunction) {
+					// Handle Cell wrapper
+					if (isCell(bindFunction)) {
+						bindFunction = bindFunction.value;
 					}
-
-					// Check if result is already an Option (Some or None)
-					if (isConstructor(result) && (result.name === "Some" || result.name === "None")) {
-						return result; // Already monadic, return as-is
-					} else {
-						// Regular value, wrap in return (Some)
-						if (isFunction(returnFunction)) {
-							return returnFunction.fn(result);
-						} else if (isNativeFunction(returnFunction)) {
-							return returnFunction.fn(result);
-						} else {
-							throw new Error(`'return' is not a function: ${valueToString(returnFunction)}`);
+					
+					if (isFunction(bindFunction)) {
+						const partiallyApplied = bindFunction.fn(left);
+						if (isFunction(partiallyApplied)) {
+							const result = partiallyApplied.fn(right);
+							// Check if result needs to be wrapped in the monad
+							return this.ensureMonadicResult(result, left);
+						} else if (isNativeFunction(partiallyApplied)) {
+							const result = partiallyApplied.fn(right);
+							return this.ensureMonadicResult(result, left);
+						}
+					} else if (isNativeFunction(bindFunction)) {
+						const partiallyApplied = bindFunction.fn(left);
+						if (isFunction(partiallyApplied)) {
+							const result = partiallyApplied.fn(right);
+							return this.ensureMonadicResult(result, left);
+						} else if (isNativeFunction(partiallyApplied)) {
+							const result = partiallyApplied.fn(right);
+							return this.ensureMonadicResult(result, left);
 						}
 					}
-				});
-
-				// Apply bind with the wrapped function
-				if (isFunction(bindFunction)) {
-					const bindPartiallyApplied = bindFunction.fn(left);
-					if (isFunction(bindPartiallyApplied)) {
-						return bindPartiallyApplied.fn(wrappedFunction);
-					} else {
-						throw new Error(
-							`bind function did not return a function after first application: ${valueToString(bindPartiallyApplied)}`
-						);
-					}
-				} else if (isNativeFunction(bindFunction)) {
-					const bindPartiallyApplied = bindFunction.fn(left);
-					if (isFunction(bindPartiallyApplied)) {
-						return bindPartiallyApplied.fn(wrappedFunction);
-					} else if (isNativeFunction(bindPartiallyApplied)) {
-						return bindPartiallyApplied.fn(wrappedFunction);
-					} else {
-						throw new Error(
-							`bind function did not return a function after first application: ${valueToString(bindPartiallyApplied)}`
-						);
-					}
-				} else {
-					throw new Error(
-						`'bind' is not a function: ${valueToString(bindFunction)}`
-					);
 				}
+				
+				throw new Error("Safe thrush operator (|?) failed: no bind function available");
 			} else if (expr.operator === "$") {
 				// Handle dollar operator (low precedence function application)
 				const left = this.evaluateExpression(expr.left);
@@ -1842,6 +1798,31 @@ export class Evaluator {
 					);
 			}
 		}
+
+		// Helper to ensure the result is properly wrapped in the same monad type as the input
+		private ensureMonadicResult(result: Value, originalMonad: Value): Value {
+			if (!isConstructor(originalMonad)) {
+				return result;
+			}
+
+			// If result is already a constructor (likely already wrapped), return as-is
+			if (isConstructor(result)) {
+				return result;
+			}
+
+			// Otherwise, wrap the result in the same monad type
+			if (originalMonad.name === "Some" || originalMonad.name === "None") {
+				// Option monad: wrap in Some
+				return createConstructor("Some", [result]);
+			} else if (originalMonad.name === "Ok" || originalMonad.name === "Err") {
+				// Result monad: wrap in Ok
+				return createConstructor("Ok", [result]);
+			}
+
+			// For other types, just return the result unwrapped
+			return result;
+		}
+
 	}
 
 // Move valueToString to a standalone function
