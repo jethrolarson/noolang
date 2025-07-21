@@ -20,7 +20,7 @@ describe("Top-level Constraint and Implement Definitions", () => {
     
     const constraintDef = result.program.statements[0] as any;
     expect(constraintDef.name).toBe("Show");
-    expect(constraintDef.typeParam).toBe("a");
+    expect(constraintDef.typeParams).toEqual(["a"]);
     expect(constraintDef.functions).toHaveLength(1);
     expect(constraintDef.functions[0].name).toBe("show");
   });
@@ -46,7 +46,7 @@ describe("Top-level Constraint and Implement Definitions", () => {
     
     const implementDef = binaryExpr.right;
     expect(implementDef.constraintName).toBe("Show");
-    expect(implementDef.typeName).toBe("Int");
+    expect((implementDef.typeExpr as any).name).toBe("Int");
     expect(implementDef.implementations).toHaveLength(1);
     expect(implementDef.implementations[0].name).toBe("show");
   });

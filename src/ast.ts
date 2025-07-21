@@ -341,7 +341,7 @@ export interface MatchExpression {
 export interface ConstraintDefinitionExpression {
 	kind: 'constraint-definition';
 	name: string;
-	typeParam: string;
+	typeParams: string[]; // Changed from single typeParam to array to support "m a"
 	functions: ConstraintFunction[];
 	type?: Type;
 	location: Location;
@@ -358,7 +358,7 @@ export interface ConstraintFunction {
 export interface ImplementDefinitionExpression {
 	kind: 'implement-definition';
 	constraintName: string;
-	typeName: string;
+	typeExpr: Type; // Changed from typeName to support type applications like (Result e)
 	implementations: ImplementationFunction[];
 	type?: Type;
 	location: Location;

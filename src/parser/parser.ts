@@ -1432,15 +1432,15 @@ const parseConstraintDefinition: C.Parser<ConstraintDefinitionExpression> = C.ma
   C.seq(
     C.keyword("constraint"),
     C.identifier(), // constraint name like "Monad"
-    C.identifier(), // type parameter like "m"
+    C.many1(C.identifier()), // type parameters like "m" or "m a"
     C.punctuation("("),
     C.sepBy(parseConstraintFunction, C.punctuation(";")),
     C.punctuation(")")
   ),
-  ([constraintKeyword, name, typeParam, openParen, functions, closeParen]): ConstraintDefinitionExpression => ({
+  ([constraintKeyword, name, typeParams, openParen, functions, closeParen]): ConstraintDefinitionExpression => ({
     kind: "constraint-definition",
     name: name.value,
-    typeParam: typeParam.value,
+    typeParams: typeParams.map((p: any) => p.value),
     functions,
     location: createLocation(constraintKeyword.location.start, closeParen.location.end),
   })
@@ -1465,15 +1465,15 @@ const parseImplementDefinition: C.Parser<ImplementDefinitionExpression> = C.map(
   C.seq(
     C.keyword("implement"),
     C.identifier(), // constraint name like "Monad"
-    parseTypeName, // type name like "List" or "Int"
+    C.lazy(() => parseTypeExpression), // type expression like "Option" or "(Result e)"
     C.punctuation("("),
     C.sepBy(parseImplementationFunction, C.punctuation(";")),
     C.punctuation(")")
   ),
-  ([implementKeyword, constraintName, typeName, openParen, implementations, closeParen]): ImplementDefinitionExpression => ({
+  ([implementKeyword, constraintName, typeExpr, openParen, implementations, closeParen]): ImplementDefinitionExpression => ({
     kind: "implement-definition",
     constraintName: constraintName.value,
-    typeName: typeName.value,
+    typeExpr,
     implementations,
     location: createLocation(implementKeyword.location.start, closeParen.location.end),
   })

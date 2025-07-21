@@ -877,7 +877,7 @@ describe("Constraint Definitions and Implementations", () => {
 		expect(program.statements).toHaveLength(1);
 		const constraintDef = assertConstraintDefinitionExpression(program.statements[0]);
 		expect(constraintDef.name).toBe("Monad");
-		expect(constraintDef.typeParam).toBe("m");
+		    expect(constraintDef.typeParams).toEqual(["m"]);
 		expect(constraintDef.functions).toHaveLength(2);
 		expect(constraintDef.functions[0].name).toBe("return");
 		expect(constraintDef.functions[1].name).toBe("bind");
@@ -890,7 +890,8 @@ describe("Constraint Definitions and Implementations", () => {
 		expect(program.statements).toHaveLength(1);
 		const implDef = assertImplementDefinitionExpression(program.statements[0]);
 		expect(implDef.constraintName).toBe("Monad");
-		expect(implDef.typeName).toBe("Option");
+		    expect(implDef.typeExpr.kind).toBe("variable");
+    expect((implDef.typeExpr as any).name).toBe("Option");
 		expect(implDef.implementations).toHaveLength(2);
 		expect(implDef.implementations[0].name).toBe("return");
 		expect(implDef.implementations[1].name).toBe("bind");
@@ -903,10 +904,23 @@ describe("Constraint Definitions and Implementations", () => {
 		expect(program.statements).toHaveLength(1);
 		const constraintDef = assertConstraintDefinitionExpression(program.statements[0]);
 		expect(constraintDef.name).toBe("Eq");
-		expect(constraintDef.typeParam).toBe("a");
+		    expect(constraintDef.typeParams).toEqual(["a"]);
 		expect(constraintDef.functions).toHaveLength(1);
 		expect(constraintDef.functions[0].name).toBe("eq");
 		expect(constraintDef.functions[0].typeParams).toEqual(["a"]);
+	});
+
+	test.skip("should parse constraint definition with multiple type parameters", () => {
+		// TODO: Skipped same as above constraint definition test
+		const lexer = new Lexer("constraint Monad m a ( bind : m a -> (a -> m b) -> m b; return : a -> m a )");
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+
+		expect(program.statements).toHaveLength(1);
+		const constraintDef = assertConstraintDefinitionExpression(program.statements[0]);
+		expect(constraintDef.name).toBe("Monad");
+		expect(constraintDef.typeParams).toEqual(["m", "a"]);
+		expect(constraintDef.functions).toHaveLength(2);
 	});
 });
 

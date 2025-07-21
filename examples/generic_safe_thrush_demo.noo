@@ -1,0 +1,81 @@
+# Generic Safe Thrush Operator (|?) Demo
+# Demonstrates that |? now works with both Option and Result types
+
+print "=== Generic Safe Thrush Operator Demo ===";
+
+# Helper functions
+add_ten = fn x => x + 10;
+multiply_two = fn x => x * 2;
+
+# ========================================
+# OPTION TYPE USAGE (existing functionality)
+# ========================================
+
+print "\n--- Option Type Examples ---";
+
+# Basic Option usage
+Some 5 |? add_ten |> print; # Some 15
+None |? add_ten |> print;   # None
+
+# Option monadic bind
+safe_divide_option = fn x => if x == 0 then None else Some (100 / x);
+Some 10 |? safe_divide_option |> print; # Some 10
+Some 0 |? safe_divide_option |> print;  # None
+
+# ========================================
+# RESULT TYPE USAGE (new functionality!)
+# ========================================
+
+print "\n--- Result Type Examples ---";
+
+# Basic Result usage  
+Ok 5 |? add_ten |> print;     # Ok 15
+Err "error" |? add_ten |> print; # Err "error"
+
+# Result monadic bind
+safe_divide_result = fn x => if x == 0 then Err "Division by zero" else Ok (100 / x);
+Ok 10 |? safe_divide_result |> print; # Ok 10
+Ok 0 |? safe_divide_result |> print;  # Err "Division by zero"
+
+# ========================================
+# CHAINING OPERATIONS
+# ========================================
+
+print "\n--- Chaining Operations ---";
+
+# Option chaining
+Some 5 |? add_ten |? multiply_two |> print; # Some 30
+None |? add_ten |? multiply_two |> print;   # None
+
+# Result chaining
+Ok 5 |? add_ten |? multiply_two |> print;         # Ok 30
+Err "failed" |? add_ten |? multiply_two |> print; # Err "failed"
+
+# ========================================
+# MIXED MONADIC/REGULAR FUNCTIONS
+# ========================================
+
+print "\n--- Mixed Function Types ---";
+
+# Mix regular and monadic functions with Options
+Some 10 |? add_ten |? safe_divide_option |> print; # Some 5 (100/20)
+
+# Mix regular and monadic functions with Results
+Ok 10 |? add_ten |? safe_divide_result |> print; # Ok 5 (100/20)
+
+# ========================================
+# COMPLEX PIPELINE EXAMPLE
+# ========================================
+
+print "\n--- Complex Pipeline ---";
+
+# A function that can fail
+parse_positive_int = fn x => if x > 0 then Ok x else Err "Must be positive";
+
+# Chain: start with Ok value -> add 10 -> ensure positive -> multiply by 2 -> divide
+Ok 5 |? add_ten |? parse_positive_int |? multiply_two |? safe_divide_result |> print; # Ok 3 (100/30)
+
+# Same chain but starting with an error
+Err "invalid input" |? add_ten |? parse_positive_int |? multiply_two |? safe_divide_result |> print; # Err "invalid input"
+
+print "\n=== Demo Complete! ===";
