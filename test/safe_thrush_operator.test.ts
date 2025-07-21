@@ -113,7 +113,11 @@ describe("Safe Thrush Operator (|?)", () => {
         Some 5 |? wrap_in_some
       `);
       // Should be Some 6, not Some (Some 6)
-      expect(result).toEqual({ tag: "constructor", name: "Some", args: [{ tag: "number", value: 6 }] });
+      expect(result).toEqual({
+        tag: "constructor",
+        name: "Some", 
+        args: [{ tag: "number", value: 6 }]
+      });
     });
   });
 
@@ -146,7 +150,11 @@ describe("Safe Thrush Operator (|?)", () => {
         safe_divide = fn x => if x == 0 then None else Some (100 / x);
         Some 10 |? add_ten |? safe_divide
       `);
-      expect(result).toEqual({ tag: "constructor", name: "Some", args: [{ tag: "number", value: 5 }] });
+      expect(result).toEqual({
+        tag: "constructor",
+        name: "Some", 
+        args: [{ tag: "number", value: 5 }]
+      });
     });
   });
 
