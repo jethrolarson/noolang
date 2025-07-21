@@ -1186,29 +1186,36 @@ const parseThrush: C.Parser<Expression> = (tokens) => {
   return parsePostfixFromResult(thrushResult.value, thrushResult.remaining);
 };
 
-// --- Dollar ($) - Low precedence function application ---
+// --- Dollar ($) - Low precedence function application (right-associative) ---
 const parseDollar: C.Parser<Expression> = (tokens) => {
-  const dollarResult = C.map(
-    C.seq(parseThrush, C.many(C.seq(C.operator("$"), parseThrush))),
-    ([left, rest]) => {
-      let result = left;
-      for (const [op, right] of rest) {
-        result = {
-          kind: "binary",
-          operator: "$",
-          left: result,
-          right,
-          location: result.location,
-        };
-      }
-      return result;
-    }
-  )(tokens);
-
-  if (!dollarResult.success) return dollarResult;
-
-  // Apply postfix operators (type annotations) to the result
-  return parsePostfixFromResult(dollarResult.value, dollarResult.remaining);
+  const leftResult = parseThrush(tokens);
+  if (!leftResult.success) return leftResult;
+  
+  // Check for $ operator
+  if (leftResult.remaining.length > 0 && 
+      leftResult.remaining[0].type === "OPERATOR" && 
+      leftResult.remaining[0].value === "$") {
+    
+    // Consume the $ token
+    const remaining = leftResult.remaining.slice(1);
+    
+    // Recursively parse the right side (this creates right-associativity)
+    const rightResult = parseDollar(remaining);
+    if (!rightResult.success) return rightResult;
+    
+    const result = {
+      kind: "binary" as const,
+      operator: "$" as const,
+      left: leftResult.value,
+      right: rightResult.value,
+      location: leftResult.value.location,
+    };
+    
+    return parsePostfixFromResult(result, rightResult.remaining);
+  }
+  
+  // No $ operator found, just return the left expression
+  return parsePostfixFromResult(leftResult.value, leftResult.remaining);
 };
 
 // --- If Expression (after dollar, before sequence) ---

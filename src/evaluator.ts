@@ -1226,13 +1226,13 @@ export class Evaluator {
 		}
 
 		private evaluateBinary(expr: BinaryExpression): Value {
-			if (expr.operator === ";") {
+			if (expr.operator === ';') {
 				// Handle semicolon operator (sequence)
 				// Evaluate left expression and discard result
 				this.evaluateExpression(expr.left);
 				// Evaluate and return right expression
 				return this.evaluateExpression(expr.right);
-			} else if (expr.operator === "|") {
+			} else if (expr.operator === '|') {
 				// Handle thrush operator
 				const left = this.evaluateExpression(expr.left);
 				const right = this.evaluateExpression(expr.right);
@@ -1243,24 +1243,10 @@ export class Evaluator {
 					return right.fn(left);
 				} else {
 					throw new Error(
-						`Cannot apply non-function in thrush: ${valueToString(right)}`,
+						`Cannot apply non-function in thrush: ${valueToString(right)}`
 					);
 				}
-			} else if (expr.operator === "$") {
-				// Handle dollar operator (low precedence function application)
-				const left = this.evaluateExpression(expr.left);
-				const right = this.evaluateExpression(expr.right);
-
-				if (isFunction(left)) {
-					return left.fn(right);
-				} else if (isNativeFunction(left)) {
-					return left.fn(right);
-				} else {
-					throw new Error(
-						`Cannot apply non-function in dollar operator: ${valueToString(left)}`,
-					);
-				}
-			} else if (expr.operator === "|>") {
+			} else if (expr.operator === '|>') {
 				// Handle pipeline operator (left-to-right composition)
 				const left = this.evaluateExpression(expr.left);
 				const right = this.evaluateExpression(expr.right);
@@ -1280,11 +1266,11 @@ export class Evaluator {
 				} else {
 					throw new Error(
 						`Cannot compose non-functions in pipeline: ${valueToString(
-							left,
-						)} and ${valueToString(right)}`,
+							left
+						)} and ${valueToString(right)}`
 					);
 				}
-			} else if (expr.operator === "<|") {
+			} else if (expr.operator === '<|') {
 				// Handle right-to-left composition operator
 				const left = this.evaluateExpression(expr.left);
 				const right = this.evaluateExpression(expr.right);
@@ -1298,32 +1284,35 @@ export class Evaluator {
 				} else {
 					throw new Error(
 						`Cannot compose non-functions: ${valueToString(
-							left,
-						)} and ${valueToString(right)}`,
+							left
+						)} and ${valueToString(right)}`
 					);
 				}
-			}
+			} else {
+				// Handle other binary operators (arithmetic, comparison, etc.)
+				const left = this.evaluateExpression(expr.left);
+				const right = this.evaluateExpression(expr.right);
+				const leftVal = isCell(left) ? left.value : left;
+				const rightVal = isCell(right) ? right.value : right;
 
-			const left = this.evaluateExpression(expr.left);
-			const right = this.evaluateExpression(expr.right);
-			const leftVal = isCell(left) ? left.value : left;
-			const rightVal = isCell(right) ? right.value : right;
-
-			const operator = this.environment.get(expr.operator);
-			const operatorVal = isCell(operator) ? operator.value : operator;
-			if (operatorVal && isNativeFunction(operatorVal)) {
-				const fn: any = operatorVal.fn(leftVal);
-				if (typeof fn === "function") {
-					return fn(rightVal);
-				} else if (isFunction(fn)) {
-					return fn.fn(rightVal);
-				} else if (isNativeFunction(fn)) {
-					return fn.fn(rightVal);
+				const operator = this.environment.get(expr.operator);
+				const operatorVal = isCell(operator) ? operator.value : operator;
+				if (operatorVal && isNativeFunction(operatorVal)) {
+					const fn: any = operatorVal.fn(leftVal);
+					if (typeof fn === 'function') {
+						return fn(rightVal);
+					} else if (isFunction(fn)) {
+						return fn.fn(rightVal);
+					} else if (isNativeFunction(fn)) {
+						return fn.fn(rightVal);
+					}
+					throw new Error(
+						`Operator ${expr.operator} did not return a function`
+					);
 				}
-				throw new Error(`Operator ${expr.operator} did not return a function`);
-			}
 
-			throw new Error(`Unknown operator: ${expr.operator}`);
+				throw new Error(`Unknown operator: ${expr.operator}`);
+			}
 		}
 
 		private evaluateIf(expr: IfExpression): Value {
