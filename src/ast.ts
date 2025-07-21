@@ -1,224 +1,233 @@
 // AST types for Noolang
 
 export type Position = {
-  line: number;
-  column: number;
+	line: number;
+	column: number;
 };
 
 export type Location = {
-  start: Position;
-  end: Position;
+	start: Position;
+	end: Position;
 };
 
 // Type system
-export type Effect = "log" | "read" | "write" | "state" | "time" | "rand" | "ffi" | "async";
+export type Effect =
+	| 'log'
+	| 'read'
+	| 'write'
+	| 'state'
+	| 'time'
+	| 'rand'
+	| 'ffi'
+	| 'async';
 
 // Type constraints for constrained polymorphism
 export type Constraint =
-  | { kind: "is"; typeVar: string; constraint: string } // a is Collection
-  | { kind: "hasField"; typeVar: string; field: string; fieldType: Type } // a has field "length" of type Int
-  | { kind: "implements"; typeVar: string; interfaceName: string } // a implements Show
-  | { kind: "custom"; typeVar: string; constraint: string; args: Type[] }; // a satisfies MyConstraint T1 T2
+	| { kind: 'is'; typeVar: string; constraint: string } // a is Collection
+	| { kind: 'hasField'; typeVar: string; field: string; fieldType: Type } // a has field "length" of type Int
+	| { kind: 'implements'; typeVar: string; interfaceName: string } // a implements Show
+	| { kind: 'custom'; typeVar: string; constraint: string; args: Type[] }; // a satisfies MyConstraint T1 T2
 
 export type ConstraintExpr =
-  | Constraint
-  | { kind: "and"; left: ConstraintExpr; right: ConstraintExpr }
-  | { kind: "or"; left: ConstraintExpr; right: ConstraintExpr }
-  | { kind: "paren"; expr: ConstraintExpr };
+	| Constraint
+	| { kind: 'and'; left: ConstraintExpr; right: ConstraintExpr }
+	| { kind: 'or'; left: ConstraintExpr; right: ConstraintExpr }
+	| { kind: 'paren'; expr: ConstraintExpr };
 
 // Extracted type definitions
 export type PrimitiveType = {
-  kind: "primitive";
-  name: "Int" | "String" | "Bool" | "List";
+	kind: 'primitive';
+	name: 'Int' | 'String' | 'Bool' | 'List';
 };
 
 export type FunctionType = {
-  kind: "function";
-  params: Type[];
-  return: Type;
-  effects: Set<Effect>;
-  constraints?: Constraint[];
+	kind: 'function';
+	params: Type[];
+	return: Type;
+	effects: Set<Effect>;
+	constraints?: Constraint[];
 };
 
 export type VariableType = {
-  kind: "variable";
-  name: string;
-  constraints?: Constraint[];
+	kind: 'variable';
+	name: string;
+	constraints?: Constraint[];
 };
 
 export type ListType = {
-  kind: "list";
-  element: Type;
+	kind: 'list';
+	element: Type;
 };
 
 export type UnionType = {
-  kind: "union";
-  types: Type[];
+	kind: 'union';
+	types: Type[];
 };
 
 export type VariantType = {
-  kind: "variant";
-  name: string;
-  args: Type[];
+	kind: 'variant';
+	name: string;
+	args: Type[];
 };
 
 export type ADTType = {
-  kind: "adt";
-  name: string;
-  typeParams: string[];
-  constructors: ConstructorDefinition[];
+	kind: 'adt';
+	name: string;
+	typeParams: string[];
+	constructors: ConstructorDefinition[];
 };
 
 export type UnitType = {
-  kind: "unit";
+	kind: 'unit';
 };
 
 export type UnknownType = {
-  kind: "unknown";
+	kind: 'unknown';
 };
 
 export type Type =
-  | PrimitiveType
-  | FunctionType
-  | VariableType
-  | ListType
-  | TupleType
-  | RecordType
-  | UnionType
-  | VariantType
-  | ADTType
-  | UnitType
-  | UnknownType;
+	| PrimitiveType
+	| FunctionType
+	| VariableType
+	| ListType
+	| TupleType
+	| RecordType
+	| UnionType
+	| VariantType
+	| ADTType
+	| UnitType
+	| UnknownType;
 
 // Expressions
 export type Expression =
-  | LiteralExpression
-  | VariableExpression
-  | FunctionExpression
-  | ApplicationExpression
-  | PipelineExpression
-  | BinaryExpression
-  | IfExpression
-  | DefinitionExpression
-  | MutableDefinitionExpression
-  | MutationExpression
-  | ImportExpression
-  | RecordExpression
-  | TupleExpression
-  | UnitExpression
-  | AccessorExpression
-  | TypedExpression
-  | ConstrainedExpression
-  | ListExpression
-  | WhereExpression
-  | TypeDefinitionExpression
-  | MatchExpression
-  | ConstraintDefinitionExpression
-  | ImplementDefinitionExpression;
+	| LiteralExpression
+	| VariableExpression
+	| FunctionExpression
+	| ApplicationExpression
+	| PipelineExpression
+	| BinaryExpression
+	| IfExpression
+	| DefinitionExpression
+	| MutableDefinitionExpression
+	| MutationExpression
+	| ImportExpression
+	| RecordExpression
+	| TupleExpression
+	| UnitExpression
+	| AccessorExpression
+	| TypedExpression
+	| ConstrainedExpression
+	| ListExpression
+	| WhereExpression
+	| TypeDefinitionExpression
+	| MatchExpression
+	| ConstraintDefinitionExpression
+	| ImplementDefinitionExpression
+	| FFIExpression;
 
 export interface LiteralExpression {
-  kind: "literal";
-  value: number | string | boolean | Expression[] | null; // null represents unit
-  type?: Type;
-  location: Location;
+	kind: 'literal';
+	value: number | string | boolean | Expression[] | null; // null represents unit
+	type?: Type;
+	location: Location;
 }
 
 export interface VariableExpression {
-  kind: "variable";
-  name: string;
-  type?: Type;
-  location: Location;
+	kind: 'variable';
+	name: string;
+	type?: Type;
+	location: Location;
 }
 
 export interface FunctionExpression {
-  kind: "function";
-  params: string[];
-  body: Expression;
-  type?: Type;
-  location: Location;
+	kind: 'function';
+	params: string[];
+	body: Expression;
+	type?: Type;
+	location: Location;
 }
 
 export interface ApplicationExpression {
-  kind: "application";
-  func: Expression;
-  args: Expression[];
-  type?: Type;
-  location: Location;
+	kind: 'application';
+	func: Expression;
+	args: Expression[];
+	type?: Type;
+	location: Location;
 }
 
 export interface PipelineExpression {
-  kind: "pipeline";
-  steps: Expression[];
-  type?: Type;
-  location: Location;
+	kind: 'pipeline';
+	steps: Expression[];
+	type?: Type;
+	location: Location;
 }
 
 export interface BinaryExpression {
-  kind: "binary";
-  operator:
-    | "+"
-    | "-"
-    | "*"
-    | "/"
-    | "=="
-    | "!="
-    | "<"
-    | ">"
-    | "<="
-    | ">="
-    | "|"
-    | "|>"
-    | "<|"
-    | ";"
-    | "$";
-  left: Expression;
-  right: Expression;
-  type?: Type;
-  location: Location;
+	kind: 'binary';
+	operator:
+		| '+'
+		| '-'
+		| '*'
+		| '/'
+		| '=='
+		| '!='
+		| '<'
+		| '>'
+		| '<='
+		| '>='
+		| '|'
+		| '|>'
+		| '<|'
+		| ';'
+		| '$';
+	left: Expression;
+	right: Expression;
+	type?: Type;
+	location: Location;
 }
 
 export interface IfExpression {
-  kind: "if";
-  condition: Expression;
-  then: Expression;
-  else: Expression;
-  type?: Type;
-  location: Location;
+	kind: 'if';
+	condition: Expression;
+	then: Expression;
+	else: Expression;
+	type?: Type;
+	location: Location;
 }
 
 export interface DefinitionExpression {
-  kind: "definition";
-  name: string;
-  value: Expression;
-  type?: Type;
-  location: Location;
+	kind: 'definition';
+	name: string;
+	value: Expression;
+	type?: Type;
+	location: Location;
 }
 
 export interface MutableDefinitionExpression {
-  kind: "mutable-definition";
-  name: string;
-  value: Expression;
-  type?: Type;
-  location: Location;
+	kind: 'mutable-definition';
+	name: string;
+	value: Expression;
+	type?: Type;
+	location: Location;
 }
 
 export interface MutationExpression {
-  kind: "mutation";
-  target: string;
-  value: Expression;
-  type?: Type;
-  location: Location;
+	kind: 'mutation';
+	target: string;
+	value: Expression;
+	type?: Type;
+	location: Location;
 }
 
 export interface ImportExpression {
-  kind: "import";
-  path: string;
-  type?: Type;
-  location: Location;
+	kind: 'import';
+	path: string;
+	type?: Type;
+	location: Location;
 }
 
 export type RecordExpression = {
-	kind: "record";
+	kind: 'record';
 	fields: FieldExpression[];
 	type?: Type;
 	location: Location;
@@ -230,284 +239,291 @@ export interface FieldExpression {
 }
 
 export interface AccessorExpression {
-  kind: "accessor";
-  field: string;
-  type?: Type;
-  location: Location;
+	kind: 'accessor';
+	field: string;
+	type?: Type;
+	location: Location;
+}
+
+export interface FFIExpression {
+	kind: 'ffi';
+	module: string;
+	functionName: string;
+	type?: Type;
+	location: Location;
 }
 
 export interface TupleExpression {
-  kind: "tuple";
-  elements: Expression[];
-  type?: Type;
-  location: Location;
+	kind: 'tuple';
+	elements: Expression[];
+	type?: Type;
+	location: Location;
 }
 
 export interface UnitExpression {
-  kind: "unit";
-  type?: Type;
-  location: Location;
+	kind: 'unit';
+	type?: Type;
+	location: Location;
 }
 
 export interface TypedExpression {
-  kind: "typed";
-  expression: Expression;
-  type: Type;
-  location: Location;
+	kind: 'typed';
+	expression: Expression;
+	type: Type;
+	location: Location;
 }
 
 export interface ConstrainedExpression {
-  kind: "constrained";
-  expression: Expression;
-  type: Type;
-  constraint: ConstraintExpr;
-  location: Location;
+	kind: 'constrained';
+	expression: Expression;
+	type: Type;
+	constraint: ConstraintExpr;
+	location: Location;
 }
 
 export interface ListExpression {
-  kind: "list";
-  elements: Expression[];
-  type?: Type;
-  location: Location;
+	kind: 'list';
+	elements: Expression[];
+	type?: Type;
+	location: Location;
 }
 
 export interface WhereExpression {
-  kind: "where";
-  main: Expression;
-  definitions: (DefinitionExpression | MutableDefinitionExpression)[];
-  type?: Type;
-  location: Location;
+	kind: 'where';
+	main: Expression;
+	definitions: (DefinitionExpression | MutableDefinitionExpression)[];
+	type?: Type;
+	location: Location;
 }
 
 // ADT Constructor definition
 export interface ConstructorDefinition {
-  name: string;
-  args: Type[];
-  location: Location;
+	name: string;
+	args: Type[];
+	location: Location;
 }
 
 // ADT Type definition
 export interface TypeDefinitionExpression {
-  kind: "type-definition";
-  name: string;
-  typeParams: string[]; // Type parameters like 'a' in Option a
-  constructors: ConstructorDefinition[];
-  type?: Type;
-  location: Location;
+	kind: 'type-definition';
+	name: string;
+	typeParams: string[]; // Type parameters like 'a' in Option a
+	constructors: ConstructorDefinition[];
+	type?: Type;
+	location: Location;
 }
 
 // Pattern in pattern matching
 export type Pattern =
-  | { kind: "constructor"; name: string; args: Pattern[]; location: Location }
-  | { kind: "variable"; name: string; location: Location }
-  | { kind: "literal"; value: number | string | boolean; location: Location }
-  | { kind: "wildcard"; location: Location };
+	| { kind: 'constructor'; name: string; args: Pattern[]; location: Location }
+	| { kind: 'variable'; name: string; location: Location }
+	| { kind: 'literal'; value: number | string | boolean; location: Location }
+	| { kind: 'wildcard'; location: Location };
 
 // Pattern matching case
 export interface MatchCase {
-  pattern: Pattern;
-  expression: Expression;
-  location: Location;
+	pattern: Pattern;
+	expression: Expression;
+	location: Location;
 }
 
 // Match expression
 export interface MatchExpression {
-  kind: "match";
-  expression: Expression;
-  cases: MatchCase[];
-  type?: Type;
-  location: Location;
+	kind: 'match';
+	expression: Expression;
+	cases: MatchCase[];
+	type?: Type;
+	location: Location;
 }
 
 // Constraint definition for trait system
 export interface ConstraintDefinitionExpression {
-  kind: "constraint-definition";
-  name: string;
-  typeParam: string;
-  functions: ConstraintFunction[];
-  type?: Type;
-  location: Location;
+	kind: 'constraint-definition';
+	name: string;
+	typeParam: string;
+	functions: ConstraintFunction[];
+	type?: Type;
+	location: Location;
 }
 
 export interface ConstraintFunction {
-  name: string;
-  typeParams: string[];
-  type: Type;
-  location: Location;
+	name: string;
+	typeParams: string[];
+	type: Type;
+	location: Location;
 }
 
 // Implement definition for trait system
 export interface ImplementDefinitionExpression {
-  kind: "implement-definition";
-  constraintName: string;
-  typeName: string;
-  implementations: ImplementationFunction[];
-  type?: Type;
-  location: Location;
+	kind: 'implement-definition';
+	constraintName: string;
+	typeName: string;
+	implementations: ImplementationFunction[];
+	type?: Type;
+	location: Location;
 }
 
 export interface ImplementationFunction {
-  name: string;
-  value: Expression;
-  location: Location;
+	name: string;
+	value: Expression;
+	location: Location;
 }
 
 // Program
 export interface Program {
-  statements: Expression[];
-  location: Location;
+	statements: Expression[];
+	location: Location;
 }
 
 // Utility functions
 export const createLocation = (start: Position, end: Position): Location => ({
-  start,
-  end,
+	start,
+	end,
 });
 
 export const createPosition = (line: number, column: number): Position => ({
-  line,
-  column,
+	line,
+	column,
 });
 
 // Type constructors
 export const intType = (): PrimitiveType => ({
-  kind: "primitive",
-  name: "Int",
+	kind: 'primitive',
+	name: 'Int',
 });
 export const numberType = (): PrimitiveType => ({
-  kind: "primitive",
-  name: "Int",
+	kind: 'primitive',
+	name: 'Int',
 }); // Alias for backwards compatibility
 export const stringType = (): PrimitiveType => ({
-  kind: "primitive",
-  name: "String",
+	kind: 'primitive',
+	name: 'String',
 });
 export const boolType = (): VariantType => ({
-  kind: "variant",
-  name: "Bool",
-  args: [],
+	kind: 'variant',
+	name: 'Bool',
+	args: [],
 });
 export const listType = (): PrimitiveType => ({
-  kind: "primitive",
-  name: "List",
+	kind: 'primitive',
+	name: 'List',
 });
 export const functionType = (
-  params: Type[],
-  returnType: Type,
-  effects: Set<Effect> = new Set()
+	params: Type[],
+	returnType: Type,
+	effects: Set<Effect> = new Set()
 ): FunctionType => ({
-  kind: "function",
-  params,
-  return: returnType,
-  effects,
+	kind: 'function',
+	params,
+	return: returnType,
+	effects,
 });
 export const typeVariable = (name: string): VariableType => ({
-  kind: "variable",
-  name,
+	kind: 'variable',
+	name,
 });
-export const unknownType = (): UnknownType => ({ kind: "unknown" });
+export const unknownType = (): UnknownType => ({ kind: 'unknown' });
 
 // New type constructors
 export const listTypeWithElement = (element: Type): ListType => ({
-  kind: "list",
-  element,
+	kind: 'list',
+	element,
 });
 
 export type TupleType = {
-  kind: "tuple";
-  elements: Type[];
+	kind: 'tuple';
+	elements: Type[];
 };
 
 export const tupleType = (elements: Type[]): TupleType => ({
-  kind: "tuple",
-  elements,
+	kind: 'tuple',
+	elements,
 });
 
 // Add tuple type constructor for Tuple T1 T2 syntax
 export const tupleTypeConstructor = (elementTypes: Type[]): TupleType => ({
-  kind: "tuple",
-  elements: elementTypes,
+	kind: 'tuple',
+	elements: elementTypes,
 });
 
 export type RecordType = {
-  kind: "record";
-  fields: { [key: string]: Type };
+	kind: 'record';
+	fields: { [key: string]: Type };
 };
 
 export const recordType = (fields: { [key: string]: Type }): RecordType => ({
-  kind: "record",
-  fields,
+	kind: 'record',
+	fields,
 });
 
 // Constructor functions for new types
 export const primitiveType = (
-  name: "Int" | "String" | "Bool" | "List"
+	name: 'Int' | 'String' | 'Bool' | 'List'
 ): PrimitiveType => ({
-  kind: "primitive",
-  name,
+	kind: 'primitive',
+	name,
 });
 
-
 export const variableType = (
-  name: string,
-  constraints?: Constraint[]
+	name: string,
+	constraints?: Constraint[]
 ): VariableType => ({
-  kind: "variable",
-  name,
-  constraints,
+	kind: 'variable',
+	name,
+	constraints,
 });
 
 export const unionType = (types: Type[]): UnionType => ({
-  kind: "union",
-  types,
+	kind: 'union',
+	types,
 });
 
 export const variantType = (name: string, args: Type[]): VariantType => ({
-  kind: "variant",
-  name,
-  args,
+	kind: 'variant',
+	name,
+	args,
 });
 
 export const adtType = (
-  name: string,
-  typeParams: string[],
-  constructors: ConstructorDefinition[]
+	name: string,
+	typeParams: string[],
+	constructors: ConstructorDefinition[]
 ): ADTType => ({
-  kind: "adt",
-  name,
-  typeParams,
-  constructors,
+	kind: 'adt',
+	name,
+	typeParams,
+	constructors,
 });
 
-export const unitType = (): UnitType => ({ kind: "unit" });
+export const unitType = (): UnitType => ({ kind: 'unit' });
 
 // Helper functions to create ADT variant types
 export const optionType = (element: Type): VariantType => ({
-  kind: "variant",
-  name: "Option",
-  args: [element],
+	kind: 'variant',
+	name: 'Option',
+	args: [element],
 });
 
 export const resultType = (success: Type, error: Type): VariantType => ({
-  kind: "variant",
-  name: "Result",
-  args: [success, error],
+	kind: 'variant',
+	name: 'Result',
+	args: [success, error],
 });
 
 // Convenience functions for common types
 export const optionInt = (): VariantType => optionType(intType());
 export const resultString = (error: Type): VariantType =>
-  resultType(stringType(), error);
+	resultType(stringType(), error);
 
 export type HasFieldConstraint = {
-	kind: "hasField";
+	kind: 'hasField';
 	typeVar: string;
 	field: string;
 	fieldType: Type;
 };
 
 export type IsConstraint = {
-	kind: "is";
+	kind: 'is';
 	typeVar: string;
 	constraint: string;
 };
@@ -515,9 +531,9 @@ export type IsConstraint = {
 // Constraint helper functions
 export const isConstraint = (
 	typeVar: string,
-	constraint: string,
+	constraint: string
 ): IsConstraint => ({
-	kind: "is",
+	kind: 'is',
 	typeVar,
 	constraint,
 });
@@ -525,31 +541,31 @@ export const isConstraint = (
 export const hasFieldConstraint = (
 	typeVar: string,
 	field: string,
-	fieldType: Type,
+	fieldType: Type
 ): HasFieldConstraint => ({
-	kind: "hasField",
+	kind: 'hasField',
 	typeVar,
 	field,
 	fieldType,
 });
 
 export type ImplementsConstraint = {
-	kind: "implements";
+	kind: 'implements';
 	typeVar: string;
 	interfaceName: string;
 };
 
 export const implementsConstraint = (
 	typeVar: string,
-	interfaceName: string,
+	interfaceName: string
 ): ImplementsConstraint => ({
-	kind: "implements",
+	kind: 'implements',
 	typeVar,
 	interfaceName,
 });
 
 export type CustomConstraint = {
-	kind: "custom";
+	kind: 'custom';
 	typeVar: string;
 	constraint: string;
 	args: Type[];
@@ -558,9 +574,9 @@ export type CustomConstraint = {
 export const customConstraint = (
 	typeVar: string,
 	constraint: string,
-	args: Type[],
+	args: Type[]
 ): CustomConstraint => ({
-	kind: "custom",
+	kind: 'custom',
 	typeVar,
 	constraint,
 	args,
@@ -568,24 +584,24 @@ export const customConstraint = (
 
 // Constrained type variable
 export const constrainedTypeVariable = (
-  name: string,
-  constraints: Constraint[]
+	name: string,
+	constraints: Constraint[]
 ): VariableType => ({
-  kind: "variable",
-  name,
-  constraints,
+	kind: 'variable',
+	name,
+	constraints,
 });
 
 // Constrained function type
 export const constrainedFunctionType = (
-  params: Type[],
-  returnType: Type,
-  effects: Set<Effect> = new Set(),
-  constraints: Constraint[] = []
+	params: Type[],
+	returnType: Type,
+	effects: Set<Effect> = new Set(),
+	constraints: Constraint[] = []
 ): FunctionType => ({
-  kind: "function",
-  params,
-  return: returnType,
-  effects,
-  constraints,
+	kind: 'function',
+	params,
+	return: returnType,
+	effects,
+	constraints,
 });

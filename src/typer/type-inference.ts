@@ -3,7 +3,6 @@ import {
 	type LiteralExpression,
 	type VariableExpression,
 	type FunctionExpression,
-	type ApplicationExpression,
 	type BinaryExpression,
 	type IfExpression,
 	type DefinitionExpression,
@@ -18,7 +17,6 @@ import {
 	type TypedExpression,
 	type ConstrainedExpression,
 	type ConstraintExpr,
-	type PipelineExpression,
 	type ConstraintDefinitionExpression,
 	type ImplementDefinitionExpression,
 	type Type,
@@ -33,20 +31,15 @@ import {
 	listTypeWithElement,
 	tupleType,
 	recordType,
-	isConstraint,
 	hasFieldConstraint,
 } from '../ast';
 import {
-	functionApplicationError,
 	undefinedVariableError,
 	nonFunctionApplicationError,
-	formatTypeError,
-	createTypeError,
 } from './type-errors';
 import {
 	getExprLocation,
 	throwTypeError,
-	isTypeKind,
 	mapSet,
 	typeToString,
 	propagateConstraintToTypeVariable,
@@ -54,19 +47,13 @@ import {
 import { unify } from './unify';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
-import { 
-	resolveConstraintVariable, 
-	createConstraintFunctionType,
-	decorateEnvironmentWithConstraintFunctions
-} from './constraint-resolution';
-import { 
-	type TypeState, 
-	type TypeResult, 
-	createPureTypeResult, 
-	createTypeResult, 
-	unionEffects, 
+import {
+	type TypeState,
+	type TypeResult,
+	createPureTypeResult,
+	createTypeResult,
+	unionEffects,
 	emptyEffects,
-	singleEffect,
 	addConstraintDefinition,
 	addConstraintImplementation,
 	getConstraintSignature,
@@ -74,12 +61,7 @@ import {
 	type ConstraintImplementation,
 	type TypeScheme,
 } from './types';
-import {
-	satisfiesConstraint,
-	solveConstraint,
-	solveConstraints,
-	validateConstraintName,
-} from './constraints';
+import { validateConstraintName } from './constraints';
 import { freshTypeVariable, generalize, instantiate, freshenTypeVariables, flattenStatements } from './type-operations';
 
 // Note: Main typeExpression is now in expression-dispatcher.ts
