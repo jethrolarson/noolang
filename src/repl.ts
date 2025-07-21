@@ -1,10 +1,14 @@
-import * as readline from "node:readline";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import { Lexer } from "./lexer";
-import { parse } from "./parser/parser";
-import { Evaluator, type Value, isNativeFunction } from "./evaluator";
-import { createTypeState, loadStdlib, cleanSubstitutions } from './typer/type-operations';
+import * as readline from 'node:readline';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { Lexer } from './lexer';
+import { parse } from './parser/parser';
+import { Evaluator, type Value, isNativeFunction } from './evaluator';
+import {
+	createTypeState,
+	loadStdlib,
+	cleanSubstitutions,
+} from './typer/type-operations';
 import { initializeBuiltins } from './typer/builtins';
 import { typeToString } from './typer/helpers';
 import type { TypeState } from './typer/types';
@@ -109,7 +113,10 @@ export class REPL {
 				if (effects.size === 0) {
 					return '';
 				}
-				const effectsList = Array.from(effects).sort().map(e => `!${e}`).join(' ');
+				const effectsList = Array.from(effects)
+					.sort()
+					.map(e => `!${e}`)
+					.join(' ');
 				return ` ${colorize.error(effectsList)}`;
 			};
 
@@ -658,7 +665,7 @@ export class REPL {
 }
 
 // Start the REPL if this file is run directly
-if (typeof require !== "undefined" && require.main === module) {
+if (typeof require !== 'undefined' && require.main === module) {
 	const repl = new REPL();
 	repl.start();
 }

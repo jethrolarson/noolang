@@ -17,7 +17,7 @@ describe('Polymorphic Function Type Pollution', () => {
 
 		const result1 = typeAndDecorate(program1, state);
 		state = result1.state;
-		
+
 		// Print should work with Int - check if this succeeds
 		expect(() => result1).not.toThrow();
 
@@ -48,7 +48,7 @@ describe('Polymorphic Function Type Pollution', () => {
 		const lexer2 = new Lexer('print "hi"');
 		const tokens2 = lexer2.tokenize();
 		const program2 = parse(tokens2);
-		
+
 		// This is where the bug manifests - print gets "stuck" on Int type
 		expect(() => {
 			const result2 = typeAndDecorate(program2, state);
@@ -59,7 +59,7 @@ describe('Polymorphic Function Type Pollution', () => {
 		const lexer3 = new Lexer('print 42');
 		const tokens3 = lexer3.tokenize();
 		const program3 = parse(tokens3);
-		
+
 		expect(() => {
 			const result3 = typeAndDecorate(program3, state);
 		}).not.toThrow();
@@ -72,20 +72,29 @@ describe('Polymorphic Function Type Pollution', () => {
 		// Test == operator with different types
 		const eq1 = typeAndDecorate(parse(new Lexer('1 == 1').tokenize()), state);
 		state = eq1.state;
-		
+
 		expect(() => {
-			const eq2 = typeAndDecorate(parse(new Lexer('"a" == "b"').tokenize()), state);
+			const eq2 = typeAndDecorate(
+				parse(new Lexer('"a" == "b"').tokenize()),
+				state
+			);
 			state = eq2.state;
 		}).not.toThrow();
 
 		// Test toString with different types
 		expect(() => {
-			const toString1 = typeAndDecorate(parse(new Lexer('toString 42').tokenize()), state);
+			const toString1 = typeAndDecorate(
+				parse(new Lexer('toString 42').tokenize()),
+				state
+			);
 			state = toString1.state;
 		}).not.toThrow();
 
 		expect(() => {
-			const toString2 = typeAndDecorate(parse(new Lexer('toString "hello"').tokenize()), state);
+			const toString2 = typeAndDecorate(
+				parse(new Lexer('toString "hello"').tokenize()),
+				state
+			);
 		}).not.toThrow();
 	});
 
@@ -94,12 +103,18 @@ describe('Polymorphic Function Type Pollution', () => {
 		state = initializeBuiltins(state);
 
 		// Test with list of integers (using cons to build lists)
-		const list1 = typeAndDecorate(parse(new Lexer('cons 1 (cons 2 (cons 3 []))').tokenize()), state);
+		const list1 = typeAndDecorate(
+			parse(new Lexer('cons 1 (cons 2 (cons 3 []))').tokenize()),
+			state
+		);
 		state = list1.state;
 
-		// Test toString with different input again - should work  
+		// Test toString with different input again - should work
 		expect(() => {
-			const toString3 = typeAndDecorate(parse(new Lexer('toString 100').tokenize()), state);
+			const toString3 = typeAndDecorate(
+				parse(new Lexer('toString 100').tokenize()),
+				state
+			);
 		}).not.toThrow();
 	});
 });

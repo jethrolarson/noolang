@@ -1,4 +1,4 @@
-import type { Constraint, Type, Effect } from "../ast";
+import type { Constraint, Type, Effect } from '../ast';
 
 // ADT registry for tracking defined algebraic data types
 export type ADTRegistry = Map<
@@ -20,10 +20,13 @@ export type ConstraintImplementation = {
 	functions: Map<string, TypeScheme>; // function name -> implementation
 };
 
-export type ConstraintRegistry = Map<string, {
-	signature: ConstraintSignature;
-	implementations: Map<string, ConstraintImplementation>; // type name -> implementation
-}>;
+export type ConstraintRegistry = Map<
+	string,
+	{
+		signature: ConstraintSignature;
+		implementations: Map<string, ConstraintImplementation>; // type name -> implementation
+	}
+>;
 
 // Type scheme for let-polymorphism
 export type TypeScheme = {
@@ -69,13 +72,20 @@ export const unionEffects = (...effectSets: Set<Effect>[]): Set<Effect> => {
 	return result;
 };
 
-export const createTypeResult = (type: Type, effects: Set<Effect>, state: TypeState): TypeResult => ({
+export const createTypeResult = (
+	type: Type,
+	effects: Set<Effect>,
+	state: TypeState
+): TypeResult => ({
 	type,
 	effects,
 	state,
 });
 
-export const createPureTypeResult = (type: Type, state: TypeState): TypeResult => ({
+export const createPureTypeResult = (
+	type: Type,
+	state: TypeState
+): TypeResult => ({
 	type,
 	effects: emptyEffects(),
 	state,
@@ -91,7 +101,7 @@ export const addConstraintDefinition = (
 ): void => {
 	registry.set(name, {
 		signature,
-		implementations: new Map()
+		implementations: new Map(),
 	});
 };
 
@@ -119,7 +129,7 @@ export const resolveConstraintFunction = (
 	if (!constraint) {
 		return null;
 	}
-	
+
 	// Convert type to string for lookup
 	const typeName = typeToString(concreteType);
 	const impl = constraint.implementations.get(typeName);
@@ -137,35 +147,35 @@ export const getConstraintSignature = (
 // Helper function to convert Type to string for registry keys
 const typeToString = (type: Type): string => {
 	switch (type.kind) {
-		case "primitive":
+		case 'primitive':
 			return type.name;
-		case "variable":
+		case 'variable':
 			return type.name;
-		case "list":
+		case 'list':
 			return `List ${typeToString(type.element)}`;
-		case "tuple":
-			return `{${type.elements.map(typeToString).join(", ")}}`;
-		case "record":
+		case 'tuple':
+			return `{${type.elements.map(typeToString).join(', ')}}`;
+		case 'record':
 			const fields = Object.entries(type.fields)
 				.map(([k, v]) => `${k}: ${typeToString(v)}`)
-				.join(", ");
+				.join(', ');
 			return `{${fields}}`;
-		case "function":
-			const params = type.params.map(typeToString).join(" -> ");
+		case 'function':
+			const params = type.params.map(typeToString).join(' -> ');
 			return `${params} -> ${typeToString(type.return)}`;
-		case "union":
-			return type.types.map(typeToString).join(" | ");
-		case "variant":
-			return type.args.length > 0 
-				? `${type.name} ${type.args.map(typeToString).join(" ")}`
+		case 'union':
+			return type.types.map(typeToString).join(' | ');
+		case 'variant':
+			return type.args.length > 0
+				? `${type.name} ${type.args.map(typeToString).join(' ')}`
 				: type.name;
-		case "adt":
+		case 'adt':
 			return type.name;
-		case "unit":
-			return "Unit";
-		case "unknown":
-			return "?";
+		case 'unit':
+			return 'Unit';
+		case 'unknown':
+			return '?';
 		default:
-			return "Unknown";
+			return 'Unknown';
 	}
 };

@@ -1,6 +1,6 @@
 /**
  * Constraint generation for the constraint-based unification system
- * 
+ *
  * This module generates unification constraints from type inference operations
  * instead of performing unification directly. This allows for better error
  * reporting, performance optimization, and support for complex constraint systems.
@@ -56,14 +56,14 @@ export const generateLiteralConstraints = (
 		return {
 			type: freshVar,
 			state: newState,
-			constraints: []
+			constraints: [],
 		};
 	}
 
 	return {
 		type,
 		state,
-		constraints: []
+		constraints: [],
 	};
 };
 
@@ -80,7 +80,7 @@ export const generateVariableConstraints = (
 		return {
 			type: freshVar,
 			state: newState,
-			constraints: []
+			constraints: [],
 		};
 	}
 
@@ -89,7 +89,7 @@ export const generateVariableConstraints = (
 	return {
 		type: instantiatedType,
 		state: newState,
-		constraints: []
+		constraints: [],
 	};
 };
 
@@ -105,7 +105,7 @@ export const generateFunctionConstraints = (
 
 	// Extend environment with parameter types
 	const extendedEnv = new Map(currentState.environment);
-	
+
 	for (const param of expr.params) {
 		const [paramType, nextState] = freshTypeVariable(currentState);
 		paramTypes.push(paramType);
@@ -125,7 +125,7 @@ export const generateFunctionConstraints = (
 	return {
 		type: funcType,
 		state: bodyResult.state,
-		constraints
+		constraints,
 	};
 };
 
@@ -135,7 +135,7 @@ export const generateApplicationConstraints = (
 	state: TypeState
 ): ConstraintTypeResult => {
 	const constraints: UnificationConstraint[] = [];
-	
+
 	// Generate constraints for function
 	const funcResult = generateConstraintsForExpression(expr.func, state);
 	constraints.push(...funcResult.constraints);
@@ -143,7 +143,7 @@ export const generateApplicationConstraints = (
 	// Generate constraints for arguments
 	let currentState = funcResult.state;
 	const argTypes: Type[] = [];
-	
+
 	for (const arg of expr.args) {
 		const argResult = generateConstraintsForExpression(arg, currentState);
 		constraints.push(...argResult.constraints);
@@ -162,13 +162,13 @@ export const generateApplicationConstraints = (
 		kind: 'equal',
 		type1: funcResult.type,
 		type2: expectedFuncType,
-		location: getExprLocation(expr)
+		location: getExprLocation(expr),
 	});
 
 	return {
 		type: resultType,
 		state: finalState,
-		constraints
+		constraints,
 	};
 };
 
@@ -183,12 +183,15 @@ export const generateBinaryConstraints = (
 	const leftResult = generateConstraintsForExpression(expr.left, state);
 	constraints.push(...leftResult.constraints);
 
-	const rightResult = generateConstraintsForExpression(expr.right, leftResult.state);
+	const rightResult = generateConstraintsForExpression(
+		expr.right,
+		leftResult.state
+	);
 	constraints.push(...rightResult.constraints);
 
 	// Handle different operators
 	const location = getExprLocation(expr);
-	
+
 	switch (expr.operator) {
 		case '+':
 		case '-':
@@ -202,7 +205,7 @@ export const generateBinaryConstraints = (
 			return {
 				type: intType(),
 				state: rightResult.state,
-				constraints
+				constraints,
 			};
 
 		case '==':
@@ -216,12 +219,12 @@ export const generateBinaryConstraints = (
 				kind: 'equal',
 				type1: leftResult.type,
 				type2: rightResult.type,
-				location
+				location,
 			});
 			return {
 				type: boolType(),
 				state: rightResult.state,
-				constraints
+				constraints,
 			};
 
 		case ';':
@@ -229,7 +232,7 @@ export const generateBinaryConstraints = (
 			return {
 				type: rightResult.type,
 				state: rightResult.state,
-				constraints
+				constraints,
 			};
 
 		default:
@@ -238,7 +241,7 @@ export const generateBinaryConstraints = (
 			return {
 				type: resultType,
 				state: finalState,
-				constraints
+				constraints,
 			};
 	}
 };
@@ -259,14 +262,20 @@ export const generateIfConstraints = (
 		kind: 'equal',
 		type1: condResult.type,
 		type2: boolType(),
-		location: getExprLocation(expr.condition)
+		location: getExprLocation(expr.condition),
 	});
 
 	// Generate constraints for then and else branches
-	const thenResult = generateConstraintsForExpression(expr.then, condResult.state);
+	const thenResult = generateConstraintsForExpression(
+		expr.then,
+		condResult.state
+	);
 	constraints.push(...thenResult.constraints);
 
-	const elseResult = generateConstraintsForExpression(expr.else, thenResult.state);
+	const elseResult = generateConstraintsForExpression(
+		expr.else,
+		thenResult.state
+	);
 	constraints.push(...elseResult.constraints);
 
 	// Both branches must have the same type
@@ -274,13 +283,13 @@ export const generateIfConstraints = (
 		kind: 'equal',
 		type1: thenResult.type,
 		type2: elseResult.type,
-		location: getExprLocation(expr)
+		location: getExprLocation(expr),
 	});
 
 	return {
 		type: thenResult.type,
 		state: elseResult.state,
-		constraints
+		constraints,
 	};
 };
 
@@ -301,7 +310,7 @@ export const generateDefinitionConstraints = (
 	return {
 		type: unitType(),
 		state: newState,
-		constraints: valueResult.constraints
+		constraints: valueResult.constraints,
 	};
 };
 
@@ -331,7 +340,7 @@ export const generateConstraintsForExpression = (
 			return {
 				type: freshVar,
 				state: newState,
-				constraints: []
+				constraints: [],
 			};
 	}
 };
@@ -342,16 +351,19 @@ export const solveConstraintsAndGetResult = (
 ): TypeResult => {
 	const solver = new ConstraintSolver();
 	solver.addConstraints(constraintResult.constraints);
-	
+
 	const solution = solver.solve();
-	
+
 	if (!solution.success) {
 		// Throw first error for now - could be improved with better error handling
 		throw new Error(solution.errors[0] || 'Constraint solving failed');
 	}
 
 	// Apply the substitution to the result type
-	const finalType = applySubstitutionToType(constraintResult.type, solution.substitution);
+	const finalType = applySubstitutionToType(
+		constraintResult.type,
+		solution.substitution
+	);
 
 	// Also merge substitutions into the state
 	const mergedSubstitution = new Map(constraintResult.state.substitution);
@@ -361,12 +373,16 @@ export const solveConstraintsAndGetResult = (
 
 	return createPureTypeResult(finalType, {
 		...constraintResult.state,
-		substitution: mergedSubstitution
+		substitution: mergedSubstitution,
 	});
 };
 
 // Helper to apply substitution to a type with cycle detection
-const applySubstitutionToType = (type: Type, substitution: Map<string, Type>, seen: Set<string> = new Set()): Type => {
+const applySubstitutionToType = (
+	type: Type,
+	substitution: Map<string, Type>,
+	seen: Set<string> = new Set()
+): Type => {
 	switch (type.kind) {
 		case 'variable':
 			if (seen.has(type.name)) {
@@ -381,39 +397,45 @@ const applySubstitutionToType = (type: Type, substitution: Map<string, Type>, se
 				return result;
 			}
 			return type;
-		
+
 		case 'function':
 			return {
 				...type,
-				params: type.params.map(p => applySubstitutionToType(p, substitution, seen)),
-				return: applySubstitutionToType(type.return, substitution, seen)
+				params: type.params.map(p =>
+					applySubstitutionToType(p, substitution, seen)
+				),
+				return: applySubstitutionToType(type.return, substitution, seen),
 			};
-		
+
 		case 'list':
 			return {
 				...type,
-				element: applySubstitutionToType(type.element, substitution, seen)
+				element: applySubstitutionToType(type.element, substitution, seen),
 			};
-		
+
 		case 'tuple':
 			return {
 				...type,
-				elements: type.elements.map(e => applySubstitutionToType(e, substitution, seen))
+				elements: type.elements.map(e =>
+					applySubstitutionToType(e, substitution, seen)
+				),
 			};
-		
+
 		case 'record':
 			const newFields: { [key: string]: Type } = {};
 			for (const [key, fieldType] of Object.entries(type.fields)) {
 				newFields[key] = applySubstitutionToType(fieldType, substitution, seen);
 			}
 			return { ...type, fields: newFields };
-		
+
 		case 'variant':
 			return {
 				...type,
-				args: type.args.map(a => applySubstitutionToType(a, substitution, seen))
+				args: type.args.map(a =>
+					applySubstitutionToType(a, substitution, seen)
+				),
 			};
-		
+
 		default:
 			return type;
 	}

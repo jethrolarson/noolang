@@ -1,6 +1,6 @@
 /**
  * Constraint-based type inference
- * 
+ *
  * This module provides a drop-in replacement for the existing type inference
  * functions that uses constraint generation and solving instead of direct
  * recursive unification.

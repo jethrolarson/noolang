@@ -2,20 +2,20 @@
 // This will be implemented in future versions
 
 export type IOEffect = {
-	kind: "IO";
+	kind: 'IO';
 	action: string;
 	data?: unknown;
 };
 
 export type StateEffect = {
-	kind: "State";
-	action: "get" | "set";
+	kind: 'State';
+	action: 'get' | 'set';
 	key?: string;
 	value?: unknown;
 };
 
 export type ErrorEffect = {
-	kind: "Error";
+	kind: 'Error';
 	message: string;
 };
 
@@ -44,7 +44,7 @@ export class EffectManager {
 // Default effect handlers (placeholders)
 export class DefaultIOHandler implements EffectHandler {
 	async handle(effect: Effect): Promise<unknown> {
-		if (effect.kind === "IO") {
+		if (effect.kind === 'IO') {
 			// IO Effect handler
 			return null;
 		}
@@ -56,10 +56,10 @@ export class DefaultStateHandler implements EffectHandler {
 	private state: Map<string, unknown> = new Map();
 
 	async handle(effect: Effect): Promise<unknown> {
-		if (effect.kind === "State") {
-			if (effect.action === "get" && effect.key) {
+		if (effect.kind === 'State') {
+			if (effect.action === 'get' && effect.key) {
 				return this.state.get(effect.key);
-			} else if (effect.action === "set" && effect.key) {
+			} else if (effect.action === 'set' && effect.key) {
 				this.state.set(effect.key, effect.value);
 				return null;
 			}

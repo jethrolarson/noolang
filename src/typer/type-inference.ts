@@ -63,10 +63,16 @@ import {
 	type TypeScheme,
 } from './types';
 import { validateConstraintName } from './constraints';
-import { freshTypeVariable, generalize, instantiate, freshenTypeVariables, flattenStatements } from './type-operations';
-import { 
+import {
+	freshTypeVariable,
+	generalize,
+	instantiate,
+	freshenTypeVariables,
+	flattenStatements,
+} from './type-operations';
+import {
 	tryResolveConstraintFunction,
-	decorateEnvironmentWithConstraintFunctions
+	decorateEnvironmentWithConstraintFunctions,
 } from './constraint-resolution';
 
 // Note: Main typeExpression is now in expression-dispatcher.ts
@@ -96,9 +102,12 @@ export const typeVariableExpr = (
 	const scheme = state.environment.get(expr.name);
 	if (!scheme) {
 		// Check if this is a constraint function before throwing error
-		const { resolveConstraintVariable, createConstraintFunctionType } = require('./constraint-resolution');
+		const {
+			resolveConstraintVariable,
+			createConstraintFunctionType,
+		} = require('./constraint-resolution');
 		const constraintResult = resolveConstraintVariable(expr.name, state);
-		
+
 		if (constraintResult.resolved && constraintResult.needsResolution) {
 			// This is a constraint function - create its type
 			const constraintType = createConstraintFunctionType(
@@ -108,7 +117,7 @@ export const typeVariableExpr = (
 			);
 			return createPureTypeResult(constraintType, state);
 		}
-		
+
 		throwTypeError(
 			location => undefinedVariableError(expr.name, location),
 			getExprLocation(expr)
@@ -157,9 +166,12 @@ const flattenConstraintExpr = (expr: ConstraintExpr): Constraint[] => {
 };
 
 // Collect free variables used in an expression
-const collectFreeVars = (expr: Expression, boundVars: Set<string> = new Set()): Set<string> => {
+const collectFreeVars = (
+	expr: Expression,
+	boundVars: Set<string> = new Set()
+): Set<string> => {
 	const freeVars = new Set<string>();
-	
+
 	const walk = (e: Expression, bound: Set<string>) => {
 		switch (e.kind) {
 			case 'variable':
@@ -201,7 +213,7 @@ const collectFreeVars = (expr: Expression, boundVars: Set<string> = new Set()): 
 				break;
 		}
 	};
-	
+
 	walk(expr, boundVars);
 	return freeVars;
 };
@@ -214,11 +226,11 @@ export const typeFunction = (
 	// Collect free variables used in the function body
 	const boundParams = new Set(expr.params);
 	const freeVars = collectFreeVars(expr.body, boundParams);
-	
+
 	// Create a minimal environment with only what's needed
 	const functionEnv = new Map<string, any>();
-	
-	// Always include built-ins and stdlib essentials  
+
+	// Always include built-ins and stdlib essentials
 	const essentials = [
 		'+',
 		'-',
@@ -279,16 +291,16 @@ export const typeFunction = (
 			functionEnv.set(essential, state.environment.get(essential)!);
 		}
 	}
-	
+
 	// Include only the free variables actually used
 	for (const freeVar of freeVars) {
 		if (state.environment.has(freeVar)) {
 			functionEnv.set(freeVar, state.environment.get(freeVar)!);
 		}
 	}
-	
+
 	// Closure optimization: using minimal environment
-	
+
 	let currentState = { ...state, environment: functionEnv };
 
 	const paramTypes: Type[] = [];
@@ -456,7 +468,15 @@ export const typeIf = (expr: IfExpression, state: TypeState): TypeResult => {
 	// Apply substitution to get final type
 	const finalType = substitute(thenResult.type, currentState.substitution);
 
-	return createTypeResult(finalType, unionEffects(conditionResult.effects, thenResult.effects, elseResult.effects), currentState);
+	return createTypeResult(
+		finalType,
+		unionEffects(
+			conditionResult.effects,
+			thenResult.effects,
+			elseResult.effects
+		),
+		currentState
+	);
 };
 
 // Type inference for binary expressions
@@ -529,15 +549,15 @@ export const typeBinary = (
 		// Dollar: a $ b means a(b) - apply left function to right value
 		// Delegate to the same logic as regular function application
 		const { typeApplication } = require('./function-application');
-		
+
 		// Create a synthetic ApplicationExpression for a $ b
 		const syntheticApp: import('../ast').ApplicationExpression = {
 			kind: 'application',
 			func: expr.left,
 			args: [expr.right],
-			location: expr.location
+			location: expr.location,
 		};
-		
+
 		return typeApplication(syntheticApp, currentState);
 	}
 
@@ -545,7 +565,7 @@ export const typeBinary = (
 	if (expr.operator === '|?') {
 		// Safe thrush: a |? f desugars to: bind a f
 		// Transform this into a function application and let constraint resolution handle it
-		
+
 		if (rightResult.type.kind !== 'function') {
 			throwTypeError(
 				location => nonFunctionApplicationError(rightResult.type, location),
@@ -564,28 +584,31 @@ export const typeBinary = (
 		try {
 			// Create a synthetic function application: bind(left)(right)
 			const { typeApplication } = require('./function-application');
-			
+
 			const bindVar: import('../ast').VariableExpression = {
 				kind: 'variable',
 				name: 'bind',
-				location: expr.location
+				location: expr.location,
 			};
-			
+
 			const syntheticApp: import('../ast').ApplicationExpression = {
 				kind: 'application',
 				func: bindVar,
 				args: [expr.left, expr.right],
-				location: expr.location
+				location: expr.location,
 			};
-			
+
 			// This will trigger constraint resolution for 'bind'
 			return typeApplication(syntheticApp, currentState);
 		} catch (error) {
 			// If constraint resolution fails, fall back to direct implementation for known monads
-			if (leftResult.type.kind === 'variant' && leftResult.type.args.length >= 1) {
+			if (
+				leftResult.type.kind === 'variant' &&
+				leftResult.type.args.length >= 1
+			) {
 				const monadName = leftResult.type.name;
 				const innerType = leftResult.type.args[0];
-				
+
 				if (monadName === 'Option' || monadName === 'Result') {
 					// Unify the function parameter with the inner type
 					currentState = unify(
@@ -597,25 +620,38 @@ export const typeBinary = (
 
 					// The result type follows monadic bind semantics
 					let resultType: Type;
-					if (rightResult.type.return.kind === 'variant' && rightResult.type.return.name === monadName) {
+					if (
+						rightResult.type.return.kind === 'variant' &&
+						rightResult.type.return.name === monadName
+					) {
 						// Function returns same monad type -> bind flattens
 						resultType = rightResult.type.return;
 					} else {
 						// Function returns T -> wrap in the monad
 						if (monadName === 'Option') {
 							resultType = variantType('Option', [rightResult.type.return]);
-						} else if (monadName === 'Result' && leftResult.type.args.length === 2) {
+						} else if (
+							monadName === 'Result' &&
+							leftResult.type.args.length === 2
+						) {
 							// Preserve error type for Result
-							resultType = variantType('Result', [rightResult.type.return, leftResult.type.args[1]]);
+							resultType = variantType('Result', [
+								rightResult.type.return,
+								leftResult.type.args[1],
+							]);
 						} else {
 							resultType = variantType(monadName, [rightResult.type.return]);
 						}
 					}
-					
-					return createTypeResult(resultType, unionEffects(leftResult.effects, rightResult.effects), currentState);
+
+					return createTypeResult(
+						resultType,
+						unionEffects(leftResult.effects, rightResult.effects),
+						currentState
+					);
 				}
 			}
-			
+
 			// Re-throw the original error if we can't handle it
 			throw error;
 		}
@@ -686,11 +722,10 @@ export const typeMutableDefinition = (
 		type: valueResult.type,
 		quantifiedVars: [],
 	});
-	return createTypeResult(
-		valueResult.type, 
-		valueResult.effects, 
-		{ ...valueResult.state, environment: newEnv }
-	);
+	return createTypeResult(valueResult.type, valueResult.effects, {
+		...valueResult.state,
+		environment: newEnv,
+	});
 };
 
 // Type inference for mutations
@@ -886,7 +921,11 @@ export const typeWhere = (
 	// Type the main expression
 	const resultResult = typeExpression(expr.main, currentState);
 
-	return createTypeResult(resultResult.type, resultResult.effects, resultResult.state);
+	return createTypeResult(
+		resultResult.type,
+		resultResult.effects,
+		resultResult.state
+	);
 };
 
 // Type inference for typed expressions
@@ -942,39 +981,39 @@ export const typeConstrained = (
 // Type constraint definition
 export const typeConstraintDefinition = (
 	expr: ConstraintDefinitionExpression,
-	state: TypeState,
+	state: TypeState
 ): TypeResult => {
 	const { name, typeParams, functions } = expr;
-	
+
 	// Create constraint signature
 	const functionMap = new Map<string, Type>();
-	
+
 	for (const func of functions) {
 		// Type the function signature, substituting the constraint type parameter
 		const funcType = func.type;
 		functionMap.set(func.name, funcType);
 	}
-	
+
 	const signature: ConstraintSignature = {
 		name,
 		typeParams,
 		functions: functionMap,
 	};
-	
+
 	// Add to constraint registry
 	addConstraintDefinition(state.constraintRegistry, name, signature);
-	
+
 	// Constraint definitions have unit type
 	return createPureTypeResult(unitType(), state);
 };
 
-// Type implement definition  
+// Type implement definition
 export const typeImplementDefinition = (
 	expr: ImplementDefinitionExpression,
-	state: TypeState,
+	state: TypeState
 ): TypeResult => {
 	const { constraintName, typeExpr, implementations } = expr;
-	
+
 	// Extract type name from type expression for simple cases
 	let typeName: string;
 	if (typeExpr.kind === 'primitive') {
@@ -983,35 +1022,42 @@ export const typeImplementDefinition = (
 		typeName = typeExpr.name;
 	} else {
 		// For now, throw error for complex type expressions - we'll improve this later
-		throw new Error(`Complex type expressions in implement definitions not yet supported: ${JSON.stringify(typeExpr)}`);
+		throw new Error(
+			`Complex type expressions in implement definitions not yet supported: ${JSON.stringify(typeExpr)}`
+		);
 	}
-	
+
 	// Check if constraint exists
-	const constraintSig = getConstraintSignature(state.constraintRegistry, constraintName);
+	const constraintSig = getConstraintSignature(
+		state.constraintRegistry,
+		constraintName
+	);
 	if (!constraintSig) {
 		throw new Error(`Constraint '${constraintName}' not defined`);
 	}
-	
+
 	// Type each implementation
 	const implementationMap = new Map<string, TypeScheme>();
 	let currentState = state;
 	let allEffects = emptyEffects();
-	
+
 	for (const impl of implementations) {
 		// Check if function is required by constraint
 		const requiredType = constraintSig.functions.get(impl.name);
 		if (!requiredType) {
-			throw new Error(`Function '${impl.name}' not required by constraint '${constraintName}'`);
+			throw new Error(
+				`Function '${impl.name}' not required by constraint '${constraintName}'`
+			);
 		}
-		
+
 		// Type the implementation
 		const implResult = typeExpression(impl.value, currentState);
 		currentState = implResult.state;
 		allEffects = unionEffects(allEffects, implResult.effects);
-		
+
 		// TODO: Check that implementation type matches required type
 		// For now, we'll trust the implementation
-		
+
 		// Store in implementation map
 		implementationMap.set(impl.name, {
 			type: implResult.type,
@@ -1019,32 +1065,35 @@ export const typeImplementDefinition = (
 			effects: implResult.effects,
 		});
 	}
-	
+
 	// Check that all required functions are implemented
 	for (const [funcName] of constraintSig.functions) {
 		if (!implementationMap.has(funcName)) {
-			throw new Error(`Missing implementation for '${funcName}' in implementation of '${constraintName}' for '${typeName}'`);
+			throw new Error(
+				`Missing implementation for '${funcName}' in implementation of '${constraintName}' for '${typeName}'`
+			);
 		}
 	}
-	
+
 	// Create constraint implementation
 	const implementation: ConstraintImplementation = {
 		functions: implementationMap,
 	};
-	
+
 	// Add to constraint registry
 	const success = addConstraintImplementation(
-		currentState.constraintRegistry, 
-		constraintName, 
-		typeName, 
+		currentState.constraintRegistry,
+		constraintName,
+		typeName,
 		implementation
 	);
-	
+
 	if (!success) {
-		throw new Error(`Failed to add implementation of '${constraintName}' for '${typeName}'`);
+		throw new Error(
+			`Failed to add implementation of '${constraintName}' for '${typeName}'`
+		);
 	}
-	
+
 	// Implement definitions have unit type
 	return createTypeResult(unitType(), allEffects, currentState);
 };
-

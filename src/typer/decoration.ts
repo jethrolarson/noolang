@@ -21,23 +21,23 @@ export const typeAndDecorate = (program: Program, initialState?: TypeState) => {
 	// Process all statements with typeExpression, then decorate the AST
 	let currentState = state;
 	let finalType = null;
-	
+
 	for (const statement of program.statements) {
 		// Type the statement (this does all the work)
 		const result = typeExpression(statement, currentState);
 		currentState = result.state;
 		finalType = result.type;
-		
+
 		// Now just add the computed type to the AST node (lightweight decoration)
 		statement.type = result.type;
 	}
-	
+
 	if (!finalType) {
 		finalType = unitType();
 	}
-	
-	return { 
-		program: { ...program }, 
-		state: currentState 
+
+	return {
+		program: { ...program },
+		state: currentState,
 	};
 };

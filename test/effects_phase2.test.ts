@@ -3,14 +3,19 @@
 
 import { Lexer } from '../src/lexer';
 import { parse } from '../src/parser/parser';
-import { typeProgram, emptyEffects, singleEffect, unionEffects } from '../src/typer';
+import {
+	typeProgram,
+	emptyEffects,
+	singleEffect,
+	unionEffects,
+} from '../src/typer';
 import type { Effect } from '../src/ast';
 
 const runNoolang = (code: string) => {
 	const lexer = new Lexer(code);
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	
+
 	return typeProgram(program);
 };
 
@@ -31,7 +36,7 @@ describe('Effects Phase 2: Separated Effects Architecture', () => {
 			const effects1 = singleEffect('read' as Effect);
 			const effects2 = singleEffect('log' as Effect);
 			const effects3 = new Set(['state', 'read'] as Effect[]); // includes duplicate 'read'
-			
+
 			const combined = unionEffects(effects1, effects2, effects3);
 			expect(combined.size).toBe(3);
 			expect(combined.has('read')).toBe(true);
@@ -276,7 +281,7 @@ describe('Effects Phase 2: Separated Effects Architecture', () => {
 				'{1, 2}',
 				'if True then 1 else 2',
 				'1 + 2',
-				'head [1, 2, 3]'
+				'head [1, 2, 3]',
 			];
 
 			for (const expr of expressions) {
