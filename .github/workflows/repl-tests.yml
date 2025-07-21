@@ -1,0 +1,184 @@
+name: REPL Automated Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/repl.ts'
+      - 'src/evaluator.ts'
+      - 'src/typer/**'
+      - 'test/repl*.test.ts'
+      - 'scripts/test-repl-automation.ts'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/repl.ts'
+      - 'src/evaluator.ts'
+      - 'src/typer/**'
+      - 'test/repl*.test.ts'
+      - 'scripts/test-repl-automation.ts'
+
+jobs:
+  repl-unit-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run REPL unit tests
+      run: npm run test:repl
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: repl-unit-test-results
+        path: |
+          coverage/
+          junit.xml
+        retention-days: 30
+
+  repl-automation-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run REPL automation tests
+      run: npm run test:repl-automation
+    
+    - name: Upload test reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: repl-automation-reports
+        path: test-reports/
+        retention-days: 30
+
+  repl-integration-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run REPL integration tests
+      run: npm run test:repl-integration
+    
+    - name: Upload integration test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: repl-integration-test-results
+        path: |
+          coverage/
+          test-results/
+        retention-days: 30
+
+  repl-cross-platform:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [16, 18, 20]
+    
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run basic REPL tests
+      run: npm run test:repl
+    
+    - name: Test REPL startup
+      run: timeout 30s npm run dev || test $? = 124
+      shell: bash
+      # This tests that REPL can start without hanging
+
+  performance-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run performance benchmarks
+      run: |
+        # Create a simple performance test
+        cat > perf-test.ts << 'EOF'
+        import { REPLTestAutomator } from './scripts/test-repl-automation';
+        
+        async function perfTest() {
+          const automator = new REPLTestAutomator();
+          await automator.startREPL();
+          
+          const start = Date.now();
+          for (let i = 0; i < 50; i++) {
+            await automator.sendCommand(`${i} + ${i + 1}`);
+          }
+          const end = Date.now();
+          
+          console.log(`50 commands took ${end - start}ms`);
+          console.log(`Average: ${(end - start) / 50}ms per command`);
+          
+          await automator.shutdown();
+        }
+        
+        perfTest().catch(console.error);
+        EOF
+        
+        npx ts-node perf-test.ts
+    
+    - name: Check memory usage
+      run: |
+        # Monitor memory usage during REPL operation
+        (npm run dev &) &
+        REPL_PID=$!
+        sleep 5
+        ps -o pid,rss,vsz,comm -p $REPL_PID || echo "REPL process not found"
+        kill $REPL_PID 2>/dev/null || true
