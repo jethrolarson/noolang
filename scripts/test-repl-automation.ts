@@ -33,7 +33,8 @@ class REPLTestAutomator {
         this.output += text;
         console.log('REPL Output:', text.trim());
         
-        if (text.includes('Welcome to Noolang') && text.includes('noolang>')) {
+        // Check accumulated output for both welcome message and prompt
+        if (this.output.includes('Welcome to Noolang') && this.output.includes('noolang>')) {
           this.isReady = true;
           resolve();
         }
