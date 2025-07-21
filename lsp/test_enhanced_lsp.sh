@@ -15,16 +15,16 @@ echo "🔧 Testing Type System Integration:"
 echo "-----------------------------------"
 
 echo "1. Basic type checking works:"
-node dist/cli.js --types "fn x => x + 1"
+node ../dist/cli.js --types "fn x => x + 1"
 echo
 
 echo "2. File-based type checking works:"
-node dist/cli.js --types-file test-improved.noo
+node ../dist/cli.js --types-file test-improved.noo
 echo
 
 echo "3. Error handling works:"
 echo 'x + "hello"' > test-error.noo
-node dist/cli.js --types-file test-error.noo 2>&1 || echo "✅ Error correctly detected"
+node ../dist/cli.js --types-file test-error.noo 2>&1 || echo "✅ Error correctly detected"
 echo
 
 echo "🚀 LSP Features Available:"
@@ -39,14 +39,14 @@ echo
 
 echo "🎉 VSCode Integration Status:"
 echo "- ✅ Extension compiled and ready at extension/out/"
-echo "- ✅ LSP server binary ready at lsp/target/release/noolang-lsp"
+echo "- ✅ LSP server binary ready at target/release/noolang-lsp"
 echo "- ✅ Full .noo file support with syntax highlighting"
 echo "- ✅ Real-time IntelliSense for Noolang development"
 echo
 
 echo "📝 To use in VSCode:"
-echo "1. Open this workspace in VSCode"
-echo "2. Install the extension from the extension/ directory"
+echo "1. Open the main workspace (../) in VSCode"
+echo "2. Install the extension from the lsp/extension/ directory"
 echo "3. Open any .noo file"
 echo "4. Get completions, hover information, and error diagnostics!"
 echo

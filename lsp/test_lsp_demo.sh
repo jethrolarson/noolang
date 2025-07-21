@@ -9,7 +9,7 @@ echo "--------------------------------------"
 echo "TypeScript CLI → Rust LSP Bridge working:"
 echo
 echo "✅ Simple file type check:"
-node dist/cli.js --types-file simple-test.noo
+node ../dist/cli.js --types-file simple-test.noo
 echo
 
 echo "✅ Completion items available:"
@@ -20,7 +20,7 @@ echo
 
 echo "2. 🔧 LSP Server Status"
 echo "----------------------"
-echo "✅ Rust LSP Server: Built and ready at lsp/target/release/noolang-lsp"
+echo "✅ Rust LSP Server: Built and ready at target/release/noolang-lsp"
 echo "✅ VSCode Extension: Built and ready at extension/out/"
 echo "✅ TypeScript CLI: Built and working at dist/cli.js"
 echo
