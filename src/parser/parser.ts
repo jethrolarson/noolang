@@ -15,6 +15,7 @@ import {
 	intType,
 	stringType,
 	unitType,
+	boolType,
 	listTypeWithElement,
 	functionType,
 	typeVariable,
@@ -74,9 +75,10 @@ const parseTypeName: C.Parser<Token> = (tokens: Token[]) => {
 };
 
 // --- Helper: parse a single type atom (primitive, variable, record, tuple, list) ---
+// This function parses ONLY atomic types, no type application
 function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
   // Try primitive types first
-  const primitiveTypes = ["Int", "Number", "String", "Unit", "List"];
+  const primitiveTypes = ["Int", "Number", "String", "Unit", "Bool"];
   for (const typeName of primitiveTypes) {
     const result = C.keyword(typeName)(tokens);
     if (result.success) {
@@ -100,44 +102,44 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
             value: unitType(),
             remaining: result.remaining,
           };
-        case "List":
+        case "Bool":
           return {
             success: true as const,
-            value: listTypeWithElement(typeVariable("a")), // List with generic element
+            value: boolType(),
             remaining: result.remaining,
           };
       }
     }
   }
 
-  // Try type application (any identifier can potentially be applied to arguments)
-  if (tokens.length > 0 && tokens[0].type === "IDENTIFIER") {
-    const identifierResult = C.identifier()(tokens);
-    if (identifierResult.success) {
-      const name = identifierResult.value.value;
-      
-      // Try to parse type arguments
-      const argsResult = C.many(C.lazy(() => parseTypeAtom))(identifierResult.remaining);
-      
-      if (argsResult.success && argsResult.value.length > 0) {
-        // Type application: identifier applied to arguments
-        return {
-          success: true as const,
-          value: variantType(name, argsResult.value),
-          remaining: argsResult.remaining,
-        };
-      } else {
-        // Just a type variable or nullary type constructor
-        return {
-          success: true as const,
-          value: typeVariable(name),
-          remaining: identifierResult.remaining,
-        };
-      }
-    }
+  // Try List type with element: List ElementType
+  const listResult = C.seq(
+    C.keyword("List"),
+    C.lazy(() => parseTypeExpression)
+  )(tokens);
+  if (listResult.success) {
+    return {
+      success: true as const,
+      value: listTypeWithElement(listResult.value[1]),
+      remaining: listResult.remaining,
+    };
   }
 
-  // Try record type
+  // Try Tuple type constructor: Tuple T1 T2 T3
+  const tupleConstructorResult = C.seq(
+    C.keyword("Tuple"),
+    C.many(C.lazy(() => parseTypeExpression))
+  )(tokens);
+  if (tupleConstructorResult.success) {
+    const elementTypes = tupleConstructorResult.value[1];
+    return {
+      success: true as const,
+      value: tupleTypeConstructor(elementTypes),
+      remaining: tupleConstructorResult.remaining,
+    };
+  }
+
+  // Try record type: { field1: Type1, field2: Type2 }
   const recordResult = C.seq(
     C.punctuation("{"),
     C.optional(
@@ -168,7 +170,7 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
     };
   }
 
-  // Try tuple type
+  // Try tuple type: { Type1, Type2, Type3 }
   const tupleResult = C.seq(
     C.punctuation("{"),
     C.optional(
@@ -188,33 +190,6 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
     };
   }
 
-  // Try List type
-  const listResult = C.seq(
-    C.keyword("List"),
-    C.lazy(() => parseTypeExpression)
-  )(tokens);
-  if (listResult.success) {
-    return {
-      success: true as const,
-      value: listTypeWithElement(listResult.value[1]),
-      remaining: listResult.remaining,
-    };
-  }
-
-  // Try Tuple type constructor: Tuple T1 T2 T3
-  const tupleConstructorResult = C.seq(
-    C.keyword("Tuple"),
-    C.many(C.lazy(() => parseTypeExpression))
-  )(tokens);
-  if (tupleConstructorResult.success) {
-    const elementTypes = tupleConstructorResult.value[1];
-    return {
-      success: true as const,
-      value: tupleTypeConstructor(elementTypes),
-      remaining: tupleConstructorResult.remaining,
-    };
-  }
-
   // Try parenthesized type: (Type)
   const parenResult = C.seq(
     C.punctuation("("),
@@ -229,43 +204,82 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
     };
   }
 
-  // Try user-defined type constructor: TypeName arg1 arg2 ...
-  if (
-    tokens.length > 0 &&
-    tokens[0].type === "IDENTIFIER" &&
-    /^[A-Z]/.test(tokens[0].value)
-  ) {
-    const typeNameResult = C.identifier()(tokens);
-    if (typeNameResult.success) {
-      // Try to parse type arguments
-      const argsResult = C.many(C.lazy(() => parseTypeAtom))(
-        typeNameResult.remaining
-      );
-      if (argsResult.success) {
-        return {
-          success: true as const,
-          value: {
-            kind: "variant",
-            name: typeNameResult.value.value,
-            args: argsResult.value,
-          } as Type,
-          remaining: argsResult.remaining,
-        };
-      }
+  // Try type variable/constructor name (but NO application here)
+  if (tokens.length > 0 && tokens[0].type === "IDENTIFIER") {
+    const identifierResult = C.identifier()(tokens);
+    if (identifierResult.success) {
+      const name = identifierResult.value.value;
+      // Just a type variable or nullary type constructor
+      return {
+        success: true as const,
+        value: typeVariable(name),
+        remaining: identifierResult.remaining,
+      };
     }
   }
 
-  return {
-    success: false,
+  // If we get here, no atomic type was found
+  return { 
+    success: false as const, 
     error: "Expected type atom",
     position: tokens[0]?.location.start.line || 0,
   };
 }
 
+// --- Helper: parse type constructor application (identifier + arguments) ---
+function parseTypeApplication(tokens: Token[]): C.ParseResult<Type> {
+  // Try type constructor application (identifier followed by arguments)
+  if (tokens.length > 0 && tokens[0].type === "IDENTIFIER") {
+    const identifierResult = C.identifier()(tokens);
+    if (identifierResult.success) {
+      const name = identifierResult.value.value;
+      
+      // Try to parse type arguments (collect ALL arguments)
+      const argsResult = C.many(C.lazy(() => parseTypeAtom))(identifierResult.remaining);
+      
+      if (argsResult.success && argsResult.value.length > 0) {
+        // Type application: identifier applied to multiple arguments
+        return {
+          success: true as const,
+          value: variantType(name, argsResult.value),
+          remaining: argsResult.remaining,
+        };
+      } else {
+        // Just a type variable or nullary type constructor
+        return {
+          success: true as const,
+          value: typeVariable(name),
+          remaining: identifierResult.remaining,
+        };
+      }
+    }
+  }
+
+  return { 
+    success: false as const, 
+    error: "Expected type constructor",
+    position: tokens[0]?.location.start.line || 0,
+  };
+}
+
+// --- Parse basic type terms (atoms or applications) ---
+function parseTypeTerm(tokens: Token[]): C.ParseResult<Type> {
+  // Try type application first (e.g., "Option Int", "Either String Int")
+  const appResult = parseTypeApplication(tokens);
+  if (appResult.success) {
+    return appResult;
+  }
+
+  // Fall back to atomic type
+  return parseTypeAtom(tokens);
+}
+
+
+
 // --- Type Expression ---
 // Helper function to parse function types without top-level effects
 const parseFunctionTypeWithoutEffects: C.Parser<Type> = (tokens) => {
-  let leftResult = parseTypeAtom(tokens);
+  let leftResult = parseTypeTerm(tokens);
   if (!leftResult.success) return leftResult;
   let left = leftResult.value;
   let rest = leftResult.remaining;
@@ -296,7 +310,7 @@ const parseFunctionTypeWithoutEffects: C.Parser<Type> = (tokens) => {
 export const parseTypeExpression: C.Parser<Type> = (tokens) => {
   // Try function type (right-associative): a -> b -> c FIRST
   const funcType = (() => {
-    let leftResult = parseTypeAtom(tokens);
+    let leftResult = parseTypeTerm(tokens);
     if (!leftResult.success) return leftResult;
     let left = leftResult.value;
     let rest = leftResult.remaining;
