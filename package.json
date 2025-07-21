@@ -13,6 +13,7 @@
     "test:repl": "jest test/repl.test.ts",
     "test:repl-integration": "jest test/repl-integration.test.ts",
     "test:repl-automation": "ts-node scripts/test-repl-automation.ts",
+    "test:repl-simple": "node scripts/simple-repl-test.js",
     "test:all": "jest && npm run test:repl-automation",
     "test:all-repl": "npm run test:repl && npm run test:repl-integration && npm run test:repl-automation",
     "benchmark": "npm run build && node benchmark.js",
