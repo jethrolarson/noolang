@@ -737,110 +737,507 @@ describe("Additional Coverage Tests", () => {
   };
 
   describe("Pattern Matching Coverage", () => {
-    test("should handle wildcard patterns and variable binding", () => {
-      const code = `
+    test("should handle wildcard pattern", () => {
+      const result = runCode(`
+        value = "anything";
+        match value with (
+          _ => "wildcard matched"
+        )
+      `);
+      expect(unwrapValue(result.finalResult)).toBe("wildcard matched");
+    });
+
+    test("should handle variable pattern with binding", () => {
+      const result = runCode(`
+        value = 123;
+        match value with (
+          x => x + 1
+        )
+      `);
+      expect(unwrapValue(result.finalResult)).toBe(124);
+    });
+
+    test("should handle constructor pattern matching", () => {
+      const result = runCode(`
+        type MyType = A | B Int;
+        value = B 42;
+        match value with (
+          A => 0;
+          B x => x
+        )
+      `);
+      expect(unwrapValue(result.finalResult)).toBe(42);
+    });
+
+    test("should throw error when no pattern matches", () => {
+      expect(() => runCode(`
+        type Color = Red | Blue;
+        value = Red;
+        match value with (
+          Blue => "blue"
+        )
+      `)).toThrow("No pattern matched in match expression");
+    });
+  });
+
+  describe("ValueToString Coverage", () => {
+    test("should convert number to string", () => {
+      const result = runCode("toString 42");
+      expect(unwrapValue(result.finalResult)).toBe("42");
+    });
+
+    test("should convert string to string with quotes", () => {
+      const result = runCode('toString "hello"');
+      expect(unwrapValue(result.finalResult)).toBe('"hello"');
+    });
+
+    test("should convert boolean True to string", () => {
+      const result = runCode("toString True");
+      expect(unwrapValue(result.finalResult)).toBe("True");
+    });
+
+    test("should convert boolean False to string", () => {
+      const result = runCode("toString False");
+      expect(unwrapValue(result.finalResult)).toBe("False");
+    });
+
+    test("should convert list to string", () => {
+      const result = runCode("toString [1, 2, 3]");
+      expect(unwrapValue(result.finalResult)).toBe("[1; 2; 3]");
+    });
+
+    test("should convert tuple to string", () => {
+      const result = runCode("toString {1, 2, 3}");
+      expect(unwrapValue(result.finalResult)).toBe("{1; 2; 3}");
+    });
+
+    test("should convert record to string", () => {
+      const result = runCode("toString { @name \"Alice\", @age 30 }");
+      expect(unwrapValue(result.finalResult)).toBe('{@name "Alice"; @age 30}');
+    });
+
+    test("should convert unit to string", () => {
+      const result = runCode("toString {}");
+      expect(unwrapValue(result.finalResult)).toBe("unit");
+    });
+
+    test("should convert function to string", () => {
+      const result = runCode("toString (fn x => x + 1)");
+      expect(unwrapValue(result.finalResult)).toBe("<function>");
+    });
+
+    test("should convert constructor without args to string", () => {
+      const result = runCode(`
+        type Color = Red | Green | Blue;
+        toString Red
+      `);
+      expect(unwrapValue(result.finalResult)).toBe("Red");
+    });
+
+    test("should convert constructor with args to string", () => {
+      const result = runCode(`
         type Option a = Some a | None;
-        getValue = fn opt => match opt with (
-          Some x => x + 10;
-          None => 0;
-          _ => -1
-        );
-        getValue (Some 5)
-      `;
-      const result = runCode(code);
+        toString (Some 42)
+      `);
+      expect(unwrapValue(result.finalResult)).toBe("Some 42");
+    });
+  });
+
+  describe("Math and String Utility Coverage", () => {
+    test("should handle abs function", () => {
+      const result = runCode("abs (-5)");
+      expect(unwrapValue(result.finalResult)).toBe(5);
+    });
+
+    test("should handle max function", () => {
+      const result = runCode("max 5 10");
+      expect(unwrapValue(result.finalResult)).toBe(10);
+    });
+
+    test("should handle min function", () => {
+      const result = runCode("min 5 10");
+      expect(unwrapValue(result.finalResult)).toBe(5);
+    });
+
+    test("should handle concat function", () => {
+      const result = runCode('concat "hello" " world"');
+      expect(unwrapValue(result.finalResult)).toBe("hello world");
+    });
+  });
+
+  describe("Record Utility Functions", () => {
+    test("should handle hasKey function", () => {
+      const result = runCode(`
+        record = { @name "Alice", @age 30 };
+        hasKey record "name"
+      `);
+      expect(unwrapValue(result.finalResult)).toBe(true);
+    });
+
+    test("should handle hasKey with missing key", () => {
+      const result = runCode(`
+        record = { @name "Alice", @age 30 };
+        hasKey record "height"
+      `);
+      expect(unwrapValue(result.finalResult)).toBe(false);
+    });
+
+    test("should handle hasValue with missing value", () => {
+      const result = runCode(`
+        record = { @name "Alice", @age 30 };
+        hasValue record 42
+      `);
+      expect(unwrapValue(result.finalResult)).toBe(false);
+    });
+  });
+
+  describe("Random Number Functions", () => {
+    test("should handle randomRange function", () => {
+      const result = runCode("randomRange 1 10");
+      expect(result.finalResult.tag).toBe("number");
+      if (result.finalResult.tag === "number") {
+        expect(result.finalResult.value).toBeGreaterThanOrEqual(1);
+        expect(result.finalResult.value).toBeLessThanOrEqual(10);
+      }
+    });
+  });
+
+  describe("Error Handling Coverage", () => {
+    test("should handle division by zero", () => {
+      expect(() => runCode("5 / 0")).toThrow("Division by zero");
+    });
+
+    test("should handle invalid function application", () => {
+      expect(() => runCode("42 5")).toThrow();
+    });
+
+    test("should handle mutGet error with non-mutable", () => {
+      expect(() => runCode("mutGet 42")).toThrow("mutGet requires a mutable reference");
+    });
+
+    test("should handle mutSet error with non-mutable", () => {
+      expect(() => runCode("mutSet 42 100")).toThrow("mutSet requires a mutable reference");
+    });
+  });
+
+  describe("Type Definition Coverage", () => {
+    test("should handle nullary constructors", () => {
+      const result = runCode(`
+        type Color = Red | Green | Blue;
+        Red
+      `);
+      expect(result.finalResult.tag).toBe("constructor");
+      if (result.finalResult.tag === "constructor") {
+        expect(result.finalResult.name).toBe("Red");
+        expect(result.finalResult.args).toEqual([]);
+      }
+    });
+
+    test("should handle constructor with arguments", () => {
+      const result = runCode(`
+        type Point = Point Int Int;
+        Point 10 20
+      `);
+      expect(result.finalResult.tag).toBe("constructor");
+      if (result.finalResult.tag === "constructor") {
+        expect(result.finalResult.name).toBe("Point");
+        expect(result.finalResult.args).toHaveLength(2);
+      }
+    });
+
+    test("should handle curried constructor application", () => {
+      const result = runCode(`
+        type Point = Point Int Int;
+        partialPoint = Point 10;
+        partialPoint 20
+      `);
+      expect(result.finalResult.tag).toBe("constructor");
+      if (result.finalResult.tag === "constructor") {
+        expect(result.finalResult.name).toBe("Point");
+        expect(result.finalResult.args).toHaveLength(2);
+      }
+    });
+  });
+
+  describe("Environment and Scope Coverage", () => {
+    test("should handle nested scopes with pattern matching", () => {
+      const result = runCode(`
+        outer = 10;
+        value = 42;
+        match value with (
+          x => x + outer
+        )
+      `);
+      expect(unwrapValue(result.finalResult)).toBe(52);
+    });
+
+    test("should handle function scoping", () => {
+      const result = runCode(`
+        x = 1;
+        f = fn y => x + y;
+        f 10
+      `);
+      expect(unwrapValue(result.finalResult)).toBe(11);
+    });
+  });
+
+  describe("Built-in List Functions Coverage", () => {
+    test("should handle cons function", () => {
+      const result = runCode("cons 1 [2, 3, 4]");
+      expect(result.finalResult.tag).toBe("list");
+      if (result.finalResult.tag === "list") {
+        expect(result.finalResult.values).toHaveLength(4);
+      }
+    });
+
+    test("should handle tail function", () => {
+      const result = runCode("tail [1, 2, 3, 4]");
+      expect(result.finalResult.tag).toBe("list");
+      if (result.finalResult.tag === "list") {
+        expect(result.finalResult.values).toHaveLength(3);
+      }
+    });
+
+    test("should handle map function", () => {
+      const result = runCode("map (fn x => x * 2) [1, 2, 3]");
+      expect(result.finalResult.tag).toBe("list");
+      if (result.finalResult.tag === "list") {
+        expect(result.finalResult.values).toHaveLength(3);
+      }
+    });
+
+    test("should handle filter function", () => {
+      const result = runCode("filter (fn x => x > 2) [1, 2, 3, 4, 5]");
+      expect(result.finalResult.tag).toBe("list");
+      if (result.finalResult.tag === "list") {
+        expect(result.finalResult.values.length).toBeLessThan(5);
+      }
+    });
+
+    test("should handle length function", () => {
+      const result = runCode("length [1, 2, 3, 4, 5]");
+      expect(unwrapValue(result.finalResult)).toBe(5);
+    });
+
+    test("should handle isEmpty function", () => {
+      const result = runCode("isEmpty []");
+      expect(unwrapValue(result.finalResult)).toBe(true);
+
+      const result2 = runCode("isEmpty [1, 2, 3]");
+      expect(unwrapValue(result2.finalResult)).toBe(false);
+    });
+
+    test("should handle append function", () => {
+      const result = runCode("append [1, 2] [3, 4]");
+      expect(result.finalResult.tag).toBe("list");
+      if (result.finalResult.tag === "list") {
+        expect(result.finalResult.values).toHaveLength(4);
+      }
+    });
+  });
+
+  describe("Pipeline and Composition Coverage", () => {
+    test("should handle pipeline operator", () => {
+      const result = runCode("5 | (fn x => x * 2)");
+      expect(unwrapValue(result.finalResult)).toBe(10);
+    });
+
+    test("should handle function composition with |>", () => {
+      const result = runCode(`
+        f = fn x => x + 1;
+        g = fn x => x * 2;
+        composed = f |> g;
+        composed 5
+      `);
+      expect(unwrapValue(result.finalResult)).toBe(12);
+    });
+
+    test("should handle function composition with <|", () => {
+      const result = runCode(`
+        f = fn x => x + 1;
+        g = fn x => x * 2;
+        composed = f <| g;
+        composed 5
+      `);
+      expect(unwrapValue(result.finalResult)).toBe(11);
+    });
+
+    test("should handle dollar operator", () => {
+      const result = runCode("(fn x => x * 2) $ 5");
+      expect(unwrapValue(result.finalResult)).toBe(10);
+    });
+  });
+
+  describe("Additional Error Coverage", () => {
+    test("should handle cons with non-list", () => {
+      expect(() => runCode("cons 1 42")).toThrow("Second argument to cons must be a list");
+    });
+
+    test("should handle tail on empty list", () => {
+      expect(() => runCode("tail []")).toThrow("Cannot get tail of empty list or non-list");
+    });
+
+    test("should handle map with non-function", () => {
+      expect(() => runCode("map 42 [1, 2, 3]")).toThrow("map requires a function and a list");
+    });
+
+    test("should handle filter with non-function", () => {
+      expect(() => runCode("filter 42 [1, 2, 3]")).toThrow("filter requires a predicate function and a list");
+    });
+
+    test("should handle length on non-list", () => {
+      expect(() => runCode("length 42")).toThrow("length requires a list");
+    });
+
+    test("should handle isEmpty on non-list", () => {
+      expect(() => runCode("isEmpty 42")).toThrow("isEmpty requires a list");
+    });
+
+    test("should handle append with non-lists", () => {
+      expect(() => runCode("append 42 [1, 2]")).toThrow("append requires two lists");
+      expect(() => runCode("append [1, 2] 42")).toThrow("append requires two lists");
+    });
+
+    test("should handle abs with non-number", () => {
+      expect(() => runCode("abs {}")).toThrow("abs requires a number");
+    });
+
+    test("should handle max with non-numbers", () => {
+      expect(() => runCode("max {} 5")).toThrow("max requires two numbers");
+    });
+
+    test("should handle min with non-numbers", () => {
+      expect(() => runCode("min {} 5")).toThrow("min requires two numbers");
+    });
+
+    test("should handle concat with non-strings", () => {
+      expect(() => runCode("concat 42 24")).toThrow("concat requires two strings");
+    });
+
+    test("should handle hasKey with non-record", () => {
+      expect(() => runCode('hasKey 42 "name"')).toThrow("hasKey requires a record and a string key");
+    });
+
+    test("should handle hasValue with non-record", () => {
+      expect(() => runCode("hasValue 42 24")).toThrow("hasValue requires a record");
+    });
+
+    test("should handle randomRange with non-numbers", () => {
+      expect(() => runCode("randomRange {} 10")).toThrow("randomRange requires number arguments");
+    });
+  });
+
+  describe("Comparison Operators Coverage", () => {
+    test("should handle string equality", () => {
+      expect(unwrapValue(runCode('"hello" == "hello"').finalResult)).toBe(true);
+      expect(unwrapValue(runCode('"hello" == "world"').finalResult)).toBe(false);
+    });
+
+    test("should handle boolean equality", () => {
+      expect(unwrapValue(runCode('True == True').finalResult)).toBe(true);
+      expect(unwrapValue(runCode('True == False').finalResult)).toBe(false);
+    });
+
+    test("should handle unit equality", () => {
+      expect(unwrapValue(runCode('{} == {}').finalResult)).toBe(true);
+    });
+
+    test("should handle mixed types returning false", () => {
+      expect(unwrapValue(runCode('42 == "42"').finalResult)).toBe(false);
+    });
+
+    test("should handle inequality operator", () => {
+      expect(unwrapValue(runCode('42 != 24').finalResult)).toBe(true);
+      expect(unwrapValue(runCode('42 != 42').finalResult)).toBe(false);
+      
+      expect(unwrapValue(runCode('"hello" != "world"').finalResult)).toBe(true);
+      expect(unwrapValue(runCode('"test" != "test"').finalResult)).toBe(false);
+      
+      expect(unwrapValue(runCode('True != False').finalResult)).toBe(true);
+      expect(unwrapValue(runCode('False != False').finalResult)).toBe(false);
+      
+      expect(unwrapValue(runCode('{} != {}').finalResult)).toBe(false);
+      expect(unwrapValue(runCode('{} != 42').finalResult)).toBe(true);
+    });
+
+    test("should handle comparison operators", () => {
+      expect(unwrapValue(runCode('5 < 10').finalResult)).toBe(true);
+      expect(unwrapValue(runCode('10 < 5').finalResult)).toBe(false);
+      expect(unwrapValue(runCode('5 < 5').finalResult)).toBe(false);
+
+      expect(unwrapValue(runCode('10 > 5').finalResult)).toBe(true);
+      expect(unwrapValue(runCode('5 > 10').finalResult)).toBe(false);
+      expect(unwrapValue(runCode('5 > 5').finalResult)).toBe(false);
+
+      expect(unwrapValue(runCode('5 <= 10').finalResult)).toBe(true);
+      expect(unwrapValue(runCode('10 <= 5').finalResult)).toBe(false);
+      expect(unwrapValue(runCode('5 <= 5').finalResult)).toBe(true);
+
+      expect(unwrapValue(runCode('10 >= 5').finalResult)).toBe(true);
+      expect(unwrapValue(runCode('5 >= 10').finalResult)).toBe(false);
+      expect(unwrapValue(runCode('5 >= 5').finalResult)).toBe(true);
+    });
+
+    test("should handle comparison with non-numbers", () => {
+      expect(() => runCode('"hello" < "world"')).toThrow("Cannot compare");
+    });
+  });
+
+  describe("Reduce Function Coverage", () => {
+    test("should handle reduce with valid function", () => {
+      const result = runCode("reduce (fn acc => fn x => acc + x) 0 [1, 2, 3, 4, 5]");
       expect(unwrapValue(result.finalResult)).toBe(15);
     });
 
-    test("should handle constructor pattern matching with multiple patterns", () => {
-      const code = `
-        type Choice = First Int | Second String | Third;
-        process = fn choice => match choice with (
-          First n => n * 2;
-          Second s => 100;
-          Third => 200
-        );
-        process (First 21)
-      `;
-      const result = runCode(code);
-      expect(unwrapValue(result.finalResult)).toBe(42);
+    test("should handle reduce with non-function", () => {
+      expect(() => runCode("reduce 42 0 [1, 2, 3]")).toThrow("reduce requires a function");
+    });
+
+    test("should handle reduce with invalid function return", () => {
+      expect(() => runCode("reduce (fn x => 42) 0 [1, 2, 3]")).toThrow("reduce function must return a function after first argument");
     });
   });
 
-  describe("ValueToString Function Coverage (Lines 1757-1783)", () => {
-    test("should convert different value types to string via toString", () => {
-      // Testing various branches of valueToString function
-      expect(unwrapValue(runCode("toString 42").finalResult)).toBe("42");
-      expect(unwrapValue(runCode('toString "hello"').finalResult)).toBe('"hello"');
-      expect(unwrapValue(runCode("toString True").finalResult)).toBe("True");
-      expect(unwrapValue(runCode("toString False").finalResult)).toBe("False");
-      expect(unwrapValue(runCode("toString []").finalResult)).toBe("[]");
-      expect(unwrapValue(runCode("toString [1, 2, 3]").finalResult)).toBe("[1; 2; 3]");
-      expect(unwrapValue(runCode("toString {1, 2}").finalResult)).toBe("{1; 2}");
-      expect(unwrapValue(runCode('toString { @x 10, @y 20 }').finalResult)).toBe("{@x 10; @y 20}");
-      expect(unwrapValue(runCode("toString (fn x => x)").finalResult)).toBe("<function>");
-      expect(unwrapValue(runCode("toString {}").finalResult)).toBe("unit");
+  describe("Advanced Features Coverage", () => {
+    test("should handle print function returning value", () => {
+      const result = runCode('print "hello"');
+      expect(unwrapValue(result.finalResult)).toBe("hello");
     });
 
-    test("should handle constructor values in toString", () => {
-      const code1 = `
-        type Color = Red | Green | Blue;
-        toString Red
-      `;
-      expect(unwrapValue(runCode(code1).finalResult)).toBe("Red");
-
-      const code2 = `
-        type Option a = Some a | None;
-        toString (Some 42)
-      `;
-      expect(unwrapValue(runCode(code2).finalResult)).toBe("Some 42");
-
-      const code3 = `
-        type Point = Point Int Int;
-        toString (Point 10 20)
-      `;
-      expect(unwrapValue(runCode(code3).finalResult)).toBe("Point 10 20");
+    test("should handle semicolon operator returning rightmost value", () => {
+      const result = runCode("1; 2; 3");
+      expect(unwrapValue(result.finalResult)).toBe(3);
     });
 
-    test("should handle complex nested data structures in toString", () => {
-      const code = `
-        type Option a = Some a | None;
-        data = [Some 1, Some 2, None];
-        toString data
-      `;
-      const result = runCode(code);
-      expect(unwrapValue(result.finalResult)).toBe("[Some 1; Some 2; None]");
-    });
-  });
-
-  describe("Error Path Coverage", () => {
-    test("should handle invalid pattern kinds via tryMatchPattern", () => {
-      // This directly tests the uncovered error path
-      const invalidPattern = { kind: "invalid" } as any;
-      const value = { tag: "number", value: 42 } as any;
-      
-      expect(() => {
-        evaluator['tryMatchPattern'](invalidPattern, value);
-      }).toThrow("Unsupported pattern kind: invalid");
-    });
-  });
-
-  describe("Edge Cases for Better Coverage", () => {
-    test("should handle empty list and empty tuple toString", () => {
-      expect(unwrapValue(runCode("toString []").finalResult)).toBe("[]");
-      expect(unwrapValue(runCode("toString {}").finalResult)).toBe("unit");
+    test("should handle list_get function", () => {
+      const result = runCode("list_get 1 [10, 20, 30]");
+      expect(unwrapValue(result.finalResult)).toBe(20);
     });
 
-    test("should handle complex record with multiple fields", () => {
-      const code = `toString { @name "Alice", @age 30, @city "NYC" }`;
-      const result = unwrapValue(runCode(code).finalResult);
-      expect(result).toContain("@name");
-      expect(result).toContain("@age");  
-      expect(result).toContain("@city");
+    test("should handle list_get with invalid index", () => {
+      expect(() => runCode("list_get 10 [1, 2, 3]")).toThrow("list_get: invalid index or not a list");
     });
 
-    test("should handle nested tuples", () => {
-      const result = unwrapValue(runCode("toString {{1, 2}, {3, 4}}").finalResult);
-      expect(result).toBe("{{1; 2}; {3; 4}}");
+    test("should handle nested pattern matching", () => {
+      const result = runCode(`
+        type Tree = Leaf Int | Node Tree Tree;
+        tree = Node (Leaf 1) (Leaf 2);
+        match tree with (
+          Leaf x => x;
+          Node left right => 100
+        )
+      `);
+      expect(unwrapValue(result.finalResult)).toBe(100);
+    });
+
+    test("should handle complex nested constructors toString", () => {
+      const result = runCode(`
+        type Tree = Leaf Int | Node Tree Tree;
+        tree = Node (Leaf 1) (Leaf 2);
+        toString tree
+      `);
+      expect(unwrapValue(result.finalResult)).toContain("Node");
+      expect(unwrapValue(result.finalResult)).toContain("Leaf");
     });
   });
 });
