@@ -75,8 +75,8 @@ const parseTypeName: C.Parser<Token> = (tokens: Token[]) => {
 
 // --- Helper: parse a single type atom (primitive, variable, record, tuple, list) ---
 function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
-  // Try primitive types first
-  const primitiveTypes = ["Int", "Number", "String", "Unit", "List"];
+  // Try primitive types first, but handle List as a parameterizable type constructor
+  const primitiveTypes = ["Int", "Number", "String", "Unit"];
   for (const typeName of primitiveTypes) {
     const result = C.keyword(typeName)(tokens);
     if (result.success) {
@@ -100,13 +100,29 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
             value: unitType(),
             remaining: result.remaining,
           };
-        case "List":
-          return {
-            success: true as const,
-            value: listTypeWithElement(typeVariable("a")), // List with generic element
-            remaining: result.remaining,
-          };
       }
+    }
+  }
+
+  // Try List as a parameterizable type constructor
+  const listKeywordResult = C.keyword("List")(tokens);
+  if (listKeywordResult.success) {
+    // Try to parse a type argument for List
+    const argResult = C.lazy(() => parseTypeAtom)(listKeywordResult.remaining);
+    if (argResult.success) {
+      // List with specific element type: List Number, List String, etc.
+      return {
+        success: true as const,
+        value: listTypeWithElement(argResult.value),
+        remaining: argResult.remaining,
+      };
+    } else {
+      // Just List (generic)
+      return {
+        success: true as const,
+        value: listTypeWithElement(typeVariable("a")),
+        remaining: listKeywordResult.remaining,
+      };
     }
   }
 

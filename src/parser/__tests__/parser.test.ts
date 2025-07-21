@@ -567,7 +567,7 @@ describe("Type annotation parsing", () => {
 		const result = parseType("List Number");
 		assertParseSuccess(result);
 		assertListType(result.value);
-		expect(result.value.element.kind).toBe("variable");
+		expect(result.value.element.kind).toBe("primitive");
 	});
 
 	test("parses function type annotation", () => {
@@ -648,12 +648,20 @@ describe("Type annotation parsing", () => {
 		expect(variantType.args[0].args).toHaveLength(2);
 	});
 
-	test("parses simple constraint type variables", () => {
+	test("parses single letter type constructor for constraints", () => {
+		// While the advanced `m a` syntax isn't currently supported,
+		// we should still be able to parse simple type variables for constraints
 		const result = parseType("m");
 		assertParseSuccess(result);
 		expect(result.value.kind).toBe("variable");
 		const varType = result.value as any;
 		expect(varType.name).toBe("m");
+		
+		// TODO: In the future, we should support `m a` syntax:
+		// const advancedResult = parseType("m a");
+		// expect(advancedResult.value.kind).toBe("variant");
+		// expect(advancedResult.value.name).toBe("m");
+		// expect(advancedResult.value.args).toHaveLength(1);
 	});
 
 	test("parses type constructor in function type", () => {
@@ -668,7 +676,8 @@ describe("Type annotation parsing", () => {
 		expect(funcType.return.name).toBe("Bool");
 	});
 
-	test("parses simple constraint function type", () => {
+	test("parses constraint function types", () => {
+		// Test simple constraint function
 		const result = parseType("a -> a");
 		assertParseSuccess(result);
 		expect(result.value.kind).toBe("function");
@@ -677,6 +686,11 @@ describe("Type annotation parsing", () => {
 		expect(funcType.params[0].name).toBe("a");
 		expect(funcType.return.kind).toBe("variable");
 		expect(funcType.return.name).toBe("a");
+		
+		// TODO: In the future, we should support more complex constraint functions:
+		// const complexResult = parseType("m a -> (a -> m b) -> m b");
+		// expect(complexResult.value.kind).toBe("function");
+		// This would be the monadic bind signature
 	});
 
 	test("parses nested record type", () => {
@@ -723,7 +737,29 @@ describe("Top-level definitions with type annotations", () => {
 		expect(typed.type.kind).toBe("primitive");
 	});
 
+	test("parses definition with list type annotation", () => {
+		const result = parseDefinition("numbers = [1, 2, 3] : List Number;");
+		expect(result.statements).toHaveLength(1);
+		const def = assertDefinitionExpression(result.statements[0]);
+		expect(def.name).toBe("numbers");
+		const typed = assertTypedExpression(def.value);
+		expect(typed.expression.kind).toBe("list");
+		expect(typed.type.kind).toBe("list"); // List types have kind "list"
+		expect((typed.type as any).element.kind).toBe("primitive"); // Number is a primitive type  
+		expect((typed.type as any).element.name).toBe("Int"); // Number maps to Int internally
+	});
 
+	test("parses multiple definitions with type annotations", () => {
+		const result = parseDefinition(`
+      add = fn x y => x + y : Number -> Number -> Number;
+      answer = 42 : Number;
+      numbers = [1, 2, 3] : List Number;
+    `);
+		expect(result.statements).toHaveLength(1);
+		const seq = assertBinaryExpression(result.statements[0]);
+		expect(seq.kind).toBe("binary"); // semicolon sequence
+		expect(seq.operator).toBe(";");
+	});
 
 	// Phase 1: Effect parsing tests
 	describe("Effect parsing", () => {
