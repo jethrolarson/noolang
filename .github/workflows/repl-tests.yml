@@ -1,0 +1,165 @@
+name: REPL Automated Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/repl.ts'
+      - 'src/evaluator.ts'
+      - 'src/typer/**'
+      - 'test/repl*.test.ts'
+      - 'scripts/test-repl-automation.ts'
+      - 'benchmarks/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/repl.ts'
+      - 'src/evaluator.ts'
+      - 'src/typer/**'
+      - 'test/repl*.test.ts'
+      - 'scripts/test-repl-automation.ts'
+      - 'benchmarks/**'
+
+jobs:
+  full-test-suite:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run all tests (including REPL)
+      run: npm run test:all
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: |
+          coverage/
+          test-results/
+        retention-days: 30
+
+  repl-focused-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run simple REPL tests
+      run: npm run test:repl-simple
+    
+    - name: Run REPL automation tests
+      run: npm run test:repl-automation
+      
+    - name: Upload REPL test artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: repl-test-artifacts
+        path: |
+          repl-test-*.log
+          test-automation-*.json
+          test-results/
+        retention-days: 14
+
+  benchmarks:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run core benchmarks
+      run: npm run benchmark
+      
+    - name: Run REPL benchmarks
+      run: npm run benchmark:repl
+    
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-results
+        path: |
+          benchmark-results/
+        retention-days: 90
+
+  performance-comparison:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Benchmark current branch
+      run: |
+        npm run benchmark:all
+        mv benchmark-results benchmark-results-current
+    
+    - name: Checkout main branch
+      run: git checkout origin/main
+      
+    - name: Install dependencies (main)
+      run: npm ci
+      
+    - name: Benchmark main branch
+      run: |
+        npm run benchmark:all
+        mv benchmark-results benchmark-results-main
+    
+    - name: Compare performance
+      run: |
+        echo "## Performance Comparison" >> $GITHUB_STEP_SUMMARY
+        echo "Comparing current branch against main..." >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f benchmark-results-current/*.json ] && [ -f benchmark-results-main/*.json ]; then
+          echo "Benchmark files found, comparison available in artifacts" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ Could not generate performance comparison" >> $GITHUB_STEP_SUMMARY
+        fi
+    
+    - name: Upload comparison results
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-comparison
+        path: |
+          benchmark-results-current/
+          benchmark-results-main/
+        retention-days: 30

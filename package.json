@@ -10,7 +10,13 @@
     "cli": "node dist/cli.js",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:repl-automation": "ts-node scripts/test-repl-automation.ts",
+    "test:repl-simple": "node scripts/simple-repl-test.js",
+    "test:all": "jest && npm run test:repl-simple",
+    "test:all-repl": "npm run test:repl-simple && npm run test:repl-automation",
     "benchmark": "npm run build && node benchmark.js",
+    "benchmark:repl": "npm run build && node benchmark.js --repl",
+    "benchmark:all": "npm run build && node benchmark.js && npm run benchmark:repl",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"*.ts\" \"*.js\" \"*.json\"",
     "vscode:package": "vsce package",
     "vscode:publish": "vsce publish"
