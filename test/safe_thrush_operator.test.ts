@@ -128,7 +128,11 @@ describe("Safe Thrush Operator (|?)", () => {
         multiply_two = fn x => x * 2;
         Some 10 |? add_five |? multiply_two
       `);
-      expect(result).toEqual({ tag: "constructor", name: "Some", args: [{ tag: "number", value: 30 }] });
+      expect(result).toEqual({
+        tag: "constructor",
+        name: "Some", 
+        args: [{ tag: "number", value: 30 }]
+      });
     });
 
     test("should short-circuit in chains when None encountered", () => {
