@@ -1095,16 +1095,13 @@ Effects are explicit and fully tracked in the type system:
 ## Future Features
 
 - **Enhanced type annotations**: Record type syntax `{@name String, @age Number}`
-- **Constraint annotations**: Explicit `given` syntax for constraint declarations
-- **File imports**: Module system for code organization  
 - **Destructuring patterns**: Pattern-based assignment for tuples and records
 - **JavaScript compilation**: Compile to JavaScript for production use
 - **VSCode Language Server**: LSP integration for intellisense and hover types
 - **Show constraints**: Add `Show` constraint to `print` function for type safety
 
 ## Contributing
-
-This is a learning project for building programming languages. Feel free to experiment and contribute!
+Feel free to fork, experiment, and contribute!
 
 ## License
 
