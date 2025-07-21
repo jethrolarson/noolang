@@ -38,65 +38,7 @@ export type Value =
 	| { tag: "constructor"; name: string; args: Value[] }
 	| { tag: "unit" };
 
-// Monad metadata for generic monad operations
-type MonadInfo = {
-	name: string;
-	successConstructors: string[];
-	failureConstructors: string[];
-	createSuccess: (value: Value) => Value;
-	createFailure: (error: Value) => Value;
-};
 
-// Registry of supported monads
-const MONAD_REGISTRY: MonadInfo[] = [
-	{
-		name: "Option",
-		successConstructors: ["Some"],
-		failureConstructors: ["None"],
-		createSuccess: (value: Value) => createConstructor("Some", [value]),
-		createFailure: () => createConstructor("None", [])
-	},
-	{
-		name: "Result", 
-		successConstructors: ["Ok"],
-		failureConstructors: ["Err"],
-		createSuccess: (value: Value) => createConstructor("Ok", [value]),
-		createFailure: (error: Value) => createConstructor("Err", [error])
-	}
-];
-
-// Helper functions for working with monads generically
-function getMonadInfo(constructorName: string): MonadInfo | null {
-	return MONAD_REGISTRY.find(monad => 
-		monad.successConstructors.includes(constructorName) || 
-		monad.failureConstructors.includes(constructorName)
-	) || null;
-}
-
-function isMonadValue(value: Value): boolean {
-	return isConstructor(value) && getMonadInfo(value.name) !== null;
-}
-
-function isSuccessValue(value: Value): boolean {
-	if (!isConstructor(value)) return false;
-	const monadInfo = getMonadInfo(value.name);
-	return monadInfo ? monadInfo.successConstructors.includes(value.name) : false;
-}
-
-function isFailureValue(value: Value): boolean {
-	if (!isConstructor(value)) return false;
-	const monadInfo = getMonadInfo(value.name);
-	return monadInfo ? monadInfo.failureConstructors.includes(value.name) : false;
-}
-
-function getCompatibleMonadInfo(value1: Value, value2: Value): MonadInfo | null {
-	if (!isConstructor(value1) || !isConstructor(value2)) return null;
-	
-	const monad1 = getMonadInfo(value1.name);
-	const monad2 = getMonadInfo(value2.name);
-	
-	return monad1 === monad2 ? monad1 : null;
-}
 
 // --- Mutable Cell type ---
 export type Cell = { cell: true; value: Value };
@@ -1307,8 +1249,7 @@ export class Evaluator {
 					);
 				}
 			} else if (expr.operator === "|?") {
-				// Handle safe thrush operator - smart monadic application
-				// Implements monadic bind directly without relying on external bind/return functions
+				// Handle safe thrush operator - smart monadic application using constraint system
 				const left = this.evaluateExpression(expr.left);
 				const right = this.evaluateExpression(expr.right);
 
@@ -1319,8 +1260,8 @@ export class Evaluator {
 					);
 				}
 
-				// Implement monadic bind directly based on the monad type
-				return this.applyMonadicBind(left, right);
+				// Use constraint system to find appropriate bind function
+				return this.applyMonadicBindViaConstraints(left, right);
 			} else if (expr.operator === "$") {
 				// Handle dollar operator (low precedence function application)
 				const left = this.evaluateExpression(expr.left);
@@ -1827,74 +1768,80 @@ export class Evaluator {
 			}
 		}
 
-		// Check if two values are compatible monads (same monad type)
-		private isCompatibleMonad(result: Value, leftOperand: Value): boolean {
-			return getCompatibleMonadInfo(result, leftOperand) !== null;
-		}
-
-		// Apply monadic bind operation directly based on monad type
-		private applyMonadicBind(monad: Value, func: Value): Value {
-			// Check if monad is a constructor (all supported monads are constructors)
-			if (!isConstructor(monad)) {
-				throw new Error(`Safe thrush operator (|?) can only be used with monadic values, got ${valueToString(monad)}`);
+		// Apply monadic bind using constraint system
+		private applyMonadicBindViaConstraints(monad: Value, func: Value): Value {
+			// Look up bind function from constraint system
+			// For now, fall back to the simple bind function until full constraint resolution is implemented
+			let bindFunction = this.environment.get("bind");
+			
+			if (!bindFunction) {
+				throw new Error(
+					"Safe thrush operator (|?) requires 'bind' function. Make sure Monad constraint is implemented."
+				);
 			}
 
-			// Handle Option types
-			if (monad.name === "Some") {
-				// Extract the value and apply the function
-				if (monad.args.length !== 1) {
-					throw new Error(`Some constructor should have exactly one argument, got ${monad.args.length}`);
-				}
-				const value = monad.args[0];
-				const result = this.applyFunction(func, value);
+			// Handle cells (mutable references)
+			if (isCell(bindFunction)) bindFunction = bindFunction.value;
 
-				// If result is already an Option, return as-is (monadic bind behavior)
-				if (isConstructor(result) && (result.name === "Some" || result.name === "None")) {
-					return result;
+			// Create a wrapper function that intelligently handles return types
+			const wrappedFunction = createFunction((x: Value) => {
+				let result: Value;
+				if (isFunction(func)) {
+					result = func.fn(x);
+				} else if (isNativeFunction(func)) {
+					result = func.fn(x);
 				} else {
-					// Wrap regular value in Some
-					return createConstructor("Some", [result]);
+					throw new Error(`Cannot apply non-function in safe thrush: ${valueToString(func)}`);
 				}
-			} else if (monad.name === "None") {
-				// Short-circuit: None |? f = None
-				return monad;
-			}
 
-			// Handle Result types
-			else if (monad.name === "Ok") {
-				// Extract the value and apply the function
-				if (monad.args.length !== 1) {
-					throw new Error(`Ok constructor should have exactly one argument, got ${monad.args.length}`);
-				}
-				const value = monad.args[0];
-				const result = this.applyFunction(func, value);
-
-				// If result is already a Result, return as-is (monadic bind behavior)
-				if (isConstructor(result) && (result.name === "Ok" || result.name === "Err")) {
-					return result;
+				// Check if result is already a monad (any constructor value)
+				// This is a generic check that works for any monad type
+				if (isConstructor(result)) {
+					return result; // Already monadic, return as-is
 				} else {
-					// Wrap regular value in Ok
-					return createConstructor("Ok", [result]);
+					// Regular value, need to wrap it
+					// Look up return function for this monad type
+					let returnFunction = this.environment.get("return");
+					if (!returnFunction) {
+						throw new Error("Safe thrush operator (|?) requires 'return' function for wrapping values.");
+					}
+					if (isCell(returnFunction)) returnFunction = returnFunction.value;
+					
+					if (isFunction(returnFunction)) {
+						return returnFunction.fn(result);
+					} else if (isNativeFunction(returnFunction)) {
+						return returnFunction.fn(result);
+					} else {
+						throw new Error(`'return' is not a function: ${valueToString(returnFunction)}`);
+					}
 				}
-			} else if (monad.name === "Err") {
-				// Short-circuit: Err e |? f = Err e
-				return monad;
-			}
+			});
 
-			// Unsupported monad type
-			else {
-				throw new Error(`Safe thrush operator (|?) does not support monad type '${monad.name}'. Supported types: Option, Result`);
-			}
-		}
-
-		// Helper method to apply a function to a value
-		private applyFunction(func: Value, value: Value): Value {
-			if (isFunction(func)) {
-				return func.fn(value);
-			} else if (isNativeFunction(func)) {
-				return func.fn(value);
+			// Apply bind with the wrapped function
+			if (isFunction(bindFunction)) {
+				const bindPartiallyApplied = bindFunction.fn(monad);
+				if (isFunction(bindPartiallyApplied)) {
+					return bindPartiallyApplied.fn(wrappedFunction);
+				} else {
+					throw new Error(
+						`bind function did not return a function after first application: ${valueToString(bindPartiallyApplied)}`
+					);
+				}
+			} else if (isNativeFunction(bindFunction)) {
+				const bindPartiallyApplied = bindFunction.fn(monad);
+				if (isFunction(bindPartiallyApplied)) {
+					return bindPartiallyApplied.fn(wrappedFunction);
+				} else if (isNativeFunction(bindPartiallyApplied)) {
+					return bindPartiallyApplied.fn(wrappedFunction);
+				} else {
+					throw new Error(
+						`bind function did not return a function after first application: ${valueToString(bindPartiallyApplied)}`
+					);
+				}
 			} else {
-				throw new Error(`Expected function, got ${valueToString(func)}`);
+				throw new Error(
+					`'bind' is not a function: ${valueToString(bindFunction)}`
+				);
 			}
 		}
 	}
