@@ -20,7 +20,7 @@ import {
 	typeConstraintDefinition,
 	typeImplementDefinition,
 } from './type-inference';
-import { typeApplication } from './function-application';
+import { typeApplication, typePipeline } from './function-application';
 import { typeMatch, typeTypeDefinition } from './pattern-matching';
 
 // Main type inference dispatcher
@@ -76,6 +76,9 @@ export const typeExpression = (
 
 		case 'match':
 			return typeMatch(expr, state);
+
+		case 'pipeline':
+			return typePipeline(expr, state);
 
 		default:
 			throw new Error(`Unknown expression kind: ${(expr as any).kind}`);

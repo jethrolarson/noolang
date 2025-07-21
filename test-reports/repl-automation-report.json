@@ -1,0 +1,81 @@
+{
+  "timestamp": "2025-07-21T08:16:22.484Z",
+  "summary": {
+    "passed": 4,
+    "total": 10,
+    "success_rate": 40
+  },
+  "results": [
+    {
+      "scenario": "Basic Arithmetic",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "scenario": "String Operations",
+      "passed": false,
+      "errors": [
+        "Exception during scenario: Timeout waiting for response to: \"world\" ++ \" peace\""
+      ]
+    },
+    {
+      "scenario": "Variable Definitions and Usage",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "scenario": "Function Definitions and Applications",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "scenario": "List Operations",
+      "passed": false,
+      "errors": [
+        "Expected output \"[1, 2, 3]\" not found in response to \"[1, 2, 3]\"",
+        "Expected output \"[0, 1, 2, 3]\" not found in response to \"cons 0 [1, 2, 3]\""
+      ]
+    },
+    {
+      "scenario": "REPL Commands",
+      "passed": false,
+      "errors": [
+        "Expected to find \"test_var\" in response to \".help\"",
+        "Expected to find \"Noolang REPL Commands\" in response to \"test_var = 123\"",
+        "Expected to find \"test_var\" in response to \"test_var = 123\"",
+        "Expected to find \"Noolang REPL Commands\" in response to \".env\""
+      ]
+    },
+    {
+      "scenario": "Error Handling",
+      "passed": false,
+      "errors": [
+        "Exception during scenario: Timeout waiting for response to: 1 + \"hello\""
+      ]
+    },
+    {
+      "scenario": "Type Polymorphism",
+      "passed": false,
+      "errors": [
+        "Exception during scenario: Timeout waiting for response to: print true"
+      ]
+    },
+    {
+      "scenario": "Complex Expressions",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "scenario": "Debugging Commands",
+      "passed": false,
+      "errors": [
+        "Expected to find \"AST for\" in response to \".tokens (1 + 2)\"",
+        "Expected to find \"\"kind\"\" in response to \".tokens (1 + 2)\"",
+        "Expected to find \"Tokens for\" in response to \".ast (fn x => x)\"",
+        "Expected to find \"\"kind\"\" in response to \".ast (fn x => x)\"",
+        "Expected to find \"Tokens for\" in response to \".ast-json (42)\"",
+        "Expected to find \"AST for\" in response to \".ast-json (42)\""
+      ]
+    }
+  ]
+}
