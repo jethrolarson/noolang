@@ -1,0 +1,36 @@
+d0cd544d372677d5a1a2308f24f11833
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.typeAndDecorate = void 0;
+const ast_1 = require("../ast");
+const type_operations_1 = require("./type-operations");
+const builtins_1 = require("./builtins");
+const expression_dispatcher_1 = require("./expression-dispatcher");
+// Decorate AST nodes with inferred types - now uses single-pass typing
+const typeAndDecorate = (program, initialState) => {
+    let state = initialState || (0, type_operations_1.createTypeState)();
+    if (!initialState) {
+        state = (0, builtins_1.initializeBuiltins)(state);
+        state = (0, type_operations_1.loadStdlib)(state);
+    }
+    // Process all statements with typeExpression, then decorate the AST
+    let currentState = state;
+    let finalType = null;
+    for (const statement of program.statements) {
+        // Type the statement (this does all the work)
+        const result = (0, expression_dispatcher_1.typeExpression)(statement, currentState);
+        currentState = result.state;
+        finalType = result.type;
+        // Now just add the computed type to the AST node (lightweight decoration)
+        statement.type = result.type;
+    }
+    if (!finalType) {
+        finalType = (0, ast_1.unitType)();
+    }
+    return {
+        program: { ...program },
+        state: currentState
+    };
+};
+exports.typeAndDecorate = typeAndDecorate;
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL3dvcmtzcGFjZS9zcmMvdHlwZXIvZGVjb3JhdGlvbi50cyIsIm1hcHBpbmdzIjoiOzs7QUFBQSxnQ0FNZ0I7QUFFaEIsdURBQWdFO0FBQ2hFLHlDQUFnRDtBQUNoRCxtRUFBeUQ7QUFFekQsdUVBQXVFO0FBQ2hFLE1BQU0sZUFBZSxHQUFHLENBQUMsT0FBZ0IsRUFBRSxZQUF3QixFQUFFLEVBQUU7SUFDN0UsSUFBSSxLQUFLLEdBQUcsWUFBWSxJQUFJLElBQUEsaUNBQWUsR0FBRSxDQUFDO0lBQzlDLElBQUksQ0FBQyxZQUFZLEVBQUUsQ0FBQztRQUNuQixLQUFLLEdBQUcsSUFBQSw2QkFBa0IsRUFBQyxLQUFLLENBQUMsQ0FBQztRQUNsQyxLQUFLLEdBQUcsSUFBQSw0QkFBVSxFQUFDLEtBQUssQ0FBQyxDQUFDO0lBQzNCLENBQUM7SUFFRCxvRUFBb0U7SUFDcEUsSUFBSSxZQUFZLEdBQUcsS0FBSyxDQUFDO0lBQ3pCLElBQUksU0FBUyxHQUFHLElBQUksQ0FBQztJQUVyQixLQUFLLE1BQU0sU0FBUyxJQUFJLE9BQU8sQ0FBQyxVQUFVLEVBQUUsQ0FBQztRQUM1Qyw4Q0FBOEM7UUFDOUMsTUFBTSxNQUFNLEdBQUcsSUFBQSxzQ0FBYyxFQUFDLFNBQVMsRUFBRSxZQUFZLENBQUMsQ0FBQztRQUN2RCxZQUFZLEdBQUcsTUFBTSxDQUFDLEtBQUssQ0FBQztRQUM1QixTQUFTLEdBQUcsTUFBTSxDQUFDLElBQUksQ0FBQztRQUV4QiwwRUFBMEU7UUFDMUUsU0FBUyxDQUFDLElBQUksR0FBRyxNQUFNLENBQUMsSUFBSSxDQUFDO0lBQzlCLENBQUM7SUFFRCxJQUFJLENBQUMsU0FBUyxFQUFFLENBQUM7UUFDaEIsU0FBUyxHQUFHLElBQUEsY0FBUSxHQUFFLENBQUM7SUFDeEIsQ0FBQztJQUVELE9BQU87UUFDTixPQUFPLEVBQUUsRUFBRSxHQUFHLE9BQU8sRUFBRTtRQUN2QixLQUFLLEVBQUUsWUFBWTtLQUNuQixDQUFDO0FBQ0gsQ0FBQyxDQUFDO0FBN0JXLFFBQUEsZUFBZSxtQkE2QjFCIiwibmFtZXMiOltdLCJzb3VyY2VzIjpbIi93b3Jrc3BhY2Uvc3JjL3R5cGVyL2RlY29yYXRpb24udHMiXSwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHtcblx0dHlwZSBFeHByZXNzaW9uLFxuXHR0eXBlIFByb2dyYW0sXG5cdHR5cGUgRGVmaW5pdGlvbkV4cHJlc3Npb24sXG5cdHR5cGUgTXV0YWJsZURlZmluaXRpb25FeHByZXNzaW9uLFxuXHR1bml0VHlwZSxcbn0gZnJvbSAnLi4vYXN0JztcbmltcG9ydCB7IHR5cGUgVHlwZVN0YXRlIH0gZnJvbSAnLi90eXBlcyc7XG5pbXBvcnQgeyBjcmVhdGVUeXBlU3RhdGUsIGxvYWRTdGRsaWIgfSBmcm9tICcuL3R5cGUtb3BlcmF0aW9ucyc7XG5pbXBvcnQgeyBpbml0aWFsaXplQnVpbHRpbnMgfSBmcm9tICcuL2J1aWx0aW5zJztcbmltcG9ydCB7IHR5cGVFeHByZXNzaW9uIH0gZnJvbSAnLi9leHByZXNzaW9uLWRpc3BhdGNoZXInO1xuXG4vLyBEZWNvcmF0ZSBBU1Qgbm9kZXMgd2l0aCBpbmZlcnJlZCB0eXBlcyAtIG5vdyB1c2VzIHNpbmdsZS1wYXNzIHR5cGluZ1xuZXhwb3J0IGNvbnN0IHR5cGVBbmREZWNvcmF0ZSA9IChwcm9ncmFtOiBQcm9ncmFtLCBpbml0aWFsU3RhdGU/OiBUeXBlU3RhdGUpID0+IHtcblx0bGV0IHN0YXRlID0gaW5pdGlhbFN0YXRlIHx8IGNyZWF0ZVR5cGVTdGF0ZSgpO1xuXHRpZiAoIWluaXRpYWxTdGF0ZSkge1xuXHRcdHN0YXRlID0gaW5pdGlhbGl6ZUJ1aWx0aW5zKHN0YXRlKTtcblx0XHRzdGF0ZSA9IGxvYWRTdGRsaWIoc3RhdGUpO1xuXHR9XG5cblx0Ly8gUHJvY2VzcyBhbGwgc3RhdGVtZW50cyB3aXRoIHR5cGVFeHByZXNzaW9uLCB0aGVuIGRlY29yYXRlIHRoZSBBU1Rcblx0bGV0IGN1cnJlbnRTdGF0ZSA9IHN0YXRlO1xuXHRsZXQgZmluYWxUeXBlID0gbnVsbDtcblx0XG5cdGZvciAoY29uc3Qgc3RhdGVtZW50IG9mIHByb2dyYW0uc3RhdGVtZW50cykge1xuXHRcdC8vIFR5cGUgdGhlIHN0YXRlbWVudCAodGhpcyBkb2VzIGFsbCB0aGUgd29yaylcblx0XHRjb25zdCByZXN1bHQgPSB0eXBlRXhwcmVzc2lvbihzdGF0ZW1lbnQsIGN1cnJlbnRTdGF0ZSk7XG5cdFx0Y3VycmVudFN0YXRlID0gcmVzdWx0LnN0YXRlO1xuXHRcdGZpbmFsVHlwZSA9IHJlc3VsdC50eXBlO1xuXHRcdFxuXHRcdC8vIE5vdyBqdXN0IGFkZCB0aGUgY29tcHV0ZWQgdHlwZSB0byB0aGUgQVNUIG5vZGUgKGxpZ2h0d2VpZ2h0IGRlY29yYXRpb24pXG5cdFx0c3RhdGVtZW50LnR5cGUgPSByZXN1bHQudHlwZTtcblx0fVxuXHRcblx0aWYgKCFmaW5hbFR5cGUpIHtcblx0XHRmaW5hbFR5cGUgPSB1bml0VHlwZSgpO1xuXHR9XG5cdFxuXHRyZXR1cm4geyBcblx0XHRwcm9ncmFtOiB7IC4uLnByb2dyYW0gfSwgXG5cdFx0c3RhdGU6IGN1cnJlbnRTdGF0ZSBcblx0fTtcbn07Il0sInZlcnNpb24iOjN9

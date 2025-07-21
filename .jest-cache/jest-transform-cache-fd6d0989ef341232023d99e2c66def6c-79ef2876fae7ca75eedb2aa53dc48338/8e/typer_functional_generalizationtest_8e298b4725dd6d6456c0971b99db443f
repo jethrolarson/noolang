@@ -1,0 +1,104 @@
+de1c13343a0b80a516d99fabdf5b7cfd
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _globals = require("@jest/globals");
+const _lexer = require("../../lexer");
+const _parser = require("../../parser/parser");
+const _index = require("../index");
+const _helpers = require("../helpers");
+// Helper function to parse a string into a program
+const parseProgram = (source)=>{
+    const lexer = new _lexer.Lexer(source);
+    const tokens = lexer.tokenize();
+    return (0, _parser.parse)(tokens);
+};
+(0, _globals.describe)('Functional Typer - Let-Polymorphism', ()=>{
+    (0, _globals.describe)('Core Let-Polymorphism', ()=>{
+        (0, _globals.it)('should generalize polymorphic identity function', ()=>{
+            const program = parseProgram('id = fn x => x');
+            const result = (0, _index.typeProgram)(program);
+            (0, _globals.expect)((0, _helpers.typeToString)(result.type, result.state.substitution)).toBe('(α) -> α');
+        });
+        (0, _globals.it)('should allow polymorphic function to be used with different types', ()=>{
+            const program = parseProgram(`
+        id = fn x => x;
+        num = id 42;
+        str = id "hello";
+        bool = id True
+      `);
+            const result = (0, _index.typeProgram)(program);
+            // The sequence returns the type of the rightmost expression
+            (0, _globals.expect)((0, _helpers.typeToString)(result.type, result.state.substitution)).toBe('Bool');
+        });
+        (0, _globals.it)('should handle higher-order functions with generalization', ()=>{
+            const program = parseProgram(`
+        apply = fn f x => f x;
+        double = fn x => x * 2;
+        result = apply double 5
+      `);
+            const result = (0, _index.typeProgram)(program);
+            // The sequence returns the type of the rightmost expression
+            (0, _globals.expect)((0, _helpers.typeToString)(result.type, result.state.substitution)).toBe('Int');
+        });
+    });
+    (0, _globals.describe)('Let-Polymorphism Edge Cases', ()=>{
+        (0, _globals.it)('should handle nested function definitions', ()=>{
+            const program = parseProgram(`
+        outer = fn x => (
+          inner = fn y => x;
+          inner 42
+        )
+      `);
+            const result = (0, _index.typeProgram)(program);
+            // This should work with proper generalization
+            (0, _globals.expect)((0, _helpers.typeToString)(result.type, result.state.substitution)).toBe('(α) -> α');
+        });
+        (0, _globals.it)('should handle curried polymorphic functions', ()=>{
+            const program = parseProgram(`
+        add = fn x y => x + y;
+        addFive = add 5;
+        result = addFive 3
+      `);
+            const result = (0, _index.typeProgram)(program);
+            (0, _globals.expect)((0, _helpers.typeToString)(result.type, result.state.substitution)).toBe('Int');
+        });
+        (0, _globals.it)('should handle multiple polymorphic functions in sequence', ()=>{
+            const program = parseProgram(`
+        id = fn x => x;
+        const = fn x y => x;
+        result1 = id 42;
+        result2 = const "hello" 123;
+        result3 = id True
+      `);
+            const result = (0, _index.typeProgram)(program);
+            (0, _globals.expect)((0, _helpers.typeToString)(result.type, result.state.substitution)).toBe('Bool');
+        });
+    });
+    (0, _globals.describe)('Type Environment Consistency', ()=>{
+        (0, _globals.it)('should properly instantiate polymorphic functions in single program', ()=>{
+            const program = parseProgram(`
+        id = fn x => x;
+        numResult = id 42;
+        strResult = id "hello";
+        boolResult = id True;
+        numResult
+      `);
+            const result = (0, _index.typeProgram)(program);
+            (0, _globals.expect)((0, _helpers.typeToString)(result.type, result.state.substitution)).toBe('Int');
+        });
+        (0, _globals.it)('should handle polymorphic function with multiple instantiations', ()=>{
+            const program = parseProgram(`
+        id = fn x => x;
+        id 42;
+        id "hello";
+        id True
+      `);
+            const result = (0, _index.typeProgram)(program);
+            (0, _globals.expect)((0, _helpers.typeToString)(result.type, result.state.substitution)).toBe('Bool');
+        });
+    });
+});
+
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIi93b3Jrc3BhY2Uvc3JjL3R5cGVyL19fdGVzdHNfXy90eXBlcl9mdW5jdGlvbmFsX2dlbmVyYWxpemF0aW9uLnRlc3QudHMiXSwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHsgZGVzY3JpYmUsIGl0LCBleHBlY3QgfSBmcm9tICdAamVzdC9nbG9iYWxzJztcbmltcG9ydCB7IExleGVyIH0gZnJvbSAnLi4vLi4vbGV4ZXInO1xuaW1wb3J0IHsgcGFyc2UgfSBmcm9tICcuLi8uLi9wYXJzZXIvcGFyc2VyJztcbmltcG9ydCB7IHR5cGVQcm9ncmFtIH0gZnJvbSAnLi4vaW5kZXgnO1xuaW1wb3J0IHsgdHlwZVRvU3RyaW5nIH0gZnJvbSAnLi4vaGVscGVycyc7XG5cbi8vIEhlbHBlciBmdW5jdGlvbiB0byBwYXJzZSBhIHN0cmluZyBpbnRvIGEgcHJvZ3JhbVxuY29uc3QgcGFyc2VQcm9ncmFtID0gKHNvdXJjZTogc3RyaW5nKSA9PiB7XG5cdGNvbnN0IGxleGVyID0gbmV3IExleGVyKHNvdXJjZSk7XG5cdGNvbnN0IHRva2VucyA9IGxleGVyLnRva2VuaXplKCk7XG5cdHJldHVybiBwYXJzZSh0b2tlbnMpO1xufTtcblxuZGVzY3JpYmUoJ0Z1bmN0aW9uYWwgVHlwZXIgLSBMZXQtUG9seW1vcnBoaXNtJywgKCkgPT4ge1xuXHRkZXNjcmliZSgnQ29yZSBMZXQtUG9seW1vcnBoaXNtJywgKCkgPT4ge1xuXHRcdGl0KCdzaG91bGQgZ2VuZXJhbGl6ZSBwb2x5bW9ycGhpYyBpZGVudGl0eSBmdW5jdGlvbicsICgpID0+IHtcblx0XHRcdGNvbnN0IHByb2dyYW0gPSBwYXJzZVByb2dyYW0oJ2lkID0gZm4geCA9PiB4Jyk7XG5cdFx0XHRjb25zdCByZXN1bHQgPSB0eXBlUHJvZ3JhbShwcm9ncmFtKTtcblx0XHRcdGV4cGVjdCh0eXBlVG9TdHJpbmcocmVzdWx0LnR5cGUsIHJlc3VsdC5zdGF0ZS5zdWJzdGl0dXRpb24pKS50b0JlKFxuXHRcdFx0XHQnKM6xKSAtPiDOsSdcblx0XHRcdCk7XG5cdFx0fSk7XG5cblx0XHRpdCgnc2hvdWxkIGFsbG93IHBvbHltb3JwaGljIGZ1bmN0aW9uIHRvIGJlIHVzZWQgd2l0aCBkaWZmZXJlbnQgdHlwZXMnLCAoKSA9PiB7XG5cdFx0XHRjb25zdCBwcm9ncmFtID0gcGFyc2VQcm9ncmFtKGBcbiAgICAgICAgaWQgPSBmbiB4ID0+IHg7XG4gICAgICAgIG51bSA9IGlkIDQyO1xuICAgICAgICBzdHIgPSBpZCBcImhlbGxvXCI7XG4gICAgICAgIGJvb2wgPSBpZCBUcnVlXG4gICAgICBgKTtcblx0XHRcdGNvbnN0IHJlc3VsdCA9IHR5cGVQcm9ncmFtKHByb2dyYW0pO1xuXHRcdFx0Ly8gVGhlIHNlcXVlbmNlIHJldHVybnMgdGhlIHR5cGUgb2YgdGhlIHJpZ2h0bW9zdCBleHByZXNzaW9uXG5cdFx0XHRleHBlY3QodHlwZVRvU3RyaW5nKHJlc3VsdC50eXBlLCByZXN1bHQuc3RhdGUuc3Vic3RpdHV0aW9uKSkudG9CZSgnQm9vbCcpO1xuXHRcdH0pO1xuXG5cdFx0aXQoJ3Nob3VsZCBoYW5kbGUgaGlnaGVyLW9yZGVyIGZ1bmN0aW9ucyB3aXRoIGdlbmVyYWxpemF0aW9uJywgKCkgPT4ge1xuXHRcdFx0Y29uc3QgcHJvZ3JhbSA9IHBhcnNlUHJvZ3JhbShgXG4gICAgICAgIGFwcGx5ID0gZm4gZiB4ID0+IGYgeDtcbiAgICAgICAgZG91YmxlID0gZm4geCA9PiB4ICogMjtcbiAgICAgICAgcmVzdWx0ID0gYXBwbHkgZG91YmxlIDVcbiAgICAgIGApO1xuXHRcdFx0Y29uc3QgcmVzdWx0ID0gdHlwZVByb2dyYW0ocHJvZ3JhbSk7XG5cdFx0XHQvLyBUaGUgc2VxdWVuY2UgcmV0dXJucyB0aGUgdHlwZSBvZiB0aGUgcmlnaHRtb3N0IGV4cHJlc3Npb25cblx0XHRcdGV4cGVjdCh0eXBlVG9TdHJpbmcocmVzdWx0LnR5cGUsIHJlc3VsdC5zdGF0ZS5zdWJzdGl0dXRpb24pKS50b0JlKCdJbnQnKTtcblx0XHR9KTtcblx0fSk7XG5cblx0ZGVzY3JpYmUoJ0xldC1Qb2x5bW9ycGhpc20gRWRnZSBDYXNlcycsICgpID0+IHtcblx0XHRpdCgnc2hvdWxkIGhhbmRsZSBuZXN0ZWQgZnVuY3Rpb24gZGVmaW5pdGlvbnMnLCAoKSA9PiB7XG5cdFx0XHRjb25zdCBwcm9ncmFtID0gcGFyc2VQcm9ncmFtKGBcbiAgICAgICAgb3V0ZXIgPSBmbiB4ID0+IChcbiAgICAgICAgICBpbm5lciA9IGZuIHkgPT4geDtcbiAgICAgICAgICBpbm5lciA0MlxuICAgICAgICApXG4gICAgICBgKTtcblx0XHRcdGNvbnN0IHJlc3VsdCA9IHR5cGVQcm9ncmFtKHByb2dyYW0pO1xuXHRcdFx0Ly8gVGhpcyBzaG91bGQgd29yayB3aXRoIHByb3BlciBnZW5lcmFsaXphdGlvblxuXHRcdFx0ZXhwZWN0KHR5cGVUb1N0cmluZyhyZXN1bHQudHlwZSwgcmVzdWx0LnN0YXRlLnN1YnN0aXR1dGlvbikpLnRvQmUoXG5cdFx0XHRcdCcozrEpIC0+IM6xJ1xuXHRcdFx0KTtcblx0XHR9KTtcblxuXHRcdGl0KCdzaG91bGQgaGFuZGxlIGN1cnJpZWQgcG9seW1vcnBoaWMgZnVuY3Rpb25zJywgKCkgPT4ge1xuXHRcdFx0Y29uc3QgcHJvZ3JhbSA9IHBhcnNlUHJvZ3JhbShgXG4gICAgICAgIGFkZCA9IGZuIHggeSA9PiB4ICsgeTtcbiAgICAgICAgYWRkRml2ZSA9IGFkZCA1O1xuICAgICAgICByZXN1bHQgPSBhZGRGaXZlIDNcbiAgICAgIGApO1xuXHRcdFx0Y29uc3QgcmVzdWx0ID0gdHlwZVByb2dyYW0ocHJvZ3JhbSk7XG5cdFx0XHRleHBlY3QodHlwZVRvU3RyaW5nKHJlc3VsdC50eXBlLCByZXN1bHQuc3RhdGUuc3Vic3RpdHV0aW9uKSkudG9CZSgnSW50Jyk7XG5cdFx0fSk7XG5cblx0XHRpdCgnc2hvdWxkIGhhbmRsZSBtdWx0aXBsZSBwb2x5bW9ycGhpYyBmdW5jdGlvbnMgaW4gc2VxdWVuY2UnLCAoKSA9PiB7XG5cdFx0XHRjb25zdCBwcm9ncmFtID0gcGFyc2VQcm9ncmFtKGBcbiAgICAgICAgaWQgPSBmbiB4ID0+IHg7XG4gICAgICAgIGNvbnN0ID0gZm4geCB5ID0+IHg7XG4gICAgICAgIHJlc3VsdDEgPSBpZCA0MjtcbiAgICAgICAgcmVzdWx0MiA9IGNvbnN0IFwiaGVsbG9cIiAxMjM7XG4gICAgICAgIHJlc3VsdDMgPSBpZCBUcnVlXG4gICAgICBgKTtcblx0XHRcdGNvbnN0IHJlc3VsdCA9IHR5cGVQcm9ncmFtKHByb2dyYW0pO1xuXHRcdFx0ZXhwZWN0KHR5cGVUb1N0cmluZyhyZXN1bHQudHlwZSwgcmVzdWx0LnN0YXRlLnN1YnN0aXR1dGlvbikpLnRvQmUoJ0Jvb2wnKTtcblx0XHR9KTtcblx0fSk7XG5cblx0ZGVzY3JpYmUoJ1R5cGUgRW52aXJvbm1lbnQgQ29uc2lzdGVuY3knLCAoKSA9PiB7XG5cdFx0aXQoJ3Nob3VsZCBwcm9wZXJseSBpbnN0YW50aWF0ZSBwb2x5bW9ycGhpYyBmdW5jdGlvbnMgaW4gc2luZ2xlIHByb2dyYW0nLCAoKSA9PiB7XG5cdFx0XHRjb25zdCBwcm9ncmFtID0gcGFyc2VQcm9ncmFtKGBcbiAgICAgICAgaWQgPSBmbiB4ID0+IHg7XG4gICAgICAgIG51bVJlc3VsdCA9IGlkIDQyO1xuICAgICAgICBzdHJSZXN1bHQgPSBpZCBcImhlbGxvXCI7XG4gICAgICAgIGJvb2xSZXN1bHQgPSBpZCBUcnVlO1xuICAgICAgICBudW1SZXN1bHRcbiAgICAgIGApO1xuXHRcdFx0Y29uc3QgcmVzdWx0ID0gdHlwZVByb2dyYW0ocHJvZ3JhbSk7XG5cdFx0XHRleHBlY3QodHlwZVRvU3RyaW5nKHJlc3VsdC50eXBlLCByZXN1bHQuc3RhdGUuc3Vic3RpdHV0aW9uKSkudG9CZSgnSW50Jyk7XG5cdFx0fSk7XG5cblx0XHRpdCgnc2hvdWxkIGhhbmRsZSBwb2x5bW9ycGhpYyBmdW5jdGlvbiB3aXRoIG11bHRpcGxlIGluc3RhbnRpYXRpb25zJywgKCkgPT4ge1xuXHRcdFx0Y29uc3QgcHJvZ3JhbSA9IHBhcnNlUHJvZ3JhbShgXG4gICAgICAgIGlkID0gZm4geCA9PiB4O1xuICAgICAgICBpZCA0MjtcbiAgICAgICAgaWQgXCJoZWxsb1wiO1xuICAgICAgICBpZCBUcnVlXG4gICAgICBgKTtcblx0XHRcdGNvbnN0IHJlc3VsdCA9IHR5cGVQcm9ncmFtKHByb2dyYW0pO1xuXHRcdFx0ZXhwZWN0KHR5cGVUb1N0cmluZyhyZXN1bHQudHlwZSwgcmVzdWx0LnN0YXRlLnN1YnN0aXR1dGlvbikpLnRvQmUoJ0Jvb2wnKTtcblx0XHR9KTtcblx0fSk7XG59KTtcbiJdLCJuYW1lcyI6WyJwYXJzZVByb2dyYW0iLCJzb3VyY2UiLCJsZXhlciIsIkxleGVyIiwidG9rZW5zIiwidG9rZW5pemUiLCJwYXJzZSIsImRlc2NyaWJlIiwiaXQiLCJwcm9ncmFtIiwicmVzdWx0IiwidHlwZVByb2dyYW0iLCJleHBlY3QiLCJ0eXBlVG9TdHJpbmciLCJ0eXBlIiwic3RhdGUiLCJzdWJzdGl0dXRpb24iLCJ0b0JlIl0sIm1hcHBpbmdzIjoiOzs7O3lCQUFxQzt1QkFDZjt3QkFDQTt1QkFDTTt5QkFDQztBQUU3QixtREFBbUQ7QUFDbkQsTUFBTUEsZUFBZSxDQUFDQztJQUNyQixNQUFNQyxRQUFRLElBQUlDLFlBQUssQ0FBQ0Y7SUFDeEIsTUFBTUcsU0FBU0YsTUFBTUcsUUFBUTtJQUM3QixPQUFPQyxJQUFBQSxhQUFLLEVBQUNGO0FBQ2Q7QUFFQUcsSUFBQUEsaUJBQVEsRUFBQyx1Q0FBdUM7SUFDL0NBLElBQUFBLGlCQUFRLEVBQUMseUJBQXlCO1FBQ2pDQyxJQUFBQSxXQUFFLEVBQUMsbURBQW1EO1lBQ3JELE1BQU1DLFVBQVVULGFBQWE7WUFDN0IsTUFBTVUsU0FBU0MsSUFBQUEsa0JBQVcsRUFBQ0Y7WUFDM0JHLElBQUFBLGVBQU0sRUFBQ0MsSUFBQUEscUJBQVksRUFBQ0gsT0FBT0ksSUFBSSxFQUFFSixPQUFPSyxLQUFLLENBQUNDLFlBQVksR0FBR0MsSUFBSSxDQUNoRTtRQUVGO1FBRUFULElBQUFBLFdBQUUsRUFBQyxxRUFBcUU7WUFDdkUsTUFBTUMsVUFBVVQsYUFBYSxDQUFDOzs7OztNQUszQixDQUFDO1lBQ0osTUFBTVUsU0FBU0MsSUFBQUEsa0JBQVcsRUFBQ0Y7WUFDM0IsNERBQTREO1lBQzVERyxJQUFBQSxlQUFNLEVBQUNDLElBQUFBLHFCQUFZLEVBQUNILE9BQU9JLElBQUksRUFBRUosT0FBT0ssS0FBSyxDQUFDQyxZQUFZLEdBQUdDLElBQUksQ0FBQztRQUNuRTtRQUVBVCxJQUFBQSxXQUFFLEVBQUMsNERBQTREO1lBQzlELE1BQU1DLFVBQVVULGFBQWEsQ0FBQzs7OztNQUkzQixDQUFDO1lBQ0osTUFBTVUsU0FBU0MsSUFBQUEsa0JBQVcsRUFBQ0Y7WUFDM0IsNERBQTREO1lBQzVERyxJQUFBQSxlQUFNLEVBQUNDLElBQUFBLHFCQUFZLEVBQUNILE9BQU9JLElBQUksRUFBRUosT0FBT0ssS0FBSyxDQUFDQyxZQUFZLEdBQUdDLElBQUksQ0FBQztRQUNuRTtJQUNEO0lBRUFWLElBQUFBLGlCQUFRLEVBQUMsK0JBQStCO1FBQ3ZDQyxJQUFBQSxXQUFFLEVBQUMsNkNBQTZDO1lBQy9DLE1BQU1DLFVBQVVULGFBQWEsQ0FBQzs7Ozs7TUFLM0IsQ0FBQztZQUNKLE1BQU1VLFNBQVNDLElBQUFBLGtCQUFXLEVBQUNGO1lBQzNCLDhDQUE4QztZQUM5Q0csSUFBQUEsZUFBTSxFQUFDQyxJQUFBQSxxQkFBWSxFQUFDSCxPQUFPSSxJQUFJLEVBQUVKLE9BQU9LLEtBQUssQ0FBQ0MsWUFBWSxHQUFHQyxJQUFJLENBQ2hFO1FBRUY7UUFFQVQsSUFBQUEsV0FBRSxFQUFDLCtDQUErQztZQUNqRCxNQUFNQyxVQUFVVCxhQUFhLENBQUM7Ozs7TUFJM0IsQ0FBQztZQUNKLE1BQU1VLFNBQVNDLElBQUFBLGtCQUFXLEVBQUNGO1lBQzNCRyxJQUFBQSxlQUFNLEVBQUNDLElBQUFBLHFCQUFZLEVBQUNILE9BQU9JLElBQUksRUFBRUosT0FBT0ssS0FBSyxDQUFDQyxZQUFZLEdBQUdDLElBQUksQ0FBQztRQUNuRTtRQUVBVCxJQUFBQSxXQUFFLEVBQUMsNERBQTREO1lBQzlELE1BQU1DLFVBQVVULGFBQWEsQ0FBQzs7Ozs7O01BTTNCLENBQUM7WUFDSixNQUFNVSxTQUFTQyxJQUFBQSxrQkFBVyxFQUFDRjtZQUMzQkcsSUFBQUEsZUFBTSxFQUFDQyxJQUFBQSxxQkFBWSxFQUFDSCxPQUFPSSxJQUFJLEVBQUVKLE9BQU9LLEtBQUssQ0FBQ0MsWUFBWSxHQUFHQyxJQUFJLENBQUM7UUFDbkU7SUFDRDtJQUVBVixJQUFBQSxpQkFBUSxFQUFDLGdDQUFnQztRQUN4Q0MsSUFBQUEsV0FBRSxFQUFDLHVFQUF1RTtZQUN6RSxNQUFNQyxVQUFVVCxhQUFhLENBQUM7Ozs7OztNQU0zQixDQUFDO1lBQ0osTUFBTVUsU0FBU0MsSUFBQUEsa0JBQVcsRUFBQ0Y7WUFDM0JHLElBQUFBLGVBQU0sRUFBQ0MsSUFBQUEscUJBQVksRUFBQ0gsT0FBT0ksSUFBSSxFQUFFSixPQUFPSyxLQUFLLENBQUNDLFlBQVksR0FBR0MsSUFBSSxDQUFDO1FBQ25FO1FBRUFULElBQUFBLFdBQUUsRUFBQyxtRUFBbUU7WUFDckUsTUFBTUMsVUFBVVQsYUFBYSxDQUFDOzs7OztNQUszQixDQUFDO1lBQ0osTUFBTVUsU0FBU0MsSUFBQUEsa0JBQVcsRUFBQ0Y7WUFDM0JHLElBQUFBLGVBQU0sRUFBQ0MsSUFBQUEscUJBQVksRUFBQ0gsT0FBT0ksSUFBSSxFQUFFSixPQUFPSyxLQUFLLENBQUNDLFlBQVksR0FBR0MsSUFBSSxDQUFDO1FBQ25FO0lBQ0Q7QUFDRCJ9

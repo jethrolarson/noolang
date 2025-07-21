@@ -1,0 +1,63 @@
+ee7c17fe34b45b799998f7a34c1ecd0b
+// Noolang value pretty-printer/formatter
+// Usage: formatValue(value: Value): string
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+function _export(target, all) {
+    for(var name in all)Object.defineProperty(target, name, {
+        enumerable: true,
+        get: Object.getOwnPropertyDescriptor(all, name).get
+    });
+}
+_export(exports, {
+    get default () {
+        return _default;
+    },
+    get formatValue () {
+        return formatValue;
+    }
+});
+const _evaluator = require("./evaluator");
+function formatValue(value) {
+    if ((0, _evaluator.isNumber)(value)) {
+        return value.value.toString();
+    }
+    if ((0, _evaluator.isString)(value)) {
+        // Escape quotes and backslashes
+        return `"${value.value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+    }
+    if ((0, _evaluator.isBool)(value)) {
+        return (0, _evaluator.boolValue)(value) ? "True" : "False";
+    }
+    if ((0, _evaluator.isList)(value)) {
+        return `[${value.values.map(formatValue).join("; ")}]`;
+    }
+    if ((0, _evaluator.isTuple)(value)) {
+        return `{${value.values.map(formatValue).join("; ")}}`;
+    }
+    if ((0, _evaluator.isRecord)(value)) {
+        return `{${Object.entries(value.fields).map(([k, v])=>`@${k} ${formatValue(v)}`).join("; ")}}`;
+    }
+    if ((0, _evaluator.isFunction)(value)) {
+        return "<function>";
+    }
+    if ((0, _evaluator.isNativeFunction)(value)) {
+        return `<native:${value.name}>`;
+    }
+    if ((0, _evaluator.isUnit)(value)) {
+        return "()";
+    }
+    if ((0, _evaluator.isConstructor)(value)) {
+        if (value.args.length === 0) {
+            return value.name;
+        } else {
+            return `${value.name} ${value.args.map(formatValue).join(" ")}`;
+        }
+    }
+    return "<unknown>";
+}
+const _default = formatValue;
+
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIi93b3Jrc3BhY2Uvc3JjL2Zvcm1hdC50cyJdLCJzb3VyY2VzQ29udGVudCI6WyIvLyBOb29sYW5nIHZhbHVlIHByZXR0eS1wcmludGVyL2Zvcm1hdHRlclxuLy8gVXNhZ2U6IGZvcm1hdFZhbHVlKHZhbHVlOiBWYWx1ZSk6IHN0cmluZ1xuXG5pbXBvcnQge1xuXHRpc051bWJlcixcblx0aXNTdHJpbmcsXG5cdGlzQm9vbCxcblx0aXNMaXN0LFxuXHRpc1JlY29yZCxcblx0aXNUdXBsZSxcblx0aXNGdW5jdGlvbixcblx0aXNOYXRpdmVGdW5jdGlvbixcblx0aXNVbml0LFxuXHRpc0NvbnN0cnVjdG9yLFxuXHR0eXBlIFZhbHVlLFxuXHRib29sVmFsdWUsXG59IGZyb20gXCIuL2V2YWx1YXRvclwiO1xuXG5leHBvcnQgZnVuY3Rpb24gZm9ybWF0VmFsdWUodmFsdWU6IFZhbHVlKTogc3RyaW5nIHtcbiAgaWYgKGlzTnVtYmVyKHZhbHVlKSkge1xuICAgIHJldHVybiB2YWx1ZS52YWx1ZS50b1N0cmluZygpO1xuICB9XG4gIGlmIChpc1N0cmluZyh2YWx1ZSkpIHtcbiAgICAvLyBFc2NhcGUgcXVvdGVzIGFuZCBiYWNrc2xhc2hlc1xuXHRcdHJldHVybiBgXCIke3ZhbHVlLnZhbHVlLnJlcGxhY2UoL1xcXFwvZywgXCJcXFxcXFxcXFwiKS5yZXBsYWNlKC9cIi9nLCAnXFxcXFwiJyl9XCJgO1xuICB9XG4gIGlmIChpc0Jvb2wodmFsdWUpKSB7XG4gICAgcmV0dXJuIGJvb2xWYWx1ZSh2YWx1ZSkgPyBcIlRydWVcIiA6IFwiRmFsc2VcIjtcbiAgfVxuICBpZiAoaXNMaXN0KHZhbHVlKSkge1xuICAgIHJldHVybiBgWyR7dmFsdWUudmFsdWVzLm1hcChmb3JtYXRWYWx1ZSkuam9pbihcIjsgXCIpfV1gO1xuICB9XG4gIGlmIChpc1R1cGxlKHZhbHVlKSkge1xuXHRcdFx0cmV0dXJuIGB7JHt2YWx1ZS52YWx1ZXMubWFwKGZvcm1hdFZhbHVlKS5qb2luKFwiOyBcIil9fWA7XG5cdFx0fVxuICBpZiAoaXNSZWNvcmQodmFsdWUpKSB7XG4gICAgcmV0dXJuIGB7JHtPYmplY3QuZW50cmllcyh2YWx1ZS5maWVsZHMpXG5cdFx0XHRcdFx0Lm1hcCgoW2ssIHZdKSA9PiBgQCR7a30gJHtmb3JtYXRWYWx1ZSh2KX1gKVxuXHRcdFx0XHRcdC5qb2luKFwiOyBcIil9fWA7XG4gIH1cbiAgaWYgKGlzRnVuY3Rpb24odmFsdWUpKSB7XG4gICAgcmV0dXJuIFwiPGZ1bmN0aW9uPlwiO1xuICB9XG4gIGlmIChpc05hdGl2ZUZ1bmN0aW9uKHZhbHVlKSkge1xuICAgIHJldHVybiBgPG5hdGl2ZToke3ZhbHVlLm5hbWV9PmA7XG4gIH1cbiAgaWYgKGlzVW5pdCh2YWx1ZSkpIHtcbiAgICByZXR1cm4gXCIoKVwiO1xuICB9XG4gIGlmIChpc0NvbnN0cnVjdG9yKHZhbHVlKSkge1xuICAgIGlmICh2YWx1ZS5hcmdzLmxlbmd0aCA9PT0gMCkge1xuICAgICAgcmV0dXJuIHZhbHVlLm5hbWU7XG4gICAgfSBlbHNlIHtcbiAgICAgIHJldHVybiBgJHt2YWx1ZS5uYW1lfSAke3ZhbHVlLmFyZ3MubWFwKGZvcm1hdFZhbHVlKS5qb2luKFwiIFwiKX1gO1xuICAgIH1cbiAgfVxuICByZXR1cm4gXCI8dW5rbm93bj5cIjtcbn1cblxuZXhwb3J0IGRlZmF1bHQgZm9ybWF0VmFsdWU7XG4iXSwibmFtZXMiOlsiZm9ybWF0VmFsdWUiLCJ2YWx1ZSIsImlzTnVtYmVyIiwidG9TdHJpbmciLCJpc1N0cmluZyIsInJlcGxhY2UiLCJpc0Jvb2wiLCJib29sVmFsdWUiLCJpc0xpc3QiLCJ2YWx1ZXMiLCJtYXAiLCJqb2luIiwiaXNUdXBsZSIsImlzUmVjb3JkIiwiT2JqZWN0IiwiZW50cmllcyIsImZpZWxkcyIsImsiLCJ2IiwiaXNGdW5jdGlvbiIsImlzTmF0aXZlRnVuY3Rpb24iLCJuYW1lIiwiaXNVbml0IiwiaXNDb25zdHJ1Y3RvciIsImFyZ3MiLCJsZW5ndGgiXSwibWFwcGluZ3MiOiJBQUFBLHlDQUF5QztBQUN6QywyQ0FBMkM7Ozs7Ozs7Ozs7OztRQTBEM0M7ZUFBQTs7UUF6Q2dCQTtlQUFBQTs7OzJCQUZUO0FBRUEsU0FBU0EsWUFBWUMsS0FBWTtJQUN0QyxJQUFJQyxJQUFBQSxtQkFBUSxFQUFDRCxRQUFRO1FBQ25CLE9BQU9BLE1BQU1BLEtBQUssQ0FBQ0UsUUFBUTtJQUM3QjtJQUNBLElBQUlDLElBQUFBLG1CQUFRLEVBQUNILFFBQVE7UUFDbkIsZ0NBQWdDO1FBQ2xDLE9BQU8sQ0FBQyxDQUFDLEVBQUVBLE1BQU1BLEtBQUssQ0FBQ0ksT0FBTyxDQUFDLE9BQU8sUUFBUUEsT0FBTyxDQUFDLE1BQU0sT0FBTyxDQUFDLENBQUM7SUFDckU7SUFDQSxJQUFJQyxJQUFBQSxpQkFBTSxFQUFDTCxRQUFRO1FBQ2pCLE9BQU9NLElBQUFBLG9CQUFTLEVBQUNOLFNBQVMsU0FBUztJQUNyQztJQUNBLElBQUlPLElBQUFBLGlCQUFNLEVBQUNQLFFBQVE7UUFDakIsT0FBTyxDQUFDLENBQUMsRUFBRUEsTUFBTVEsTUFBTSxDQUFDQyxHQUFHLENBQUNWLGFBQWFXLElBQUksQ0FBQyxNQUFNLENBQUMsQ0FBQztJQUN4RDtJQUNBLElBQUlDLElBQUFBLGtCQUFPLEVBQUNYLFFBQVE7UUFDbkIsT0FBTyxDQUFDLENBQUMsRUFBRUEsTUFBTVEsTUFBTSxDQUFDQyxHQUFHLENBQUNWLGFBQWFXLElBQUksQ0FBQyxNQUFNLENBQUMsQ0FBQztJQUN2RDtJQUNBLElBQUlFLElBQUFBLG1CQUFRLEVBQUNaLFFBQVE7UUFDbkIsT0FBTyxDQUFDLENBQUMsRUFBRWEsT0FBT0MsT0FBTyxDQUFDZCxNQUFNZSxNQUFNLEVBQ3BDTixHQUFHLENBQUMsQ0FBQyxDQUFDTyxHQUFHQyxFQUFFLEdBQUssQ0FBQyxDQUFDLEVBQUVELEVBQUUsQ0FBQyxFQUFFakIsWUFBWWtCLElBQUksRUFDekNQLElBQUksQ0FBQyxNQUFNLENBQUMsQ0FBQztJQUNqQjtJQUNBLElBQUlRLElBQUFBLHFCQUFVLEVBQUNsQixRQUFRO1FBQ3JCLE9BQU87SUFDVDtJQUNBLElBQUltQixJQUFBQSwyQkFBZ0IsRUFBQ25CLFFBQVE7UUFDM0IsT0FBTyxDQUFDLFFBQVEsRUFBRUEsTUFBTW9CLElBQUksQ0FBQyxDQUFDLENBQUM7SUFDakM7SUFDQSxJQUFJQyxJQUFBQSxpQkFBTSxFQUFDckIsUUFBUTtRQUNqQixPQUFPO0lBQ1Q7SUFDQSxJQUFJc0IsSUFBQUEsd0JBQWEsRUFBQ3RCLFFBQVE7UUFDeEIsSUFBSUEsTUFBTXVCLElBQUksQ0FBQ0MsTUFBTSxLQUFLLEdBQUc7WUFDM0IsT0FBT3hCLE1BQU1vQixJQUFJO1FBQ25CLE9BQU87WUFDTCxPQUFPLEdBQUdwQixNQUFNb0IsSUFBSSxDQUFDLENBQUMsRUFBRXBCLE1BQU11QixJQUFJLENBQUNkLEdBQUcsQ0FBQ1YsYUFBYVcsSUFBSSxDQUFDLE1BQU07UUFDakU7SUFDRjtJQUNBLE9BQU87QUFDVDtNQUVBLFdBQWVYIn0=

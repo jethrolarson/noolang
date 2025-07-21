@@ -1,0 +1,93 @@
+a24d8cc31389cfa33cd42403fb2d63a2
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.typeProgram = exports.validateAllSubstitutionConstraints = exports.typeAndDecorate = exports.typeTypeDefinition = exports.typeMatch = exports.typePipeline = exports.typeApplication = exports.typeConstrained = exports.typeTyped = exports.typeWhere = exports.typeList = exports.typeTuple = exports.typeAccessor = exports.typeRecord = exports.typeImport = exports.typeMutation = exports.typeMutableDefinition = exports.typeBinary = exports.typeIf = exports.typeDefinition = exports.typeFunction = exports.typeVariableExpr = exports.typeLiteral = exports.typeExpression = exports.loadStdlib = exports.freshenTypeVariables = exports.instantiate = exports.generalize = exports.freeTypeVarsEnv = exports.freeTypeVars = exports.freshTypeVariable = exports.cleanSubstitutions = exports.createTypeState = exports.createPureTypeResult = exports.createTypeResult = exports.unionEffects = exports.singleEffect = exports.emptyEffects = void 0;
+const ast_1 = require("../ast");
+const types_1 = require("./types");
+const type_operations_1 = require("./type-operations");
+const expression_dispatcher_1 = require("./expression-dispatcher");
+const builtins_1 = require("./builtins");
+// Re-export TypeResult and effect helpers from types module
+var types_2 = require("./types");
+Object.defineProperty(exports, "emptyEffects", { enumerable: true, get: function () { return types_2.emptyEffects; } });
+Object.defineProperty(exports, "singleEffect", { enumerable: true, get: function () { return types_2.singleEffect; } });
+Object.defineProperty(exports, "unionEffects", { enumerable: true, get: function () { return types_2.unionEffects; } });
+Object.defineProperty(exports, "createTypeResult", { enumerable: true, get: function () { return types_2.createTypeResult; } });
+Object.defineProperty(exports, "createPureTypeResult", { enumerable: true, get: function () { return types_2.createPureTypeResult; } });
+// Re-export createTypeState from type-operations module
+var type_operations_2 = require("./type-operations");
+Object.defineProperty(exports, "createTypeState", { enumerable: true, get: function () { return type_operations_2.createTypeState; } });
+Object.defineProperty(exports, "cleanSubstitutions", { enumerable: true, get: function () { return type_operations_2.cleanSubstitutions; } });
+// Re-export freshTypeVariable from type-operations module
+var type_operations_3 = require("./type-operations");
+Object.defineProperty(exports, "freshTypeVariable", { enumerable: true, get: function () { return type_operations_3.freshTypeVariable; } });
+// Re-export freeTypeVars from type-operations module
+var type_operations_4 = require("./type-operations");
+Object.defineProperty(exports, "freeTypeVars", { enumerable: true, get: function () { return type_operations_4.freeTypeVars; } });
+// Re-export freeTypeVarsEnv from type-operations module
+var type_operations_5 = require("./type-operations");
+Object.defineProperty(exports, "freeTypeVarsEnv", { enumerable: true, get: function () { return type_operations_5.freeTypeVarsEnv; } });
+// Re-export generalize from type-operations module
+var type_operations_6 = require("./type-operations");
+Object.defineProperty(exports, "generalize", { enumerable: true, get: function () { return type_operations_6.generalize; } });
+// Re-export instantiate from type-operations module
+var type_operations_7 = require("./type-operations");
+Object.defineProperty(exports, "instantiate", { enumerable: true, get: function () { return type_operations_7.instantiate; } });
+// Re-export freshenTypeVariables from type-operations module
+var type_operations_8 = require("./type-operations");
+Object.defineProperty(exports, "freshenTypeVariables", { enumerable: true, get: function () { return type_operations_8.freshenTypeVariables; } });
+// Re-export loadStdlib from type-operations module
+var type_operations_9 = require("./type-operations");
+Object.defineProperty(exports, "loadStdlib", { enumerable: true, get: function () { return type_operations_9.loadStdlib; } });
+// Re-export typeExpression from expression-dispatcher module
+var expression_dispatcher_2 = require("./expression-dispatcher");
+Object.defineProperty(exports, "typeExpression", { enumerable: true, get: function () { return expression_dispatcher_2.typeExpression; } });
+// Re-export type inference functions from their respective modules
+var type_inference_1 = require("./type-inference");
+Object.defineProperty(exports, "typeLiteral", { enumerable: true, get: function () { return type_inference_1.typeLiteral; } });
+Object.defineProperty(exports, "typeVariableExpr", { enumerable: true, get: function () { return type_inference_1.typeVariableExpr; } });
+Object.defineProperty(exports, "typeFunction", { enumerable: true, get: function () { return type_inference_1.typeFunction; } });
+Object.defineProperty(exports, "typeDefinition", { enumerable: true, get: function () { return type_inference_1.typeDefinition; } });
+Object.defineProperty(exports, "typeIf", { enumerable: true, get: function () { return type_inference_1.typeIf; } });
+Object.defineProperty(exports, "typeBinary", { enumerable: true, get: function () { return type_inference_1.typeBinary; } });
+Object.defineProperty(exports, "typeMutableDefinition", { enumerable: true, get: function () { return type_inference_1.typeMutableDefinition; } });
+Object.defineProperty(exports, "typeMutation", { enumerable: true, get: function () { return type_inference_1.typeMutation; } });
+Object.defineProperty(exports, "typeImport", { enumerable: true, get: function () { return type_inference_1.typeImport; } });
+Object.defineProperty(exports, "typeRecord", { enumerable: true, get: function () { return type_inference_1.typeRecord; } });
+Object.defineProperty(exports, "typeAccessor", { enumerable: true, get: function () { return type_inference_1.typeAccessor; } });
+Object.defineProperty(exports, "typeTuple", { enumerable: true, get: function () { return type_inference_1.typeTuple; } });
+Object.defineProperty(exports, "typeList", { enumerable: true, get: function () { return type_inference_1.typeList; } });
+Object.defineProperty(exports, "typeWhere", { enumerable: true, get: function () { return type_inference_1.typeWhere; } });
+Object.defineProperty(exports, "typeTyped", { enumerable: true, get: function () { return type_inference_1.typeTyped; } });
+Object.defineProperty(exports, "typeConstrained", { enumerable: true, get: function () { return type_inference_1.typeConstrained; } });
+var function_application_1 = require("./function-application");
+Object.defineProperty(exports, "typeApplication", { enumerable: true, get: function () { return function_application_1.typeApplication; } });
+Object.defineProperty(exports, "typePipeline", { enumerable: true, get: function () { return function_application_1.typePipeline; } });
+var pattern_matching_1 = require("./pattern-matching");
+Object.defineProperty(exports, "typeMatch", { enumerable: true, get: function () { return pattern_matching_1.typeMatch; } });
+Object.defineProperty(exports, "typeTypeDefinition", { enumerable: true, get: function () { return pattern_matching_1.typeTypeDefinition; } });
+var decoration_1 = require("./decoration");
+Object.defineProperty(exports, "typeAndDecorate", { enumerable: true, get: function () { return decoration_1.typeAndDecorate; } });
+// Re-export helper functions from their modules
+var constraints_1 = require("./constraints");
+Object.defineProperty(exports, "validateAllSubstitutionConstraints", { enumerable: true, get: function () { return constraints_1.validateAllSubstitutionConstraints; } });
+// Export the main program typing function
+const typeProgram = (program) => {
+    let state = (0, type_operations_1.createTypeState)();
+    state = (0, builtins_1.initializeBuiltins)(state);
+    state = (0, type_operations_1.loadStdlib)(state);
+    let finalType = null;
+    let allEffects = new Set();
+    for (const statement of program.statements) {
+        const result = (0, expression_dispatcher_1.typeExpression)(statement, state);
+        state = result.state;
+        finalType = result.type;
+        allEffects = (0, types_1.unionEffects)(allEffects, result.effects);
+    }
+    if (!finalType) {
+        finalType = (0, ast_1.unitType)();
+    }
+    return { type: finalType, effects: allEffects, state };
+};
+exports.typeProgram = typeProgram;
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL3dvcmtzcGFjZS9zcmMvdHlwZXIvaW5kZXgudHMiLCJtYXBwaW5ncyI6Ijs7O0FBQUEsZ0NBQXdFO0FBR3hFLG1DQUE4RjtBQUc5Rix1REFBZ0U7QUFDaEUsbUVBQXlEO0FBRXpELHlDQUFnRDtBQUVoRCw0REFBNEQ7QUFDNUQsaUNBT2lCO0FBTGhCLHFHQUFBLFlBQVksT0FBQTtBQUNaLHFHQUFBLFlBQVksT0FBQTtBQUNaLHFHQUFBLFlBQVksT0FBQTtBQUNaLHlHQUFBLGdCQUFnQixPQUFBO0FBQ2hCLDZHQUFBLG9CQUFvQixPQUFBO0FBR3JCLHdEQUF3RDtBQUN4RCxxREFBd0U7QUFBL0Qsa0hBQUEsZUFBZSxPQUFBO0FBQUUscUhBQUEsa0JBQWtCLE9BQUE7QUFFNUMsMERBQTBEO0FBQzFELHFEQUFzRDtBQUE3QyxvSEFBQSxpQkFBaUIsT0FBQTtBQUcxQixxREFBcUQ7QUFDckQscURBQWlEO0FBQXhDLCtHQUFBLFlBQVksT0FBQTtBQUVyQix3REFBd0Q7QUFDeEQscURBQW9EO0FBQTNDLGtIQUFBLGVBQWUsT0FBQTtBQUV4QixtREFBbUQ7QUFDbkQscURBQStDO0FBQXRDLDZHQUFBLFVBQVUsT0FBQTtBQUVuQixvREFBb0Q7QUFDcEQscURBQWdEO0FBQXZDLDhHQUFBLFdBQVcsT0FBQTtBQUVwQiw2REFBNkQ7QUFDN0QscURBQXlEO0FBQWhELHVIQUFBLG9CQUFvQixPQUFBO0FBRzdCLG1EQUFtRDtBQUNuRCxxREFBK0M7QUFBdEMsNkdBQUEsVUFBVSxPQUFBO0FBRW5CLDZEQUE2RDtBQUM3RCxpRUFBeUQ7QUFBaEQsdUhBQUEsY0FBYyxPQUFBO0FBR3ZCLG1FQUFtRTtBQUNuRSxtREFpQjBCO0FBaEJ6Qiw2R0FBQSxXQUFXLE9BQUE7QUFDWCxrSEFBQSxnQkFBZ0IsT0FBQTtBQUNoQiw4R0FBQSxZQUFZLE9BQUE7QUFDWixnSEFBQSxjQUFjLE9BQUE7QUFDZCx3R0FBQSxNQUFNLE9BQUE7QUFDTiw0R0FBQSxVQUFVLE9BQUE7QUFDVix1SEFBQSxxQkFBcUIsT0FBQTtBQUNyQiw4R0FBQSxZQUFZLE9BQUE7QUFDWiw0R0FBQSxVQUFVLE9BQUE7QUFDViw0R0FBQSxVQUFVLE9BQUE7QUFDViw4R0FBQSxZQUFZLE9BQUE7QUFDWiwyR0FBQSxTQUFTLE9BQUE7QUFDVCwwR0FBQSxRQUFRLE9BQUE7QUFDUiwyR0FBQSxTQUFTLE9BQUE7QUFDVCwyR0FBQSxTQUFTLE9BQUE7QUFDVCxpSEFBQSxlQUFlLE9BQUE7QUFHaEIsK0RBR2dDO0FBRi9CLHVIQUFBLGVBQWUsT0FBQTtBQUNmLG9IQUFBLFlBQVksT0FBQTtBQUdiLHVEQUc0QjtBQUYzQiw2R0FBQSxTQUFTLE9BQUE7QUFDVCxzSEFBQSxrQkFBa0IsT0FBQTtBQUduQiwyQ0FFc0I7QUFEckIsNkdBQUEsZUFBZSxPQUFBO0FBR2hCLGdEQUFnRDtBQUNoRCw2Q0FBbUU7QUFBMUQsaUlBQUEsa0NBQWtDLE9BQUE7QUFDM0MsMENBQTBDO0FBQ25DLE1BQU0sV0FBVyxHQUFHLENBQUMsT0FBZ0IsRUFBYyxFQUFFO0lBQzNELElBQUksS0FBSyxHQUFHLElBQUEsaUNBQWUsR0FBRSxDQUFDO0lBQzlCLEtBQUssR0FBRyxJQUFBLDZCQUFrQixFQUFDLEtBQUssQ0FBQyxDQUFDO0lBQ2xDLEtBQUssR0FBRyxJQUFBLDRCQUFVLEVBQUMsS0FBSyxDQUFDLENBQUM7SUFFMUIsSUFBSSxTQUFTLEdBQWdCLElBQUksQ0FBQztJQUNsQyxJQUFJLFVBQVUsR0FBRyxJQUFJLEdBQUcsRUFBVSxDQUFDO0lBRW5DLEtBQUssTUFBTSxTQUFTLElBQUksT0FBTyxDQUFDLFVBQVUsRUFBRSxDQUFDO1FBQzVDLE1BQU0sTUFBTSxHQUFHLElBQUEsc0NBQWMsRUFBQyxTQUFTLEVBQUUsS0FBSyxDQUFDLENBQUM7UUFDaEQsS0FBSyxHQUFHLE1BQU0sQ0FBQyxLQUFLLENBQUM7UUFDckIsU0FBUyxHQUFHLE1BQU0sQ0FBQyxJQUFJLENBQUM7UUFDeEIsVUFBVSxHQUFHLElBQUEsb0JBQVksRUFBQyxVQUFVLEVBQUUsTUFBTSxDQUFDLE9BQU8sQ0FBQyxDQUFDO0lBQ3ZELENBQUM7SUFFRCxJQUFJLENBQUMsU0FBUyxFQUFFLENBQUM7UUFDaEIsU0FBUyxHQUFHLElBQUEsY0FBUSxHQUFFLENBQUM7SUFDeEIsQ0FBQztJQUVELE9BQU8sRUFBRSxJQUFJLEVBQUUsU0FBUyxFQUFFLE9BQU8sRUFBRSxVQUFVLEVBQUUsS0FBSyxFQUFFLENBQUM7QUFDeEQsQ0FBQyxDQUFDO0FBcEJXLFFBQUEsV0FBVyxlQW9CdEIiLCJuYW1lcyI6W10sInNvdXJjZXMiOlsiL3dvcmtzcGFjZS9zcmMvdHlwZXIvaW5kZXgudHMiXSwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHsgdHlwZSBQcm9ncmFtLCB0eXBlIFR5cGUsIHVuaXRUeXBlLCB0eXBlIEVmZmVjdCB9IGZyb20gJy4uL2FzdCc7XG5pbXBvcnQgeyBmb3JtYXRUeXBlRXJyb3IsIGNyZWF0ZVR5cGVFcnJvciB9IGZyb20gJy4vdHlwZS1lcnJvcnMnO1xuaW1wb3J0IHsgdHlwZVRvU3RyaW5nIH0gZnJvbSAnLi9oZWxwZXJzJztcbmltcG9ydCB7IHR5cGUgVHlwZVN0YXRlLCB0eXBlIFR5cGVSZXN1bHQsIGNyZWF0ZVB1cmVUeXBlUmVzdWx0LCB1bmlvbkVmZmVjdHMgfSBmcm9tICcuL3R5cGVzJztcbmltcG9ydCB7IHNhdGlzZmllc0NvbnN0cmFpbnQsIHZhbGlkYXRlQWxsU3Vic3RpdHV0aW9uQ29uc3RyYWludHMgfSBmcm9tICcuL2NvbnN0cmFpbnRzJztcbmltcG9ydCB7IHN1YnN0aXR1dGUgfSBmcm9tICcuL3N1YnN0aXR1dGUnO1xuaW1wb3J0IHsgY3JlYXRlVHlwZVN0YXRlLCBsb2FkU3RkbGliIH0gZnJvbSAnLi90eXBlLW9wZXJhdGlvbnMnO1xuaW1wb3J0IHsgdHlwZUV4cHJlc3Npb24gfSBmcm9tICcuL2V4cHJlc3Npb24tZGlzcGF0Y2hlcic7XG5pbXBvcnQgeyB0eXBlQW5kRGVjb3JhdGUgfSBmcm9tICcuL2RlY29yYXRpb24nO1xuaW1wb3J0IHsgaW5pdGlhbGl6ZUJ1aWx0aW5zIH0gZnJvbSAnLi9idWlsdGlucyc7XG5cbi8vIFJlLWV4cG9ydCBUeXBlUmVzdWx0IGFuZCBlZmZlY3QgaGVscGVycyBmcm9tIHR5cGVzIG1vZHVsZVxuZXhwb3J0IHsgXG5cdHR5cGUgVHlwZVJlc3VsdCxcblx0ZW1wdHlFZmZlY3RzLFxuXHRzaW5nbGVFZmZlY3QsXG5cdHVuaW9uRWZmZWN0cyxcblx0Y3JlYXRlVHlwZVJlc3VsdCxcblx0Y3JlYXRlUHVyZVR5cGVSZXN1bHRcbn0gZnJvbSAnLi90eXBlcyc7XG5cbi8vIFJlLWV4cG9ydCBjcmVhdGVUeXBlU3RhdGUgZnJvbSB0eXBlLW9wZXJhdGlvbnMgbW9kdWxlXG5leHBvcnQgeyBjcmVhdGVUeXBlU3RhdGUsIGNsZWFuU3Vic3RpdHV0aW9ucyB9IGZyb20gJy4vdHlwZS1vcGVyYXRpb25zJztcblxuLy8gUmUtZXhwb3J0IGZyZXNoVHlwZVZhcmlhYmxlIGZyb20gdHlwZS1vcGVyYXRpb25zIG1vZHVsZVxuZXhwb3J0IHsgZnJlc2hUeXBlVmFyaWFibGUgfSBmcm9tICcuL3R5cGUtb3BlcmF0aW9ucyc7XG5cblxuLy8gUmUtZXhwb3J0IGZyZWVUeXBlVmFycyBmcm9tIHR5cGUtb3BlcmF0aW9ucyBtb2R1bGVcbmV4cG9ydCB7IGZyZWVUeXBlVmFycyB9IGZyb20gJy4vdHlwZS1vcGVyYXRpb25zJztcblxuLy8gUmUtZXhwb3J0IGZyZWVUeXBlVmFyc0VudiBmcm9tIHR5cGUtb3BlcmF0aW9ucyBtb2R1bGVcbmV4cG9ydCB7IGZyZWVUeXBlVmFyc0VudiB9IGZyb20gJy4vdHlwZS1vcGVyYXRpb25zJztcblxuLy8gUmUtZXhwb3J0IGdlbmVyYWxpemUgZnJvbSB0eXBlLW9wZXJhdGlvbnMgbW9kdWxlXG5leHBvcnQgeyBnZW5lcmFsaXplIH0gZnJvbSAnLi90eXBlLW9wZXJhdGlvbnMnO1xuXG4vLyBSZS1leHBvcnQgaW5zdGFudGlhdGUgZnJvbSB0eXBlLW9wZXJhdGlvbnMgbW9kdWxlXG5leHBvcnQgeyBpbnN0YW50aWF0ZSB9IGZyb20gJy4vdHlwZS1vcGVyYXRpb25zJztcblxuLy8gUmUtZXhwb3J0IGZyZXNoZW5UeXBlVmFyaWFibGVzIGZyb20gdHlwZS1vcGVyYXRpb25zIG1vZHVsZVxuZXhwb3J0IHsgZnJlc2hlblR5cGVWYXJpYWJsZXMgfSBmcm9tICcuL3R5cGUtb3BlcmF0aW9ucyc7XG5cblxuLy8gUmUtZXhwb3J0IGxvYWRTdGRsaWIgZnJvbSB0eXBlLW9wZXJhdGlvbnMgbW9kdWxlXG5leHBvcnQgeyBsb2FkU3RkbGliIH0gZnJvbSAnLi90eXBlLW9wZXJhdGlvbnMnO1xuXG4vLyBSZS1leHBvcnQgdHlwZUV4cHJlc3Npb24gZnJvbSBleHByZXNzaW9uLWRpc3BhdGNoZXIgbW9kdWxlXG5leHBvcnQgeyB0eXBlRXhwcmVzc2lvbiB9IGZyb20gJy4vZXhwcmVzc2lvbi1kaXNwYXRjaGVyJztcblxuXG4vLyBSZS1leHBvcnQgdHlwZSBpbmZlcmVuY2UgZnVuY3Rpb25zIGZyb20gdGhlaXIgcmVzcGVjdGl2ZSBtb2R1bGVzXG5leHBvcnQge1xuXHR0eXBlTGl0ZXJhbCxcblx0dHlwZVZhcmlhYmxlRXhwcixcblx0dHlwZUZ1bmN0aW9uLFxuXHR0eXBlRGVmaW5pdGlvbixcblx0dHlwZUlmLFxuXHR0eXBlQmluYXJ5LFxuXHR0eXBlTXV0YWJsZURlZmluaXRpb24sXG5cdHR5cGVNdXRhdGlvbixcblx0dHlwZUltcG9ydCxcblx0dHlwZVJlY29yZCxcblx0dHlwZUFjY2Vzc29yLFxuXHR0eXBlVHVwbGUsXG5cdHR5cGVMaXN0LFxuXHR0eXBlV2hlcmUsXG5cdHR5cGVUeXBlZCxcblx0dHlwZUNvbnN0cmFpbmVkLFxufSBmcm9tICcuL3R5cGUtaW5mZXJlbmNlJztcblxuZXhwb3J0IHtcblx0dHlwZUFwcGxpY2F0aW9uLFxuXHR0eXBlUGlwZWxpbmUsXG59IGZyb20gJy4vZnVuY3Rpb24tYXBwbGljYXRpb24nO1xuXG5leHBvcnQge1xuXHR0eXBlTWF0Y2gsXG5cdHR5cGVUeXBlRGVmaW5pdGlvbixcbn0gZnJvbSAnLi9wYXR0ZXJuLW1hdGNoaW5nJztcblxuZXhwb3J0IHtcblx0dHlwZUFuZERlY29yYXRlLFxufSBmcm9tICcuL2RlY29yYXRpb24nO1xuXG4vLyBSZS1leHBvcnQgaGVscGVyIGZ1bmN0aW9ucyBmcm9tIHRoZWlyIG1vZHVsZXNcbmV4cG9ydCB7IHZhbGlkYXRlQWxsU3Vic3RpdHV0aW9uQ29uc3RyYWludHMgfSBmcm9tICcuL2NvbnN0cmFpbnRzJztcbi8vIEV4cG9ydCB0aGUgbWFpbiBwcm9ncmFtIHR5cGluZyBmdW5jdGlvblxuZXhwb3J0IGNvbnN0IHR5cGVQcm9ncmFtID0gKHByb2dyYW06IFByb2dyYW0pOiBUeXBlUmVzdWx0ID0+IHtcblx0bGV0IHN0YXRlID0gY3JlYXRlVHlwZVN0YXRlKCk7XG5cdHN0YXRlID0gaW5pdGlhbGl6ZUJ1aWx0aW5zKHN0YXRlKTtcblx0c3RhdGUgPSBsb2FkU3RkbGliKHN0YXRlKTtcblxuXHRsZXQgZmluYWxUeXBlOiBUeXBlIHwgbnVsbCA9IG51bGw7XG5cdGxldCBhbGxFZmZlY3RzID0gbmV3IFNldDxFZmZlY3Q+KCk7XG5cblx0Zm9yIChjb25zdCBzdGF0ZW1lbnQgb2YgcHJvZ3JhbS5zdGF0ZW1lbnRzKSB7XG5cdFx0Y29uc3QgcmVzdWx0ID0gdHlwZUV4cHJlc3Npb24oc3RhdGVtZW50LCBzdGF0ZSk7XG5cdFx0c3RhdGUgPSByZXN1bHQuc3RhdGU7XG5cdFx0ZmluYWxUeXBlID0gcmVzdWx0LnR5cGU7XG5cdFx0YWxsRWZmZWN0cyA9IHVuaW9uRWZmZWN0cyhhbGxFZmZlY3RzLCByZXN1bHQuZWZmZWN0cyk7XG5cdH1cblxuXHRpZiAoIWZpbmFsVHlwZSkge1xuXHRcdGZpbmFsVHlwZSA9IHVuaXRUeXBlKCk7XG5cdH1cblxuXHRyZXR1cm4geyB0eXBlOiBmaW5hbFR5cGUsIGVmZmVjdHM6IGFsbEVmZmVjdHMsIHN0YXRlIH07XG59O1xuIl0sInZlcnNpb24iOjN9

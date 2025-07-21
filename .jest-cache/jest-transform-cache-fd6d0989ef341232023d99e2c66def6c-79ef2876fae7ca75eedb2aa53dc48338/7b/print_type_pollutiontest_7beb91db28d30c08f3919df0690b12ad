@@ -1,0 +1,92 @@
+675473f2024dac80744b068472572ff0
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _lexer = require("../src/lexer");
+const _parser = require("../src/parser/parser");
+const _typer = require("../src/typer");
+const _typeoperations = require("../src/typer/type-operations");
+const _builtins = require("../src/typer/builtins");
+describe('Polymorphic Function Type Pollution', ()=>{
+    test('print should remain polymorphic between uses', ()=>{
+        // Initialize fresh type state for each test
+        let state = (0, _typeoperations.createTypeState)();
+        state = (0, _builtins.initializeBuiltins)(state);
+        // First, use print with integer
+        const lexer1 = new _lexer.Lexer('print 1');
+        const tokens1 = lexer1.tokenize();
+        const program1 = (0, _parser.parse)(tokens1);
+        const result1 = (0, _typer.typeAndDecorate)(program1, state);
+        state = result1.state;
+        // Print should work with Int - check if this succeeds
+        expect(()=>result1).not.toThrow();
+        // Now use print with string - this should also work
+        const lexer2 = new _lexer.Lexer('print "hello"');
+        const tokens2 = lexer2.tokenize();
+        const program2 = (0, _parser.parse)(tokens2);
+        // This should not throw - print should be polymorphic
+        expect(()=>{
+            const result2 = (0, _typer.typeAndDecorate)(program2, state);
+        }).not.toThrow();
+    });
+    test('simulate REPL behavior - alternating print types', ()=>{
+        // Simulate REPL state persistence
+        let state = (0, _typeoperations.createTypeState)();
+        state = (0, _builtins.initializeBuiltins)(state);
+        // First REPL input: print 1
+        const lexer1 = new _lexer.Lexer('print 1');
+        const tokens1 = lexer1.tokenize();
+        const program1 = (0, _parser.parse)(tokens1);
+        const result1 = (0, _typer.typeAndDecorate)(program1, state);
+        state = result1.state; // Persist state like REPL does
+        // Second REPL input: print "hi" - this should work
+        const lexer2 = new _lexer.Lexer('print "hi"');
+        const tokens2 = lexer2.tokenize();
+        const program2 = (0, _parser.parse)(tokens2);
+        // This is where the bug manifests - print gets "stuck" on Int type
+        expect(()=>{
+            const result2 = (0, _typer.typeAndDecorate)(program2, state);
+            state = result2.state;
+        }).not.toThrow();
+        // Third REPL input: print 42 - should work again
+        const lexer3 = new _lexer.Lexer('print 42');
+        const tokens3 = lexer3.tokenize();
+        const program3 = (0, _parser.parse)(tokens3);
+        expect(()=>{
+            const result3 = (0, _typer.typeAndDecorate)(program3, state);
+        }).not.toThrow();
+    });
+    test('other polymorphic functions should not have type pollution', ()=>{
+        let state = (0, _typeoperations.createTypeState)();
+        state = (0, _builtins.initializeBuiltins)(state);
+        // Test == operator with different types
+        const eq1 = (0, _typer.typeAndDecorate)((0, _parser.parse)(new _lexer.Lexer('1 == 1').tokenize()), state);
+        state = eq1.state;
+        expect(()=>{
+            const eq2 = (0, _typer.typeAndDecorate)((0, _parser.parse)(new _lexer.Lexer('"a" == "b"').tokenize()), state);
+            state = eq2.state;
+        }).not.toThrow();
+        // Test toString with different types
+        expect(()=>{
+            const toString1 = (0, _typer.typeAndDecorate)((0, _parser.parse)(new _lexer.Lexer('toString 42').tokenize()), state);
+            state = toString1.state;
+        }).not.toThrow();
+        expect(()=>{
+            const toString2 = (0, _typer.typeAndDecorate)((0, _parser.parse)(new _lexer.Lexer('toString "hello"').tokenize()), state);
+        }).not.toThrow();
+    });
+    test('list functions should remain polymorphic', ()=>{
+        let state = (0, _typeoperations.createTypeState)();
+        state = (0, _builtins.initializeBuiltins)(state);
+        // Test with list of integers (using cons to build lists)
+        const list1 = (0, _typer.typeAndDecorate)((0, _parser.parse)(new _lexer.Lexer('cons 1 (cons 2 (cons 3 []))').tokenize()), state);
+        state = list1.state;
+        // Test toString with different input again - should work  
+        expect(()=>{
+            const toString3 = (0, _typer.typeAndDecorate)((0, _parser.parse)(new _lexer.Lexer('toString 100').tokenize()), state);
+        }).not.toThrow();
+    });
+});
+
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIi93b3Jrc3BhY2UvdGVzdC9wcmludF90eXBlX3BvbGx1dGlvbi50ZXN0LnRzIl0sInNvdXJjZXNDb250ZW50IjpbImltcG9ydCB7IExleGVyIH0gZnJvbSAnLi4vc3JjL2xleGVyJztcbmltcG9ydCB7IHBhcnNlIH0gZnJvbSAnLi4vc3JjL3BhcnNlci9wYXJzZXInO1xuaW1wb3J0IHsgdHlwZUFuZERlY29yYXRlIH0gZnJvbSAnLi4vc3JjL3R5cGVyJztcbmltcG9ydCB7IGNyZWF0ZVR5cGVTdGF0ZSB9IGZyb20gJy4uL3NyYy90eXBlci90eXBlLW9wZXJhdGlvbnMnO1xuaW1wb3J0IHsgaW5pdGlhbGl6ZUJ1aWx0aW5zIH0gZnJvbSAnLi4vc3JjL3R5cGVyL2J1aWx0aW5zJztcblxuZGVzY3JpYmUoJ1BvbHltb3JwaGljIEZ1bmN0aW9uIFR5cGUgUG9sbHV0aW9uJywgKCkgPT4ge1xuXHR0ZXN0KCdwcmludCBzaG91bGQgcmVtYWluIHBvbHltb3JwaGljIGJldHdlZW4gdXNlcycsICgpID0+IHtcblx0XHQvLyBJbml0aWFsaXplIGZyZXNoIHR5cGUgc3RhdGUgZm9yIGVhY2ggdGVzdFxuXHRcdGxldCBzdGF0ZSA9IGNyZWF0ZVR5cGVTdGF0ZSgpO1xuXHRcdHN0YXRlID0gaW5pdGlhbGl6ZUJ1aWx0aW5zKHN0YXRlKTtcblxuXHRcdC8vIEZpcnN0LCB1c2UgcHJpbnQgd2l0aCBpbnRlZ2VyXG5cdFx0Y29uc3QgbGV4ZXIxID0gbmV3IExleGVyKCdwcmludCAxJyk7XG5cdFx0Y29uc3QgdG9rZW5zMSA9IGxleGVyMS50b2tlbml6ZSgpO1xuXHRcdGNvbnN0IHByb2dyYW0xID0gcGFyc2UodG9rZW5zMSk7XG5cblx0XHRjb25zdCByZXN1bHQxID0gdHlwZUFuZERlY29yYXRlKHByb2dyYW0xLCBzdGF0ZSk7XG5cdFx0c3RhdGUgPSByZXN1bHQxLnN0YXRlO1xuXHRcdFxuXHRcdC8vIFByaW50IHNob3VsZCB3b3JrIHdpdGggSW50IC0gY2hlY2sgaWYgdGhpcyBzdWNjZWVkc1xuXHRcdGV4cGVjdCgoKSA9PiByZXN1bHQxKS5ub3QudG9UaHJvdygpO1xuXG5cdFx0Ly8gTm93IHVzZSBwcmludCB3aXRoIHN0cmluZyAtIHRoaXMgc2hvdWxkIGFsc28gd29ya1xuXHRcdGNvbnN0IGxleGVyMiA9IG5ldyBMZXhlcigncHJpbnQgXCJoZWxsb1wiJyk7XG5cdFx0Y29uc3QgdG9rZW5zMiA9IGxleGVyMi50b2tlbml6ZSgpO1xuXHRcdGNvbnN0IHByb2dyYW0yID0gcGFyc2UodG9rZW5zMik7XG5cblx0XHQvLyBUaGlzIHNob3VsZCBub3QgdGhyb3cgLSBwcmludCBzaG91bGQgYmUgcG9seW1vcnBoaWNcblx0XHRleHBlY3QoKCkgPT4ge1xuXHRcdFx0Y29uc3QgcmVzdWx0MiA9IHR5cGVBbmREZWNvcmF0ZShwcm9ncmFtMiwgc3RhdGUpO1xuXHRcdH0pLm5vdC50b1Rocm93KCk7XG5cdH0pO1xuXG5cdHRlc3QoJ3NpbXVsYXRlIFJFUEwgYmVoYXZpb3IgLSBhbHRlcm5hdGluZyBwcmludCB0eXBlcycsICgpID0+IHtcblx0XHQvLyBTaW11bGF0ZSBSRVBMIHN0YXRlIHBlcnNpc3RlbmNlXG5cdFx0bGV0IHN0YXRlID0gY3JlYXRlVHlwZVN0YXRlKCk7XG5cdFx0c3RhdGUgPSBpbml0aWFsaXplQnVpbHRpbnMoc3RhdGUpO1xuXG5cdFx0Ly8gRmlyc3QgUkVQTCBpbnB1dDogcHJpbnQgMVxuXHRcdGNvbnN0IGxleGVyMSA9IG5ldyBMZXhlcigncHJpbnQgMScpO1xuXHRcdGNvbnN0IHRva2VuczEgPSBsZXhlcjEudG9rZW5pemUoKTtcblx0XHRjb25zdCBwcm9ncmFtMSA9IHBhcnNlKHRva2VuczEpO1xuXHRcdGNvbnN0IHJlc3VsdDEgPSB0eXBlQW5kRGVjb3JhdGUocHJvZ3JhbTEsIHN0YXRlKTtcblx0XHRzdGF0ZSA9IHJlc3VsdDEuc3RhdGU7IC8vIFBlcnNpc3Qgc3RhdGUgbGlrZSBSRVBMIGRvZXNcblxuXHRcdC8vIFNlY29uZCBSRVBMIGlucHV0OiBwcmludCBcImhpXCIgLSB0aGlzIHNob3VsZCB3b3JrXG5cdFx0Y29uc3QgbGV4ZXIyID0gbmV3IExleGVyKCdwcmludCBcImhpXCInKTtcblx0XHRjb25zdCB0b2tlbnMyID0gbGV4ZXIyLnRva2VuaXplKCk7XG5cdFx0Y29uc3QgcHJvZ3JhbTIgPSBwYXJzZSh0b2tlbnMyKTtcblx0XHRcblx0XHQvLyBUaGlzIGlzIHdoZXJlIHRoZSBidWcgbWFuaWZlc3RzIC0gcHJpbnQgZ2V0cyBcInN0dWNrXCIgb24gSW50IHR5cGVcblx0XHRleHBlY3QoKCkgPT4ge1xuXHRcdFx0Y29uc3QgcmVzdWx0MiA9IHR5cGVBbmREZWNvcmF0ZShwcm9ncmFtMiwgc3RhdGUpO1xuXHRcdFx0c3RhdGUgPSByZXN1bHQyLnN0YXRlO1xuXHRcdH0pLm5vdC50b1Rocm93KCk7XG5cblx0XHQvLyBUaGlyZCBSRVBMIGlucHV0OiBwcmludCA0MiAtIHNob3VsZCB3b3JrIGFnYWluXG5cdFx0Y29uc3QgbGV4ZXIzID0gbmV3IExleGVyKCdwcmludCA0MicpO1xuXHRcdGNvbnN0IHRva2VuczMgPSBsZXhlcjMudG9rZW5pemUoKTtcblx0XHRjb25zdCBwcm9ncmFtMyA9IHBhcnNlKHRva2VuczMpO1xuXHRcdFxuXHRcdGV4cGVjdCgoKSA9PiB7XG5cdFx0XHRjb25zdCByZXN1bHQzID0gdHlwZUFuZERlY29yYXRlKHByb2dyYW0zLCBzdGF0ZSk7XG5cdFx0fSkubm90LnRvVGhyb3coKTtcblx0fSk7XG5cblx0dGVzdCgnb3RoZXIgcG9seW1vcnBoaWMgZnVuY3Rpb25zIHNob3VsZCBub3QgaGF2ZSB0eXBlIHBvbGx1dGlvbicsICgpID0+IHtcblx0XHRsZXQgc3RhdGUgPSBjcmVhdGVUeXBlU3RhdGUoKTtcblx0XHRzdGF0ZSA9IGluaXRpYWxpemVCdWlsdGlucyhzdGF0ZSk7XG5cblx0XHQvLyBUZXN0ID09IG9wZXJhdG9yIHdpdGggZGlmZmVyZW50IHR5cGVzXG5cdFx0Y29uc3QgZXExID0gdHlwZUFuZERlY29yYXRlKHBhcnNlKG5ldyBMZXhlcignMSA9PSAxJykudG9rZW5pemUoKSksIHN0YXRlKTtcblx0XHRzdGF0ZSA9IGVxMS5zdGF0ZTtcblx0XHRcblx0XHRleHBlY3QoKCkgPT4ge1xuXHRcdFx0Y29uc3QgZXEyID0gdHlwZUFuZERlY29yYXRlKHBhcnNlKG5ldyBMZXhlcignXCJhXCIgPT0gXCJiXCInKS50b2tlbml6ZSgpKSwgc3RhdGUpO1xuXHRcdFx0c3RhdGUgPSBlcTIuc3RhdGU7XG5cdFx0fSkubm90LnRvVGhyb3coKTtcblxuXHRcdC8vIFRlc3QgdG9TdHJpbmcgd2l0aCBkaWZmZXJlbnQgdHlwZXNcblx0XHRleHBlY3QoKCkgPT4ge1xuXHRcdFx0Y29uc3QgdG9TdHJpbmcxID0gdHlwZUFuZERlY29yYXRlKHBhcnNlKG5ldyBMZXhlcigndG9TdHJpbmcgNDInKS50b2tlbml6ZSgpKSwgc3RhdGUpO1xuXHRcdFx0c3RhdGUgPSB0b1N0cmluZzEuc3RhdGU7XG5cdFx0fSkubm90LnRvVGhyb3coKTtcblxuXHRcdGV4cGVjdCgoKSA9PiB7XG5cdFx0XHRjb25zdCB0b1N0cmluZzIgPSB0eXBlQW5kRGVjb3JhdGUocGFyc2UobmV3IExleGVyKCd0b1N0cmluZyBcImhlbGxvXCInKS50b2tlbml6ZSgpKSwgc3RhdGUpO1xuXHRcdH0pLm5vdC50b1Rocm93KCk7XG5cdH0pO1xuXG5cdHRlc3QoJ2xpc3QgZnVuY3Rpb25zIHNob3VsZCByZW1haW4gcG9seW1vcnBoaWMnLCAoKSA9PiB7XG5cdFx0bGV0IHN0YXRlID0gY3JlYXRlVHlwZVN0YXRlKCk7XG5cdFx0c3RhdGUgPSBpbml0aWFsaXplQnVpbHRpbnMoc3RhdGUpO1xuXG5cdFx0Ly8gVGVzdCB3aXRoIGxpc3Qgb2YgaW50ZWdlcnMgKHVzaW5nIGNvbnMgdG8gYnVpbGQgbGlzdHMpXG5cdFx0Y29uc3QgbGlzdDEgPSB0eXBlQW5kRGVjb3JhdGUocGFyc2UobmV3IExleGVyKCdjb25zIDEgKGNvbnMgMiAoY29ucyAzIFtdKSknKS50b2tlbml6ZSgpKSwgc3RhdGUpO1xuXHRcdHN0YXRlID0gbGlzdDEuc3RhdGU7XG5cblx0XHQvLyBUZXN0IHRvU3RyaW5nIHdpdGggZGlmZmVyZW50IGlucHV0IGFnYWluIC0gc2hvdWxkIHdvcmsgIFxuXHRcdGV4cGVjdCgoKSA9PiB7XG5cdFx0XHRjb25zdCB0b1N0cmluZzMgPSB0eXBlQW5kRGVjb3JhdGUocGFyc2UobmV3IExleGVyKCd0b1N0cmluZyAxMDAnKS50b2tlbml6ZSgpKSwgc3RhdGUpO1xuXHRcdH0pLm5vdC50b1Rocm93KCk7XG5cdH0pO1xufSk7Il0sIm5hbWVzIjpbImRlc2NyaWJlIiwidGVzdCIsInN0YXRlIiwiY3JlYXRlVHlwZVN0YXRlIiwiaW5pdGlhbGl6ZUJ1aWx0aW5zIiwibGV4ZXIxIiwiTGV4ZXIiLCJ0b2tlbnMxIiwidG9rZW5pemUiLCJwcm9ncmFtMSIsInBhcnNlIiwicmVzdWx0MSIsInR5cGVBbmREZWNvcmF0ZSIsImV4cGVjdCIsIm5vdCIsInRvVGhyb3ciLCJsZXhlcjIiLCJ0b2tlbnMyIiwicHJvZ3JhbTIiLCJyZXN1bHQyIiwibGV4ZXIzIiwidG9rZW5zMyIsInByb2dyYW0zIiwicmVzdWx0MyIsImVxMSIsImVxMiIsInRvU3RyaW5nMSIsInRvU3RyaW5nMiIsImxpc3QxIiwidG9TdHJpbmczIl0sIm1hcHBpbmdzIjoiOzs7O3VCQUFzQjt3QkFDQTt1QkFDVTtnQ0FDQTswQkFDRztBQUVuQ0EsU0FBUyx1Q0FBdUM7SUFDL0NDLEtBQUssZ0RBQWdEO1FBQ3BELDRDQUE0QztRQUM1QyxJQUFJQyxRQUFRQyxJQUFBQSwrQkFBZTtRQUMzQkQsUUFBUUUsSUFBQUEsNEJBQWtCLEVBQUNGO1FBRTNCLGdDQUFnQztRQUNoQyxNQUFNRyxTQUFTLElBQUlDLFlBQUssQ0FBQztRQUN6QixNQUFNQyxVQUFVRixPQUFPRyxRQUFRO1FBQy9CLE1BQU1DLFdBQVdDLElBQUFBLGFBQUssRUFBQ0g7UUFFdkIsTUFBTUksVUFBVUMsSUFBQUEsc0JBQWUsRUFBQ0gsVUFBVVA7UUFDMUNBLFFBQVFTLFFBQVFULEtBQUs7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

@@ -1,0 +1,173 @@
+48ca0914626c69b2137766df55c67a86
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const globals_1 = require("@jest/globals");
+const lexer_1 = require("../src/lexer");
+const parser_1 = require("../src/parser/parser");
+const typer_1 = require("../src/typer");
+const evaluator_1 = require("../src/evaluator");
+const helpers_1 = require("../src/typer/helpers");
+// Helper function to run Noolang code and get both value and type
+const runNoolang = (code) => {
+    const lexer = new lexer_1.Lexer(code);
+    const tokens = lexer.tokenize();
+    const ast = (0, parser_1.parse)(tokens);
+    const decoratedResult = (0, typer_1.typeAndDecorate)(ast);
+    const evaluator = new evaluator_1.Evaluator();
+    const result = evaluator.evaluateProgram(decoratedResult.program);
+    return {
+        finalValue: result.finalResult,
+        finalType: decoratedResult.state
+            ? (0, helpers_1.typeToString)(decoratedResult.program.statements[decoratedResult.program.statements.length - 1].type, decoratedResult.state.substitution)
+            : "unknown",
+    };
+};
+(0, globals_1.describe)("ADT Language Limitations", () => {
+    (0, globals_1.describe)("Multiple ADT Definitions", () => {
+        (0, globals_1.it)("should now work with map and multiple ADTs (polymorphism fixed)", () => {
+            // This test was previously failing due to lack of polymorphism in map
+            // Now that map is properly polymorphic, it should work
+            (0, globals_1.expect)(() => runNoolang(`
+        type Color = Red | Green | Blue;
+        type Shape a = Circle a | Rectangle a a | Triangle a a a;
+        colors = [Red, Green, Blue];
+        shapes = [Circle 3, Rectangle 5 4];
+        color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
+        calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
+        color_numbers = map color_to_number colors;
+        areas = map calculate_area shapes;
+        color_numbers
+      `)).not.toThrow();
+        });
+        (0, globals_1.it)("should work when ADTs are used in separate programs", () => {
+            // This demonstrates the workaround: use ADTs in separate programs
+            const colorResult = runNoolang(`
+        type Color = Red | Green | Blue;
+        colors = [Red, Green, Blue];
+        color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
+        color_numbers = map color_to_number colors;
+        color_numbers
+      `);
+            (0, globals_1.expect)(colorResult.finalValue).toEqual({
+                tag: "list",
+                values: [
+                    { tag: "number", value: 1 },
+                    { tag: "number", value: 2 },
+                    { tag: "number", value: 3 },
+                ],
+            });
+            const shapeResult = runNoolang(`
+        type Shape a = Circle a | Rectangle a a | Triangle a a a;
+        shapes = [Circle 3, Rectangle 5 4];
+        calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
+        areas = map calculate_area shapes;
+        areas
+      `);
+            (0, globals_1.expect)(shapeResult.finalValue).toEqual({
+                tag: "list",
+                values: [
+                    { tag: "number", value: 27 },
+                    { tag: "number", value: 20 },
+                ],
+            });
+        });
+        (0, globals_1.it)("should work when ADTs are used sequentially without map", () => {
+            // This shows that the issue is specifically with map + multiple ADTs
+            const result = runNoolang(`
+        type Color = Red | Green | Blue;
+        type Shape a = Circle a | Rectangle a a | Triangle a a a;
+        color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
+        calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
+        color_result = color_to_number Red;
+        shape_result = calculate_area (Circle 5);
+        { @color color_result, @shape shape_result }
+      `);
+            (0, globals_1.expect)(result.finalValue).toEqual({
+                tag: "record",
+                fields: {
+                    color: { tag: "number", value: 1 },
+                    shape: { tag: "number", value: 75 },
+                },
+            });
+        });
+    });
+    (0, globals_1.describe)("Root Cause Analysis", () => {
+        (0, globals_1.it)("should demonstrate that the type unification issue is now fixed", () => {
+            // The issue was in the type system when it tried to unify
+            // type variables that had been associated with different ADT types
+            // This is now fixed with proper let-polymorphism for map
+            (0, globals_1.expect)(() => runNoolang(`
+        type Color = Red | Green | Blue;
+        type Shape a = Circle a | Rectangle a a | Triangle a a a;
+        # This works fine - no type unification issues
+        colors = [Red, Green, Blue];
+        shapes = [Circle 3, Rectangle 5 4];
+        # This also works - separate operations
+        color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
+        calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
+        # This now works - map is properly polymorphic
+        color_numbers = map color_to_number colors;
+        areas = map calculate_area shapes;
+        color_numbers
+      `)).not.toThrow();
+        });
+    });
+    (0, globals_1.describe)("Workarounds", () => {
+        (0, globals_1.it)("should work with separate type definitions", () => {
+            // Workaround 1: Define ADTs in separate programs
+            const result1 = runNoolang(`
+        type Color = Red | Green | Blue;
+        colors = [Red, Green, Blue];
+        color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
+        map color_to_number colors
+      `);
+            (0, globals_1.expect)(result1.finalValue).toEqual({
+                tag: "list",
+                values: [
+                    { tag: "number", value: 1 },
+                    { tag: "number", value: 2 },
+                    { tag: "number", value: 3 },
+                ],
+            });
+        });
+        (0, globals_1.it)("should work with manual iteration instead of map", () => {
+            // Workaround 2: Use manual iteration instead of map
+            const result = runNoolang(`
+        type Color = Red | Green | Blue;
+        type Shape a = Circle a | Rectangle a a | Triangle a a a;
+        color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
+        calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
+        # Manual iteration instead of map
+        colors = [Red, Green, Blue];
+        shapes = [Circle 3, Rectangle 5 4];
+        color1 = color_to_number Red;
+        color2 = color_to_number Green;
+        color3 = color_to_number Blue;
+        shape1 = calculate_area (Circle 3);
+        shape2 = calculate_area (Rectangle 5 4);
+        { @colors [color1, color2, color3], @shapes [shape1, shape2] }
+      `);
+            (0, globals_1.expect)(result.finalValue).toEqual({
+                tag: "record",
+                fields: {
+                    colors: {
+                        tag: "list",
+                        values: [
+                            { tag: "number", value: 1 },
+                            { tag: "number", value: 2 },
+                            { tag: "number", value: 3 },
+                        ],
+                    },
+                    shapes: {
+                        tag: "list",
+                        values: [
+                            { tag: "number", value: 27 },
+                            { tag: "number", value: 20 },
+                        ],
+                    },
+                },
+            });
+        });
+    });
+});
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,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QUFRLEVBQUUsS0FBSyxFQUFFLENBQUMsRUFBRTtvQkFDM0IsRUFBRSxHQUFHLEVBQUUsUUFBUSxFQUFFLEtBQUssRUFBRSxDQUFDLEVBQUU7aUJBQzVCO2FBQ0YsQ0FBQyxDQUFDO1FBQ0wsQ0FBQyxDQUFDLENBQUM7UUFFSCxJQUFBLFlBQUUsRUFBQyxrREFBa0QsRUFBRSxHQUFHLEVBQUU7WUFDMUQsb0RBQW9EO1lBQ3BELE1BQU0sTUFBTSxHQUFHLFVBQVUsQ0FBQzs7Ozs7Ozs7Ozs7Ozs7T0FjekIsQ0FBQyxDQUFDO1lBRUgsSUFBQSxnQkFBTSxFQUFDLE1BQU0sQ0FBQyxVQUFVLENBQUMsQ0FBQyxPQUFPLENBQUM7Z0JBQ2hDLEdBQUcsRUFBRSxRQUFRO2dCQUNiLE1BQU0sRUFBRTtvQkFDTixNQUFNLEVBQUU7d0JBQ04sR0FBRyxFQUFFLE1BQU07d0JBQ1gsTUFBTSxFQUFFOzRCQUNOLEVBQUUsR0FBRyxFQUFFLFFBQVEsRUFBRSxLQUFLLEVBQUUsQ0FBQyxFQUFFOzRCQUMzQixFQUFFLEdBQUcsRUFBRSxRQUFRLEVBQUUsS0FBSyxFQUFFLENBQUMsRUFBRTs0QkFDM0IsRUFBRSxHQUFHLEVBQUUsUUFBUSxFQUFFLEtBQUssRUFBRSxDQUFDLEVBQUU7eUJBQzVCO3FCQUNGO29CQUNELE1BQU0sRUFBRTt3QkFDTixHQUFHLEVBQUUsTUFBTTt3QkFDWCxNQUFNLEVBQUU7NEJBQ04sRUFBRSxHQUFHLEVBQUUsUUFBUSxFQUFFLEtBQUssRUFBRSxFQUFFLEVBQUU7NEJBQzVCLEVBQUUsR0FBRyxFQUFFLFFBQVEsRUFBRSxLQUFLLEVBQUUsRUFBRSxFQUFFO3lCQUM3QjtxQkFDRjtpQkFDRjthQUNGLENBQUMsQ0FBQztRQUNMLENBQUMsQ0FBQyxDQUFDO0lBQ0wsQ0FBQyxDQUFDLENBQUM7QUFDTCxDQUFDLENBQUMsQ0FBQyIsIm5hbWVzIjpbXSwic291cmNlcyI6WyIvd29ya3NwYWNlL3Rlc3QvYWR0X2xpbWl0YXRpb25zLnRlc3QudHMiXSwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHsgZGVzY3JpYmUsIGl0LCBleHBlY3QgfSBmcm9tIFwiQGplc3QvZ2xvYmFsc1wiO1xuaW1wb3J0IHsgTGV4ZXIgfSBmcm9tIFwiLi4vc3JjL2xleGVyXCI7XG5pbXBvcnQgeyBwYXJzZSB9IGZyb20gXCIuLi9zcmMvcGFyc2VyL3BhcnNlclwiO1xuaW1wb3J0IHsgdHlwZUFuZERlY29yYXRlIH0gZnJvbSAnLi4vc3JjL3R5cGVyJztcbmltcG9ydCB7IEV2YWx1YXRvciB9IGZyb20gXCIuLi9zcmMvZXZhbHVhdG9yXCI7XG5pbXBvcnQgeyB0eXBlVG9TdHJpbmcgfSBmcm9tICcuLi9zcmMvdHlwZXIvaGVscGVycyc7XG5cbi8vIEhlbHBlciBmdW5jdGlvbiB0byBydW4gTm9vbGFuZyBjb2RlIGFuZCBnZXQgYm90aCB2YWx1ZSBhbmQgdHlwZVxuY29uc3QgcnVuTm9vbGFuZyA9IChjb2RlOiBzdHJpbmcpID0+IHtcbiAgY29uc3QgbGV4ZXIgPSBuZXcgTGV4ZXIoY29kZSk7XG4gIGNvbnN0IHRva2VucyA9IGxleGVyLnRva2VuaXplKCk7XG4gIGNvbnN0IGFzdCA9IHBhcnNlKHRva2Vucyk7XG4gIGNvbnN0IGRlY29yYXRlZFJlc3VsdCA9IHR5cGVBbmREZWNvcmF0ZShhc3QpO1xuICBjb25zdCBldmFsdWF0b3IgPSBuZXcgRXZhbHVhdG9yKCk7XG4gIGNvbnN0IHJlc3VsdCA9IGV2YWx1YXRvci5ldmFsdWF0ZVByb2dyYW0oZGVjb3JhdGVkUmVzdWx0LnByb2dyYW0pO1xuXG4gIHJldHVybiB7XG4gICAgZmluYWxWYWx1ZTogcmVzdWx0LmZpbmFsUmVzdWx0LFxuICAgIGZpbmFsVHlwZTogZGVjb3JhdGVkUmVzdWx0LnN0YXRlXG4gICAgICA/IHR5cGVUb1N0cmluZyhcbiAgICAgICAgICBkZWNvcmF0ZWRSZXN1bHQucHJvZ3JhbS5zdGF0ZW1lbnRzW1xuICAgICAgICAgICAgZGVjb3JhdGVkUmVzdWx0LnByb2dyYW0uc3RhdGVtZW50cy5sZW5ndGggLSAxXG4gICAgICAgICAgXS50eXBlISxcbiAgICAgICAgICBkZWNvcmF0ZWRSZXN1bHQuc3RhdGUuc3Vic3RpdHV0aW9uLFxuICAgICAgICApXG4gICAgICA6IFwidW5rbm93blwiLFxuICB9O1xufTtcblxuZGVzY3JpYmUoXCJBRFQgTGFuZ3VhZ2UgTGltaXRhdGlvbnNcIiwgKCkgPT4ge1xuICBkZXNjcmliZShcIk11bHRpcGxlIEFEVCBEZWZpbml0aW9uc1wiLCAoKSA9PiB7XG4gICAgaXQoXCJzaG91bGQgbm93IHdvcmsgd2l0aCBtYXAgYW5kIG11bHRpcGxlIEFEVHMgKHBvbHltb3JwaGlzbSBmaXhlZClcIiwgKCkgPT4ge1xuICAgICAgLy8gVGhpcyB0ZXN0IHdhcyBwcmV2aW91c2x5IGZhaWxpbmcgZHVlIHRvIGxhY2sgb2YgcG9seW1vcnBoaXNtIGluIG1hcFxuICAgICAgLy8gTm93IHRoYXQgbWFwIGlzIHByb3Blcmx5IHBvbHltb3JwaGljLCBpdCBzaG91bGQgd29ya1xuICAgICAgZXhwZWN0KCgpID0+XG4gICAgICAgIHJ1bk5vb2xhbmcoYFxuICAgICAgICB0eXBlIENvbG9yID0gUmVkIHwgR3JlZW4gfCBCbHVlO1xuICAgICAgICB0eXBlIFNoYXBlIGEgPSBDaXJjbGUgYSB8IFJlY3RhbmdsZSBhIGEgfCBUcmlhbmdsZSBhIGEgYTtcbiAgICAgICAgY29sb3JzID0gW1JlZCwgR3JlZW4sIEJsdWVdO1xuICAgICAgICBzaGFwZXMgPSBbQ2lyY2xlIDMsIFJlY3RhbmdsZSA1IDRdO1xuICAgICAgICBjb2xvcl90b19udW1iZXIgPSBmbiBjb2xvciA9PiBtYXRjaCBjb2xvciB3aXRoIChSZWQgPT4gMTsgR3JlZW4gPT4gMjsgQmx1ZSA9PiAzKTtcbiAgICAgICAgY2FsY3VsYXRlX2FyZWEgPSBmbiBzaGFwZSA9PiBtYXRjaCBzaGFwZSB3aXRoIChDaXJjbGUgcmFkaXVzID0+IHJhZGl1cyAqIHJhZGl1cyAqIDM7IFJlY3RhbmdsZSB3aWR0aCBoZWlnaHQgPT4gd2lkdGggKiBoZWlnaHQ7IFRyaWFuZ2xlIGEgYiBjID0+IChhICogYikgLyAyKTtcbiAgICAgICAgY29sb3JfbnVtYmVycyA9IG1hcCBjb2xvcl90b19udW1iZXIgY29sb3JzO1xuICAgICAgICBhcmVhcyA9IG1hcCBjYWxjdWxhdGVfYXJlYSBzaGFwZXM7XG4gICAgICAgIGNvbG9yX251bWJlcnNcbiAgICAgIGApLFxuICAgICAgKS5ub3QudG9UaHJvdygpO1xuICAgIH0pO1xuXG4gICAgaXQoXCJzaG91bGQgd29yayB3aGVuIEFEVHMgYXJlIHVzZWQgaW4gc2VwYXJhdGUgcHJvZ3JhbXNcIiwgKCkgPT4ge1xuICAgICAgLy8gVGhpcyBkZW1vbnN0cmF0ZXMgdGhlIHdvcmthcm91bmQ6IHVzZSBBRFRzIGluIHNlcGFyYXRlIHByb2dyYW1zXG4gICAgICBjb25zdCBjb2xvclJlc3VsdCA9IHJ1bk5vb2xhbmcoYFxuICAgICAgICB0eXBlIENvbG9yID0gUmVkIHwgR3JlZW4gfCBCbHVlO1xuICAgICAgICBjb2xvcnMgPSBbUmVkLCBHcmVlbiwgQmx1ZV07XG4gICAgICAgIGNvbG9yX3RvX251bWJlciA9IGZuIGNvbG9yID0+IG1hdGNoIGNvbG9yIHdpdGggKFJlZCA9PiAxOyBHcmVlbiA9PiAyOyBCbHVlID0+IDMpO1xuICAgICAgICBjb2xvcl9udW1iZXJzID0gbWFwIGNvbG9yX3RvX251bWJlciBjb2xvcnM7XG4gICAgICAgIGNvbG9yX251bWJlcnNcbiAgICAgIGApO1xuXG4gICAgICBleHBlY3QoY29sb3JSZXN1bHQuZmluYWxWYWx1ZSkudG9FcXVhbCh7XG4gICAgICAgIHRhZzogXCJsaXN0XCIsXG4gICAgICAgIHZhbHVlczogW1xuICAgICAgICAgIHsgdGFnOiBcIm51bWJlclwiLCB2YWx1ZTogMSB9LFxuICAgICAgICAgIHsgdGFnOiBcIm51bWJlclwiLCB2YWx1ZTogMiB9LFxuICAgICAgICAgIHsgdGFnOiBcIm51bWJlclwiLCB2YWx1ZTogMyB9LFxuICAgICAgICBdLFxuICAgICAgfSk7XG5cbiAgICAgIGNvbnN0IHNoYXBlUmVzdWx0ID0gcnVuTm9vbGFuZyhgXG4gICAgICAgIHR5cGUgU2hhcGUgYSA9IENpcmNsZSBhIHwgUmVjdGFuZ2xlIGEgYSB8IFRyaWFuZ2xlIGEgYSBhO1xuICAgICAgICBzaGFwZXMgPSBbQ2lyY2xlIDMsIFJlY3RhbmdsZSA1IDRdO1xuICAgICAgICBjYWxjdWxhdGVfYXJlYSA9IGZuIHNoYXBlID0+IG1hdGNoIHNoYXBlIHdpdGggKENpcmNsZSByYWRpdXMgPT4gcmFkaXVzICogcmFkaXVzICogMzsgUmVjdGFuZ2xlIHdpZHRoIGhlaWdodCA9PiB3aWR0aCAqIGhlaWdodDsgVHJpYW5nbGUgYSBiIGMgPT4gKGEgKiBiKSAvIDIpO1xuICAgICAgICBhcmVhcyA9IG1hcCBjYWxjdWxhdGVfYXJlYSBzaGFwZXM7XG4gICAgICAgIGFyZWFzXG4gICAgICBgKTtcblxuICAgICAgZXhwZWN0KHNoYXBlUmVzdWx0LmZpbmFsVmFsdWUpLnRvRXF1YWwoe1xuICAgICAgICB0YWc6IFwibGlzdFwiLFxuICAgICAgICB2YWx1ZXM6IFtcbiAgICAgICAgICB7IHRhZzogXCJudW1iZXJcIiwgdmFsdWU6IDI3IH0sXG4gICAgICAgICAgeyB0YWc6IFwibnVtYmVyXCIsIHZhbHVlOiAyMCB9LFxuICAgICAgICBdLFxuICAgICAgfSk7XG4gICAgfSk7XG5cbiAgICBpdChcInNob3VsZCB3b3JrIHdoZW4gQURUcyBhcmUgdXNlZCBzZXF1ZW50aWFsbHkgd2l0aG91dCBtYXBcIiwgKCkgPT4ge1xuICAgICAgLy8gVGhpcyBzaG93cyB0aGF0IHRoZSBpc3N1ZSBpcyBzcGVjaWZpY2FsbHkgd2l0aCBtYXAgKyBtdWx0aXBsZSBBRFRzXG4gICAgICBjb25zdCByZXN1bHQgPSBydW5Ob29sYW5nKGBcbiAgICAgICAgdHlwZSBDb2xvciA9IFJlZCB8IEdyZWVuIHwgQmx1ZTtcbiAgICAgICAgdHlwZSBTaGFwZSBhID0gQ2lyY2xlIGEgfCBSZWN0YW5nbGUgYSBhIHwgVHJpYW5nbGUgYSBhIGE7XG4gICAgICAgIGNvbG9yX3RvX251bWJlciA9IGZuIGNvbG9yID0+IG1hdGNoIGNvbG9yIHdpdGggKFJlZCA9PiAxOyBHcmVlbiA9PiAyOyBCbHVlID0+IDMpO1xuICAgICAgICBjYWxjdWxhdGVfYXJlYSA9IGZuIHNoYXBlID0+IG1hdGNoIHNoYXBlIHdpdGggKENpcmNsZSByYWRpdXMgPT4gcmFkaXVzICogcmFkaXVzICogMzsgUmVjdGFuZ2xlIHdpZHRoIGhlaWdodCA9PiB3aWR0aCAqIGhlaWdodDsgVHJpYW5nbGUgYSBiIGMgPT4gKGEgKiBiKSAvIDIpO1xuICAgICAgICBjb2xvcl9yZXN1bHQgPSBjb2xvcl90b19udW1iZXIgUmVkO1xuICAgICAgICBzaGFwZV9yZXN1bHQgPSBjYWxjdWxhdGVfYXJlYSAoQ2lyY2xlIDUpO1xuICAgICAgICB7IEBjb2xvciBjb2xvcl9yZXN1bHQsIEBzaGFwZSBzaGFwZV9yZXN1bHQgfVxuICAgICAgYCk7XG5cbiAgICAgIGV4cGVjdChyZXN1bHQuZmluYWxWYWx1ZSkudG9FcXVhbCh7XG4gICAgICAgIHRhZzogXCJyZWNvcmRcIixcbiAgICAgICAgZmllbGRzOiB7XG4gICAgICAgICAgY29sb3I6IHsgdGFnOiBcIm51bWJlclwiLCB2YWx1ZTogMSB9LFxuICAgICAgICAgIHNoYXBlOiB7IHRhZzogXCJudW1iZXJcIiwgdmFsdWU6IDc1IH0sXG4gICAgICAgIH0sXG4gICAgICB9KTtcbiAgICB9KTtcbiAgfSk7XG5cbiAgZGVzY3JpYmUoXCJSb290IENhdXNlIEFuYWx5c2lzXCIsICgpID0+IHtcbiAgICBpdChcInNob3VsZCBkZW1vbnN0cmF0ZSB0aGF0IHRoZSB0eXBlIHVuaWZpY2F0aW9uIGlzc3VlIGlzIG5vdyBmaXhlZFwiLCAoKSA9PiB7XG4gICAgICAvLyBUaGUgaXNzdWUgd2FzIGluIHRoZSB0eXBlIHN5c3RlbSB3aGVuIGl0IHRyaWVkIHRvIHVuaWZ5XG4gICAgICAvLyB0eXBlIHZhcmlhYmxlcyB0aGF0IGhhZCBiZWVuIGFzc29jaWF0ZWQgd2l0aCBkaWZmZXJlbnQgQURUIHR5cGVzXG4gICAgICAvLyBUaGlzIGlzIG5vdyBmaXhlZCB3aXRoIHByb3BlciBsZXQtcG9seW1vcnBoaXNtIGZvciBtYXBcbiAgICAgIGV4cGVjdCgoKSA9PlxuICAgICAgICBydW5Ob29sYW5nKGBcbiAgICAgICAgdHlwZSBDb2xvciA9IFJlZCB8IEdyZWVuIHwgQmx1ZTtcbiAgICAgICAgdHlwZSBTaGFwZSBhID0gQ2lyY2xlIGEgfCBSZWN0YW5nbGUgYSBhIHwgVHJpYW5nbGUgYSBhIGE7XG4gICAgICAgICMgVGhpcyB3b3JrcyBmaW5lIC0gbm8gdHlwZSB1bmlmaWNhdGlvbiBpc3N1ZXNcbiAgICAgICAgY29sb3JzID0gW1JlZCwgR3JlZW4sIEJsdWVdO1xuICAgICAgICBzaGFwZXMgPSBbQ2lyY2xlIDMsIFJlY3RhbmdsZSA1IDRdO1xuICAgICAgICAjIFRoaXMgYWxzbyB3b3JrcyAtIHNlcGFyYXRlIG9wZXJhdGlvbnNcbiAgICAgICAgY29sb3JfdG9fbnVtYmVyID0gZm4gY29sb3IgPT4gbWF0Y2ggY29sb3Igd2l0aCAoUmVkID0+IDE7IEdyZWVuID0+IDI7IEJsdWUgPT4gMyk7XG4gICAgICAgIGNhbGN1bGF0ZV9hcmVhID0gZm4gc2hhcGUgPT4gbWF0Y2ggc2hhcGUgd2l0aCAoQ2lyY2xlIHJhZGl1cyA9PiByYWRpdXMgKiByYWRpdXMgKiAzOyBSZWN0YW5nbGUgd2lkdGggaGVpZ2h0ID0+IHdpZHRoICogaGVpZ2h0OyBUcmlhbmdsZSBhIGIgYyA9PiAoYSAqIGIpIC8gMik7XG4gICAgICAgICMgVGhpcyBub3cgd29ya3MgLSBtYXAgaXMgcHJvcGVybHkgcG9seW1vcnBoaWNcbiAgICAgICAgY29sb3JfbnVtYmVycyA9IG1hcCBjb2xvcl90b19udW1iZXIgY29sb3JzO1xuICAgICAgICBhcmVhcyA9IG1hcCBjYWxjdWxhdGVfYXJlYSBzaGFwZXM7XG4gICAgICAgIGNvbG9yX251bWJlcnNcbiAgICAgIGApLFxuICAgICAgKS5ub3QudG9UaHJvdygpO1xuICAgIH0pO1xuICB9KTtcblxuICBkZXNjcmliZShcIldvcmthcm91bmRzXCIsICgpID0+IHtcbiAgICBpdChcInNob3VsZCB3b3JrIHdpdGggc2VwYXJhdGUgdHlwZSBkZWZpbml0aW9uc1wiLCAoKSA9PiB7XG4gICAgICAvLyBXb3JrYXJvdW5kIDE6IERlZmluZSBBRFRzIGluIHNlcGFyYXRlIHByb2dyYW1zXG4gICAgICBjb25zdCByZXN1bHQxID0gcnVuTm9vbGFuZyhgXG4gICAgICAgIHR5cGUgQ29sb3IgPSBSZWQgfCBHcmVlbiB8IEJsdWU7XG4gICAgICAgIGNvbG9ycyA9IFtSZWQsIEdyZWVuLCBCbHVlXTtcbiAgICAgICAgY29sb3JfdG9fbnVtYmVyID0gZm4gY29sb3IgPT4gbWF0Y2ggY29sb3Igd2l0aCAoUmVkID0+IDE7IEdyZWVuID0+IDI7IEJsdWUgPT4gMyk7XG4gICAgICAgIG1hcCBjb2xvcl90b19udW1iZXIgY29sb3JzXG4gICAgICBgKTtcblxuICAgICAgZXhwZWN0KHJlc3VsdDEuZmluYWxWYWx1ZSkudG9FcXVhbCh7XG4gICAgICAgIHRhZzogXCJsaXN0XCIsXG4gICAgICAgIHZhbHVlczogW1xuICAgICAgICAgIHsgdGFnOiBcIm51bWJlclwiLCB2YWx1ZTogMSB9LFxuICAgICAgICAgIHsgdGFnOiBcIm51bWJlclwiLCB2YWx1ZTogMiB9LFxuICAgICAgICAgIHsgdGFnOiBcIm51bWJlclwiLCB2YWx1ZTogMyB9LFxuICAgICAgICBdLFxuICAgICAgfSk7XG4gICAgfSk7XG5cbiAgICBpdChcInNob3VsZCB3b3JrIHdpdGggbWFudWFsIGl0ZXJhdGlvbiBpbnN0ZWFkIG9mIG1hcFwiLCAoKSA9PiB7XG4gICAgICAvLyBXb3JrYXJvdW5kIDI6IFVzZSBtYW51YWwgaXRlcmF0aW9uIGluc3RlYWQgb2YgbWFwXG4gICAgICBjb25zdCByZXN1bHQgPSBydW5Ob29sYW5nKGBcbiAgICAgICAgdHlwZSBDb2xvciA9IFJlZCB8IEdyZWVuIHwgQmx1ZTtcbiAgICAgICAgdHlwZSBTaGFwZSBhID0gQ2lyY2xlIGEgfCBSZWN0YW5nbGUgYSBhIHwgVHJpYW5nbGUgYSBhIGE7XG4gICAgICAgIGNvbG9yX3RvX251bWJlciA9IGZuIGNvbG9yID0+IG1hdGNoIGNvbG9yIHdpdGggKFJlZCA9PiAxOyBHcmVlbiA9PiAyOyBCbHVlID0+IDMpO1xuICAgICAgICBjYWxjdWxhdGVfYXJlYSA9IGZuIHNoYXBlID0+IG1hdGNoIHNoYXBlIHdpdGggKENpcmNsZSByYWRpdXMgPT4gcmFkaXVzICogcmFkaXVzICogMzsgUmVjdGFuZ2xlIHdpZHRoIGhlaWdodCA9PiB3aWR0aCAqIGhlaWdodDsgVHJpYW5nbGUgYSBiIGMgPT4gKGEgKiBiKSAvIDIpO1xuICAgICAgICAjIE1hbnVhbCBpdGVyYXRpb24gaW5zdGVhZCBvZiBtYXBcbiAgICAgICAgY29sb3JzID0gW1JlZCwgR3JlZW4sIEJsdWVdO1xuICAgICAgICBzaGFwZXMgPSBbQ2lyY2xlIDMsIFJlY3RhbmdsZSA1IDRdO1xuICAgICAgICBjb2xvcjEgPSBjb2xvcl90b19udW1iZXIgUmVkO1xuICAgICAgICBjb2xvcjIgPSBjb2xvcl90b19udW1iZXIgR3JlZW47XG4gICAgICAgIGNvbG9yMyA9IGNvbG9yX3RvX251bWJlciBCbHVlO1xuICAgICAgICBzaGFwZTEgPSBjYWxjdWxhdGVfYXJlYSAoQ2lyY2xlIDMpO1xuICAgICAgICBzaGFwZTIgPSBjYWxjdWxhdGVfYXJlYSAoUmVjdGFuZ2xlIDUgNCk7XG4gICAgICAgIHsgQGNvbG9ycyBbY29sb3IxLCBjb2xvcjIsIGNvbG9yM10sIEBzaGFwZXMgW3NoYXBlMSwgc2hhcGUyXSB9XG4gICAgICBgKTtcblxuICAgICAgZXhwZWN0KHJlc3VsdC5maW5hbFZhbHVlKS50b0VxdWFsKHtcbiAgICAgICAgdGFnOiBcInJlY29yZFwiLFxuICAgICAgICBmaWVsZHM6IHtcbiAgICAgICAgICBjb2xvcnM6IHtcbiAgICAgICAgICAgIHRhZzogXCJsaXN0XCIsXG4gICAgICAgICAgICB2YWx1ZXM6IFtcbiAgICAgICAgICAgICAgeyB0YWc6IFwibnVtYmVyXCIsIHZhbHVlOiAxIH0sXG4gICAgICAgICAgICAgIHsgdGFnOiBcIm51bWJlclwiLCB2YWx1ZTogMiB9LFxuICAgICAgICAgICAgICB7IHRhZzogXCJudW1iZXJcIiwgdmFsdWU6IDMgfSxcbiAgICAgICAgICAgIF0sXG4gICAgICAgICAgfSxcbiAgICAgICAgICBzaGFwZXM6IHtcbiAgICAgICAgICAgIHRhZzogXCJsaXN0XCIsXG4gICAgICAgICAgICB2YWx1ZXM6IFtcbiAgICAgICAgICAgICAgeyB0YWc6IFwibnVtYmVyXCIsIHZhbHVlOiAyNyB9LFxuICAgICAgICAgICAgICB7IHRhZzogXCJudW1iZXJcIiwgdmFsdWU6IDIwIH0sXG4gICAgICAgICAgICBdLFxuICAgICAgICAgIH0sXG4gICAgICAgIH0sXG4gICAgICB9KTtcbiAgICB9KTtcbiAgfSk7XG59KTtcbiJdLCJ2ZXJzaW9uIjozfQ==
