@@ -380,7 +380,6 @@ impl LanguageServer for Backend {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tower_lsp::lsp_types::{Position, Range};
 
     // Helper function that implements the same logic as apply_incremental_change for testing
