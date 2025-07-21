@@ -1,0 +1,68 @@
+# Modernization Demo: Before vs After
+
+# ========================================
+# SAFE LIST OPERATIONS (MODERNIZED)
+# ========================================
+
+# Before: list_get could throw exceptions
+# After: list_get returns Option for safety
+
+numbers = [10, 20, 30, 40, 50];
+
+# Safe access - returns Some value
+first = list_get 0 numbers;      # Some 10
+second = list_get 1 numbers;     # Some 20
+
+# Safe access - returns None for out of bounds
+invalid = list_get 99 numbers;   # None - no exception!
+
+# Safe head function
+head_result = head numbers;      # Some 10
+head_empty = head [];            # None
+
+# ========================================
+# WORKING WITH OPTIONS SAFELY
+# ========================================
+
+# Extract values safely with defaults
+first_value = option_get_or 0 first;        # 10
+invalid_value = option_get_or 0 invalid;    # 0 (default)
+
+# Chain operations safely
+safe_chain = (
+  maybe_head = head numbers;
+  option_get_or -1 maybe_head
+);
+
+# ========================================
+# COMPARISON OPERATIONS
+# ========================================
+
+# Basic equality still works
+eq1 = 42 == 42;           # True
+eq2 = "hello" == "hello"; # True
+eq3 = 1 == 2;             # False
+
+# Boolean operations work with ADTs
+bool_test = True == False; # False
+bool_not = not True;       # False
+
+# ========================================
+# RESULTS SUMMARY
+# ========================================
+
+{
+  @title "Noolang Built-ins Modernization Demo",
+  @safe_access_valid first,
+  @safe_access_invalid invalid,
+  @safe_head_valid head_result,
+  @safe_head_empty head_empty,
+  @extracted_value first_value,
+  @default_value invalid_value,
+  @chained_operation safe_chain,
+  @equality_works eq1,
+  @string_equality eq2,
+  @inequality eq3,
+  @boolean_equality bool_test,
+  @boolean_not bool_not
+}

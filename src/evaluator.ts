@@ -20,7 +20,11 @@ import type {
 	WhereExpression,
 	MutableDefinitionExpression,
 	MutationExpression,
+	ConstraintDefinitionExpression,
+	ImplementDefinitionExpression,
 } from './ast';
+import type { TypeState } from './typer/types';
+import { decorateEnvironmentWithConstraintFunctions } from './typer/constraint-resolution';
 import { createError } from './errors';
 import { formatValue } from './format';
 import { Lexer } from './lexer';
@@ -381,7 +385,9 @@ export class Evaluator {
 				if (isNumber(index) && isList(list)) {
 					const idx = index.value;
 					if (idx >= 0 && idx < list.values.length) {
-						return list.values[idx];
+						return createConstructor('Some', [list.values[idx]]);
+					} else {
+						return createConstructor('None', []);
 					}
 				}
 				throw new Error('list_get: invalid index or not a list');
@@ -747,6 +753,54 @@ export class Evaluator {
 				return ref.value;
 			})
 		);
+
+		// Primitive support functions for trait implementations
+		this.environment.set(
+			'primitive_int_eq',
+			createNativeFunction('primitive_int_eq', (a: Value) => (b: Value) => {
+				if (isNumber(a) && isNumber(b)) {
+					return createBool(a.value === b.value);
+				}
+				return createFalse();
+			})
+		);
+
+		this.environment.set(
+			'primitive_string_eq', 
+			createNativeFunction('primitive_string_eq', (a: Value) => (b: Value) => {
+				if (isString(a) && isString(b)) {
+					return createBool(a.value === b.value);
+				}
+				return createFalse();
+			})
+		);
+
+		this.environment.set(
+			'intToString',
+			createNativeFunction('intToString', (n: Value) => {
+				if (isNumber(n)) {
+					return createString(n.value.toString());
+				}
+				throw new Error('intToString requires a number');
+			})
+		);
+	}
+
+	addConstraintFunctions(typeState: TypeState): void {
+		// Add specialized constraint functions from type checking to runtime environment
+		const decoratedState = decorateEnvironmentWithConstraintFunctions(typeState);
+		
+		// Transfer specialized functions to runtime environment
+		for (const [name, typeScheme] of decoratedState.environment) {
+			if (name.startsWith('__')) {
+				// This is a specialized constraint function
+				// For now, create a placeholder function
+				// The actual implementation should come from the typeScheme
+				this.environment.set(name, createFunction(() => {
+					throw new Error(`Specialized constraint function ${name} not implemented in runtime`);
+				}));
+			}
+		}
 	}
 
 	private loadStdlib(): void {
@@ -951,6 +1005,10 @@ export class Evaluator {
 				return this.evaluateTypeDefinition(expr as TypeDefinitionExpression);
 			case 'match':
 				return this.evaluateMatch(expr as MatchExpression);
+			case 'constraint-definition':
+				return this.evaluateConstraintDefinition(expr as ConstraintDefinitionExpression);
+			case 'implement-definition':
+				return this.evaluateImplementDefinition(expr as ImplementDefinitionExpression);
 			default:
 				throw new Error(
 					`Unknown expression kind: ${(expr as Expression).kind}`
@@ -1637,9 +1695,97 @@ export class Evaluator {
 				return `${this.expressionToString(expr.main)} where (${expr.definitions
 					.map(d => this.expressionToString(d))
 					.join('; ')})`;
+			case 'constraint-definition':
+				return `constraint ${expr.name}`;
+			case 'implement-definition':
+				return `implement ${expr.constraintName}`;
 			default:
 				return 'unknown';
 		}
+	}
+
+	private evaluateConstraintDefinition(expr: ConstraintDefinitionExpression): Value {
+		// Constraint definitions create runtime dispatcher functions for each constraint function
+		for (const func of expr.functions) {
+			// Create a dispatcher function that will resolve to the right implementation at runtime
+			const dispatcherFunction = createFunction((arg: Value) => {
+				// Try to find the specialized function for this argument type
+				const argType = this.getValueTypeName(arg);
+				const specializedName = `__${expr.name}_${func.name}_${argType}`;
+				const specializedImpl = this.environment.get(specializedName);
+				
+				if (specializedImpl) {
+					// Handle cells
+					let impl = specializedImpl;
+					if (isCell(impl)) {
+						impl = impl.value;
+					}
+					
+					if (isFunction(impl)) {
+						return impl.fn(arg);
+					} else if (isNativeFunction(impl)) {
+						return impl.fn(arg);
+					}
+				}
+				
+				throw new Error(`No implementation of ${expr.name} for ${argType}`);
+			});
+			
+			// Register the dispatcher under the constraint function name
+			this.environment.set(func.name, dispatcherFunction);
+		}
+		
+		return createUnit();
+	}
+
+	private getValueTypeName(value: Value): string {
+		// Get a type name from a runtime value for constraint resolution
+		if (isNumber(value)) return 'Int';
+		if (isString(value)) return 'String';
+		if (isBool(value)) return 'Bool';
+		if (isList(value)) return 'List';
+		if (isRecord(value)) return 'Record';
+		if (isTuple(value)) return 'Tuple';
+		if (isConstructor(value)) {
+			// For ADT constructors, use the constructor name
+			if (value.name === 'Some' || value.name === 'None') return 'Option';
+			if (value.name === 'Ok' || value.name === 'Err') return 'Result';
+			return value.name;
+		}
+		return 'Unknown';
+	}
+
+	private evaluateImplementDefinition(expr: ImplementDefinitionExpression): Value {
+		// Implementation definitions need to register specialized function names
+		// in the runtime environment for type-directed dispatch
+		
+		// Generate the type name from the type expression
+		const typeName = this.typeExpressionToString(expr.typeExpr);
+		
+		// Register each implementation with a specialized name
+		for (const impl of expr.implementations) {
+			const specializedName = `__${expr.constraintName}_${impl.name}_${typeName}`;
+			const implementation = this.evaluateExpression(impl.value);
+			this.environment.set(specializedName, implementation);
+		}
+		
+		return createUnit();
+	}
+
+	private typeExpressionToString(typeExpr: any): string {
+		// Convert type expression to string for generating specialized names
+		if (typeExpr.kind === 'primitive') {
+			return typeExpr.name;
+		} else if (typeExpr.kind === 'variable') {
+			return typeExpr.name;
+		} else if (typeExpr.kind === 'list') {
+			return `List ${this.typeExpressionToString(typeExpr.element)}`;
+		} else if (typeExpr.kind === 'function') {
+			// For function types, just use a simple representation
+			return 'Function';
+		}
+		// Fallback
+		return 'Unknown';
 	}
 
 	private evaluateTypeDefinition(expr: TypeDefinitionExpression): Value {

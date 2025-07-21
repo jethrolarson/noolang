@@ -21,7 +21,7 @@ type Result a b = Ok a | Err b;
 # Safe head function - returns Option instead of throwing
 head = fn list => if (length list) == 0 
   then None 
-  else Some (list_get 0 list);
+  else list_get 0 list;
 
 # Join list elements with a separator
 # Example: join ", " [1, 2, 3] -> "1, 2, 3"
@@ -38,6 +38,38 @@ id = fn x => x;
 
 # Function composition
 compose = fn f g => fn x => f (g x);
+
+# Helper function for list equality - simplified for now
+listEqualsInt = fn list1 list2 => (length list1) == (length list2);
+
+# ========================================
+# MODERNIZED BUILT-INS (without full trait system for now)
+# ========================================
+
+# Show-like functions for basic types (until trait system is fully implemented)
+showInt = toString;  # Use built-in toString for now
+showString = fn s => s;
+showBool = fn b => match b with (True => "True"; False => "False");
+
+# Show for Option 
+showOption = fn showElement opt => match opt with (
+  Some x => concat "Some(" (concat (showElement x) ")");
+  None => "None"
+);
+
+# Show for Result
+showResult = fn showOk showErr res => match res with (
+  Ok x => concat "Ok(" (concat (showOk x) ")");
+  Err e => concat "Err(" (concat (showErr e) ")")
+);
+
+# Eq-like functions for basic types
+equalsInt = primitive_int_eq;
+equalsString = primitive_string_eq;
+equalsBool = fn a b => match a with (
+  True => match b with (True => True; False => False);
+  False => match b with (True => False; False => True)
+);
 
 # ========================================
 # MONAD CONSTRAINT AND IMPLEMENTATIONS  

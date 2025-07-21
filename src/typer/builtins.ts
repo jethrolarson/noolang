@@ -9,6 +9,7 @@ import {
 	listTypeWithElement,
 	typeVariable,
 	unitType,
+	optionType,
 	Type,
 	Effect,
 } from '../ast';
@@ -283,6 +284,16 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		type: createUnaryFunctionType(typeVariable('a'), stringType()),
 		quantifiedVars: ['a'],
 	});
+	
+	// Primitive comparison functions (pure)
+	newEnv.set('primitive_int_eq', {
+		type: createBinaryFunctionType(intType(), intType(), boolType()),
+		quantifiedVars: [],
+	});
+	newEnv.set('primitive_string_eq', {
+		type: createBinaryFunctionType(stringType(), stringType(), boolType()),
+		quantifiedVars: [],
+	});
 
 	// Record utilities
 	newEnv.set('hasKey', {
@@ -321,11 +332,11 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 
 	// head function is now self-hosted in stdlib.noo
 
-	// Minimal built-in for self-hosted functions
+	// Minimal built-in for self-hosted functions - now returns Option for safety
 	newEnv.set('list_get', {
 		type: functionType(
 			[intType(), listTypeWithElement(typeVariable('a'))],
-			typeVariable('a')
+			optionType(typeVariable('a'))
 		),
 		quantifiedVars: ['a'],
 	});
