@@ -1,0 +1,25 @@
+# Test modernized list_get function
+
+# Test that list_get returns Option instead of throwing
+test1 = list_get 0 [1, 2, 3];  # Should be Some 1
+test2 = list_get 1 [1, 2, 3];  # Should be Some 2  
+test3 = list_get 5 [1, 2, 3];  # Should be None (out of bounds)
+
+# Test basic equality to make sure we have working comparison
+test4 = 1 == 1;
+test5 = 1 == 2;
+
+# Test head function which now uses the safe list_get
+test6 = head [1, 2, 3];  # Should be Some 1
+test7 = head [];         # Should be None
+
+# Return results
+{
+  @list_get_valid test1,
+  @list_get_valid2 test2,
+  @list_get_invalid test3,
+  @equals_true test4,
+  @equals_false test5,
+  @head_valid test6,
+  @head_empty test7
+}

@@ -9,6 +9,7 @@ import {
 	listTypeWithElement,
 	typeVariable,
 	unitType,
+	optionType,
 	Type,
 	Effect,
 } from '../ast';
@@ -321,11 +322,11 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 
 	// head function is now self-hosted in stdlib.noo
 
-	// Minimal built-in for self-hosted functions
+	// Minimal built-in for self-hosted functions - now returns Option for safety
 	newEnv.set('list_get', {
 		type: functionType(
 			[intType(), listTypeWithElement(typeVariable('a'))],
-			typeVariable('a')
+			optionType(typeVariable('a'))
 		),
 		quantifiedVars: ['a'],
 	});

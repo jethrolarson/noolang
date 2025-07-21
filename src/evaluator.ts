@@ -381,7 +381,9 @@ export class Evaluator {
 				if (isNumber(index) && isList(list)) {
 					const idx = index.value;
 					if (idx >= 0 && idx < list.values.length) {
-						return list.values[idx];
+						return createConstructor('Some', [list.values[idx]]);
+					} else {
+						return createConstructor('None', []);
 					}
 				}
 				throw new Error('list_get: invalid index or not a list');
@@ -745,6 +747,37 @@ export class Evaluator {
 					throw new Error('mutGet requires a mutable reference');
 				}
 				return ref.value;
+			})
+		);
+
+		// Primitive support functions for trait implementations
+		this.environment.set(
+			'primitive_int_eq',
+			createNativeFunction('primitive_int_eq', (a: Value) => (b: Value) => {
+				if (isNumber(a) && isNumber(b)) {
+					return createBool(a.value === b.value);
+				}
+				return createFalse();
+			})
+		);
+
+		this.environment.set(
+			'primitive_string_eq', 
+			createNativeFunction('primitive_string_eq', (a: Value) => (b: Value) => {
+				if (isString(a) && isString(b)) {
+					return createBool(a.value === b.value);
+				}
+				return createFalse();
+			})
+		);
+
+		this.environment.set(
+			'intToString',
+			createNativeFunction('intToString', (n: Value) => {
+				if (isNumber(n)) {
+					return createString(n.value.toString());
+				}
+				throw new Error('intToString requires a number');
 			})
 		);
 	}

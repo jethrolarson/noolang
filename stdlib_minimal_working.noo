@@ -1,0 +1,50 @@
+# Minimal Noolang Standard Library for Testing Modernization
+
+# ========================================
+# CORE ALGEBRAIC DATA TYPES
+# ========================================
+
+# Boolean type
+type Bool = True | False;
+
+# Option type for handling nullable values
+type Option a = Some a | None;
+
+# Result type for error handling  
+type Result a b = Ok a | Err b;
+
+# ========================================
+# LIST OPERATIONS
+# ========================================
+
+# Safe head function - returns Option instead of throwing
+head = fn list => if (length list) == 0 
+  then None 
+  else list_get 0 list;
+
+# ========================================
+# UTILITY FUNCTIONS
+# ========================================
+
+# Identity function
+id = fn x => x;
+
+# Function composition
+compose = fn f g => fn x => f (g x);
+
+# ========================================
+# BOOLEAN OPERATIONS
+# ========================================
+
+# Boolean negation
+not = fn b => match b with (True => False; False => True);
+
+# ========================================
+# OPTION UTILITIES
+# ========================================
+
+# Extract value from Option with default
+option_get_or = fn default opt => match opt with (
+  Some value => value;
+  None => default
+);
