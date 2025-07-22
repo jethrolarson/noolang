@@ -5,9 +5,10 @@
  * the constraint solver for better performance and extensibility.
  */
 
-import { Type } from '../ast';
+import { Type, typeVariable, intType } from '../ast';
 import { TypeState } from './types';
 import { ConstraintSolver, UnificationConstraint } from './constraint-solver';
+import { createTypeState } from './type-operations';
 
 // Drop-in replacement for the existing unify function
 // Track unify call frequency
@@ -79,8 +80,6 @@ export const constraintBasedUnify = (
 
 // Test the constraint-based unify with a simple case
 export const testConstraintUnify = () => {
-	const { typeVariable, intType } = require('../ast');
-	const { createTypeState } = require('./type-operations');
 
 	const state = createTypeState();
 	const t1 = typeVariable('a');

@@ -48,6 +48,8 @@ import {
 import { unify } from './unify';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
+import { resolveConstraintVariable, createConstraintFunctionType } from './constraint-resolution';
+import { typeApplication } from './function-application';
 import {
 	type TypeState,
 	type TypeResult,
@@ -102,10 +104,6 @@ export const typeVariableExpr = (
 	const scheme = state.environment.get(expr.name);
 	if (!scheme) {
 		// Check if this is a constraint function before throwing error
-		const {
-			resolveConstraintVariable,
-			createConstraintFunctionType,
-		} = require('./constraint-resolution');
 		const constraintResult = resolveConstraintVariable(expr.name, state);
 
 		if (constraintResult.resolved && constraintResult.needsResolution) {
@@ -548,7 +546,6 @@ export const typeBinary = (
 	if (expr.operator === '$') {
 		// Dollar: a $ b means a(b) - apply left function to right value
 		// Delegate to the same logic as regular function application
-		const { typeApplication } = require('./function-application');
 
 		// Create a synthetic ApplicationExpression for a $ b
 		const syntheticApp: import('../ast').ApplicationExpression = {
@@ -583,7 +580,6 @@ export const typeBinary = (
 		// Try constraint resolution first, fall back to direct implementation
 		try {
 			// Create a synthetic function application: bind(left)(right)
-			const { typeApplication } = require('./function-application');
 
 			const bindVar: import('../ast').VariableExpression = {
 				kind: 'variable',
