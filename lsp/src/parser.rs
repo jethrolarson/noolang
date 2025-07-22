@@ -332,10 +332,15 @@ impl TypeScriptBridge {
 
     /// Parse AST output from TypeScript
     fn parse_ast_output(&self, output: &str) -> Result<Value> {
+        eprintln!("LSP Debug: CLI output length: {}", output.len());
+        eprintln!("LSP Debug: CLI output: '{}'", output);
+        
         // Find JSON in the output
-        for line in output.lines() {
+        for (i, line) in output.lines().enumerate() {
             let trimmed = line.trim();
+            eprintln!("LSP Debug: Line {}: '{}'", i, trimmed);
             if trimmed.starts_with('{') {
+                eprintln!("LSP Debug: Found JSON line, parsing...");
                 return Ok(serde_json::from_str(trimmed)?);
             }
         }
