@@ -3,9 +3,7 @@
 set -e
 
 echo "🔧 Building Noolang LSP..."
-cd lsp
 cargo build --release
-cd ..
 
 echo "📦 Installing extension dependencies..."
 cd extension
@@ -14,9 +12,7 @@ npm run compile
 cd ..
 
 echo "🧪 Testing LSP server..."
-cd lsp
 cargo test
-cd ..
 
 echo "✅ LSP setup complete!"
 echo ""
@@ -31,4 +27,4 @@ echo "2. Press F5 to start debugging"
 echo "3. Open a .noo file to trigger the LSP"
 echo ""
 echo "To run manual tests:"
-echo "cd lsp && cargo run --bin noolang-lsp" 
+echo "cargo run --bin noolang-lsp" 

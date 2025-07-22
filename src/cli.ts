@@ -23,6 +23,7 @@ function printUsage() {
 	console.log(`       ${colorize.command('noo --types-detailed <expr>')}`);
 	console.log(`       ${colorize.command('noo --types-env <expr>')}`);
 	console.log(`       ${colorize.command('noo --types-ast <expr>')}`);
+	console.log(`       ${colorize.command('noo --symbol-type <file> <symbol>')}`);
 	console.log('');
 	console.log(colorize.section('Examples:'));
 	console.log(`  ${colorize.identifier('noo my_program.noo')}`);
@@ -44,6 +45,7 @@ function printUsage() {
 	);
 	console.log(`  ${colorize.identifier('noo --types-env "fn x => x + 1"')}`);
 	console.log(`  ${colorize.identifier('noo --types-ast "fn x => x + 1"')}`);
+	console.log(`  ${colorize.identifier('noo --symbol-type examples/demo.noo factorial')}`);
 	console.log('');
 	console.log(colorize.section('Or use the REPL:'));
 	console.log(`  ${colorize.identifier('noo')}`);
@@ -249,6 +251,42 @@ async function main() {
 			const { program: decoratedProgram } = typeAndDecorate(program);
 			console.log('Typed AST:');
 			console.log(JSON.stringify(decoratedProgram, null, 2));
+		} catch (err) {
+			console.error('Error:', (err as Error).message);
+			process.exit(1);
+		}
+		return;
+	}
+
+	// Check for --symbol-type flag
+	if (args[0] === '--symbol-type' && args[1] && args[2]) {
+		const file = args[1];
+		const symbol = args[2];
+		try {
+			const fullPath = path.resolve(file);
+			const code = fs.readFileSync(fullPath, 'utf8');
+			
+			// Create a program that includes the original file content plus the symbol reference
+			const testExpr = `${symbol}`;
+			const combinedCode = `${code}; ${testExpr}`;
+			
+			const lexer = new Lexer(combinedCode);
+			const tokens = lexer.tokenize();
+			const program = parse(tokens);
+			const { program: decoratedProgram, state } = typeAndDecorate(program);
+			
+			// Get the type of the last statement (which is our symbol reference)
+			if (decoratedProgram.statements.length > 0) {
+				const lastStmt = decoratedProgram.statements[decoratedProgram.statements.length - 1];
+				if (lastStmt.type) {
+					const typeStr = typeToString(lastStmt.type, state.substitution);
+					console.log(`Symbol '${symbol}' has type: ${typeStr}`);
+				} else {
+					console.log(`Symbol '${symbol}': <no type information>`);
+				}
+			} else {
+				console.log(`Symbol '${symbol}': <not found>`);
+			}
 		} catch (err) {
 			console.error('Error:', (err as Error).message);
 			process.exit(1);
