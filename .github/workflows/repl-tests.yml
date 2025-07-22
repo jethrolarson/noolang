@@ -27,7 +27,8 @@ on:
       - '.github/workflows/repl-tests.yml'
 
 jobs:
-  fast-tests:
+  # Run core Jest tests once with fast SWC compilation
+  core-tests:
     runs-on: ubuntu-latest
     
     steps:
@@ -42,7 +43,7 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: Run fast Jest tests (SWC)
+    - name: Run Jest tests (SWC)
       run: npm run test:fast
       
     - name: Cache Jest transform cache
@@ -54,62 +55,10 @@ jobs:
           jest-cache-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
           jest-cache-${{ runner.os }}-
 
-  full-test-suite:
+  # Run REPL-specific tests separately
+  repl-tests:
     runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-    
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Cache Jest transform cache
-      uses: actions/cache@v4
-      with:
-        path: .jest-cache
-        key: jest-cache-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('src/**/*.ts', 'test/**/*.ts') }}
-        restore-keys: |
-          jest-cache-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
-          jest-cache-${{ runner.os }}-
-    
-    - name: Setup Rust (for LSP tests)
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-    
-    - name: Cache Rust dependencies
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          lsp/target
-        key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          rust-${{ runner.os }}-
-    
-    - name: Run all tests (including REPL and LSP)
-      run: npm run test:all
-    
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results
-        path: |
-          coverage/
-          test-results/
-        retention-days: 30
-
-  repl-focused-tests:
-    runs-on: ubuntu-latest
+    needs: core-tests  # Only run if core tests pass
     
     steps:
     - uses: actions/checkout@v4
@@ -140,8 +89,10 @@ jobs:
           test-results/
         retention-days: 14
 
+  # Run LSP tests separately
   lsp-tests:
     runs-on: ubuntu-latest
+    needs: core-tests  # Only run if core tests pass
     
     steps:
     - uses: actions/checkout@v4
@@ -200,6 +151,7 @@ jobs:
           lsp/test-*.log
         retention-days: 14
 
+  # Run benchmarks (can run in parallel with other tests)
   benchmarks:
     runs-on: ubuntu-latest
     
@@ -290,6 +242,7 @@ jobs:
           benchmark-results/
         retention-days: 90
 
+  # Performance comparison for PRs
   performance-comparison:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
