@@ -190,11 +190,11 @@ join = fn separator list =>
   reduce (fn acc x => if acc == "" then x else concat acc (concat separator x)) "" list;
 
 implement Functor List (
-  map = fn f list => list_map f list
+  map = fn f list => reduce (fn acc x => append acc [f x]) [] list
 );
 
 implement Monad List (
-  bind = fn f list => list_map f list;
+  bind = fn f list => reduce (fn acc x => append acc (f x)) [] list;
   pure = fn x => [x]
 );
 

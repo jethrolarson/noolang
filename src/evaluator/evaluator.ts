@@ -412,14 +412,14 @@ export class Evaluator {
 			})
 		);
 
-		// List utility functions
+		// List utility functions (keeping as built-in for performance)
 		this.environment.set(
-			'list_map',
-			createNativeFunction('list_map', (func: Value) => (list: Value) => {
+			'map_builtin',
+			createNativeFunction('map_builtin', (func: Value) => (list: Value) => {
 				if (isFunction(func) && isList(list)) {
 					return createList(list.values.map((item: Value) => func.fn(item)));
 				}
-				throw new Error('list_map requires a function and a list');
+				throw new Error('map_builtin requires a function and a list');
 			})
 		);
 		this.environment.set(
