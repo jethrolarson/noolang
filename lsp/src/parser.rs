@@ -68,7 +68,11 @@ pub struct SymbolReference {
 
 impl TypeScriptBridge {
     pub fn new() -> Self {
-        // Try multiple possible paths for the CLI
+        // Get current working directory for debugging
+        let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        eprintln!("LSP Debug: Current working directory: {}", cwd.display());
+        
+        // Try multiple possible paths for the CLI with proper path resolution
         let possible_paths = vec![
             "../dist/cli.js",           // From lsp/ directory to workspace root
             "dist/cli.js",              // From workspace root
@@ -76,10 +80,12 @@ impl TypeScriptBridge {
             "./dist/cli.js",            // Explicit relative path
         ];
         
-        let mut cli_path = "dist/cli.js".to_string(); // Default fallback
+        let mut cli_path = "../dist/cli.js".to_string(); // Better default for lsp directory
         
         for path in &possible_paths {
-            if std::path::Path::new(path).exists() {
+            let full_path = std::path::Path::new(path);
+            eprintln!("LSP Debug: Checking path: {} -> {}", path, full_path.exists());
+            if full_path.exists() {
                 cli_path = path.to_string();
                 eprintln!("LSP Debug: Found CLI at: {}", path);
                 break;
