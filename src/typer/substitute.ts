@@ -1,9 +1,6 @@
 import { type Type, type Constraint } from '../ast';
 import { mapObject } from './helpers';
 
-// Performance tracking for substitute
-let substituteCallCount = 0;
-let totalSubstituteTime = 0;
 
 // Cache for substitution results to avoid repeated work
 const substituteCache = new Map<string, Type>();
@@ -13,9 +10,6 @@ export const substitute = (
 	type: Type,
 	substitution: Map<string, Type>
 ): Type => {
-	const startTime = Date.now();
-	substituteCallCount++;
-
 	let result: Type;
 	// Generate cache key - only for type variables as they're most common
 	if (type.kind === 'variable' && substitution.size < 20) {
@@ -26,90 +20,78 @@ export const substitute = (
 		if (cached) {
 			result = cached;
 		} else {
-			result = substituteWithCache(type, substitution, new Set());
+			result = substituteWithCache(substitution, new Set())(type);
 			if (substituteCache.size < 1000) {
 				// Prevent unbounded cache growth
 				substituteCache.set(cacheKey, result);
 			}
 		}
 	} else {
-		result = substituteWithCache(type, substitution, new Set());
+		result = substituteWithCache(substitution, new Set())(type);
 	}
-
-	const elapsed = Date.now() - startTime;
-	totalSubstituteTime += elapsed;
-
-	// Stats tracking (disabled for clean output)
 
 	return result;
 };
 
-const substituteWithCache = (
-	type: Type,
-	substitution: Map<string, Type>,
-	seen: Set<string>
-): Type => {
-	switch (type.kind) {
-		case 'variable': {
-			if (seen.has(type.name)) {
-				// Cycle detected, return original variable
+const substituteWithCache =
+	(substitution: Map<string, Type>, seen: Set<string>) =>
+	(type: Type): Type => {
+		switch (type.kind) {
+			case 'variable': {
+				if (seen.has(type.name)) {
+					// Cycle detected, return original variable
+					return type;
+				}
+				const sub = substitution.get(type.name);
+				if (sub) {
+					seen.add(type.name);
+					const result = substituteWithCache(substitution, seen)(sub);
+					seen.delete(type.name);
+					return result;
+				}
 				return type;
 			}
-			const sub = substitution.get(type.name);
-			if (sub) {
-				seen.add(type.name);
-				const result = substituteWithCache(sub, substitution, seen);
-				seen.delete(type.name);
-				return result;
-			}
-			return type;
+			case 'function':
+				return {
+					...type,
+					params: type.params.map(substituteWithCache(substitution, seen)),
+					return: substituteWithCache(substitution, seen)(type.return),
+					constraints: type.constraints?.map(c =>
+						substituteConstraint(c, substitution)
+					),
+				};
+			case 'list':
+				return {
+					...type,
+					element: substituteWithCache(substitution, seen)(type.element),
+				};
+			case 'tuple':
+				return {
+					...type,
+					elements: type.elements.map(substituteWithCache(substitution, seen)),
+				};
+			case 'record':
+				return {
+					...type,
+					fields: mapObject(
+						type.fields,
+						substituteWithCache(substitution, seen)
+					),
+				};
+			case 'union':
+				return {
+					...type,
+					types: type.types.map(substituteWithCache(substitution, seen)),
+				};
+			case 'variant':
+				return {
+					...type,
+					args: type.args.map(substituteWithCache(substitution, seen)),
+				};
+			default:
+				return type;
 		}
-		case 'function':
-			return {
-				...type,
-				params: type.params.map(param =>
-					substituteWithCache(param, substitution, seen)
-				),
-				return: substituteWithCache(type.return, substitution, seen),
-				constraints: type.constraints?.map(c =>
-					substituteConstraint(c, substitution)
-				),
-			};
-		case 'list':
-			return {
-				...type,
-				element: substituteWithCache(type.element, substitution, seen),
-			};
-		case 'tuple':
-			return {
-				...type,
-				elements: type.elements.map(el =>
-					substituteWithCache(el, substitution, seen)
-				),
-			};
-		case 'record':
-			return {
-				...type,
-				fields: mapObject(type.fields, (v, k) =>
-					substituteWithCache(v, substitution, seen)
-				),
-			};
-		case 'union':
-			return {
-				...type,
-				types: type.types.map(t => substituteWithCache(t, substitution, seen)),
-			};
-		case 'variant':
-			return {
-				...type,
-				args: type.args.map(arg =>
-					substituteWithCache(arg, substitution, seen)
-				),
-			};
-		default:
-			return type;
-	}
-};
+	};
 
 // Apply substitution to a constraint
 export const substituteConstraint = (

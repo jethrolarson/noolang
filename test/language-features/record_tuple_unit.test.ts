@@ -1,4 +1,4 @@
-import { Lexer } from '../../src/lexer';
+import { Lexer } from '../../src/lexer/lexer';
 import { parse } from '../../src/parser/parser';
 
 describe('Records, Tuples, and Unit', () => {

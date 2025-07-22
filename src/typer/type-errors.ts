@@ -334,10 +334,11 @@ function typeToString(type: Type): string {
 			return type.name;
 		case 'variable':
 			return type.name;
-		case 'function':
+		case 'function': {
 			const paramStr = type.params.map(typeToString).join(' ');
 			const effectStr = formatEffectsString(type.effects);
 			return `(${paramStr}) -> ${typeToString(type.return)}${effectStr}`;
+		}
 		case 'list':
 			return `List ${typeToString(type.element)}`;
 		case 'tuple':

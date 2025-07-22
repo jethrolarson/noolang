@@ -16,9 +16,10 @@ import { functionApplicationError } from './type-errors';
 // Performance tracking
 let unifyCallCount = 0;
 let totalUnifyTime = 0;
-let slowUnifyCalls: Array<{ type1: string; type2: string; time: number }> = [];
-let unifyCallSources = new Map<string, number>(); // Track where unify calls come from
-let unifyTypePatterns = new Map<string, number>(); // Track what types are being unified
+const slowUnifyCalls: Array<{ type1: string; type2: string; time: number }> =
+	[];
+const unifyCallSources = new Map<string, number>(); // Track where unify calls come from
+const unifyTypePatterns = new Map<string, number>(); // Track what types are being unified
 
 const typeToPattern = (t: Type): string => {
 	switch (t.kind) {
@@ -40,9 +41,6 @@ const typeToPattern = (t: Type): string => {
 			return t.kind;
 	}
 };
-
-// Cache for unification results to avoid repeated work
-const unifyCache = new Map<string, TypeState>();
 
 const unifyInternal = (
 	t1: Type,
@@ -241,7 +239,7 @@ function unifyUnit(
 	s1: Type,
 	s2: Type,
 	state: TypeState,
-	location?: { line: number; column: number }
+	_location?: { line: number; column: number }
 ): TypeState {
 	if (!isTypeKind(s1, 'unit') || !isTypeKind(s2, 'unit')) {
 		throw new Error('unifyUnit called with non-unit types');
@@ -260,8 +258,8 @@ function unifyVariable(
 		throw new Error('unifyVariable called with non-variable s1');
 	}
 	// Optimized constraint collection - avoid array spreading
-	let constraintsToCheck: Constraint[] = [];
-	let seenVars = new Set<string>();
+	const constraintsToCheck: Constraint[] = [];
+	const seenVars = new Set<string>();
 	let currentVar: Type = s1;
 	while (isTypeKind(currentVar, 'variable')) {
 		if (seenVars.has(currentVar.name)) break;
@@ -344,7 +342,7 @@ function unifyVariable(
 }
 
 let functionUnifyCount = 0;
-let functionUnifyPatterns = new Map<string, number>();
+const functionUnifyPatterns = new Map<string, number>();
 
 function unifyFunction(
 	s1: Type,

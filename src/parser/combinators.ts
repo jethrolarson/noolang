@@ -1,4 +1,4 @@
-import type { Token, TokenType } from '../lexer';
+import type { Token, TokenType } from '../lexer/lexer';
 
 export type ParseError = {
 	success: false;

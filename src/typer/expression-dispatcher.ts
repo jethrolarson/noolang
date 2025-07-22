@@ -1,5 +1,5 @@
 // Type expression dispatcher with proper error handling
-import { type Expression, type Type, type Effect, unitType } from '../ast';
+import { type Expression, unitType } from '../ast';
 import { TypeState, TypeResult, createPureTypeResult } from './types';
 import {
 	typeLiteral,

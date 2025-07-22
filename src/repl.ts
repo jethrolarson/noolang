@@ -1,9 +1,9 @@
 import * as readline from 'node:readline';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { Lexer } from './lexer';
+import { Lexer } from './lexer/lexer';
 import { parse } from './parser/parser';
-import { Evaluator, type Value, isNativeFunction } from './evaluator';
+import { Evaluator, type Value, isNativeFunction } from './evaluator/evaluator';
 import {
 	createTypeState,
 	loadStdlib,

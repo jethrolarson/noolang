@@ -155,14 +155,16 @@ const typeToString = (type: Type): string => {
 			return `List ${typeToString(type.element)}`;
 		case 'tuple':
 			return `{${type.elements.map(typeToString).join(', ')}}`;
-		case 'record':
+		case 'record': {
 			const fields = Object.entries(type.fields)
 				.map(([k, v]) => `${k}: ${typeToString(v)}`)
 				.join(', ');
 			return `{${fields}}`;
-		case 'function':
+		}
+		case 'function': {
 			const params = type.params.map(typeToString).join(' -> ');
 			return `${params} -> ${typeToString(type.return)}`;
+		}
 		case 'union':
 			return type.types.map(typeToString).join(' | ');
 		case 'variant':

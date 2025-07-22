@@ -5,6 +5,7 @@ import {
 	type Constraint,
 	functionType,
 	isConstraint,
+	type Effect,
 } from '../ast';
 import {
 	functionApplicationError,
@@ -24,11 +25,6 @@ import {
 	createTypeResult,
 	unionEffects,
 } from './types';
-import {
-	validateFunctionCall,
-	areEffectsCompatible,
-	mergeEffects,
-} from './effect-validation';
 import { satisfiesConstraint } from './constraints';
 import { substitute } from './substitute';
 import { unify } from './unify';
@@ -45,7 +41,7 @@ function continueWithSpecializedFunction(
 	expr: ApplicationExpression,
 	specializedFuncType: Type,
 	argTypes: Type[],
-	allEffects: Set<import('../ast').Effect>,
+	allEffects: Set<Effect>,
 	state: TypeState
 ): TypeResult {
 	let currentState = state;
@@ -125,13 +121,6 @@ export const validateConstraints = (
 	// Apply substitution to get the concrete type
 	const substitutedType = substitute(type, state.substitution);
 
-	// If it's a type variable with constraints, check them
-	if (substitutedType.kind === 'variable' && substitutedType.constraints) {
-		for (const constraint of substitutedType.constraints) {
-			// currentState = solveConstraint(constraint, currentState, location);
-		}
-	}
-
 	// If it's a function type, check constraints on parameters and return type
 	if (substitutedType.kind === 'function') {
 		// Check constraints on parameters
@@ -146,14 +135,7 @@ export const validateConstraints = (
 			location
 		);
 
-		// Check function-level constraints
-		if (substitutedType.constraints) {
-			// currentState = solveConstraints(
-			// 	substitutedType.constraints,
-			// 	currentState,
-			// 	location
-			// );
-		}
+		// TODO Check function-level constraints
 	}
 
 	// If it's a list type, check constraints on element type

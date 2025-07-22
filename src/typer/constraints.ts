@@ -1,189 +1,6 @@
-import {
-	typeVariable,
-	Constraint,
-	Type,
-	HasFieldConstraint,
-	IsConstraint,
-	ImplementsConstraint,
-	CustomConstraint,
-} from '../ast';
+import { Constraint, Type } from '../ast';
 import { TypeState } from './types';
-import { formatTypeError, createTypeError } from './type-errors';
-import { substitute } from './substitute';
 import { constraintsEqual, isTypeKind, typeToString } from './helpers';
-import { unify } from './unify';
-
-// Constraint solving functions
-export const solveConstraints = (
-	constraints: Constraint[],
-	state: TypeState,
-	location?: { line: number; column: number }
-): TypeState => {
-	let currentState = state;
-
-	for (const constraint of constraints) {
-		currentState = solveConstraint(constraint, currentState, location);
-	}
-
-	return currentState;
-};
-
-export const solveConstraint = (
-	constraint: Constraint,
-	state: TypeState,
-	location?: { line: number; column: number }
-): TypeState => {
-	switch (constraint.kind) {
-		case 'is':
-			return solveIsConstraint(constraint, state, location);
-		case 'hasField':
-			return solveHasFieldConstraint(constraint, state, location);
-		case 'implements':
-			return solveImplementsConstraint(constraint, state, location);
-		case 'custom':
-			return solveCustomConstraint(constraint, state, location);
-		default:
-			return state;
-	}
-};
-
-const solveIsConstraint = (
-	constraint: { kind: 'is'; typeVar: string; constraint: string },
-	state: TypeState,
-	location?: { line: number; column: number }
-): TypeState => {
-	// Validate constraint name first
-	validateConstraintName(constraint.constraint);
-
-	const typeVar = substitute(
-		typeVariable(constraint.typeVar),
-		state.substitution
-	);
-
-	// If the type variable has been unified to a concrete type, check if it satisfies the constraint
-	if (typeVar.kind !== 'variable') {
-		// Check if the concrete type satisfies the constraint
-		if (!satisfiesConstraint(typeVar, constraint.constraint)) {
-			throw new Error(
-				formatTypeError(
-					createTypeError(
-						`Type ${typeToString(
-							typeVar,
-							state.substitution
-						)} does not satisfy constraint '${
-							constraint.constraint
-						}'. This often occurs when trying to use a partial function (one that can fail) in an unsafe context like function composition. Consider using total functions that return Option or Result types instead.`,
-						{},
-						location || { line: 1, column: 1 }
-					)
-				)
-			);
-		}
-	} else {
-		// For type variables, we need to track the constraint for later solving
-		// Add the constraint to the type variable if it doesn't already have it
-		if (!typeVar.constraints) {
-			typeVar.constraints = [];
-		}
-
-		// Check if this constraint is already present
-		const existingConstraint = typeVar.constraints.find(
-			c =>
-				c.kind === 'is' &&
-				c.typeVar === constraint.typeVar &&
-				c.constraint === constraint.constraint
-		);
-
-		if (!existingConstraint) {
-			typeVar.constraints.push(constraint);
-		}
-	}
-
-	return state;
-};
-
-const solveHasFieldConstraint = (
-	constraint: {
-		kind: 'hasField';
-		typeVar: string;
-		field: string;
-		fieldType: Type;
-	},
-	state: TypeState,
-	location?: { line: number; column: number }
-): TypeState => {
-	const typeVar = substitute(
-		typeVariable(constraint.typeVar),
-		state.substitution
-	);
-
-	if (typeVar.kind === 'record') {
-		// Check if the record has the required field with the right type
-		if (!(constraint.field in typeVar.fields)) {
-			throw new Error(
-				formatTypeError(
-					createTypeError(
-						`Record type missing required field '${constraint.field}'`,
-						{},
-						location || { line: 1, column: 1 }
-					)
-				)
-			);
-		}
-
-		// Unify the field type
-		let newState = state;
-		newState = unify(
-			typeVar.fields[constraint.field],
-			constraint.fieldType,
-			newState,
-			location
-		);
-
-		return newState;
-	} else if (typeVar.kind === 'variable') {
-		// For type variables, we'll track the constraint for later solving
-		return state;
-	} else {
-		throw new Error(
-			formatTypeError(
-				createTypeError(
-					`Type ${typeToString(
-						typeVar,
-						state.substitution
-					)} cannot have fields`,
-					{},
-					location || { line: 1, column: 1 }
-				)
-			)
-		);
-	}
-};
-
-const solveImplementsConstraint = (
-	constraint: { kind: 'implements'; typeVar: string; interfaceName: string },
-	state: TypeState,
-	location?: { line: number; column: number }
-): TypeState => {
-	// For now, we'll just track the constraint
-	// In a full implementation, we'd check if the type implements the interface
-	return state;
-};
-
-const solveCustomConstraint = (
-	constraint: {
-		kind: 'custom';
-		typeVar: string;
-		constraint: string;
-		args: Type[];
-	},
-	state: TypeState,
-	location?: { line: number; column: number }
-): TypeState => {
-	// For now, we'll just track the constraint
-	// In a full implementation, we'd call the custom constraint solver
-	return state;
-};
 
 // Validate that a constraint name is valid
 export const validateConstraintName = (constraint: string): void => {
@@ -194,8 +11,8 @@ export const validateConstraintName = (constraint: string): void => {
 };
 
 export const satisfiesConstraint = (
-	type: Type,
-	constraint: string
+	_type: Type,
+	_constraint: string
 ): boolean => {
 	// All non-hasField constraints are meaningless, so they're not supported
 	return false;
@@ -208,7 +25,6 @@ export function propagateConstraintToType(type: Type, constraint: Constraint) {
 			type.constraints = type.constraints || [];
 			if (!type.constraints.some(c => constraintsEqual(c, constraint))) {
 				type.constraints.push(constraint);
-			} else {
 			}
 			break;
 		case 'function':
