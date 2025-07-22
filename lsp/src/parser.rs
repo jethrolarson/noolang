@@ -707,6 +707,19 @@ mod tests {
     // Helper function to check if CLI is available
     fn cli_available() -> bool {
         let bridge = TypeScriptBridge::new();
+        
+        // First check if Node.js is available
+        if std::process::Command::new("node")
+            .args(&["--version"])
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false) == false
+        {
+            return false;
+        }
+        
+        // Then check if the CLI file exists and works
+        std::path::Path::new(&bridge.cli_path).exists() &&
         std::process::Command::new("node")
             .args(&[&bridge.cli_path, "--help"])
             .output()
@@ -779,6 +792,11 @@ mod tests {
 
     #[test]
     fn test_find_definition_not_found() {
+        if !cli_available() {
+            println!("Skipping test - TypeScript CLI not available");
+            return;
+        }
+
         let content = "add = fn x y => x + y;";
         let test_file = create_test_file(content).unwrap();
         let bridge = create_bridge();
@@ -798,6 +816,11 @@ mod tests {
 
     #[test]
     fn test_find_references_basic() {
+        if !cli_available() {
+            println!("Skipping test - TypeScript CLI not available");
+            return;
+        }
+
         let content = "add = fn x y => x + y;\nresult = add 2 3;\ncalc = add 1 4;";
         let test_file = create_test_file(content).unwrap();
         let bridge = create_bridge();
@@ -825,6 +848,11 @@ mod tests {
 
     #[test]
     fn test_find_references_from_usage() {
+        if !cli_available() {
+            println!("Skipping test - TypeScript CLI not available");
+            return;
+        }
+
         let content = "multiply = fn a b => a * b;\nresult = multiply 3 4;";
         let test_file = create_test_file(content).unwrap();
         let bridge = create_bridge();
@@ -848,6 +876,11 @@ mod tests {
 
     #[test]
     fn test_get_document_symbols() {
+        if !cli_available() {
+            println!("Skipping test - TypeScript CLI not available");
+            return;
+        }
+
         let content = "add = fn x y => x + y;\nmultiply = fn a b => a * b;\nresult = 42;";
         let test_file = create_test_file(content).unwrap();
         let bridge = create_bridge();
@@ -891,6 +924,11 @@ mod tests {
 
     #[test]
     fn test_complex_nested_expressions() {
+        if !cli_available() {
+            println!("Skipping test - TypeScript CLI not available");
+            return;
+        }
+
         let content = "add = fn x y => x + y;\ncalculation = add (add 1 2) (add 3 4);";
         let test_file = create_test_file(content).unwrap();
         let bridge = create_bridge();
