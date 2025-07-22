@@ -443,6 +443,7 @@ impl LanguageServer for Backend {
                             name: symbol.name,
                             kind: symbol_kind,
                             tags: None,
+                            deprecated: Some(false),
                             location: Location {
                                 uri: uri.clone(),
                                 range: Range {

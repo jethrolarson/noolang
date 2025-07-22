@@ -11,6 +11,9 @@ tokio = { version = "1.0", features = ["full"] }
 anyhow = "1.0"
 thiserror = "1.0"
 
+[dev-dependencies]
+tokio-test = "0.4"
+
 [lib]
 name = "noolang_lsp"
 path = "src/lib.rs"
