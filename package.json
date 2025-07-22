@@ -39,6 +39,7 @@
     "noo": "dist/cli.js"
   },
   "engines": {
+    "node": ">=20.0.0",
     "vscode": "^1.74.0"
   },
   "categories": [
