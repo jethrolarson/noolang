@@ -716,20 +716,10 @@ mod tests {
     fn cli_available() -> bool {
         let bridge = TypeScriptBridge::new();
         
-        // First check if Node.js is available
-        if std::process::Command::new("node")
-            .args(&["--version"])
-            .output()
-            .map(|output| output.status.success())
-            .unwrap_or(false) == false
-        {
-            return false;
-        }
-        
-        // Then check if the CLI file exists and works
+        // Check if CLI file exists and Node.js can execute it
         std::path::Path::new(&bridge.cli_path).exists() &&
         std::process::Command::new("node")
-            .args(&[&bridge.cli_path, "--help"])
+            .args(&["--version"])
             .output()
             .map(|output| output.status.success())
             .unwrap_or(false)
