@@ -68,11 +68,7 @@ pub struct SymbolReference {
 
 impl TypeScriptBridge {
     pub fn new() -> Self {
-        // Get current working directory for debugging
-        let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-        eprintln!("LSP Debug: Current working directory: {}", cwd.display());
-        
-        // Try multiple possible paths for the CLI with proper path resolution
+        // Try multiple possible paths for the CLI
         let possible_paths = vec![
             "../dist/cli.js",           // From lsp/ directory to workspace root
             "dist/cli.js",              // From workspace root
@@ -83,18 +79,11 @@ impl TypeScriptBridge {
         let mut cli_path = "../dist/cli.js".to_string(); // Better default for lsp directory
         
         for path in &possible_paths {
-            let full_path = std::path::Path::new(path);
-            eprintln!("LSP Debug: Checking path: {} -> {}", path, full_path.exists());
-            if full_path.exists() {
+            if std::path::Path::new(path).exists() {
                 cli_path = path.to_string();
-                eprintln!("LSP Debug: Found CLI at: {}", path);
                 break;
             }
         }
-        
-        // Debug logging for path resolution
-        eprintln!("LSP Debug: CLI path resolved to: {}", cli_path);
-        eprintln!("LSP Debug: CLI exists: {}", std::path::Path::new(&cli_path).exists());
         
         Self {
             cli_path,
@@ -332,18 +321,14 @@ impl TypeScriptBridge {
 
     /// Parse AST output from TypeScript
     fn parse_ast_output(&self, output: &str) -> Result<Value> {
-        eprintln!("LSP Debug: CLI output length: {}", output.len());
-        
         // Find the start of JSON and extract everything from there
         let lines: Vec<&str> = output.lines().collect();
         for (i, line) in lines.iter().enumerate() {
             let trimmed = line.trim();
             if trimmed.starts_with('{') {
-                eprintln!("LSP Debug: Found JSON start at line {}", i);
                 // Collect all lines from the JSON start to the end
                 let json_lines: Vec<&str> = lines[i..].to_vec();
                 let json_str = json_lines.join("\n");
-                eprintln!("LSP Debug: Parsing JSON: {}", json_str);
                 return Ok(serde_json::from_str(&json_str)?);
             }
         }
@@ -708,11 +693,13 @@ mod tests {
     use super::*;
     use std::fs;
 
-    // Helper function to create a test file
+    // Helper function to create a test file with unique name
     fn create_test_file(content: &str) -> Result<String> {
-        let test_file = "/tmp/test_navigation.noo";
-        fs::write(test_file, content)?;
-        Ok(test_file.to_string())
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let test_file = format!("/tmp/test_navigation_{}.noo", timestamp);
+        fs::write(&test_file, content)?;
+        Ok(test_file)
     }
 
     // Helper function to create TypeScript bridge
