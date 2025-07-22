@@ -19,6 +19,7 @@ pub struct DiagnosticInfo {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Some variants may not be used yet
 pub enum DiagnosticSeverity {
     Error,
     Warning,
@@ -27,6 +28,7 @@ pub enum DiagnosticSeverity {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // May be used in future features
 pub struct TypeInfo {
     pub line: usize,
     pub column: usize,
@@ -46,6 +48,7 @@ pub struct SymbolDefinition {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Some variants may not be used yet
 pub enum SymbolKind {
     Variable,
     Function,
@@ -54,6 +57,7 @@ pub enum SymbolKind {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Used in navigation features
 pub struct SymbolReference {
     pub name: String,
     pub line: usize,
@@ -122,6 +126,7 @@ impl TypeScriptBridge {
     }
 
     /// Get AST information for position-based queries
+    #[allow(dead_code)] // Used in tests and future features
     pub fn get_ast(&self, expression: &str) -> Result<Value> {
         let output = Command::new("node")
             .args(&[&self.cli_path, "--ast", expression])
@@ -615,9 +620,9 @@ impl TypeScriptBridge {
     }
 
     /// Check if position is within the given range
-    fn position_within_range(&self, target_line: usize, target_col: usize, 
-                           start_line: usize, start_col: usize, 
-                           end_line: usize, end_col: usize) -> bool {
+    pub fn position_within_range(&self, target_line: usize, target_col: usize, 
+                                start_line: usize, start_col: usize, 
+                                end_line: usize, end_col: usize) -> bool {
         if target_line < start_line || target_line > end_line {
             return false;
         }

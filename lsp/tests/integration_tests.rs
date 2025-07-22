@@ -1,6 +1,16 @@
 use std::fs;
 use noolang_lsp::TypeScriptBridge;
 
+// Helper function to check if CLI is available
+fn cli_available() -> bool {
+    let bridge = TypeScriptBridge::new();
+    std::process::Command::new("node")
+        .args(&["--version"])
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
 // Helper function to create test files
 fn create_test_file(name: &str, content: &str) -> String {
     let test_file = format!("/tmp/{}", name);
@@ -15,6 +25,11 @@ fn cleanup_test_file(path: &str) {
 
 #[test]
 fn test_typescript_bridge_navigation_features() {
+    if !cli_available() {
+        println!("Skipping integration test - Node.js not available");
+        return;
+    }
+
     let bridge = TypeScriptBridge::new();
     
     let content = r#"
@@ -65,7 +80,7 @@ fn test_position_conversion() {
     // Test that position conversion between LSP (0-based) and AST (1-based) works correctly
     let bridge = TypeScriptBridge::new();
     
-    // Test position within range calculations
+    // Test position within range calculations (basic validation)
     assert!(bridge.position_within_range(1, 5, 1, 1, 1, 10)); // Same line, within range
     assert!(bridge.position_within_range(2, 5, 1, 1, 3, 10)); // Multi-line, within range
     assert!(!bridge.position_within_range(1, 15, 1, 1, 1, 10)); // Same line, out of range
@@ -74,6 +89,11 @@ fn test_position_conversion() {
 
 #[test]
 fn test_complex_navigation_scenarios() {
+    if !cli_available() {
+        println!("Skipping test - Node.js not available");
+        return;
+    }
+
     let bridge = TypeScriptBridge::new();
     
     let content = r#"
@@ -113,6 +133,11 @@ result = pipeline 5;
 
 #[test]
 fn test_adt_navigation() {
+    if !cli_available() {
+        println!("Skipping test - Node.js not available");
+        return;
+    }
+
     let bridge = TypeScriptBridge::new();
     
     let content = r#"
@@ -143,6 +168,11 @@ result = unwrap value;
 
 #[test]
 fn test_error_recovery() {
+    if !cli_available() {
+        println!("Skipping test - Node.js not available");
+        return;
+    }
+
     let bridge = TypeScriptBridge::new();
     
     // Test with syntactically incorrect code
@@ -166,6 +196,11 @@ fn test_error_recovery() {
 
 #[test]
 fn test_empty_and_whitespace_files() {
+    if !cli_available() {
+        println!("Skipping test - Node.js not available");
+        return;
+    }
+
     let bridge = TypeScriptBridge::new();
     
     // Test empty file
@@ -189,6 +224,11 @@ fn test_empty_and_whitespace_files() {
 
 #[test]
 fn test_large_file_performance() {
+    if !cli_available() {
+        println!("Skipping test - Node.js not available");
+        return;
+    }
+
     let bridge = TypeScriptBridge::new();
     
     // Generate a larger test file
@@ -218,6 +258,11 @@ fn test_large_file_performance() {
 
 #[test] 
 fn test_unicode_and_special_characters() {
+    if !cli_available() {
+        println!("Skipping test - Node.js not available");
+        return;
+    }
+
     let bridge = TypeScriptBridge::new();
     
     let content = r#"
@@ -231,7 +276,7 @@ emoji_func = fn 🚀 => 🚀 * 2;
     // Test that Unicode identifiers work
     match bridge.get_document_symbols(&test_file) {
         Ok(symbols) => {
-            let names: Vec<String> = symbols.iter().map(|s| s.name.clone()).collect();
+            let _names: Vec<String> = symbols.iter().map(|s| s.name.clone()).collect();
             // Note: This depends on how the parser handles Unicode
             // The test validates that the system doesn't crash with Unicode
             assert!(symbols.len() > 0, "Should find some symbols even with Unicode");
@@ -247,6 +292,11 @@ emoji_func = fn 🚀 => 🚀 * 2;
 
 #[test]
 fn test_multiple_files_isolation() {
+    if !cli_available() {
+        println!("Skipping test - Node.js not available");
+        return;
+    }
+
     let bridge = TypeScriptBridge::new();
     
     let content1 = "add = fn x y => x + y;\nresult1 = add 1 2;";
