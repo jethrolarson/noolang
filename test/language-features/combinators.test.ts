@@ -1,4 +1,4 @@
-import { Lexer } from '../../src/lexer';
+import { Lexer } from '../../src/lexer/lexer';
 import * as C from '../../src/parser/combinators';
 
 describe('Parser Combinators', () => {

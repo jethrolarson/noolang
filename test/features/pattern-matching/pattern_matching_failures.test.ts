@@ -1,24 +1,24 @@
-import { Lexer } from '../../../src/lexer';
+import { Lexer } from '../../../src/lexer/lexer';
 import { parse } from '../../../src/parser/parser';
 import { typeAndDecorate } from '../../../src/typer';
-import { Evaluator, Value } from '../../../src/evaluator';
+import { Evaluator, Value } from '../../../src/evaluator/evaluator';
 
 /**
  * PATTERN MATCHING FAILURES - TYPE SYSTEM LIMITATION
- * 
+ *
  * These tests are currently skipped because they expose a fundamental limitation
  * in the current type system: parametric ADT pattern matching is not properly
  * implemented. All tests fail with "Pattern expects constructor but got α".
- * 
+ *
  * ROOT CAUSE: The type inference engine doesn't properly handle type variables (α)
  * when pattern matching on parametric ADTs. This requires significant type system
  * work to resolve type variables in pattern matching contexts.
- * 
+ *
  * REQUIRED IMPROVEMENTS:
  * 1. Type inference for parametric ADTs in pattern matching
- * 2. Proper handling of type variables in constructor patterns  
+ * 2. Proper handling of type variables in constructor patterns
  * 3. Type variable instantiation during pattern matching
- * 
+ *
  * STATUS: These tests should remain skipped until the type system is enhanced
  * to support parametric pattern matching. This is a known limitation that
  * requires substantial type system development work.

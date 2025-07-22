@@ -1,7 +1,7 @@
-import { Lexer } from '../../src/lexer';
+import { Lexer } from '../../src/lexer/lexer';
 import { parse } from '../../src/parser/parser';
 import { typeAndDecorate } from '../../src/typer';
-import { Evaluator, Value } from '../../src/evaluator';
+import { Evaluator, Value } from '../../src/evaluator/evaluator';
 
 function unwrapValue(val: Value): any {
 	if (val === null) return null;

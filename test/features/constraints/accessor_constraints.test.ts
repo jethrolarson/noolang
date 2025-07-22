@@ -1,7 +1,7 @@
 import { parse } from '../../../src/parser/parser';
-import { Lexer } from '../../../src/lexer';
+import { Lexer } from '../../../src/lexer/lexer';
 import { typeProgram } from '../../../src/typer';
-import { Evaluator } from '../../../src/evaluator';
+import { Evaluator } from '../../../src/evaluator/evaluator';
 
 const parseProgram = (code: string) => {
 	const lexer = new Lexer(code);

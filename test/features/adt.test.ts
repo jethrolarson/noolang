@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
-import { Lexer } from '../../src/lexer';
+import { Lexer } from '../../src/lexer/lexer';
 import { parse } from '../../src/parser/parser';
-import { Evaluator } from '../../src/evaluator';
+import { Evaluator } from '../../src/evaluator/evaluator';
 import { typeProgram } from '../../src/typer';
 import { typeToString } from '../../src/typer/helpers';
 
