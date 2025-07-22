@@ -131,7 +131,13 @@ jobs:
         cd lsp
         cargo build --release
     
-    - name: Run LSP unit tests
+    - name: Run LSP core tests
+      run: |
+        cd lsp
+        chmod +x run_core_tests.sh
+        ./run_core_tests.sh
+    
+    - name: Run LSP comprehensive tests
       run: |
         cd lsp
         cargo test

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::parser::{TypeScriptBridge, DiagnosticSeverity};
+use crate::parser::{TypeScriptBridge, DiagnosticSeverity, SymbolKind};
 
 pub struct Backend {
     client: Client,
@@ -344,29 +344,130 @@ impl LanguageServer for Backend {
     }
 
     async fn goto_definition(&self, params: GotoDefinitionParams) -> Result<Option<GotoDefinitionResponse>> {
-        // TODO: Implement definition lookup by analyzing the AST
-        // For now, return None to indicate no definition found
-        let _uri = &params.text_document_position_params.text_document.uri;
-        let _position = &params.text_document_position_params.position;
+        let uri = &params.text_document_position_params.text_document.uri;
+        let position = &params.text_document_position_params.position;
         
-        Ok(None)
+        // Convert URI to file path
+        let file_path = uri.path();
+        
+        // Convert LSP position (0-based) to our internal format (1-based)
+        let line = (position.line + 1) as usize;
+        let column = (position.character + 1) as usize;
+        
+        match self.ts_bridge.find_definition(file_path, line, column) {
+            Ok(Some(definition)) => {
+                let location = Location {
+                    uri: uri.clone(),
+                    range: Range {
+                        start: Position {
+                            line: (definition.line.saturating_sub(1)) as u32, // Convert to 0-based
+                            character: (definition.column.saturating_sub(1)) as u32, // Convert to 0-based
+                        },
+                        end: Position {
+                            line: (definition.end_line.saturating_sub(1)) as u32,
+                            character: (definition.end_column.saturating_sub(1)) as u32,
+                        },
+                    },
+                };
+                Ok(Some(GotoDefinitionResponse::Scalar(location)))
+            }
+            Ok(None) => Ok(None),
+            Err(err) => {
+                eprintln!("Error finding definition: {}", err);
+                Ok(None)
+            }
+        }
     }
 
     async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
-        // TODO: Implement reference finding by analyzing the AST
-        // For now, return None to indicate no references found
-        let _uri = &params.text_document_position.text_document.uri;
-        let _position = &params.text_document_position.position;
+        let uri = &params.text_document_position.text_document.uri;
+        let position = &params.text_document_position.position;
         
-        Ok(None)
+        // Convert URI to file path
+        let file_path = uri.path();
+        
+        // Convert LSP position (0-based) to our internal format (1-based)
+        let line = (position.line + 1) as usize;
+        let column = (position.character + 1) as usize;
+        
+        match self.ts_bridge.find_references(file_path, line, column) {
+            Ok(references) => {
+                if references.is_empty() {
+                    Ok(None)
+                } else {
+                    let locations: Vec<Location> = references.into_iter().map(|reference| {
+                        Location {
+                            uri: uri.clone(),
+                            range: Range {
+                                start: Position {
+                                    line: (reference.line.saturating_sub(1)) as u32, // Convert to 0-based
+                                    character: (reference.column.saturating_sub(1)) as u32, // Convert to 0-based
+                                },
+                                end: Position {
+                                    line: (reference.end_line.saturating_sub(1)) as u32,
+                                    character: (reference.end_column.saturating_sub(1)) as u32,
+                                },
+                            },
+                        }
+                    }).collect();
+                    Ok(Some(locations))
+                }
+            }
+            Err(err) => {
+                eprintln!("Error finding references: {}", err);
+                Ok(None)
+            }
+        }
     }
 
     async fn document_symbol(&self, params: DocumentSymbolParams) -> Result<Option<DocumentSymbolResponse>> {
-        // TODO: Implement symbol extraction from AST
-        // For now, return None to indicate no symbols found
-        let _uri = &params.text_document.uri;
+        let uri = &params.text_document.uri;
         
-        Ok(None)
+        // Convert URI to file path
+        let file_path = uri.path();
+        
+        match self.ts_bridge.get_document_symbols(file_path) {
+            Ok(symbols) => {
+                if symbols.is_empty() {
+                    Ok(None)
+                } else {
+                    let symbol_info: Vec<SymbolInformation> = symbols.into_iter().map(|symbol| {
+                        let symbol_kind = match symbol.kind {
+                            SymbolKind::Function => tower_lsp::lsp_types::SymbolKind::FUNCTION,
+                            SymbolKind::Variable => tower_lsp::lsp_types::SymbolKind::VARIABLE,
+                            SymbolKind::Type => tower_lsp::lsp_types::SymbolKind::CLASS,
+                            SymbolKind::Constructor => tower_lsp::lsp_types::SymbolKind::CONSTRUCTOR,
+                        };
+
+                        SymbolInformation {
+                            name: symbol.name,
+                            kind: symbol_kind,
+                            tags: None,
+                            deprecated: None,
+                            location: Location {
+                                uri: uri.clone(),
+                                range: Range {
+                                    start: Position {
+                                        line: (symbol.line.saturating_sub(1)) as u32, // Convert to 0-based
+                                        character: (symbol.column.saturating_sub(1)) as u32, // Convert to 0-based
+                                    },
+                                    end: Position {
+                                        line: (symbol.end_line.saturating_sub(1)) as u32,
+                                        character: (symbol.end_column.saturating_sub(1)) as u32,
+                                    },
+                                },
+                            },
+                            container_name: None,
+                        }
+                    }).collect();
+                    Ok(Some(DocumentSymbolResponse::Flat(symbol_info)))
+                }
+            }
+            Err(err) => {
+                eprintln!("Error getting document symbols: {}", err);
+                Ok(None)
+            }
+        }
     }
 
     async fn symbol(&self, params: WorkspaceSymbolParams) -> Result<Option<Vec<SymbolInformation>>> {

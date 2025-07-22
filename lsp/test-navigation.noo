@@ -1,0 +1,5 @@
+add = fn x y => x + y;
+multiply = fn a b => a * b;
+result = add 2 3;
+calculation = multiply (add 1 2) 5;
+final_value = add result calculation
