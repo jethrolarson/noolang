@@ -18,7 +18,7 @@ constraint Monad m (
 
 # Constraint for functors
 constraint Functor f ( 
-  map a b : (a -> b) -> f a -> f b 
+  fmap a b : (a -> b) -> f a -> f b 
 );
 
 constraint Eq a ( 
@@ -91,7 +91,7 @@ implement Monad Option (
 );
 
 implement Functor Option (
-  map = fn f opt => match opt with (
+  fmap = fn f opt => match opt with (
     Some x => Some (f x);
     None => None
   )
@@ -147,7 +147,7 @@ implement Monad Result (
 );
 
 implement Functor Result (
-  map = fn f res => match res with (
+  fmap = fn f res => match res with (
     Ok x => Ok (f x);
     Err e => Err e
   )
