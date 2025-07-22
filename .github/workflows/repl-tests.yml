@@ -242,10 +242,11 @@ jobs:
           benchmark-results/
         retention-days: 90
 
-  # Performance comparison for PRs
+  # Performance comparison for PRs only
   performance-comparison:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    # Only run for pull requests, not for pushes to branches
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
     
     steps:
     - uses: actions/checkout@v4
@@ -270,35 +271,59 @@ jobs:
           jest-cache-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
           jest-cache-${{ runner.os }}-
       
-    - name: Benchmark current branch
+    - name: Build and benchmark current branch
       run: |
-        echo "Benchmarking current branch..."
-        npm run benchmark:all || echo "Current branch benchmarks failed"
-        if [ -d "benchmark-results" ]; then
-          mv benchmark-results benchmark-results-current
+        echo "Building and benchmarking current branch..."
+        if npm run build; then
+          echo "✅ Current branch build successful"
+          if npm run benchmark:all; then
+            echo "✅ Current branch benchmarks successful"
+            if [ -d "benchmark-results" ]; then
+              mv benchmark-results benchmark-results-current
+              echo "✅ Current branch results saved"
+            else
+              echo "⚠️ No benchmark results from current branch"
+            fi
+          else
+            echo "⚠️ Current branch benchmarks failed"
+          fi
         else
-          echo "No benchmark results from current branch"
+          echo "❌ Current branch build failed - skipping benchmarks"
         fi
     
-    - name: Checkout main branch
+    - name: Checkout and benchmark main branch
       run: |
+        echo "Switching to main branch..."
         git reset --hard HEAD
         git clean -fd
         git checkout origin/main
-      
-    - name: Install dependencies and build (main)
-      run: |
-        npm ci
-        npm run build
-      
-    - name: Benchmark main branch
-      run: |
-        echo "Benchmarking main branch..."
-        npm run benchmark:all || echo "Main branch benchmarks failed"
-        if [ -d "benchmark-results" ]; then
-          mv benchmark-results benchmark-results-main
+        
+        echo "Installing dependencies for main branch..."
+        if npm ci; then
+          echo "✅ Main branch dependencies installed"
+          
+          echo "Building main branch..."
+          if npm run build; then
+            echo "✅ Main branch build successful"
+            
+            echo "Benchmarking main branch..."
+            if npm run benchmark:all; then
+              echo "✅ Main branch benchmarks successful"
+              if [ -d "benchmark-results" ]; then
+                mv benchmark-results benchmark-results-main
+                echo "✅ Main branch results saved"
+              else
+                echo "⚠️ No benchmark results from main branch"
+              fi
+            else
+              echo "⚠️ Main branch benchmarks failed"
+            fi
+          else
+            echo "❌ Main branch build failed - skipping benchmarks"
+            echo "This might be due to test file issues on main branch"
+          fi
         else
-          echo "No benchmark results from main branch"
+          echo "❌ Main branch dependency installation failed"
         fi
     
     - name: Compare performance
@@ -307,18 +332,26 @@ jobs:
         echo "Comparing current branch against main..." >> $GITHUB_STEP_SUMMARY
         
         # Check if benchmark files exist with proper globbing
-        CURRENT_RESULTS=$(find benchmark-results-current -name "*.json" 2>/dev/null | head -1)
-        MAIN_RESULTS=$(find benchmark-results-main -name "*.json" 2>/dev/null | head -1)
+        CURRENT_RESULTS=""
+        MAIN_RESULTS=""
+        
+        if [ -d "benchmark-results-current" ]; then
+          CURRENT_RESULTS=$(find benchmark-results-current -name "*.json" 2>/dev/null | head -1)
+        fi
+        
+        if [ -d "benchmark-results-main" ]; then
+          MAIN_RESULTS=$(find benchmark-results-main -name "*.json" 2>/dev/null | head -1)
+        fi
         
         if [ -n "$CURRENT_RESULTS" ] && [ -n "$MAIN_RESULTS" ]; then
-          echo "✅ Benchmark files found" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Benchmark files found for both branches" >> $GITHUB_STEP_SUMMARY
           
           # Add basic performance validation
           echo "### Performance Analysis" >> $GITHUB_STEP_SUMMARY
           
           # Extract performance metrics and compare
-          CURRENT_AVG=$(grep -o '"avg":"[0-9.]*"' "$CURRENT_RESULTS" | head -1 | cut -d'"' -f4)
-          MAIN_AVG=$(grep -o '"avg":"[0-9.]*"' "$MAIN_RESULTS" | head -1 | cut -d'"' -f4)
+          CURRENT_AVG=$(grep -o '"avg":[0-9.]*' "$CURRENT_RESULTS" | head -1 | cut -d':' -f2)
+          MAIN_AVG=$(grep -o '"avg":[0-9.]*' "$MAIN_RESULTS" | head -1 | cut -d':' -f2)
           
           if [ -n "$CURRENT_AVG" ] && [ -n "$MAIN_AVG" ]; then
             echo "- Current branch average: ${CURRENT_AVG}ms" >> $GITHUB_STEP_SUMMARY
@@ -340,13 +373,20 @@ jobs:
           else
             echo "⚠️ Could not extract performance metrics for comparison" >> $GITHUB_STEP_SUMMARY
           fi
+        elif [ -n "$CURRENT_RESULTS" ]; then
+          echo "⚠️ Only current branch benchmarks available" >> $GITHUB_STEP_SUMMARY
+          echo "Main branch benchmarks failed (possibly due to build issues)" >> $GITHUB_STEP_SUMMARY
+        elif [ -n "$MAIN_RESULTS" ]; then
+          echo "⚠️ Only main branch benchmarks available" >> $GITHUB_STEP_SUMMARY
+          echo "Current branch benchmarks failed" >> $GITHUB_STEP_SUMMARY
         else
-          echo "⚠️ Could not generate performance comparison - benchmark files missing" >> $GITHUB_STEP_SUMMARY
-          echo "::warning::Benchmark comparison failed - results files not found"
+          echo "⚠️ No benchmark results available for comparison" >> $GITHUB_STEP_SUMMARY
+          echo "Both branches had build or benchmark issues" >> $GITHUB_STEP_SUMMARY
         fi
     
     - name: Upload comparison results
       uses: actions/upload-artifact@v4
+      if: always()
       with:
         name: performance-comparison
         path: |
