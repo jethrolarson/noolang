@@ -237,6 +237,16 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		),
 		quantifiedVars: ['a', 'b'],
 	});
+	newEnv.set('list_map', {
+		type: functionType(
+			[
+				functionType([typeVariable('a')], typeVariable('b')),
+				listTypeWithElement(typeVariable('a')),
+			],
+			listTypeWithElement(typeVariable('b'))
+		),
+		quantifiedVars: ['a', 'b'],
+	});
 	const lengthType = createUnaryFunctionType(
 		listTypeWithElement(typeVariable('a')),
 		intType()
