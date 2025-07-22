@@ -34,6 +34,34 @@ pub struct TypeInfo {
     pub expression: String,
 }
 
+// New structures for navigation features
+#[derive(Debug, Clone)]
+pub struct SymbolDefinition {
+    pub name: String,
+    pub kind: SymbolKind,
+    pub line: usize,
+    pub column: usize,
+    pub end_line: usize,
+    pub end_column: usize,
+}
+
+#[derive(Debug, Clone)]
+pub enum SymbolKind {
+    Variable,
+    Function,
+    Type,
+    Constructor,
+}
+
+#[derive(Debug, Clone)]
+pub struct SymbolReference {
+    pub name: String,
+    pub line: usize,
+    pub column: usize,
+    pub end_line: usize,
+    pub end_column: usize,
+}
+
 impl TypeScriptBridge {
     pub fn new() -> Self {
         // Get the current executable directory and resolve the CLI path
@@ -105,6 +133,21 @@ impl TypeScriptBridge {
         } else {
             let stderr = String::from_utf8(output.stderr)?;
             Err(anyhow::anyhow!("AST parsing failed: {}", stderr))
+        }
+    }
+
+    /// Get AST for a file to support navigation features
+    pub fn get_ast_file(&self, file_path: &str) -> Result<Value> {
+        let output = Command::new("node")
+            .args(&[&self.cli_path, "--ast-file", file_path])
+            .output()?;
+        
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            self.parse_ast_output(&stdout)
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            Err(anyhow::anyhow!("AST command failed: {}", stderr))
         }
     }
 
@@ -284,6 +327,310 @@ impl TypeScriptBridge {
             }
         }
         Err(anyhow::anyhow!("No JSON found in AST output"))
+    }
+
+    /// Find definition of symbol at given position
+    pub fn find_definition(&self, file_path: &str, line: usize, column: usize) -> Result<Option<SymbolDefinition>> {
+        let ast = self.get_ast_file(file_path)?;
+        let symbol_name = self.extract_symbol_at_position(&ast, line, column)?;
+        
+        if let Some(name) = symbol_name {
+            // Find the definition of this symbol in the AST
+            if let Some(definition) = self.find_symbol_definition(&ast, &name) {
+                return Ok(Some(definition));
+            }
+        }
+        
+        Ok(None)
+    }
+
+    /// Find all references to a symbol at the given position
+    pub fn find_references(&self, file_path: &str, line: usize, column: usize) -> Result<Vec<SymbolReference>> {
+        let ast = self.get_ast_file(file_path)?;
+        let symbol_name = self.extract_symbol_at_position(&ast, line, column)?;
+        
+        if let Some(name) = symbol_name {
+            return Ok(self.find_symbol_references(&ast, &name));
+        }
+        
+        Ok(Vec::new())
+    }
+
+    /// Extract all symbols from a file for document symbol outline
+    pub fn get_document_symbols(&self, file_path: &str) -> Result<Vec<SymbolDefinition>> {
+        let ast = self.get_ast_file(file_path)?;
+        Ok(self.extract_all_symbols(&ast))
+    }
+
+    /// Extract symbol name at the given position
+    fn extract_symbol_at_position(&self, ast: &Value, line: usize, column: usize) -> Result<Option<String>> {
+        self.find_symbol_at_position_recursive(ast, line, column)
+    }
+
+    /// Recursively search AST for symbol at position
+    fn find_symbol_at_position_recursive(&self, node: &Value, target_line: usize, target_column: usize) -> Result<Option<String>> {
+        // Check if this node has location info
+        if let Some(location) = node.get("location") {
+            if let (Some(start), Some(end)) = (location.get("start"), location.get("end")) {
+                if let (Some(start_line), Some(start_col), Some(end_line), Some(end_col)) = (
+                    start.get("line").and_then(|v| v.as_u64()),
+                    start.get("column").and_then(|v| v.as_u64()),
+                    end.get("line").and_then(|v| v.as_u64()),
+                    end.get("column").and_then(|v| v.as_u64()),
+                ) {
+                    let start_line = start_line as usize;
+                    let start_col = start_col as usize;
+                    let end_line = end_line as usize;
+                    let end_col = end_col as usize;
+
+                    // Check if target position is within this node
+                    if self.position_within_range(target_line, target_column, start_line, start_col, end_line, end_col) {
+                        // If this is a variable or identifier node, return its name
+                        if let Some(kind) = node.get("kind").and_then(|v| v.as_str()) {
+                            match kind {
+                                "variable" => {
+                                    if let Some(name) = node.get("name").and_then(|v| v.as_str()) {
+                                        return Ok(Some(name.to_string()));
+                                    }
+                                }
+                                "definition" => {
+                                    if let Some(name) = node.get("name").and_then(|v| v.as_str()) {
+                                        return Ok(Some(name.to_string()));
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Recursively search child nodes
+        if let Some(obj) = node.as_object() {
+            for value in obj.values() {
+                if let Ok(Some(result)) = self.find_symbol_at_position_recursive(value, target_line, target_column) {
+                    return Ok(Some(result));
+                }
+            }
+        }
+
+        if let Some(arr) = node.as_array() {
+            for item in arr {
+                if let Ok(Some(result)) = self.find_symbol_at_position_recursive(item, target_line, target_column) {
+                    return Ok(Some(result));
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Find the definition of a symbol in the AST
+    fn find_symbol_definition(&self, ast: &Value, symbol_name: &str) -> Option<SymbolDefinition> {
+        self.find_definition_recursive(ast, symbol_name)
+    }
+
+    /// Recursively search for symbol definition
+    fn find_definition_recursive(&self, node: &Value, symbol_name: &str) -> Option<SymbolDefinition> {
+        // Check if this is a definition node
+        if let Some(kind) = node.get("kind").and_then(|v| v.as_str()) {
+            if kind == "definition" {
+                if let Some(name) = node.get("name").and_then(|v| v.as_str()) {
+                    if name == symbol_name {
+                        // Extract location information
+                        if let Some(location) = node.get("location") {
+                            if let (Some(start), Some(end)) = (location.get("start"), location.get("end")) {
+                                if let (Some(start_line), Some(start_col), Some(end_line), Some(end_col)) = (
+                                    start.get("line").and_then(|v| v.as_u64()),
+                                    start.get("column").and_then(|v| v.as_u64()),
+                                    end.get("line").and_then(|v| v.as_u64()),
+                                    end.get("column").and_then(|v| v.as_u64()),
+                                ) {
+                                    // Determine symbol kind based on the value
+                                    let symbol_kind = if let Some(value) = node.get("value") {
+                                        if let Some(value_kind) = value.get("kind").and_then(|v| v.as_str()) {
+                                            match value_kind {
+                                                "function" => SymbolKind::Function,
+                                                _ => SymbolKind::Variable,
+                                            }
+                                        } else {
+                                            SymbolKind::Variable
+                                        }
+                                    } else {
+                                        SymbolKind::Variable
+                                    };
+
+                                    return Some(SymbolDefinition {
+                                        name: name.to_string(),
+                                        kind: symbol_kind,
+                                        line: start_line as usize,
+                                        column: start_col as usize,
+                                        end_line: end_line as usize,
+                                        end_column: end_col as usize,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Recursively search child nodes
+        if let Some(obj) = node.as_object() {
+            for value in obj.values() {
+                if let Some(result) = self.find_definition_recursive(value, symbol_name) {
+                    return Some(result);
+                }
+            }
+        }
+
+        if let Some(arr) = node.as_array() {
+            for item in arr {
+                if let Some(result) = self.find_definition_recursive(item, symbol_name) {
+                    return Some(result);
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Find all references to a symbol in the AST
+    fn find_symbol_references(&self, ast: &Value, symbol_name: &str) -> Vec<SymbolReference> {
+        let mut references = Vec::new();
+        self.find_references_recursive(ast, symbol_name, &mut references);
+        references
+    }
+
+    /// Recursively search for symbol references
+    fn find_references_recursive(&self, node: &Value, symbol_name: &str, references: &mut Vec<SymbolReference>) {
+        // Check if this is a variable reference
+        if let Some(kind) = node.get("kind").and_then(|v| v.as_str()) {
+            if kind == "variable" {
+                if let Some(name) = node.get("name").and_then(|v| v.as_str()) {
+                    if name == symbol_name {
+                        // Extract location information
+                        if let Some(location) = node.get("location") {
+                            if let (Some(start), Some(end)) = (location.get("start"), location.get("end")) {
+                                if let (Some(start_line), Some(start_col), Some(end_line), Some(end_col)) = (
+                                    start.get("line").and_then(|v| v.as_u64()),
+                                    start.get("column").and_then(|v| v.as_u64()),
+                                    end.get("line").and_then(|v| v.as_u64()),
+                                    end.get("column").and_then(|v| v.as_u64()),
+                                ) {
+                                    references.push(SymbolReference {
+                                        name: name.to_string(),
+                                        line: start_line as usize,
+                                        column: start_col as usize,
+                                        end_line: end_line as usize,
+                                        end_column: end_col as usize,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Recursively search child nodes
+        if let Some(obj) = node.as_object() {
+            for value in obj.values() {
+                self.find_references_recursive(value, symbol_name, references);
+            }
+        }
+
+        if let Some(arr) = node.as_array() {
+            for item in arr {
+                self.find_references_recursive(item, symbol_name, references);
+            }
+        }
+    }
+
+    /// Extract all symbol definitions for document outline
+    fn extract_all_symbols(&self, ast: &Value) -> Vec<SymbolDefinition> {
+        let mut symbols = Vec::new();
+        self.extract_symbols_recursive(ast, &mut symbols);
+        symbols
+    }
+
+    /// Recursively extract all symbol definitions
+    fn extract_symbols_recursive(&self, node: &Value, symbols: &mut Vec<SymbolDefinition>) {
+        // Check if this is a definition node
+        if let Some(kind) = node.get("kind").and_then(|v| v.as_str()) {
+            if kind == "definition" {
+                if let Some(name) = node.get("name").and_then(|v| v.as_str()) {
+                    // Extract location information
+                    if let Some(location) = node.get("location") {
+                        if let (Some(start), Some(end)) = (location.get("start"), location.get("end")) {
+                            if let (Some(start_line), Some(start_col), Some(end_line), Some(end_col)) = (
+                                start.get("line").and_then(|v| v.as_u64()),
+                                start.get("column").and_then(|v| v.as_u64()),
+                                end.get("line").and_then(|v| v.as_u64()),
+                                end.get("column").and_then(|v| v.as_u64()),
+                            ) {
+                                // Determine symbol kind based on the value
+                                let symbol_kind = if let Some(value) = node.get("value") {
+                                    if let Some(value_kind) = value.get("kind").and_then(|v| v.as_str()) {
+                                        match value_kind {
+                                            "function" => SymbolKind::Function,
+                                            _ => SymbolKind::Variable,
+                                        }
+                                    } else {
+                                        SymbolKind::Variable
+                                    }
+                                } else {
+                                    SymbolKind::Variable
+                                };
+
+                                symbols.push(SymbolDefinition {
+                                    name: name.to_string(),
+                                    kind: symbol_kind,
+                                    line: start_line as usize,
+                                    column: start_col as usize,
+                                    end_line: end_line as usize,
+                                    end_column: end_col as usize,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Recursively search child nodes
+        if let Some(obj) = node.as_object() {
+            for value in obj.values() {
+                self.extract_symbols_recursive(value, symbols);
+            }
+        }
+
+        if let Some(arr) = node.as_array() {
+            for item in arr {
+                self.extract_symbols_recursive(item, symbols);
+            }
+        }
+    }
+
+    /// Check if position is within the given range
+    fn position_within_range(&self, target_line: usize, target_col: usize, 
+                           start_line: usize, start_col: usize, 
+                           end_line: usize, end_col: usize) -> bool {
+        if target_line < start_line || target_line > end_line {
+            return false;
+        }
+        
+        if target_line == start_line && target_col < start_col {
+            return false;
+        }
+        
+        if target_line == end_line && target_col > end_col {
+            return false;
+        }
+        
+        true
     }
 
     /// Get completion suggestions based on context
