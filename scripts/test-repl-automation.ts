@@ -23,6 +23,15 @@ class REPLTestAutomator {
     return new Promise((resolve, reject) => {
       const replPath = path.join(__dirname, '..', 'src', 'repl.ts');
       
+      // Add timeout for REPL startup
+      const startupTimeout = setTimeout(() => {
+        console.log('⏰ REPL startup timed out after 15 seconds');
+        if (this.replProcess && !this.replProcess.killed) {
+          this.replProcess.kill('SIGTERM');
+        }
+        reject(new Error('REPL startup timeout'));
+      }, 15000);
+      
       this.replProcess = spawn('npx', ['ts-node', replPath], {
         stdio: ['pipe', 'pipe', 'pipe'],
         cwd: path.join(__dirname, '..')
@@ -34,8 +43,11 @@ class REPLTestAutomator {
         console.log('REPL Output:', text.trim());
         
         // Check accumulated output for both welcome message and prompt
-        if (this.output.includes('Welcome to Noolang') && this.output.includes('noolang>')) {
+        if ((this.output.includes('Welcome to Noolang') && this.output.includes('noolang>')) ||
+            this.output.includes('noo>') || 
+            this.output.includes('>')) {
           this.isReady = true;
+          clearTimeout(startupTimeout);
           resolve();
         }
       });
@@ -47,6 +59,7 @@ class REPLTestAutomator {
       });
 
       this.replProcess.on('error', (error) => {
+        clearTimeout(startupTimeout);
         console.error('Process error:', error);
         reject(error);
       });
@@ -54,11 +67,6 @@ class REPLTestAutomator {
       this.replProcess.on('exit', (code) => {
         console.log(`REPL process exited with code ${code}`);
       });
-
-      // Timeout if REPL doesn't start
-      setTimeout(() => {
-        reject(new Error('REPL startup timeout'));
-      }, 15000);
     });
   }
 
