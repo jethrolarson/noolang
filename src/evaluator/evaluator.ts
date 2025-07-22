@@ -1721,35 +1721,77 @@ export class Evaluator {
 	): Value {
 		// Constraint definitions create runtime dispatcher functions for each constraint function
 		for (const func of expr.functions) {
-			// Create a dispatcher function that will resolve to the right implementation at runtime
-			const dispatcherFunction = createFunction((arg: Value) => {
-				// Try to find the specialized function for this argument type
-				const argType = this.getValueTypeName(arg);
-				const specializedName = `__${expr.name}_${func.name}_${argType}`;
-				const specializedImpl = this.environment.get(specializedName);
-
-				if (specializedImpl) {
-					// Handle cells
-					let impl = specializedImpl;
-					if (isCell(impl)) {
-						impl = impl.value;
-					}
-
-					if (isFunction(impl)) {
-						return impl.fn(arg);
-					} else if (isNativeFunction(impl)) {
-						return impl.fn(arg);
-					}
-				}
-
-				throw new Error(`No implementation of ${expr.name} for ${argType}`);
-			});
+			// Create a more sophisticated dispatcher that handles multi-argument functions
+			const dispatcherFunction = this.createConstraintDispatcher(expr.name, func.name, func.type);
 
 			// Register the dispatcher under the constraint function name
 			this.environment.set(func.name, dispatcherFunction);
 		}
 
 		return createUnit();
+	}
+
+	private createConstraintDispatcher(constraintName: string, funcName: string, funcType: Type): Value {
+		// Analyze the function type to determine dispatch strategy
+
+		
+		// For map specifically, we know it's (a -> b) -> f a -> f b
+		// So we create a curried dispatcher that waits for the second argument
+		if (funcName === 'map') {
+			return createFunction((func: Value) => {
+				return createFunction((functor: Value) => {
+					const functorType = this.getValueTypeName(functor);
+					return this.resolveConstraintImplementation(constraintName, funcName, functorType, [func, functor]);
+				});
+			});
+		}
+		
+		// For equals specifically, we know it's a -> a -> Bool  
+		// So we create a curried dispatcher that dispatches on the first argument
+		if (funcName === 'equals') {
+			return createFunction((arg1: Value) => {
+				const argType = this.getValueTypeName(arg1);
+				return createFunction((arg2: Value) => {
+					return this.resolveConstraintImplementation(constraintName, funcName, argType, [arg1, arg2]);
+				});
+			});
+		}
+		
+		// For single-argument functions like show, bind, pure
+		return createFunction((arg: Value) => {
+			const argType = this.getValueTypeName(arg);
+			return this.resolveConstraintImplementation(constraintName, funcName, argType, [arg]);
+		});
+	}
+
+	private resolveConstraintImplementation(constraintName: string, funcName: string, typeName: string, args: Value[]): Value {
+		const specializedName = `__${constraintName}_${funcName}_${typeName}`;
+		const specializedImpl = this.environment.get(specializedName);
+
+		if (specializedImpl) {
+			// Handle cells
+			let impl = specializedImpl;
+			if (isCell(impl)) {
+				impl = impl.value;
+			}
+
+			if (isFunction(impl) || isNativeFunction(impl)) {
+				// Apply all arguments to the implementation
+				let result: Value = impl;
+				for (const arg of args) {
+					if (isFunction(result)) {
+						result = result.fn(arg);
+					} else if (isNativeFunction(result)) {
+						result = result.fn(arg);
+					} else {
+						throw new Error(`Implementation ${specializedName} is not a function`);
+					}
+				}
+				return result;
+			}
+		}
+
+		throw new Error(`No implementation of ${constraintName} for ${typeName}`);
 	}
 
 	private getValueTypeName(value: Value): string {
@@ -1791,21 +1833,18 @@ export class Evaluator {
 
 	private typeExpressionToString(typeExpr: Type): string {
 		// Convert type expression to string for generating specialized names
+		// For runtime dispatch, we want just the type constructor name
 		if (typeExpr.kind === 'primitive') {
 			return typeExpr.name;
 		} else if (typeExpr.kind === 'variable') {
 			return typeExpr.name;
 		} else if (typeExpr.kind === 'list') {
-			return `List ${this.typeExpressionToString(typeExpr.element)}`;
+			// For List types, just return "List" regardless of element type
+			return 'List';
 		} else if (typeExpr.kind === 'variant') {
 			// Handle ADT types like Bool, Option, Result
-			if (typeExpr.args.length === 0) {
-				return typeExpr.name;
-			} else {
-				// For parameterized types like Option a, Result a b
-				const argNames = typeExpr.args.map(arg => this.typeExpressionToString(arg)).join(' ');
-				return `${typeExpr.name} ${argNames}`;
-			}
+			// For dispatch, we just want the type constructor name
+			return typeExpr.name;
 		} else if (typeExpr.kind === 'function') {
 			// For function types, just use a simple representation
 			return 'Function';

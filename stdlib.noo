@@ -210,6 +210,10 @@ implement Show String (
   show = id
 );
 
+implement Show List (
+  show = fn showElement list => concat "[" (concat (join ", " (map showElement list)) "]")
+);
+
 # Eq-like functions for basic types
 implement Eq Int (
   equals = primitive_int_eq
