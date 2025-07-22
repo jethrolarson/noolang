@@ -68,28 +68,30 @@ pub struct SymbolReference {
 
 impl TypeScriptBridge {
     pub fn new() -> Self {
-        // Get the current executable directory and resolve the CLI path
-        let exe_path = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from(""));
-        let exe_dir = exe_path.parent().unwrap_or_else(|| std::path::Path::new(""));
+        // Try multiple possible paths for the CLI
+        let possible_paths = vec![
+            "../dist/cli.js",           // From lsp/ directory to workspace root
+            "dist/cli.js",              // From workspace root
+            "../../dist/cli.js",        // From nested directories
+            "./dist/cli.js",            // Explicit relative path
+        ];
         
-        // Try to find the CLI relative to the LSP binary location
-        let cli_path = if exe_dir.join("../dist/cli.js").exists() {
-            exe_dir.join("../dist/cli.js")
-        } else if exe_dir.join("../../dist/cli.js").exists() {
-            exe_dir.join("../../dist/cli.js")
-        } else if exe_dir.join("dist/cli.js").exists() {
-            exe_dir.join("dist/cli.js")
-        } else {
-            // Fallback to relative path from current working directory
-            std::path::PathBuf::from("dist/cli.js")
-        };
+        let mut cli_path = "dist/cli.js".to_string(); // Default fallback
+        
+        for path in &possible_paths {
+            if std::path::Path::new(path).exists() {
+                cli_path = path.to_string();
+                eprintln!("LSP Debug: Found CLI at: {}", path);
+                break;
+            }
+        }
         
         // Debug logging for path resolution
-        eprintln!("LSP Debug: CLI path resolved to: {}", cli_path.display());
-        eprintln!("LSP Debug: CLI exists: {}", cli_path.exists());
+        eprintln!("LSP Debug: CLI path resolved to: {}", cli_path);
+        eprintln!("LSP Debug: CLI exists: {}", std::path::Path::new(&cli_path).exists());
         
         Self {
-            cli_path: cli_path.to_string_lossy().to_string(),
+            cli_path,
         }
     }
 
@@ -792,11 +794,6 @@ mod tests {
 
     #[test]
     fn test_find_definition_not_found() {
-        if !cli_available() {
-            println!("Skipping test - TypeScript CLI not available");
-            return;
-        }
-
         let content = "add = fn x y => x + y;";
         let test_file = create_test_file(content).unwrap();
         let bridge = create_bridge();
@@ -816,11 +813,6 @@ mod tests {
 
     #[test]
     fn test_find_references_basic() {
-        if !cli_available() {
-            println!("Skipping test - TypeScript CLI not available");
-            return;
-        }
-
         let content = "add = fn x y => x + y;\nresult = add 2 3;\ncalc = add 1 4;";
         let test_file = create_test_file(content).unwrap();
         let bridge = create_bridge();
@@ -848,11 +840,6 @@ mod tests {
 
     #[test]
     fn test_find_references_from_usage() {
-        if !cli_available() {
-            println!("Skipping test - TypeScript CLI not available");
-            return;
-        }
-
         let content = "multiply = fn a b => a * b;\nresult = multiply 3 4;";
         let test_file = create_test_file(content).unwrap();
         let bridge = create_bridge();
@@ -876,11 +863,6 @@ mod tests {
 
     #[test]
     fn test_get_document_symbols() {
-        if !cli_available() {
-            println!("Skipping test - TypeScript CLI not available");
-            return;
-        }
-
         let content = "add = fn x y => x + y;\nmultiply = fn a b => a * b;\nresult = 42;";
         let test_file = create_test_file(content).unwrap();
         let bridge = create_bridge();
@@ -924,11 +906,6 @@ mod tests {
 
     #[test]
     fn test_complex_nested_expressions() {
-        if !cli_available() {
-            println!("Skipping test - TypeScript CLI not available");
-            return;
-        }
-
         let content = "add = fn x y => x + y;\ncalculation = add (add 1 2) (add 3 4);";
         let test_file = create_test_file(content).unwrap();
         let bridge = create_bridge();
