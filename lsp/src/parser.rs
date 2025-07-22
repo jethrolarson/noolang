@@ -155,26 +155,134 @@ impl TypeScriptBridge {
 
     /// Get position-based type information for hover support
     pub fn get_position_type(&self, file_path: &str, line: usize, column: usize) -> Result<Option<String>> {
-        // First try to get the AST to understand the structure
+        // Try to get AST to find the specific symbol at position
+        if let Ok(ast) = self.get_ast_file(file_path) {
+            if let Ok(Some(symbol_name)) = self.extract_symbol_at_position(&ast, line, column) {
+                // Get the type of the specific symbol
+                if let Ok(type_info) = self.get_symbol_type(file_path, &symbol_name) {
+                    return Ok(Some(type_info));
+                }
+            }
+        }
+        
+        // Fallback to expression-based extraction
         if let Ok(content) = std::fs::read_to_string(file_path) {
             let lines: Vec<&str> = content.lines().collect();
             if let Some(target_line) = lines.get(line.saturating_sub(1)) {
                 // Try to extract the expression at the given position
                 if let Some(expression) = self.extract_expression_at_position(target_line, column) {
-                    // Get type information for this expression
+                    // Get type information for this specific expression
                     if let Ok(types) = self.get_expression_types(&expression) {
-                        return Ok(types.first().cloned());
+                        if let Some(expr_type) = types.first() {
+                            // Clean up the type string to be more readable
+                            return Ok(Some(self.simplify_type_string(expr_type)));
+                        }
                     }
                 }
-            }
-            
-            // Fallback: get all types for the file and try to match position
-            if let Ok(types) = self.get_type_info(file_path) {
-                return Ok(types.first().cloned());
+                
+                // Try to extract a simple identifier for variable lookups
+                if let Some(identifier) = self.extract_identifier_at_position(target_line, column) {
+                    if let Ok(id_type) = self.get_symbol_type(file_path, &identifier) {
+                        return Ok(Some(id_type));
+                    }
+                }
             }
         }
         
         Ok(None)
+    }
+
+    /// Get the type of a specific symbol from the program
+    fn get_symbol_type(&self, file_path: &str, symbol_name: &str) -> Result<String> {
+        // Use the new --symbol-type CLI command
+        let output = Command::new("node")
+            .args(&[&self.cli_path, "--symbol-type", file_path, symbol_name])
+            .output()?;
+        
+        if output.status.success() {
+            let stdout = String::from_utf8(output.stdout)?;
+            // Parse the output to extract just the type
+            if let Some(type_start) = stdout.find("has type: ") {
+                let type_str = stdout[type_start + 10..].trim();
+                return Ok(self.simplify_type_string(type_str));
+            }
+        }
+        
+        // Fallback: try AST-based approach
+        if let Ok(ast) = self.get_ast_file(file_path) {
+            if let Some(symbol_type) = self.extract_symbol_type_from_ast(&ast, symbol_name) {
+                return Ok(self.simplify_type_string(&symbol_type));
+            }
+        }
+        
+        Err(anyhow::anyhow!("Could not determine type for symbol: {}", symbol_name))
+    }
+
+    /// Extract symbol type information from AST
+    fn extract_symbol_type_from_ast(&self, _ast: &Value, _symbol_name: &str) -> Option<String> {
+        // TODO: Implement AST traversal to find symbol type
+        // For now, return None to fall back to other methods
+        None
+    }
+
+    /// Simplify type strings for better hover display
+    fn simplify_type_string(&self, type_str: &str) -> String {
+        // If it's a complex record type, try to extract just the relevant part
+        if type_str.starts_with("{ ") && type_str.contains(": ") {
+            // For record types, show a simplified version
+            if type_str.len() > 50 {
+                return "Record".to_string();
+            }
+        }
+        
+        // Clean up function type display
+        if type_str.contains(" -> ") {
+            return type_str.replace(" -> ", " → ").to_string();
+        }
+        
+        type_str.to_string()
+    }
+
+    /// Extract a simple identifier at the given position
+    fn extract_identifier_at_position(&self, line: &str, column: usize) -> Option<String> {
+        let chars: Vec<char> = line.chars().collect();
+        if column >= chars.len() {
+            return None;
+        }
+
+        // Find identifier boundaries (letters, numbers, underscore)
+        let mut start = column;
+        let mut end = column;
+
+        // Expand backwards to find start
+        while start > 0 {
+            let ch = chars[start - 1];
+            if ch.is_alphabetic() || ch.is_numeric() || ch == '_' {
+                start -= 1;
+            } else {
+                break;
+            }
+        }
+
+        // Expand forwards to find end
+        while end < chars.len() {
+            let ch = chars[end];
+            if ch.is_alphabetic() || ch.is_numeric() || ch == '_' {
+                end += 1;
+            } else {
+                break;
+            }
+        }
+
+        if start < end {
+            let identifier: String = chars[start..end].iter().collect();
+            // Only return if it looks like a valid identifier (starts with letter)
+            if identifier.chars().next().map_or(false, |c| c.is_alphabetic()) {
+                return Some(identifier);
+            }
+        }
+        
+        None
     }
 
     /// Extract expression at a given position in a line
@@ -244,50 +352,155 @@ impl TypeScriptBridge {
         let mut diagnostics = Vec::new();
         
         for line in error_output.lines() {
-            if line.contains("Error:") || line.contains("TypeError:") {
-                // Try to extract line and column information
-                // Look for patterns like "at line 1, column 5" or "1:5"
+            if line.contains("Error") || line.contains("TypeError") || line.contains("Parse error") {
                 let mut diag_line = 1;
                 let mut diag_column = 1;
                 let mut message = line.to_string();
+                let mut severity = DiagnosticSeverity::Error;
                 
-                // Try to parse position information
-                if let Some(pos_start) = line.find("line ") {
-                    if let Some(pos_end) = line[pos_start + 5..].find(',') {
-                        if let Ok(line_num) = line[pos_start + 5..pos_start + 5 + pos_end].parse::<usize>() {
-                            diag_line = line_num;
-                        }
-                    }
+                // Extract line and column information from various patterns
+                // Pattern 1: "at line X, column Y"
+                if let Some(captures) = self.extract_line_column_pattern1(line) {
+                    diag_line = captures.0;
+                    diag_column = captures.1;
+                }
+                // Pattern 2: "line X:Y" or "X:Y" 
+                else if let Some(captures) = self.extract_line_column_pattern2(line) {
+                    diag_line = captures.0;
+                    diag_column = captures.1;
+                }
+                // Pattern 3: Parse errors with "at line X"
+                else if let Some(line_num) = self.extract_parse_error_line(line) {
+                    diag_line = line_num;
+                    diag_column = 1; // Default to start of line for parse errors
                 }
                 
-                if let Some(pos_start) = line.find("column ") {
-                    if let Some(remaining) = line.get(pos_start + 7..) {
-                        let col_str: String = remaining.chars()
-                            .take_while(|c| c.is_ascii_digit())
-                            .collect();
-                        if let Ok(col_num) = col_str.parse::<usize>() {
-                            diag_column = col_num;
-                        }
-                    }
-                }
+                // Clean up the message to remove location info and make it clearer
+                message = self.clean_error_message(line);
                 
-                // Clean up the message
-                if let Some(error_start) = line.find("Error:") {
-                    message = line[error_start..].to_string();
-                } else if let Some(error_start) = line.find("TypeError:") {
-                    message = line[error_start..].to_string();
+                // Determine severity
+                if line.contains("warning") || line.contains("Warning") {
+                    severity = DiagnosticSeverity::Warning;
+                } else if line.contains("info") || line.contains("Info") {
+                    severity = DiagnosticSeverity::Information;
                 }
                 
                 diagnostics.push(DiagnosticInfo {
                     line: diag_line,
                     column: diag_column,
                     message,
-                    severity: DiagnosticSeverity::Error,
+                    severity,
                 });
             }
         }
         
+        // If no specific errors found but there's output, create a generic error
+        if diagnostics.is_empty() && !error_output.trim().is_empty() {
+            diagnostics.push(DiagnosticInfo {
+                line: 1,
+                column: 1,
+                message: format!("Error: {}", error_output.trim()),
+                severity: DiagnosticSeverity::Error,
+            });
+        }
+        
         Ok(diagnostics)
+    }
+
+    /// Extract line and column from "at line X, column Y" pattern
+    fn extract_line_column_pattern1(&self, line: &str) -> Option<(usize, usize)> {
+        if let Some(line_start) = line.find("line ") {
+            if let Some(line_end) = line[line_start + 5..].find(',') {
+                if let Ok(line_num) = line[line_start + 5..line_start + 5 + line_end].parse::<usize>() {
+                    if let Some(col_start) = line.find("column ") {
+                        let remaining = &line[col_start + 7..];
+                        let col_str: String = remaining.chars()
+                            .take_while(|c| c.is_ascii_digit())
+                            .collect();
+                        if let Ok(col_num) = col_str.parse::<usize>() {
+                            return Some((line_num, col_num));
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Extract line and column from "X:Y" pattern
+    fn extract_line_column_pattern2(&self, line: &str) -> Option<(usize, usize)> {
+        // Look for patterns like "1:5" or "line 1:5"
+        for part in line.split_whitespace() {
+            if let Some(colon_pos) = part.find(':') {
+                let line_part = &part[..colon_pos];
+                let col_part = &part[colon_pos + 1..];
+                
+                // Remove non-digit prefix if present (like in "line1:5")
+                let line_digits: String = line_part.chars()
+                    .skip_while(|c| !c.is_ascii_digit())
+                    .take_while(|c| c.is_ascii_digit())
+                    .collect();
+                
+                let col_digits: String = col_part.chars()
+                    .take_while(|c| c.is_ascii_digit())
+                    .collect();
+                
+                if let (Ok(line_num), Ok(col_num)) = (line_digits.parse::<usize>(), col_digits.parse::<usize>()) {
+                    return Some((line_num, col_num));
+                }
+            }
+        }
+        None
+    }
+
+    /// Extract line number from parse errors
+    fn extract_parse_error_line(&self, line: &str) -> Option<usize> {
+        if line.contains("Parse error") {
+            // Look for "at line X"
+            if let Some(at_pos) = line.find("at line ") {
+                let remaining = &line[at_pos + 8..];
+                let line_str: String = remaining.chars()
+                    .take_while(|c| c.is_ascii_digit())
+                    .collect();
+                if let Ok(line_num) = line_str.parse::<usize>() {
+                    return Some(line_num);
+                }
+            }
+            
+            // Alternative: look for any number after "line"
+            if let Some(line_pos) = line.find("line ") {
+                let remaining = &line[line_pos + 5..];
+                let line_str: String = remaining.chars()
+                    .take_while(|c| c.is_ascii_digit())
+                    .collect();
+                if let Ok(line_num) = line_str.parse::<usize>() {
+                    return Some(line_num);
+                }
+            }
+        }
+        None
+    }
+
+    /// Clean up error messages for better display
+    fn clean_error_message(&self, line: &str) -> String {
+        let mut message = line.to_string();
+        
+        // Remove common prefixes and location info
+        if let Some(error_start) = message.find("Error:") {
+            message = message[error_start..].to_string();
+        } else if let Some(error_start) = message.find("TypeError:") {
+            message = message[error_start..].to_string();
+        } else if let Some(error_start) = message.find("Parse error:") {
+            message = message[error_start..].to_string();
+        }
+        
+        // Remove location patterns that are now redundant
+        message = regex::Regex::new(r"\s+at line \d+(?:, column \d+)?")
+            .unwrap_or_else(|_| regex::Regex::new(r"").unwrap())
+            .replace_all(&message, "")
+            .to_string();
+        
+        message.trim().to_string()
     }
 
     /// Parse types output from TypeScript
