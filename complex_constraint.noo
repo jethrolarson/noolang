@@ -1,0 +1,1 @@
+constraint Monad m ( bind a b : m a -> (a -> m b) -> m b )

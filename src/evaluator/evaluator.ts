@@ -787,27 +787,28 @@ export class Evaluator {
 		);
 	}
 
-	addConstraintFunctions(typeState: TypeState): void {
-		// Add specialized constraint functions from type checking to runtime environment
-		const decoratedState =
-			decorateEnvironmentWithConstraintFunctions(typeState);
-
-		// Transfer specialized functions to runtime environment
-		for (const [name] of decoratedState.environment) {
-			if (name.startsWith('__')) {
-				// This is a specialized constraint function
-				// For now, create a placeholder function
-				// The actual implementation should come from the typeScheme
-				this.environment.set(
-					name,
-					createFunction(() => {
-						throw new Error(
-							`Specialized constraint function ${name} not implemented in runtime`
-						);
-					})
-				);
+	loadStdlibConstraints(): void {
+		// Load and evaluate stdlib.noo to populate constraint implementations
+		try {
+			const stdlibPath = this.path.join(__dirname, '..', '..', 'stdlib.noo');
+			if (this.fs.existsSync(stdlibPath)) {
+				const stdlibContent = this.fs.readFileSync(stdlibPath, 'utf-8');
+				const lexer = new Lexer(stdlibContent);
+				const tokens = lexer.tokenize();
+				const stdlibProgram = parse(tokens);
+				
+				// Evaluate stdlib statements to register constraint implementations
+				this.evaluateProgram(stdlibProgram);
 			}
+		} catch (error) {
+			console.warn('Warning: Failed to load stdlib constraint implementations:', error);
 		}
+	}
+
+	addConstraintFunctions(typeState: TypeState): void {
+		// This method is now mostly a no-op since constraint functions
+		// are populated by loadStdlibConstraints()
+		// But we keep it for compatibility
 	}
 
 	private loadStdlib(): void {
@@ -1760,9 +1761,10 @@ export class Evaluator {
 		if (isRecord(value)) return 'Record';
 		if (isTuple(value)) return 'Tuple';
 		if (isConstructor(value)) {
-			// For ADT constructors, use the constructor name
+			// For ADT constructors, use the type name, not constructor name
 			if (value.name === 'Some' || value.name === 'None') return 'Option';
 			if (value.name === 'Ok' || value.name === 'Err') return 'Result';
+			if (value.name === 'True' || value.name === 'False') return 'Bool';
 			return value.name;
 		}
 		return 'Unknown';
@@ -1795,6 +1797,15 @@ export class Evaluator {
 			return typeExpr.name;
 		} else if (typeExpr.kind === 'list') {
 			return `List ${this.typeExpressionToString(typeExpr.element)}`;
+		} else if (typeExpr.kind === 'variant') {
+			// Handle ADT types like Bool, Option, Result
+			if (typeExpr.args.length === 0) {
+				return typeExpr.name;
+			} else {
+				// For parameterized types like Option a, Result a b
+				const argNames = typeExpr.args.map(arg => this.typeExpressionToString(arg)).join(' ');
+				return `${typeExpr.name} ${argNames}`;
+			}
 		} else if (typeExpr.kind === 'function') {
 			// For function types, just use a simple representation
 			return 'Function';

@@ -1018,8 +1018,47 @@ export const typeImplementDefinition = (
 		typeName = typeExpr.name;
 	} else if (typeExpr.kind === 'variable') {
 		typeName = typeExpr.name;
+	} else if (typeExpr.kind === 'variant') {
+		// Handle ADT types like Bool, Option, Result, etc.
+		if (typeExpr.args.length === 0) {
+			// Simple ADT like Bool
+			typeName = typeExpr.name;
+		} else {
+			// Parameterized ADT like Option a, Result a b
+			// Convert to string representation
+			const argNames = typeExpr.args.map(arg => {
+				if (arg.kind === 'variable') return arg.name;
+				if (arg.kind === 'primitive') return arg.name;
+				return 'Unknown';
+			}).join(' ');
+			typeName = `${typeExpr.name} ${argNames}`;
+		}
+	} else if (typeExpr.kind === 'application') {
+		// Handle type applications like m a
+		let constructorName: string;
+		if (typeExpr.constructor.kind === 'variable') {
+			constructorName = typeExpr.constructor.name;
+		} else if (typeExpr.constructor.kind === 'primitive') {
+			constructorName = typeExpr.constructor.name;
+		} else {
+			constructorName = 'Unknown';
+		}
+		const argNames = typeExpr.args.map(arg => {
+			if (arg.kind === 'variable') return arg.name;
+			if (arg.kind === 'primitive') return arg.name;
+			return 'Unknown';
+		}).join(' ');
+		typeName = `${constructorName} ${argNames}`;
+	} else if (typeExpr.kind === 'list') {
+		// Handle List types - for constraints, treat List a as just "List"
+		// since constraints typically abstract over the element type
+		if (typeExpr.element.kind === 'variable') {
+			typeName = 'List';
+		} else {
+			typeName = `List ${typeExpr.element.kind === 'primitive' ? typeExpr.element.name : 'Unknown'}`;
+		}
 	} else {
-		// For now, throw error for complex type expressions - we'll improve this later
+		// For now, throw error for other complex type expressions
 		throw new Error(
 			`Complex type expressions in implement definitions not yet supported: ${JSON.stringify(typeExpr)}`
 		);

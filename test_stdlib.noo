@@ -53,13 +53,6 @@ implement Show Bool (
   )
 );
 
-implement Eq Bool (
-  equals = fn a b => match a with (
-    True => match b with (True => True; False => False);
-    False => match b with (True => False; False => True)
-  )
-);
-
 # Boolean negation
 not = fn b => match b with (True => False; False => True);
 

@@ -1,0 +1,1 @@
+x = 42; y = True; concat (show x) (concat " and " (show y))

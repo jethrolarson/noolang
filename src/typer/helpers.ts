@@ -10,6 +10,7 @@ import {
 	type RecordType,
 	type UnionType,
 	type VariantType,
+	type TypeApplication,
 	ConstraintExpr,
 	Constraint,
 	IsConstraint,
@@ -206,6 +207,17 @@ const typesEqualUncached = (t1: Type, t2: Type): boolean => {
 			return t1.args.every((arg, i) => typesEqual(arg, t2_variant.args[i]));
 		}
 
+		case 'application': {
+			const t2_app = t2 as TypeApplication;
+			if (t1.args.length !== t2_app.args.length) {
+				return false;
+			}
+			return (
+				typesEqual(t1.constructor, t2_app.constructor) &&
+				t1.args.every((arg, i) => typesEqual(arg, t2_app.args[i]))
+			);
+		}
+
 		default:
 			return false;
 	}
@@ -255,6 +267,14 @@ export const typesSimilar = (t1: Type, t2: Type): boolean => {
 			return (
 				t1.types.length === t2Union.types.length &&
 				t1.types.every((type, i) => typesSimilar(type, t2Union.types[i]))
+			);
+		}
+		case 'application': {
+			const t2App = t2 as TypeApplication;
+			return (
+				typesSimilar(t1.constructor, t2App.constructor) &&
+				t1.args.length === t2App.args.length &&
+				t1.args.every((arg, i) => typesSimilar(arg, t2App.args[i]))
 			);
 		}
 		default:

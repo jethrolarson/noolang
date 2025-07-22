@@ -105,6 +105,11 @@ const unifyInternal = (
 		return unifyVariant(s1, s2, state, location);
 	}
 
+	// Handle type application types
+	if (isTypeKind(s1, 'application') && isTypeKind(s2, 'application')) {
+		return unifyTypeApplication(s1, s2, state, location);
+	}
+
 	// If we get here, the types cannot be unified
 	// Add debug info for difficult cases
 	const debugContext = context || {};
@@ -518,6 +523,39 @@ function unifyVariant(
 
 	// Unify corresponding type arguments
 	let currentState = state;
+	for (let i = 0; i < s1.args.length; i++) {
+		currentState = unify(s1.args[i], s2.args[i], currentState, location);
+	}
+	return currentState;
+}
+
+function unifyTypeApplication(
+	s1: Type,
+	s2: Type,
+	state: TypeState,
+	location?: { line: number; column: number }
+): TypeState {
+	if (!isTypeKind(s1, 'application') || !isTypeKind(s2, 'application')) {
+		throw new Error('unifyTypeApplication called with non-application types');
+	}
+
+	// First unify the constructors
+	let currentState = unify(s1.constructor, s2.constructor, state, location);
+
+	// Type applications must have the same number of type arguments
+	if (s1.args.length !== s2.args.length) {
+		throw new Error(
+			formatTypeError(
+				createTypeError(
+					`Type application arity mismatch: ${s1.args.length} vs ${s2.args.length} type arguments`,
+					{},
+					location || { line: 1, column: 1 }
+				)
+			)
+		);
+	}
+
+	// Unify corresponding type arguments
 	for (let i = 0; i < s1.args.length; i++) {
 		currentState = unify(s1.args[i], s2.args[i], currentState, location);
 	}

@@ -88,6 +88,12 @@ const substituteWithCache =
 					...type,
 					args: type.args.map(substituteWithCache(substitution, seen)),
 				};
+			case 'application':
+				return {
+					...type,
+					constructor: substituteWithCache(substitution, seen)(type.constructor),
+					args: type.args.map(substituteWithCache(substitution, seen)),
+				};
 			default:
 				return type;
 		}

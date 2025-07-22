@@ -19,6 +19,7 @@ import {
 	listTypeWithElement,
 	functionType,
 	typeVariable,
+	typeApplication,
 	type TypedExpression,
 	type ConstrainedExpression,
 	type ListExpression,
@@ -251,15 +252,30 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 		}
 	}
 
-	// Try type variable or simple identifier
+	// Try type application: typeVar arg1 arg2 ... (for both lowercase and uppercase)
 	if (tokens.length > 0 && tokens[0].type === 'IDENTIFIER') {
 		const identifierResult = C.identifier()(tokens);
 		if (identifierResult.success) {
-			return {
-				success: true as const,
-				value: typeVariable(identifierResult.value.value),
-				remaining: identifierResult.remaining,
-			};
+			// Try to parse type arguments
+			const argsResult = C.many(C.lazy(() => parseTypeAtom))(
+				identifierResult.remaining
+			);
+			if (argsResult.success && argsResult.value.length > 0) {
+				// This is a type application: typeVar arg1 arg2 ...
+				const constructor = typeVariable(identifierResult.value.value);
+				return {
+					success: true as const,
+					value: typeApplication(constructor, argsResult.value),
+					remaining: argsResult.remaining,
+				};
+			} else {
+				// This is just a simple type variable
+				return {
+					success: true as const,
+					value: typeVariable(identifierResult.value.value),
+					remaining: identifierResult.remaining,
+				};
+			}
 		}
 	}
 

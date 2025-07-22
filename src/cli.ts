@@ -355,6 +355,9 @@ async function main() {
 
 		const evaluator = new Evaluator();
 
+		// Load and evaluate stdlib to populate constraint functions
+		evaluator.loadStdlibConstraints();
+
 		// Transfer specialized constraint functions to evaluator
 		evaluator.addConstraintFunctions(state);
 

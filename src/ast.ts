@@ -85,6 +85,12 @@ export type UnknownType = {
 	kind: 'unknown';
 };
 
+export type TypeApplication = {
+	kind: 'application';
+	constructor: Type;
+	args: Type[];
+};
+
 export type Type =
 	| PrimitiveType
 	| FunctionType
@@ -96,7 +102,8 @@ export type Type =
 	| VariantType
 	| ADTType
 	| UnitType
-	| UnknownType;
+	| UnknownType
+	| TypeApplication;
 
 // Expressions
 export type Expression =
@@ -455,6 +462,12 @@ export type RecordType = {
 export const recordType = (fields: { [key: string]: Type }): RecordType => ({
 	kind: 'record',
 	fields,
+});
+
+export const typeApplication = (constructor: Type, args: Type[]): TypeApplication => ({
+	kind: 'application',
+	constructor,
+	args,
 });
 
 // Constructor functions for new types
