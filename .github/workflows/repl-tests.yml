@@ -56,7 +56,7 @@ jobs:
           jest-cache-${{ runner.os }}-
 
   # Run REPL-specific tests separately
-  repl-tests:
+  repl-focused-tests:
     runs-on: ubuntu-latest
     needs: core-tests  # Only run if core tests pass
     
