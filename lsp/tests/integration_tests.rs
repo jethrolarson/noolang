@@ -97,6 +97,7 @@ fn test_complex_navigation_scenarios() {
     let bridge = TypeScriptBridge::new();
     
     let content = r#"
+# Complex nested function calls
 compose = fn f g x => f (g x);
 increment = fn x => x + 1;
 double = fn x => x * 2;
@@ -106,23 +107,23 @@ result = pipeline 5;
     
     let test_file = create_test_file("complex_test.noo", content);
     
-    // Test finding definition of 'compose' from nested usage
-    match bridge.find_definition(&test_file, 5, 12) {
+    // Test finding definition of 'compose' from nested usage (line 5: "pipeline = compose double increment;")
+    match bridge.find_definition(&test_file, 5, 15) {
         Ok(Some(def)) => {
             assert_eq!(def.name, "compose");
-            assert_eq!(def.line, 1);
+            assert_eq!(def.line, 2);
         }
         Ok(None) => panic!("Expected to find 'compose' definition"),
         Err(e) => panic!("Error: {}", e),
     }
     
-    // Test finding references to 'increment' 
+    // Test finding references to 'increment' (defined on line 3)
     match bridge.find_references(&test_file, 3, 1) {
         Ok(refs) => {
             assert!(refs.len() >= 1, "Expected references to 'increment'");
-            // Should find usage in 'pipeline' definition
-            let line_4_ref = refs.iter().any(|r| r.line == 4);
-            assert!(line_4_ref, "Expected reference on line 4");
+            // Should find usage in 'pipeline' definition  
+            let line_5_ref = refs.iter().any(|r| r.line == 5);
+            assert!(line_5_ref, "Expected reference on line 5");
         }
         Err(e) => panic!("Error finding references: {}", e),
     }
