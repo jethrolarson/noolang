@@ -879,6 +879,128 @@ describe('Mutable Definitions and Mutations', () => {
 		expect(mutDef.name).toBe('result');
 		expect(mutDef.value.kind).toBe('function');
 	});
+
+	test('should parse mutation with complex expression', () => {
+		const lexer = new Lexer('mut x = 0; mut! x = fn y => y + 1');
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		// The parser combines statements with semicolons into binary expressions
+		expect(program.statements).toHaveLength(1);
+		expect(program.statements[0].kind).toBe('binary');
+	});
+
+	test('should parse mutation expression syntax (semantic validity tested in type system)', () => {
+		const lexer = new Lexer('mut! x = fn y => y + 1');
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		expect(program.statements).toHaveLength(1);
+		const mutation = assertMutationExpression(program.statements[0]);
+		expect(mutation.target).toBe('x');
+		expect(mutation.value.kind).toBe('function');
+	});
+
+	test('should parse mutation with binary expression', () => {
+		const lexer = new Lexer('mut! x = y + z');
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		expect(program.statements).toHaveLength(1);
+		const mutation = assertMutationExpression(program.statements[0]);
+		expect(mutation.target).toBe('x');
+		expect(mutation.value.kind).toBe('binary');
+	});
+
+	test('should parse mutation with if expression', () => {
+		const lexer = new Lexer('mut! x = if y > 0 then 1 else 0');
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		expect(program.statements).toHaveLength(1);
+		const mutation = assertMutationExpression(program.statements[0]);
+		expect(mutation.target).toBe('x');
+		expect(mutation.value.kind).toBe('if');
+	});
+
+	test('should parse mutation with record expression', () => {
+		const lexer = new Lexer('mut! point = {10, 20}');
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		expect(program.statements).toHaveLength(1);
+		const mutation = assertMutationExpression(program.statements[0]);
+		expect(mutation.target).toBe('point');
+		expect(mutation.value.kind).toBe('tuple');
+	});
+
+	test('should parse mutation with list expression', () => {
+		const lexer = new Lexer('mut! items = [1, 2, 3]');
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		expect(program.statements).toHaveLength(1);
+		const mutation = assertMutationExpression(program.statements[0]);
+		expect(mutation.target).toBe('items');
+		expect(mutation.value.kind).toBe('list');
+	});
+
+	test('should parse mutation with function application', () => {
+		const lexer = new Lexer('mut! result = add 1 2');
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		expect(program.statements).toHaveLength(1);
+		const mutation = assertMutationExpression(program.statements[0]);
+		expect(mutation.target).toBe('result');
+		expect(mutation.value.kind).toBe('application');
+	});
+
+	test('should parse mutation with accessor expression', () => {
+		const lexer = new Lexer('mut! name = @name person');
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		expect(program.statements).toHaveLength(1);
+		const mutation = assertMutationExpression(program.statements[0]);
+		expect(mutation.target).toBe('name');
+		expect(mutation.value.kind).toBe('application');
+	});
+
+	test('should parse mutation with match expression', () => {
+		const lexer = new Lexer(
+			'mut! result = match x with (Some y => y; None => 0)'
+		);
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		expect(program.statements).toHaveLength(1);
+		const mutation = assertMutationExpression(program.statements[0]);
+		expect(mutation.target).toBe('result');
+		expect(mutation.value.kind).toBe('match');
+	});
+
+	test('should parse mutation with where expression', () => {
+		const lexer = new Lexer(
+			'mut! result = value where (x = 1; y = 2; value = x + y)'
+		);
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		expect(program.statements).toHaveLength(1);
+		const mutation = assertMutationExpression(program.statements[0]);
+		expect(mutation.target).toBe('result');
+		expect(mutation.value.kind).toBe('where');
+	});
+
+	test('should parse multiple mutations in sequence', () => {
+		const lexer = new Lexer('mut x = 1; mut! x = 2; mut! x = 3');
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		// The parser combines statements with semicolons into binary expressions
+		expect(program.statements).toHaveLength(1);
+		expect(program.statements[0].kind).toBe('binary');
+	});
+
+	test('should parse mutation with complex nested expressions', () => {
+		const lexer = new Lexer('mut! result = if x > 0 then 1 else 0');
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		expect(program.statements).toHaveLength(1);
+		const mutation = assertMutationExpression(program.statements[0]);
+		expect(mutation.target).toBe('result');
+		expect(mutation.value.kind).toBe('if');
+	});
 });
 
 // Add new test suite for Constraint Definitions and Implementations

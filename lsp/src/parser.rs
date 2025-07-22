@@ -36,8 +36,28 @@ pub struct TypeInfo {
 
 impl TypeScriptBridge {
     pub fn new() -> Self {
+        // Get the current executable directory and resolve the CLI path
+        let exe_path = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from(""));
+        let exe_dir = exe_path.parent().unwrap_or_else(|| std::path::Path::new(""));
+        
+        // Try to find the CLI relative to the LSP binary location
+        let cli_path = if exe_dir.join("../dist/cli.js").exists() {
+            exe_dir.join("../dist/cli.js")
+        } else if exe_dir.join("../../dist/cli.js").exists() {
+            exe_dir.join("../../dist/cli.js")
+        } else if exe_dir.join("dist/cli.js").exists() {
+            exe_dir.join("dist/cli.js")
+        } else {
+            // Fallback to relative path from current working directory
+            std::path::PathBuf::from("dist/cli.js")
+        };
+        
+        // Debug logging for path resolution
+        eprintln!("LSP Debug: CLI path resolved to: {}", cli_path.display());
+        eprintln!("LSP Debug: CLI exists: {}", cli_path.exists());
+        
         Self {
-            cli_path: "../dist/cli.js".to_string(),
+            cli_path: cli_path.to_string_lossy().to_string(),
         }
     }
 

@@ -12,6 +12,8 @@ import {
 	typeTuple,
 	typeAccessor,
 	typeDefinition,
+	typeMutableDefinition,
+	typeMutation,
 	typeConstraintDefinition,
 	typeImplementDefinition,
 } from './type-inference';
@@ -56,6 +58,12 @@ export const typeExpression = (
 
 		case 'definition':
 			return typeDefinition(expr, state);
+
+		case 'mutable-definition':
+			return typeMutableDefinition(expr, state);
+
+		case 'mutation':
+			return typeMutation(expr, state);
 
 		case 'unit':
 			return createPureTypeResult(unitType(), state);

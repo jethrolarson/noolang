@@ -19,7 +19,6 @@ The REPL testing system consists of three main components:
 npm run test:all-repl
 
 # Run individual test suites
-npm run test:repl              # Unit tests only
 npm run test:repl-integration  # Integration tests only
 npm run test:repl-automation   # Automation scenarios
 ```

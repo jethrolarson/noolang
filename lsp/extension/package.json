@@ -3,6 +3,11 @@
   "displayName": "Noolang Language Server",
   "description": "LSP support for Noolang programming language",
   "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jethrolarson/noolang.git"
+  },
+  "license": "MIT",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -32,7 +37,7 @@
         "noolang.languageServerPath": {
           "type": "string",
           "default": "./lsp/target/release/noolang-lsp",
-          "description": "Path to the Noolang LSP server binary"
+          "description": "Path to the Noolang LSP server binary (relative to workspace root)"
         },
         "noolang.enableLanguageServer": {
           "type": "boolean",

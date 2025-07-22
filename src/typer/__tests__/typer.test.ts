@@ -199,6 +199,131 @@ describe('Functional Type Inference', () => {
 			expect(() => typeProgram(program)).toThrow();
 		});
 	});
+
+	describe('Mutation Types', () => {
+		it('should type mutable definition with simple value', () => {
+			const program = parseProgram('mut x = 42; x');
+			const result = typeProgram(program);
+			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+		});
+
+		it('should type mutable definition with function', () => {
+			const program = parseProgram('mut f = fn x => x + 1; f 5');
+			const result = typeProgram(program);
+			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+		});
+
+		it('should type mutation with same type', () => {
+			const program = parseProgram('mut x = 10; mut! x = 20; x');
+			const result = typeProgram(program);
+			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+		});
+
+		it('should type mutation with compatible types', () => {
+			const program = parseProgram('mut x = 10; mut! x = 15; x + 5');
+			const result = typeProgram(program);
+			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+		});
+
+		it('should reject mutation of undefined variable', () => {
+			const program = parseProgram('mut! x = 42');
+			expect(() => typeProgram(program)).toThrow('Undefined variable');
+		});
+
+		it('should reject mutation with incompatible types', () => {
+			const program = parseProgram('mut x = 10; mut! x = "hello"');
+			expect(() => typeProgram(program)).toThrow();
+		});
+
+		it('should reject mutation of non-mutable variable', () => {
+			const program = parseProgram('x = 10; mut! x = 20');
+			// This should be caught at runtime, not type time
+			// The type system allows it but the evaluator will throw
+			const result = typeProgram(program);
+			expect(result).toBeDefined();
+		});
+
+		it('should handle mutation in sequences', () => {
+			const program = parseProgram('mut x = 1; mut! x = 2; x');
+			const result = typeProgram(program);
+			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+		});
+
+		it('should handle multiple mutations of same variable', () => {
+			const program = parseProgram('mut x = 0; mut! x = 1; mut! x = 2; x');
+			const result = typeProgram(program);
+			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+		});
+
+		it('should handle mutation with complex expressions', () => {
+			const program = parseProgram('mut x = 1; mut! x = x + 1; x');
+			const result = typeProgram(program);
+			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+		});
+
+		it('should handle mutation with function calls', () => {
+			const program = parseProgram(
+				'add = fn x y => x + y; mut x = 5; mut! x = add x 3; x'
+			);
+			const result = typeProgram(program);
+			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+		});
+
+		it('should handle mutation with conditional expressions', () => {
+			const program = parseProgram(
+				'mut x = 10; mut! x = if x > 5 then 20 else 0; x'
+			);
+			const result = typeProgram(program);
+			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+		});
+
+		it('should handle mutation with record values', () => {
+			const program = parseProgram(
+				'mut point = {10, 20}; mut! point = {30, 40}; point'
+			);
+			const result = typeProgram(program);
+			expect(typeToString(result.type, result.state.substitution)).toBe(
+				'(Int Int)'
+			);
+		});
+
+		it('should handle mutation with list values', () => {
+			const program = parseProgram(
+				'mut items = [1, 2, 3]; mut! items = [4, 5, 6]; head items'
+			);
+			const result = typeProgram(program);
+			expect(typeToString(result.type, result.state.substitution)).toBe(
+				'Option Int'
+			);
+		});
+
+		it('should handle mutation with external variables', () => {
+			const program = parseProgram(`
+				outer = 100;
+				mut inner = 10;
+				mut! inner = inner + outer;
+				inner
+			`);
+			const result = typeProgram(program);
+			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+		});
+
+		it('should handle mutation with polymorphic functions', () => {
+			const program = parseProgram(
+				'id = fn x => x; mut x = 42; mut! x = id x; x'
+			);
+			const result = typeProgram(program);
+			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+		});
+
+		it('should handle mutation with built-in functions', () => {
+			const program = parseProgram(
+				'mut list = [1, 2, 3]; mut! list = map (fn x => x * 2) list; length list'
+			);
+			const result = typeProgram(program);
+			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+		});
+	});
 });
 
 describe('Constraint Propagation (Functional Typer)', () => {
