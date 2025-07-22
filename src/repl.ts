@@ -13,21 +13,16 @@ import { initializeBuiltins } from './typer/builtins';
 import { typeToString } from './typer/helpers';
 import type { TypeState } from './typer/types';
 import { typeExpression, unionEffects, emptyEffects } from './typer';
-import type {
-	Expression,
-	FieldExpression,
-	LiteralExpression,
-	Type,
-} from './ast';
+import type { Expression, FieldExpression, LiteralExpression } from './ast';
 import { formatValue } from './format';
 import { colorize } from './colors';
 import { typeAndDecorate } from './typer';
 
 const log = console.log.bind(console);
 export class REPL {
-	private evaluator: Evaluator;
-	private rl: readline.Interface;
-	private typeState: TypeState;
+	evaluator: Evaluator;
+	rl: readline.Interface;
+	typeState: TypeState;
 
 	constructor() {
 		this.evaluator = new Evaluator();
@@ -63,7 +58,7 @@ export class REPL {
 		});
 	}
 
-	private processInput(input: string): void {
+	public processInput(input: string): void {
 		if (input === '') {
 			return;
 		}
@@ -170,23 +165,6 @@ export class REPL {
 		}
 	}
 
-	private typeToString(type: Type): string {
-		switch (type.kind) {
-			case 'primitive':
-				return type.name;
-			case 'function':
-				return `${this.typeToString(type.params[0])} -> ${this.typeToString(
-					type.return
-				)}`;
-			case 'variable':
-				return type.name;
-			case 'unknown':
-				return '?';
-			default:
-				return 'unknown';
-		}
-	}
-
 	private showHelp(): void {
 		log(colorize.section('Noolang REPL Commands:'));
 		log('');
@@ -196,7 +174,9 @@ export class REPL {
 		log(`  ${colorize.command('.exit')}     - Exit the REPL`);
 		log('');
 		log(colorize.section('Environment Commands:'));
-		log(`  ${colorize.command('.env')}      - Show current environment with types`);
+		log(
+			`  ${colorize.command('.env')}      - Show current environment with types`
+		);
 		log(`  ${colorize.command('.env-json')} - Show environment as JSON`);
 		log(`  ${colorize.command('.clear-env')} - Clear environment`);
 		log(`  ${colorize.command('.types')}    - Show type environment`);
@@ -238,10 +218,10 @@ export class REPL {
 		for (const [name, value] of env) {
 			// Get type information from type environment
 			const typeScheme = typeEnv.get(name);
-			const typeStr = typeScheme 
+			const typeStr = typeScheme
 				? typeToString(typeScheme.type, this.typeState.substitution)
 				: 'unknown';
-			
+
 			log(
 				`  ${colorize.identifier(name)}: ${colorize.value(formatValue(value))} ${colorize.section(':')} ${colorize.type(typeStr)}`
 			);
@@ -319,10 +299,10 @@ export class REPL {
 		for (const [name, value] of env) {
 			// Get type information from type environment
 			const typeScheme = typeEnv.get(name);
-			const typeStr = typeScheme 
+			const typeStr = typeScheme
 				? typeToString(typeScheme.type, this.typeState.substitution)
 				: 'unknown';
-				
+
 			envObj[name] = {
 				value: this.valueToString(value),
 				type: typeStr,
@@ -368,31 +348,6 @@ export class REPL {
 					expression
 				)}":`
 			);
-			tokens.forEach((token, i) => {
-				log(
-					`  ${colorize.number(`${i}:`)} ${colorize.type(
-						token.type
-					)} ${colorize.string(`'${token.value}'`)}`
-				);
-			});
-		} catch (error) {
-			console.error(
-				colorize.error(`Error tokenizing: ${(error as Error).message}`)
-			);
-		}
-	}
-
-	private showTokens(input: string): void {
-		if (!input) {
-			log(colorize.warning('Usage: .tokens (expression)'));
-			return;
-		}
-
-		try {
-			const lexer = new Lexer(input);
-			const tokens = lexer.tokenize();
-
-			log(`${colorize.section('Tokens for')} "${colorize.identifier(input)}":`);
 			tokens.forEach((token, i) => {
 				log(
 					`  ${colorize.number(`${i}:`)} ${colorize.type(
@@ -466,26 +421,6 @@ export class REPL {
 			log(
 				`${colorize.section('AST for')} "${colorize.identifier(expression)}":`
 			);
-			log(this.astToString(program.statements[0]));
-		} catch (error) {
-			console.error(
-				colorize.error(`Error parsing: ${(error as Error).message}`)
-			);
-		}
-	}
-
-	private showAST(input: string): void {
-		if (!input) {
-			log(colorize.warning('Usage: .ast (expression)'));
-			return;
-		}
-
-		try {
-			const lexer = new Lexer(input);
-			const tokens = lexer.tokenize();
-			const program = parse(tokens);
-
-			log(`${colorize.section('AST for')} "${colorize.identifier(input)}":`);
 			log(this.astToString(program.statements[0]));
 		} catch (error) {
 			console.error(
@@ -655,12 +590,10 @@ export class REPL {
 	private showTypeEnvironment(): void {
 		log(colorize.section('Type Environment:'));
 		for (const [name, typeScheme] of this.typeState.environment) {
-			const typeStr = typeScheme.type 
+			const typeStr = typeScheme.type
 				? typeToString(typeScheme.type, this.typeState.substitution)
 				: 'unknown';
-			log(
-				`  ${colorize.identifier(name)}: ${colorize.type(typeStr)}`
-			);
+			log(`  ${colorize.identifier(name)}: ${colorize.type(typeStr)}`);
 		}
 	}
 }
