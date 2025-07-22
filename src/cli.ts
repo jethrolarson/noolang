@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-import { Lexer } from './lexer';
+/* eslint-disable no-console */
+import { Lexer } from './lexer/lexer';
 import { parse } from './parser/parser';
-import { Evaluator } from './evaluator';
+import { Evaluator } from './evaluator/evaluator';
 import { typeAndDecorate } from './typer/index';
 import { typeToString } from './typer/helpers';
 import * as fs from 'node:fs';
@@ -224,7 +225,7 @@ async function main() {
 			const lexer = new Lexer(expr);
 			const tokens = lexer.tokenize();
 			const program = parse(tokens);
-			const { program: decoratedProgram, state } = typeAndDecorate(program);
+			const { program: _decoratedProgram, state } = typeAndDecorate(program);
 			console.log('Type Environment:');
 			// The printTypeEnvironment function was removed from the new Typer,
 			// so this part of the CLI will need to be updated or removed
@@ -245,7 +246,7 @@ async function main() {
 			const lexer = new Lexer(expr);
 			const tokens = lexer.tokenize();
 			const program = parse(tokens);
-			const { program: decoratedProgram, state } = typeAndDecorate(program);
+			const { program: decoratedProgram } = typeAndDecorate(program);
 			console.log('Typed AST:');
 			console.log(JSON.stringify(decoratedProgram, null, 2));
 		} catch (err) {
@@ -306,7 +307,6 @@ async function main() {
 				const parseMs = parseTime - lexTime;
 				const typeMs = typeTime - parseTime;
 				const evalMs = evalTime - typeTime;
-				const formatMs = formatTime - evalTime;
 
 				console.log(
 					gray(
@@ -354,10 +354,10 @@ async function main() {
 		const typeTime = performance.now();
 
 		const evaluator = new Evaluator();
-		
+
 		// Transfer specialized constraint functions to evaluator
 		evaluator.addConstraintFunctions(state);
-		
+
 		const finalResult = evaluator.evaluateProgram(decoratedProgram);
 		const evalTime = performance.now();
 

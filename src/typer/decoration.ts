@@ -1,10 +1,4 @@
-import {
-	type Expression,
-	type Program,
-	type DefinitionExpression,
-	type MutableDefinitionExpression,
-	unitType,
-} from '../ast';
+import { type Program, unitType } from '../ast';
 import { type TypeState } from './types';
 import { createTypeState, loadStdlib } from './type-operations';
 import { initializeBuiltins } from './builtins';

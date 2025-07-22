@@ -33,6 +33,7 @@ import {
 	recordType,
 	variantType,
 	hasFieldConstraint,
+	ApplicationExpression,
 } from '../ast';
 import {
 	undefinedVariableError,
@@ -71,9 +72,10 @@ import {
 	flattenStatements,
 } from './type-operations';
 import {
-	tryResolveConstraintFunction,
-	decorateEnvironmentWithConstraintFunctions,
+	createConstraintFunctionType,
+	resolveConstraintVariable,
 } from './constraint-resolution';
+import { typeApplication } from './function-application';
 
 // Note: Main typeExpression is now in expression-dispatcher.ts
 // This file only contains the individual type inference functions
@@ -102,10 +104,6 @@ export const typeVariableExpr = (
 	const scheme = state.environment.get(expr.name);
 	if (!scheme) {
 		// Check if this is a constraint function before throwing error
-		const {
-			resolveConstraintVariable,
-			createConstraintFunctionType,
-		} = require('./constraint-resolution');
 		const constraintResult = resolveConstraintVariable(expr.name, state);
 
 		if (constraintResult.resolved && constraintResult.needsResolution) {
@@ -179,16 +177,18 @@ const collectFreeVars = (
 					freeVars.add(e.name);
 				}
 				break;
-			case 'function':
+			case 'function': {
 				// Parameters are bound in the function body
 				const newBound = new Set([...bound, ...e.params]);
 				walk(e.body, newBound);
 				break;
-			case 'definition':
+			}
+			case 'definition': {
 				// The defined name is bound for the value expression
 				const defBound = new Set([...bound, e.name]);
 				walk(e.value, defBound);
 				break;
+			}
 			case 'application':
 				walk(e.func, bound);
 				e.args.forEach(arg => walk(arg, bound));
@@ -548,10 +548,9 @@ export const typeBinary = (
 	if (expr.operator === '$') {
 		// Dollar: a $ b means a(b) - apply left function to right value
 		// Delegate to the same logic as regular function application
-		const { typeApplication } = require('./function-application');
 
 		// Create a synthetic ApplicationExpression for a $ b
-		const syntheticApp: import('../ast').ApplicationExpression = {
+		const syntheticApp: ApplicationExpression = {
 			kind: 'application',
 			func: expr.left,
 			args: [expr.right],
@@ -583,15 +582,14 @@ export const typeBinary = (
 		// Try constraint resolution first, fall back to direct implementation
 		try {
 			// Create a synthetic function application: bind(left)(right)
-			const { typeApplication } = require('./function-application');
 
-			const bindVar: import('../ast').VariableExpression = {
+			const bindVar: VariableExpression = {
 				kind: 'variable',
 				name: 'bind',
 				location: expr.location,
 			};
 
-			const syntheticApp: import('../ast').ApplicationExpression = {
+			const syntheticApp: ApplicationExpression = {
 				kind: 'application',
 				func: bindVar,
 				args: [expr.left, expr.right],
@@ -959,7 +957,7 @@ export const typeConstrained = (
 	const inferredResult = typeExpression(expr.expression, state);
 	const explicitType = expr.type;
 
-	let currentState = unify(
+	const currentState = unify(
 		inferredResult.type,
 		explicitType,
 		inferredResult.state,

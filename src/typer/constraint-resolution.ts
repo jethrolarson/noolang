@@ -1,20 +1,6 @@
 // Constraint function resolution for trait system
-import {
-	Type,
-	Expression,
-	VariableExpression,
-	ApplicationExpression,
-	typeVariable,
-	functionType,
-} from '../ast';
-import {
-	TypeState,
-	TypeResult,
-	TypeScheme,
-	resolveConstraintFunction,
-	createPureTypeResult,
-	createTypeResult,
-} from './types';
+import { Type, Expression } from '../ast';
+import { TypeState, TypeScheme, resolveConstraintFunction } from './types';
 import { substitute } from './substitute';
 import { typeToString } from './helpers';
 
@@ -23,7 +9,7 @@ import { typeToString } from './helpers';
  */
 export function tryResolveConstraintFunction(
 	functionName: string,
-	args: Expression[],
+	_args: Expression[],
 	argTypes: Type[],
 	state: TypeState
 ): { resolved: boolean; specializedName?: string; typeScheme?: TypeScheme } {
@@ -74,8 +60,7 @@ export function decorateEnvironmentWithConstraintFunctions(
 
 	// Add all available constraint implementations to the environment
 	for (const [constraintName, constraintInfo] of state.constraintRegistry) {
-		for (const [functionName, functionType] of constraintInfo.signature
-			.functions) {
+		for (const [functionName] of constraintInfo.signature.functions) {
 			for (const [typeName, implementation] of constraintInfo.implementations) {
 				const specializedName = `__${constraintName}_${functionName}_${typeName}`;
 

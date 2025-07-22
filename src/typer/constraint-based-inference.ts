@@ -16,6 +16,7 @@ import {
 	IfExpression,
 	DefinitionExpression,
 	Program,
+	unitType,
 } from '../ast';
 
 import { TypeState, TypeResult, createPureTypeResult } from './types';
@@ -50,7 +51,6 @@ export const typeProgramConstraintBased = (program: Program): TypeResult => {
 	}
 
 	if (!finalType) {
-		const { unitType } = require('../ast');
 		finalType = unitType();
 	}
 

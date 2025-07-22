@@ -6,9 +6,7 @@
  * and that effect annotations are enforced during type checking.
  */
 
-import { Type, Effect, FunctionType, FunctionExpression } from '../ast';
-import { TypeState, TypeResult } from './types';
-import { getExprLocation } from './helpers';
+import { Type, Effect, FunctionExpression } from '../ast';
 import { formatTypeError, createTypeError } from './type-errors';
 
 /**
@@ -97,7 +95,7 @@ export const extractDeclaredEffects = (
  * Validates that effectful operations are properly declared
  */
 export const validateEffectDeclaration = (
-	expression: any,
+	_expression: unknown,
 	requiredEffects: Set<Effect>,
 	declaredEffects: Set<Effect>,
 	location?: { line: number; column: number }

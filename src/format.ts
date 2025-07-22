@@ -14,7 +14,7 @@ import {
 	isConstructor,
 	type Value,
 	boolValue,
-} from './evaluator';
+} from './evaluator/evaluator';
 
 export function formatValue(value: Value): string {
 	if (isNumber(value)) {

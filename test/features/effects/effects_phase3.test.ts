@@ -1,7 +1,7 @@
 // Phase 3 Effects System Tests
 // Testing effect validation, propagation, and built-in effectful functions
 
-import { Lexer } from '../../../src/lexer';
+import { Lexer } from '../../../src/lexer/lexer';
 import { parse } from '../../../src/parser/parser';
 import { typeProgram } from '../../../src/typer';
 import type { Effect } from '../../../src/ast';
@@ -26,10 +26,6 @@ const expectPure = (code: string) => {
 	const result = runNoolang(code);
 	expect(result.effects.size).toBe(0);
 	return result;
-};
-
-const expectError = (code: string, errorMessage?: string) => {
-	expect(() => runNoolang(code)).toThrow(errorMessage);
 };
 
 describe('Effects Phase 3: Effect Validation and Built-in Functions', () => {

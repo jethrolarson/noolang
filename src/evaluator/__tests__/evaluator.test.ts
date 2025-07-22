@@ -1,8 +1,8 @@
-import { Lexer } from '../../lexer';
+import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
 import { typeAndDecorate } from '../../typer';
-import { Evaluator } from '../../evaluator';
-import { Value } from '../../evaluator';
+import { Evaluator } from '../evaluator';
+import { Value } from '../evaluator';
 
 function unwrapValue(val: Value): any {
 	if (val === null) return null;
@@ -395,20 +395,20 @@ describe('Evaluator', () => {
 
 		/**
 		 * EVALUATOR PERFORMANCE LIMITATION - CAN BE OPTIMIZED
-		 * 
+		 *
 		 * This test fails due to excessive JavaScript stack frame usage.
 		 * Each Noolang recursive call creates ~6 JavaScript stack frames:
-		 * evaluateApplication + withNewEnvironment + arrow function + 
+		 * evaluateApplication + withNewEnvironment + arrow function +
 		 * evaluateExpression + evaluateIf + recursive call
-		 * 
-		 * PROBLEM: 1000 Noolang calls = ~6000 JS frames, exceeding typical 
+		 *
+		 * PROBLEM: 1000 Noolang calls = ~6000 JS frames, exceeding typical
 		 * stack limits (~10k frames).
-		 * 
+		 *
 		 * POSSIBLE SOLUTIONS:
 		 * 1. Implement trampoline-style evaluation
 		 * 2. Reduce stack frame usage per call
 		 * 3. Add tail call optimization
-		 * 
+		 *
 		 * STATUS: Can be fixed with evaluator optimization work.
 		 */
 		test.skip('should handle deep recursion without stack overflow', () => {

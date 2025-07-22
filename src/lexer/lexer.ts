@@ -1,4 +1,4 @@
-import { Position, Location, createPosition, createLocation } from './ast';
+import { Position, Location, createPosition, createLocation } from '../ast';
 
 export type TokenType =
 	| 'IDENTIFIER'
@@ -304,7 +304,7 @@ export class Lexer {
 			return this.readOperator();
 		}
 
-		if (/[(),;:\[\]{}]/.test(char)) {
+		if (/[(),;:[\]{}]/.test(char)) {
 			return this.readPunctuation();
 		}
 

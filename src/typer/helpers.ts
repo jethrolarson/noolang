@@ -127,7 +127,7 @@ export const typesEqual = (t1: Type, t2: Type): boolean => {
 		(t2.kind === 'primitive' || t2.kind === 'variable')
 	) {
 		const key = `${t1.kind}:${(t1 as any).name}-${t2.kind}:${(t2 as any).name}`;
-		let cached = typesEqualCache.get(key);
+		const cached = typesEqualCache.get(key);
 		if (cached !== undefined) return cached;
 
 		const result = typesEqualUncached(t1, t2);

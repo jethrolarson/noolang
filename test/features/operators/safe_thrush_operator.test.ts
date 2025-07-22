@@ -1,5 +1,5 @@
-import { Evaluator, Value } from '../../../src/evaluator';
-import { Lexer } from '../../../src/lexer';
+import { Evaluator, Value } from '../../../src/evaluator/evaluator';
+import { Lexer } from '../../../src/lexer/lexer';
 import { parse } from '../../../src/parser/parser';
 import { typeAndDecorate, typeProgram } from '../../../src/typer';
 import { typeToString } from '../../../src/typer/helpers';

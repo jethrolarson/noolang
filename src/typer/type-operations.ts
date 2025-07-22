@@ -1,14 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import {
-	type Type,
-	type Expression,
-	type Program,
-	typeVariable,
-	unitType,
-} from '../ast';
+import { type Type, type Expression, typeVariable } from '../ast';
 import { parse } from '../parser/parser';
-import { Lexer } from '../lexer';
+import { Lexer } from '../lexer/lexer';
 import {
 	type TypeState,
 	type TypeEnvironment,

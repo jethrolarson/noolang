@@ -20,7 +20,6 @@ import {
 	stringType,
 	boolType,
 	functionType,
-	typeVariable,
 	unitType,
 } from '../ast';
 
@@ -235,7 +234,7 @@ export const generateBinaryConstraints = (
 				constraints,
 			};
 
-		default:
+		default: {
 			// Unknown operator - create fresh type variable
 			const [resultType, finalState] = freshTypeVariable(rightResult.state);
 			return {
@@ -243,6 +242,7 @@ export const generateBinaryConstraints = (
 				state: finalState,
 				constraints,
 			};
+		}
 	}
 };
 
@@ -334,7 +334,7 @@ export const generateConstraintsForExpression = (
 			return generateIfConstraints(expr, state);
 		case 'definition':
 			return generateDefinitionConstraints(expr, state);
-		default:
+		default: {
 			// For unhandled expression types, create a fresh type variable
 			const [freshVar, newState] = freshTypeVariable(state);
 			return {
@@ -342,6 +342,7 @@ export const generateConstraintsForExpression = (
 				state: newState,
 				constraints: [],
 			};
+		}
 	}
 };
 
@@ -384,7 +385,7 @@ const applySubstitutionToType = (
 	seen: Set<string> = new Set()
 ): Type => {
 	switch (type.kind) {
-		case 'variable':
+		case 'variable': {
 			if (seen.has(type.name)) {
 				// Cycle detected, return the variable as-is
 				return type;
@@ -397,6 +398,7 @@ const applySubstitutionToType = (
 				return result;
 			}
 			return type;
+		}
 
 		case 'function':
 			return {
@@ -421,12 +423,13 @@ const applySubstitutionToType = (
 				),
 			};
 
-		case 'record':
+		case 'record': {
 			const newFields: { [key: string]: Type } = {};
 			for (const [key, fieldType] of Object.entries(type.fields)) {
 				newFields[key] = applySubstitutionToType(fieldType, substitution, seen);
 			}
 			return { ...type, fields: newFields };
+		}
 
 		case 'variant':
 			return {

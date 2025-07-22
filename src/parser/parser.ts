@@ -1,5 +1,6 @@
-import type { Token } from '../lexer';
+import type { Token } from '../lexer/lexer';
 import {
+	PipelineExpression,
 	type Expression,
 	type Program,
 	type LiteralExpression,
@@ -38,6 +39,7 @@ import {
 	type ImplementDefinitionExpression,
 	type ConstraintFunction,
 	type ImplementationFunction,
+	type MutationExpression,
 } from '../ast';
 import * as C from './combinators';
 
@@ -136,7 +138,7 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 						C.punctuation(':'),
 						C.lazy(() => parseTypeExpression)
 					),
-					([name, colon, type]) => [name.value, type] as [string, Type]
+					([name, _colon, type]) => [name.value, type] as [string, Type]
 				),
 				C.punctuation(',')
 			)
@@ -271,7 +273,7 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 // --- Type Expression ---
 // Helper function to parse function types without top-level effects
 const parseFunctionTypeWithoutEffects: C.Parser<Type> = tokens => {
-	let leftResult = parseTypeAtom(tokens);
+	const leftResult = parseTypeAtom(tokens);
 	if (!leftResult.success) return leftResult;
 	let left = leftResult.value;
 	let rest = leftResult.remaining;
@@ -302,7 +304,7 @@ const parseFunctionTypeWithoutEffects: C.Parser<Type> = tokens => {
 export const parseTypeExpression: C.Parser<Type> = tokens => {
 	// Try function type (right-associative): a -> b -> c FIRST
 	const funcType = (() => {
-		let leftResult = parseTypeAtom(tokens);
+		const leftResult = parseTypeAtom(tokens);
 		if (!leftResult.success) return leftResult;
 		let left = leftResult.value;
 		let rest = leftResult.remaining;
@@ -328,7 +330,7 @@ export const parseTypeExpression: C.Parser<Type> = tokens => {
 		}
 
 		// Parse effects at the end of the entire function type chain
-		let effects = new Set<Effect>();
+		const effects = new Set<Effect>();
 		let effectRest = rest;
 
 		// Parse effects: !effect1 !effect2 ...
@@ -427,7 +429,7 @@ export const parseTypeExpression: C.Parser<Type> = tokens => {
 						C.punctuation(':'),
 						C.lazy(() => parseTypeExpression)
 					),
-					([name, colon, type]) => [name.value, type] as [string, Type]
+					([name, _colon, type]) => [name.value, type] as [string, Type]
 				),
 				C.punctuation(',')
 			)
@@ -594,7 +596,7 @@ const parseRecordFieldOrPositional =
 const parseRecordFields: C.Parser<
 	{ name: string; value: Expression }[]
 > = tokens => {
-	let fields: { name: string; value: Expression; isNamed: boolean }[] = [];
+	const fields: { name: string; value: Expression; isNamed: boolean }[] = [];
 	let rest = tokens;
 	// Parse first field
 	const firstFieldResult = parseRecordFieldOrPositional(0)(rest);
@@ -655,7 +657,7 @@ const parseRecordFields: C.Parser<
 // --- Record/Tuple Parsing ---
 const parseRecord = C.map(
 	C.seq(C.punctuation('{'), C.optional(parseRecordFields), C.punctuation('}')),
-	([open, fields, close]): Expression => {
+	([open, fields, _close]): Expression => {
 		const fieldsList = fields || [];
 		if (fieldsList.length === 0) {
 			// Empty braces: unit
@@ -696,7 +698,7 @@ const parseParenExpr: C.Parser<Expression> = C.map(
 		C.lazy(() => parseSequence), // Use parseSequence to allow full semicolon-separated sequences
 		C.punctuation(')')
 	),
-	([open, expr, close]) => expr
+	([_open, expr, _close]) => expr
 );
 
 // --- Lambda Expression ---
@@ -770,7 +772,7 @@ const parseLambdaExpression: C.Parser<FunctionExpression> = tokens => {
 // --- List Parsing ---
 // Custom parser for a sequence of expressions separated by semicolons
 const parseListElements: C.Parser<Expression[]> = tokens => {
-	let elements: Expression[] = [];
+	const elements: Expression[] = [];
 	let rest = tokens;
 
 	// Parse first element
@@ -824,7 +826,7 @@ const parseListElements: C.Parser<Expression[]> = tokens => {
 
 const parseList: C.Parser<ListExpression> = C.map(
 	C.seq(C.punctuation('['), C.optional(parseListElements), C.punctuation(']')),
-	([open, elements, close]) => {
+	([open, elements, _close]) => {
 		const elementsList: Expression[] = elements || [];
 		return {
 			kind: 'list',
@@ -854,7 +856,7 @@ const parseIfExpression: C.Parser<Expression> = C.map(
 		C.keyword('else'),
 		C.lazy(() => parseSequenceTerm)
 	),
-	([ifKw, condition, thenKw, thenExpr, elseKw, elseExpr]) => {
+	([ifKw, condition, _thenKw, thenExpr, _elseKw, elseExpr]) => {
 		return {
 			kind: 'if',
 			condition,
@@ -1154,17 +1156,18 @@ const parseCompose: C.Parser<Expression> = tokens => {
 		([left, rest]) => {
 			// Build steps array for pipeline expression
 			const steps = [left];
-			for (const [op, right] of rest) {
+			for (const [_op, right] of rest) {
 				steps.push(right);
 			}
 
 			// If we have multiple steps, create a pipeline expression
 			if (steps.length > 1) {
-				return {
+				const result: PipelineExpression = {
 					kind: 'pipeline',
 					steps,
 					location: left.location,
-				} as import('../ast').PipelineExpression;
+				};
+				return result;
 			}
 
 			// Otherwise just return the single expression
@@ -1318,7 +1321,7 @@ const parseDefinition: C.Parser<DefinitionExpression> = C.map(
 		C.operator('='),
 		C.lazy(() => parseSequenceTermWithIf)
 	),
-	([name, equals, value]): DefinitionExpression => {
+	([name, _equals, value]): DefinitionExpression => {
 		return {
 			kind: 'definition',
 			name: name.value,
@@ -1332,21 +1335,14 @@ const parseDefinition: C.Parser<DefinitionExpression> = C.map(
 const parseDefinitionWithType: C.Parser<DefinitionExpression> = parseDefinition;
 
 // --- Mutable Definition ---
-const parseMutableDefinition: C.Parser<
-	import('../ast').MutableDefinitionExpression
-> = C.map(
+const parseMutableDefinition: C.Parser<MutableDefinitionExpression> = C.map(
 	C.seq(
 		C.keyword('mut'),
 		C.identifier(),
 		C.operator('='),
 		C.lazy(() => parseSequenceTermWithIf)
 	),
-	([
-		mut,
-		name,
-		equals,
-		value,
-	]): import('../ast').MutableDefinitionExpression => {
+	([mut, name, _equals, value]): MutableDefinitionExpression => {
 		return {
 			kind: 'mutable-definition',
 			name: name.value,
@@ -1357,14 +1353,14 @@ const parseMutableDefinition: C.Parser<
 );
 
 // --- Mutation ---
-const parseMutation: C.Parser<import('../ast').MutationExpression> = C.map(
+const parseMutation: C.Parser<MutationExpression> = C.map(
 	C.seq(
 		C.keyword('mut!'),
 		C.identifier(),
 		C.operator('='),
 		C.lazy(() => parseSequenceTermWithIf)
 	),
-	([mut, name, equals, value]): import('../ast').MutationExpression => {
+	([mut, name, _equals, value]): MutationExpression => {
 		return {
 			kind: 'mutation',
 			target: name.value,
@@ -1423,7 +1419,7 @@ const parseTypeDefinition: C.Parser<TypeDefinitionExpression> = C.map(
 	]): TypeDefinitionExpression => ({
 		kind: 'type-definition',
 		name: name.value,
-		typeParams: typeParams.map((p: any) => p.value),
+		typeParams: typeParams.map(p => p.value),
 		constructors,
 		location: createLocation(
 			type.location.start,
@@ -1442,7 +1438,7 @@ const parseConstraintFunction: C.Parser<ConstraintFunction> = C.map(
 	),
 	([name, typeParams, colon, type]): ConstraintFunction => ({
 		name: name.value,
-		typeParams: typeParams.map((p: any) => p.value),
+		typeParams: typeParams.map(p => p.value),
 		type,
 		location: createLocation(name.location.start, colon.location.end),
 	})
@@ -1463,13 +1459,13 @@ const parseConstraintDefinition: C.Parser<ConstraintDefinitionExpression> =
 			constraintKeyword,
 			name,
 			typeParams,
-			openParen,
+			_openParen,
 			functions,
 			closeParen,
 		]): ConstraintDefinitionExpression => ({
 			kind: 'constraint-definition',
 			name: name.value,
-			typeParams: typeParams.map((p: any) => p.value),
+			typeParams: typeParams.map(p => p.value),
 			functions,
 			location: createLocation(
 				constraintKeyword.location.start,
@@ -1485,7 +1481,7 @@ const parseImplementationFunction: C.Parser<ImplementationFunction> = C.map(
 		C.operator('='),
 		C.lazy(() => parseSequenceTerm)
 	),
-	([name, equals, value]): ImplementationFunction => ({
+	([name, _equals, value]): ImplementationFunction => ({
 		name: name.value,
 		value,
 		location: createLocation(name.location.start, value.location.end),
@@ -1506,7 +1502,7 @@ const parseImplementDefinition: C.Parser<ImplementDefinitionExpression> = C.map(
 		implementKeyword,
 		constraintName,
 		typeExpr,
-		openParen,
+		_openParen,
 		implementations,
 		closeParen,
 	]): ImplementDefinitionExpression => ({
@@ -1618,7 +1614,7 @@ const parsePattern: C.Parser<Pattern> = C.choice(
 			C.lazy(() => parsePattern),
 			C.punctuation(')')
 		),
-		([name, openParen, arg, closeParen]): Pattern => ({
+		([name, _openParen, arg, closeParen]): Pattern => ({
 			kind: 'constructor',
 			name: name.value,
 			args: [arg],
@@ -1661,7 +1657,7 @@ const parseMatchCase: C.Parser<MatchCase> = C.map(
 		C.operator('=>'),
 		C.lazy(() => parseMatchCaseExpression) // Use dedicated parser for match case expressions
 	),
-	([pattern, arrow, expression]): MatchCase => ({
+	([pattern, _arrow, expression]): MatchCase => ({
 		pattern,
 		expression,
 		location: createLocation(pattern.location.start, expression.location.end),
@@ -1681,8 +1677,8 @@ const parseMatchExpression: C.Parser<MatchExpression> = C.map(
 	([
 		match,
 		expression,
-		with_,
-		openParen,
+		_with,
+		_openParen,
 		cases,
 		closeParen,
 	]): MatchExpression => ({
@@ -1702,7 +1698,7 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
 		C.sepBy(parseWhereDefinition, C.punctuation(';')),
 		C.punctuation(')')
 	),
-	([main, where, openParen, definitions, closeParen]): WhereExpression => {
+	([main, _where, _openParen, definitions, _closeParen]): WhereExpression => {
 		return {
 			kind: 'where',
 			main,
@@ -1773,7 +1769,7 @@ const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
 			C.lazy(() => parseConstraintExpr),
 			C.punctuation(')')
 		),
-		([open, expr, close]) => ({ kind: 'paren', expr })
+		([_open, expr, _close]) => ({ kind: 'paren', expr })
 	),
 	// a is Collection
 	C.map(
@@ -1785,7 +1781,7 @@ const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
 				// Removed meaningless constraint keywords
 			)
 		),
-		([typeVar, isKeyword, constraint]): ConstraintExpr => ({
+		([typeVar, _isKeyword, constraint]): ConstraintExpr => ({
 			kind: 'is',
 			typeVar: typeVar.value,
 			constraint: constraint.value,
@@ -1804,11 +1800,11 @@ const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
 		),
 		([
 			typeVar,
-			has,
-			field,
+			_has,
+			_field,
 			fieldName,
-			of,
-			type,
+			_of,
+			_type,
 			fieldType,
 		]): ConstraintExpr => ({
 			kind: 'hasField',
@@ -1820,7 +1816,7 @@ const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
 	// a implements Interface
 	C.map(
 		C.seq(C.identifier(), C.keyword('implements'), C.identifier()),
-		([typeVar, implementsKeyword, interfaceName]): ConstraintExpr => ({
+		([typeVar, _implementsKeyword, interfaceName]): ConstraintExpr => ({
 			kind: 'implements',
 			typeVar: typeVar.value,
 			interfaceName: interfaceName.value,
@@ -1831,7 +1827,7 @@ const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
 // --- Parse constraint expression with precedence: and > or ---
 const parseConstraintExpr: C.Parser<ConstraintExpr> = tokens => {
 	// Parse left side (and chains)
-	let leftResult = parseConstraintAnd(tokens);
+	const leftResult = parseConstraintAnd(tokens);
 	if (!leftResult.success) return leftResult;
 	let left = leftResult.value;
 	let rest = leftResult.remaining;
@@ -1852,7 +1848,7 @@ const parseConstraintExpr: C.Parser<ConstraintExpr> = tokens => {
 };
 
 const parseConstraintAnd: C.Parser<ConstraintExpr> = tokens => {
-	let leftResult = parseAtomicConstraint(tokens);
+	const leftResult = parseAtomicConstraint(tokens);
 	if (!leftResult.success) return leftResult;
 	let left = leftResult.value;
 	let rest = leftResult.remaining;
@@ -1882,7 +1878,7 @@ const parseExprWithType: C.Parser<Expression> = C.choice(
 			C.keyword('given'),
 			parseConstraintExpr
 		),
-		([expr, colon, type, given, constraint]): ConstrainedExpression => ({
+		([expr, _colon, type, _given, constraint]): ConstrainedExpression => ({
 			kind: 'constrained',
 			expression: expr,
 			type,
@@ -1897,7 +1893,7 @@ const parseExprWithType: C.Parser<Expression> = C.choice(
 			C.punctuation(':'),
 			C.lazy(() => parseTypeExpression)
 		),
-		([expr, colon, type]): TypedExpression => ({
+		([expr, _colon, type]): TypedExpression => ({
 			kind: 'typed',
 			expression: expr,
 			type,
@@ -1921,7 +1917,7 @@ const parseSequence: C.Parser<Expression> = C.map(
 	),
 	([left, rest]) => {
 		let result = left;
-		for (const [op, right] of rest) {
+		for (const [_op, right] of rest) {
 			result = {
 				kind: 'binary',
 				operator: ';',
@@ -1943,7 +1939,7 @@ export const parse = (tokens: Token[]): Program => {
 	const nonEOFTokens = tokens.filter(t => t.type !== 'EOF');
 
 	// Parse multiple top-level expressions separated by semicolons
-	let statements: Expression[] = [];
+	const statements: Expression[] = [];
 	let rest = nonEOFTokens;
 	while (rest.length > 0) {
 		// Skip leading semicolons

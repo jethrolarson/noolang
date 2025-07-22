@@ -1,8 +1,8 @@
-import { Lexer } from '../../../src/lexer';
+import { Lexer } from '../../../src/lexer/lexer';
 import { parse } from '../../../src/parser/parser';
-import { Evaluator } from '../../../src/evaluator';
+import { Evaluator } from '../../../src/evaluator/evaluator';
 import { typeAndDecorate } from '../../../src/typer';
-import { Value } from '../../../src/evaluator';
+import { Value } from '../../../src/evaluator/evaluator';
 
 let evaluator: Evaluator;
 

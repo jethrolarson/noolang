@@ -1,4 +1,4 @@
-import { Lexer } from '../../lexer';
+import { Lexer } from '../../lexer/lexer';
 
 describe('Lexer', () => {
 	// Helper function to create lexer and get all tokens

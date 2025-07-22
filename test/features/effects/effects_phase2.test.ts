@@ -1,7 +1,7 @@
 // Phase 2 Effects System Tests
 // Testing separated effects in TypeResult and effect composition
 
-import { Lexer } from '../../../src/lexer';
+import { Lexer } from '../../../src/lexer/lexer';
 import { parse } from '../../../src/parser/parser';
 import {
 	typeProgram,

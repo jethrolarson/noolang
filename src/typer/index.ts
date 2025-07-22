@@ -1,20 +1,7 @@
 import { type Program, type Type, unitType, type Effect } from '../ast';
-import { formatTypeError, createTypeError } from './type-errors';
-import { typeToString } from './helpers';
-import {
-	type TypeState,
-	type TypeResult,
-	createPureTypeResult,
-	unionEffects,
-} from './types';
-import {
-	satisfiesConstraint,
-	validateAllSubstitutionConstraints,
-} from './constraints';
-import { substitute } from './substitute';
+import { type TypeResult, unionEffects } from './types';
 import { createTypeState, loadStdlib } from './type-operations';
 import { typeExpression } from './expression-dispatcher';
-import { typeAndDecorate } from './decoration';
 import { initializeBuiltins } from './builtins';
 
 // Re-export TypeResult and effect helpers from types module

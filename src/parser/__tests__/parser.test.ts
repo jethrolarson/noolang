@@ -1,4 +1,4 @@
-import { Lexer } from '../../lexer';
+import { Lexer } from '../../lexer/lexer';
 import { parse, parseTypeExpression } from '../parser';
 import type {
 	Expression,
@@ -7,9 +7,6 @@ import type {
 	FunctionExpression,
 	ApplicationExpression,
 	BinaryExpression,
-	IfExpression,
-	RecordExpression,
-	AccessorExpression,
 	Type,
 	RecordType,
 	TupleType,
@@ -62,27 +59,6 @@ function assertApplicationExpression(expr: Expression): ApplicationExpression {
 function assertBinaryExpression(expr: Expression): BinaryExpression {
 	if (expr.kind !== 'binary') {
 		throw new Error(`Expected binary expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
-function assertIfExpression(expr: Expression): IfExpression {
-	if (expr.kind !== 'if') {
-		throw new Error(`Expected if expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
-function assertRecordExpression(expr: Expression): RecordExpression {
-	if (expr.kind !== 'record') {
-		throw new Error(`Expected record expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
-function assertAccessorExpression(expr: Expression): AccessorExpression {
-	if (expr.kind !== 'accessor') {
-		throw new Error(`Expected accessor expression, got ${expr.kind}`);
 	}
 	return expr;
 }
@@ -1006,13 +982,11 @@ describe('Mutable Definitions and Mutations', () => {
 // Add new test suite for Constraint Definitions and Implementations
 describe('Constraint Definitions and Implementations', () => {
 	/**
-	 * ✅ FIXED: The complex original test case had issues, but simpler constraint 
+	 * ✅ FIXED: The complex original test case had issues, but simpler constraint
 	 * definitions work fine. Updated test to use working syntax.
 	 */
 	test('should parse constraint definition', () => {
-		const lexer = new Lexer(
-			'constraint Show a ( show : a -> String )'
-		);
+		const lexer = new Lexer('constraint Show a ( show : a -> String )');
 		const tokens = lexer.tokenize();
 		const program = parse(tokens);
 		expect(program.statements).toHaveLength(1);
@@ -1061,9 +1035,7 @@ describe('Constraint Definitions and Implementations', () => {
 	 * Multiple type parameters work fine with simpler constraint definitions.
 	 */
 	test('should parse constraint definition with multiple type parameters', () => {
-		const lexer = new Lexer(
-			'constraint Eq a b ( eq : a -> b -> Bool )'
-		);
+		const lexer = new Lexer('constraint Eq a b ( eq : a -> b -> Bool )');
 		const tokens = lexer.tokenize();
 		const program = parse(tokens);
 
@@ -1159,7 +1131,7 @@ describe('Constraint Expressions', () => {
 
 	/**
 	 * PARSER LIMITATION - MORE COMPLEX TO FIX
-	 * 
+	 *
 	 * Constrained expressions with hasField have parser precedence conflicts
 	 * at the top level. This appears to be more complex than the other parser
 	 * fixes and may require more significant parser changes.

@@ -104,7 +104,7 @@ const unificationConstraintsEqual = (
 	if (c1.kind !== c2.kind) return false;
 
 	switch (c1.kind) {
-		case 'equal':
+		case 'equal': {
 			const c2Equal = c2 as { kind: 'equal'; type1: Type; type2: Type };
 			return (
 				c1.type1.kind === c2Equal.type1.kind &&
@@ -112,7 +112,8 @@ const unificationConstraintsEqual = (
 				JSON.stringify(c1.type1) === JSON.stringify(c2Equal.type1) &&
 				JSON.stringify(c1.type2) === JSON.stringify(c2Equal.type2)
 			);
-		case 'instance':
+		}
+		case 'instance': {
 			const c2Instance = c2 as {
 				kind: 'instance';
 				typeVar: string;
@@ -122,7 +123,8 @@ const unificationConstraintsEqual = (
 				c1.typeVar === c2Instance.typeVar &&
 				JSON.stringify(c1.type) === JSON.stringify(c2Instance.type)
 			);
-		case 'check':
+		}
+		case 'check': {
 			const c2Check = c2 as {
 				kind: 'check';
 				constraint: import('../ast').Constraint;
@@ -132,6 +134,7 @@ const unificationConstraintsEqual = (
 				JSON.stringify(c1.constraint) === JSON.stringify(c2Check.constraint) &&
 				JSON.stringify(c1.type) === JSON.stringify(c2Check.type)
 			);
+		}
 		default:
 			return false;
 	}
@@ -221,9 +224,6 @@ export class ConstraintSolver {
 		while (changed && iterations < maxIterations) {
 			changed = false;
 			iterations++;
-
-			const constraintsBefore = this.state.constraints.length;
-
 			for (let i = 0; i < this.state.constraints.length; i++) {
 				const constraint = this.state.constraints[i];
 
@@ -234,10 +234,6 @@ export class ConstraintSolver {
 					i--; // Adjust index after removal
 				}
 			}
-
-			const constraintsAfter = this.state.constraints.length;
-
-			// Debug logging disabled for clean performance test
 		}
 
 		if (iterations >= maxIterations) {
@@ -321,7 +317,7 @@ export class ConstraintSolver {
 	private processInstanceConstraint(
 		typeVar: string,
 		type: Type,
-		location?: { line: number; column: number }
+		_location?: { line: number; column: number }
 	): boolean {
 		// Check for occurs check
 		if (this.occursIn(typeVar, type)) {
@@ -377,7 +373,7 @@ export class ConstraintSolver {
 	private processCheckConstraint(
 		constraint: import('../ast').Constraint,
 		type: Type,
-		location?: { line: number; column: number }
+		_location?: { line: number; column: number }
 	): boolean {
 		// Apply substitution first
 		const substitutedType = this.applySubstitution(type);
@@ -465,7 +461,7 @@ export class ConstraintSolver {
 				}
 				return true;
 
-			case 'record':
+			case 'record': {
 				if (type2.kind !== 'record') return false;
 
 				const keys1 = Object.keys(type1.fields);
@@ -492,6 +488,7 @@ export class ConstraintSolver {
 					}
 				}
 				return true;
+			}
 
 			case 'primitive':
 				if (type2.kind !== 'primitive') return false;
@@ -586,7 +583,7 @@ export class ConstraintSolver {
 					if (!this.typesEqual(t1.elements[i], t2.elements[i])) return false;
 				}
 				return true;
-			case 'record':
+			case 'record': {
 				if (t2.kind !== 'record') return false;
 				const keys1 = Object.keys(t1.fields);
 				const keys2 = Object.keys(t2.fields);
@@ -596,6 +593,7 @@ export class ConstraintSolver {
 					if (!this.typesEqual(t1.fields[key], t2.fields[key])) return false;
 				}
 				return true;
+			}
 			case 'variant':
 				if (t2.kind !== 'variant') return false;
 				if (t1.name !== t2.name) return false;
@@ -642,29 +640,33 @@ export class ConstraintSolver {
 				return substituted.name;
 			case 'unit':
 				return 'unit';
-			case 'function':
+			case 'function': {
 				const params = substituted.params
 					.map(p => this.typeToString(p))
 					.join(', ');
 				return `(${params}) -> ${this.typeToString(substituted.return)}`;
+			}
 			case 'list':
 				return `[${this.typeToString(substituted.element)}]`;
-			case 'tuple':
+			case 'tuple': {
 				const elements = substituted.elements
 					.map(e => this.typeToString(e))
 					.join(', ');
 				return `{${elements}}`;
-			case 'record':
+			}
+			case 'record': {
 				const fields = Object.entries(substituted.fields)
 					.map(([key, fieldType]) => `@${key} ${this.typeToString(fieldType)}`)
 					.join(', ');
 				return `{${fields}}`;
-			case 'variant':
+			}
+			case 'variant': {
 				if (substituted.args.length === 0) {
 					return substituted.name;
 				}
 				const args = substituted.args.map(a => this.typeToString(a)).join(' ');
 				return `${substituted.name} ${args}`;
+			}
 			default:
 				return `<${substituted.kind}>`;
 		}

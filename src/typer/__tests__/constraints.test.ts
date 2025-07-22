@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { Lexer } from '../../lexer';
+import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
 import { typeProgram, createTypeState } from '..';
 import { typeToString } from '../helpers';
