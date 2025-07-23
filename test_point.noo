@@ -1,0 +1,3 @@
+type Point a = Point a a;
+origin = Point 0 0;
+origin
