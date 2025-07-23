@@ -2,20 +2,75 @@ import { Constraint, Type } from '../ast';
 import { TypeState } from './types';
 import { constraintsEqual, isTypeKind, typeToString } from './helpers';
 
+// Built-in constraint types that Noolang supports
+const BUILT_IN_CONSTRAINTS = new Set([
+	'Collection',  // Lists and records (not primitive types like String, Int, Bool)
+	'Number',      // Numeric types (Int)
+	'String',      // String types
+	'Boolean',     // Boolean types
+	'Show',        // Types that can be converted to strings
+	'List',        // List types specifically
+	'Record',      // Record types specifically
+	'Function',    // Function types
+	'Eq',          // Types that support equality comparison
+]);
+
 // Validate that a constraint name is valid
 export const validateConstraintName = (constraint: string): void => {
-	// All constraints are now meaningless type checks, so reject them all
-	throw new Error(
-		`Constraint '${constraint}' is not supported. Use hasField constraints for record typing instead.`
-	);
+	if (!BUILT_IN_CONSTRAINTS.has(constraint)) {
+		throw new Error(
+			`Unknown constraint '${constraint}'. Built-in constraints are: ${Array.from(BUILT_IN_CONSTRAINTS).join(', ')}`
+		);
+	}
 };
 
 export const satisfiesConstraint = (
-	_type: Type,
-	_constraint: string
+	type: Type,
+	constraint: string
 ): boolean => {
-	// All non-hasField constraints are meaningless, so they're not supported
-	return false;
+	// Apply substitutions if needed - for now assume type is already resolved
+	switch (constraint) {
+		case 'Collection':
+			// Lists and records (not primitive types like String, Int, Bool)
+			return type.kind === 'list' || type.kind === 'record' || type.kind === 'tuple';
+			
+		case 'Number':
+			// Numeric types (Int)
+			return type.kind === 'primitive' && type.name === 'Int';
+			
+		case 'String':
+			// String types
+			return type.kind === 'primitive' && type.name === 'String';
+			
+		case 'Boolean':
+			// Boolean types  
+			return type.kind === 'primitive' && type.name === 'Bool';
+			
+		case 'Show':
+			// Types that can be converted to strings - for now, all basic types can be shown
+			return type.kind === 'primitive' || type.kind === 'list' || type.kind === 'record' || 
+			       type.kind === 'tuple' || type.kind === 'variant';
+			       
+		case 'List':
+			// List types specifically
+			return type.kind === 'list';
+			
+		case 'Record':
+			// Record types specifically
+			return type.kind === 'record';
+			
+		case 'Function':
+			// Function types
+			return type.kind === 'function';
+			
+		case 'Eq':
+			// Types that support equality comparison - most types except functions
+			return type.kind !== 'function';
+			
+		default:
+			// Unknown constraint
+			return false;
+	}
 };
 
 // Helper: Recursively push a constraint to all type variables inside a type
