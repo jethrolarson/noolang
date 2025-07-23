@@ -1,0 +1,11 @@
+type Color = Red | Green | Blue;
+red = Red;
+red
+
+type Box a = Box a;
+box = Box 42;
+box
+
+type Point a = Point a a;
+origin = Point 0 0;
+origin
