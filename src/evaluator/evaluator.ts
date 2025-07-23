@@ -1314,8 +1314,8 @@ export class Evaluator {
 				);
 			}
 
-			// Try to call the stdlib bind function directly as fallback
-			let bindFunction = this.environment.get('bind');
+			// Use the standalone option_bind function for backward compatibility
+			let bindFunction = this.environment.get('option_bind');
 			if (bindFunction) {
 				// Handle Cell wrapper
 				if (isCell(bindFunction)) {
@@ -1345,7 +1345,7 @@ export class Evaluator {
 			}
 
 			throw new Error(
-				'Safe thrush operator (|?) failed: no bind function available'
+				'Safe thrush operator (|?) failed: no option_bind function available'
 			);
 		} else if (expr.operator === '$') {
 			// Handle dollar operator (low precedence function application)
@@ -1742,6 +1742,17 @@ export class Evaluator {
 				return createFunction((functor: Value) => {
 					const functorType = this.getValueTypeName(functor);
 					return this.resolveConstraintImplementation(constraintName, funcName, functorType, [func, functor]);
+				});
+			});
+		}
+		
+		// For bind specifically, we know it's m a -> (a -> m b) -> m b
+		// So we create a curried dispatcher that dispatches on the first argument (the monadic value)
+		if (funcName === 'bind') {
+			return createFunction((monad: Value) => {
+				const monadType = this.getValueTypeName(monad);
+				return createFunction((func: Value) => {
+					return this.resolveConstraintImplementation(constraintName, funcName, monadType, [monad, func]);
 				});
 			});
 		}

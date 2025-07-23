@@ -117,14 +117,7 @@ implement Applicative Option (
   )
 );
 
-# Standalone bind function for Option (needed by safe thrush operator)
-bind = fn opt f => match opt with (
-  Some value => f value;
-  None => None
-);
 
-# Standalone return function for Option  
-return = fn x => Some x;
 
 # ========================================
 # RESULT TYPE
@@ -183,6 +176,11 @@ implement Applicative Result (
   )
 );
 
+# Standalone option bind function for safe thrush operator compatibility
+option_bind = fn opt f => match opt with (
+  Some value => f value;
+  None => None
+);
 
 # ========================================
 # LIST OPERATIONS
