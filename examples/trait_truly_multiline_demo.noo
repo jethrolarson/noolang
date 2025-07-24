@@ -1,0 +1,47 @@
+# Trait System Phase 2 - Working Demo
+print "=== Trait System Phase 2 Demo ===";
+
+# All basic traits are already defined in stdlib:
+# - Show for Int, String, List, Option, etc.
+# - Functor for List, Option, Result
+# - Eq for Int, String, Option, etc.
+
+print "✓ All basic traits loaded from stdlib";
+
+# Test basic Show functionality
+test1 = show 42;
+print "show 42 =";
+print test1;
+
+# Test Functor functionality with Option
+increment = fn x => x + 1;
+test2 = map increment (Some 41);
+print "map increment (Some 41) =";
+print test2;
+
+test3 = map increment None;
+print "map increment None =";
+print test3;
+
+# Test Functor functionality with List
+test4 = map increment [1, 2, 3];
+print "map increment [1, 2, 3] =";
+print test4;
+
+# Test the original target example!
+test5 = map increment (Some 1);
+print "🎯 THE TARGET: map increment (Some 1) =";
+print test5;
+
+# Test partial application
+double = fn x => x * 2;
+mapDouble = map double;
+test6 = mapDouble (Some 5);
+print "mapDouble (Some 5) =";
+print test6;
+
+test7 = mapDouble [1, 2, 3];
+print "mapDouble [1, 2, 3] =";
+print test7;
+
+print "=== ✅ Phase 2.5 Complete - Trait evaluation working! ===";

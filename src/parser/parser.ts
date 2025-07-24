@@ -225,43 +225,57 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 		};
 	}
 
-	// Try uppercase type constructor: TypeName arg1 arg2 ... (preserve original logic)
+	// Try type constructor (uppercase or lowercase): TypeName arg1 arg2 ... 
 	if (
 		tokens.length > 0 &&
-		tokens[0].type === 'IDENTIFIER' &&
-		/^[A-Z]/.test(tokens[0].value)
+		tokens[0].type === 'IDENTIFIER'
 	) {
 		const typeNameResult = C.identifier()(tokens);
 		if (typeNameResult.success) {
+			const typeName = typeNameResult.value.value;
+			
 			// Try to parse type arguments
 			const argsResult = C.many(C.lazy(() => parseTypeAtom))(
 				typeNameResult.remaining
 			);
-			if (argsResult.success) {
+			if (argsResult.success && argsResult.value.length > 0) {
+				// Type constructor with arguments (like Option a, f a, List String)
 				return {
 					success: true as const,
 					value: {
 						kind: 'variant',
-						name: typeNameResult.value.value,
+						name: typeName,
 						args: argsResult.value,
 					} as Type,
 					remaining: argsResult.remaining,
 				};
+			} else {
+				// Check if it's a type constructor (uppercase) or type variable (lowercase)
+				const isUpperCase = typeName[0] === typeName[0].toUpperCase();
+				if (isUpperCase) {
+					// Type constructor without arguments (like Bool, Option, etc.)
+					return {
+						success: true as const,
+						value: {
+							kind: 'variant',
+							name: typeName,
+							args: [],
+						} as Type,
+						remaining: typeNameResult.remaining,
+					};
+				} else {
+					// Type variable (like a, b, etc.)
+					return {
+						success: true as const,
+						value: typeVariable(typeName),
+						remaining: typeNameResult.remaining,
+					};
+				}
 			}
 		}
 	}
 
-	// Try type variable or simple identifier
-	if (tokens.length > 0 && tokens[0].type === 'IDENTIFIER') {
-		const identifierResult = C.identifier()(tokens);
-		if (identifierResult.success) {
-			return {
-				success: true as const,
-				value: typeVariable(identifierResult.value.value),
-				remaining: identifierResult.remaining,
-			};
-		}
-	}
+
 
 	return {
 		success: false,
@@ -271,21 +285,22 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 }
 
 // --- Type Expression ---
-// Helper function to parse function types without top-level effects
+// Helper function to parse function types without top-level effects (right-associative)
 const parseFunctionTypeWithoutEffects: C.Parser<Type> = tokens => {
 	const leftResult = parseTypeAtom(tokens);
 	if (!leftResult.success) return leftResult;
-	let left = leftResult.value;
-	let rest = leftResult.remaining;
-
-	while (
+	
+	const rest = leftResult.remaining;
+	
+	// Check for -> operator
+	if (
 		rest &&
 		rest.length > 0 &&
 		rest[0].type === 'OPERATOR' &&
 		rest[0].value === '->'
 	) {
-		rest = rest.slice(1);
-		const rightResult = parseFunctionTypeWithoutEffects(rest);
+		// Right-associative: recursively parse the rest as a function type
+		const rightResult = parseFunctionTypeWithoutEffects(rest.slice(1));
 		if (!rightResult.success) return rightResult;
 		if (!rightResult.value)
 			return {
@@ -294,11 +309,14 @@ const parseFunctionTypeWithoutEffects: C.Parser<Type> = tokens => {
 				position: tokens[0]?.location.start.line || 0,
 			};
 
-		left = functionType([left], rightResult.value);
-		rest = rightResult.remaining;
+		return {
+			success: true as const,
+			value: functionType([leftResult.value], rightResult.value),
+			remaining: rightResult.remaining
+		};
 	}
 
-	return { success: true as const, value: left, remaining: rest };
+	return { success: true as const, value: leftResult.value, remaining: rest };
 };
 
 export const parseTypeExpression: C.Parser<Type> = tokens => {
@@ -306,17 +324,17 @@ export const parseTypeExpression: C.Parser<Type> = tokens => {
 	const funcType = (() => {
 		const leftResult = parseTypeAtom(tokens);
 		if (!leftResult.success) return leftResult;
-		let left = leftResult.value;
-		let rest = leftResult.remaining;
+		
+		const rest = leftResult.remaining;
 
-		while (
+		// Check for -> operator for right-associative parsing
+		if (
 			rest &&
 			rest.length > 0 &&
 			rest[0].type === 'OPERATOR' &&
 			rest[0].value === '->'
 		) {
-			rest = rest.slice(1);
-			const rightResult = parseFunctionTypeWithoutEffects(rest);
+			const rightResult = parseFunctionTypeWithoutEffects(rest.slice(1));
 			if (!rightResult.success) return rightResult;
 			if (!rightResult.value)
 				return {
@@ -325,13 +343,11 @@ export const parseTypeExpression: C.Parser<Type> = tokens => {
 					position: tokens[0]?.location.start.line || 0,
 				};
 
-			left = functionType([left], rightResult.value);
-			rest = rightResult.remaining;
-		}
-
-		// Parse effects at the end of the entire function type chain
-		const effects = new Set<Effect>();
-		let effectRest = rest;
+			const functionTypeResult = functionType([leftResult.value], rightResult.value);
+			
+			// Parse effects at the end of the entire function type chain
+			const effects = new Set<Effect>();
+			let effectRest = rightResult.remaining;
 
 		// Parse effects: !effect1 !effect2 ...
 		while (
@@ -381,12 +397,14 @@ export const parseTypeExpression: C.Parser<Type> = tokens => {
 			effectRest = effectRest.slice(1); // consume effect name
 		}
 
-		// Apply effects to the function type (including empty effects)
-		if (left.kind === 'function') {
-			left = { ...left, effects };
+			// Apply effects to the function type (including empty effects)
+			const finalType = { ...functionTypeResult, effects };
+
+			return { success: true as const, value: finalType, remaining: effectRest };
 		}
 
-		return { success: true as const, value: left, remaining: effectRest };
+		// If no arrow, just return the left result
+		return { success: true as const, value: leftResult.value, remaining: leftResult.remaining };
 	})();
 
 	if (funcType.success && funcType.value) {

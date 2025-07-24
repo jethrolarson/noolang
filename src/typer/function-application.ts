@@ -150,8 +150,34 @@ export const typeApplication = (
 			
 			if (resolution.found && resolution.impl) {
 				// We found a trait implementation - evaluate it with the arguments
-				// For now, just continue with normal function application
-				// TODO: Properly substitute the trait implementation
+				// The trait implementation is an expression we need to type
+				const traitImplType = typeExpression(resolution.impl, currentState);
+				
+				// Apply the trait implementation to the arguments
+				if (traitImplType.type.kind === 'function') {
+					// Create a new application expression using the trait implementation
+					const traitApp: ApplicationExpression = {
+						kind: 'application',
+						func: resolution.impl,
+						args: expr.args,
+						location: expr.location
+					};
+					
+					// Recursively type the new application
+					return typeApplication(traitApp, currentState);
+				} else {
+					// The trait implementation should be a function
+					const funcName = expr.func.kind === 'variable' ? expr.func.name : 'unknown';
+					throwTypeError(
+						location => ({
+							type: 'TypeError' as const,
+							kind: 'general',
+							message: `Trait implementation for ${funcName} is not a function`,
+							location
+						}),
+						getExprLocation(expr)
+					);
+				}
 			}
 		}
 	}

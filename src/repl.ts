@@ -25,10 +25,10 @@ export class REPL {
 	typeState: TypeState;
 
 	constructor() {
-		this.evaluator = new Evaluator();
 		this.typeState = createTypeState();
 		this.typeState = initializeBuiltins(this.typeState);
 		this.typeState = loadStdlib(this.typeState); // Ensure stdlib types are loaded
+		this.evaluator = new Evaluator({ traitRegistry: this.typeState.traitRegistry });
 		this.rl = readline.createInterface({
 			input: process.stdin,
 			output: process.stdout,

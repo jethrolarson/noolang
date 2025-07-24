@@ -52,12 +52,18 @@ export function addTraitImplementation(
 	if (!traitImpls) {
 		return false; // Trait not found
 	}
+	
+	// Check for duplicate implementation
+	if (traitImpls.has(impl.typeName)) {
+		throw new Error(`Duplicate implementation of ${traitName} for ${impl.typeName}`);
+	}
+	
 	traitImpls.set(impl.typeName, impl);
 	return true;
 }
 
 // Get the concrete type name for trait lookup
-export function getTypeName(type: Type): string | null {
+export function getTypeName(type: Type): string {
 	switch (type.kind) {
 		case 'primitive':
 			return type.name;
@@ -65,8 +71,17 @@ export function getTypeName(type: Type): string | null {
 			return type.name; // For ADTs like Option, Result
 		case 'list':
 			return 'List';
+		case 'function':
+			return 'function';
+		case 'variable':
+			return type.name;
+		case 'record':
+			return 'record';
+		case 'tuple':
+			return 'tuple';
 		default:
-			return null;
+			// For any other types, use the kind as the name
+			return type.kind;
 	}
 }
 

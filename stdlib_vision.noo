@@ -192,9 +192,9 @@ implement Monad List (
 );
 
 # Implement Show for Lists (if elements are showable)
-implement Show (List a) given Show a (
-  show = fn list => "[" + (join ", " (map show list)) + "]"
-);
+#implement Show (List a) given Show a (
+#  show = fn list => "[" + (join ", " (map show list)) + "]"
+#);
 
 # ========================================
 # Constrint implementations for basic types

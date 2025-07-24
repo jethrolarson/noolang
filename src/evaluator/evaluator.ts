@@ -25,7 +25,7 @@ import type {
 	Type,
 } from '../ast';
 import type { TypeState } from '../typer/types';
-import { decorateEnvironmentWithConstraintFunctions } from '../typer/constraint-resolution';
+
 import { createError } from '../errors';
 import { formatValue } from '../format';
 import { Lexer } from '../lexer/lexer';
@@ -41,6 +41,7 @@ export type Value =
 	| { tag: 'function'; fn: (...args: Value[]) => Value }
 	| { tag: 'native'; name: string; fn: unknown }
 	| { tag: 'constructor'; name: string; args: Value[] }
+	| { tag: 'trait-function'; name: string; traitRegistry: any; partialArgs?: Value[] }
 	| { tag: 'unit' };
 
 // --- Mutable Cell type ---
@@ -195,10 +196,12 @@ export class Evaluator {
 	private currentFileDir?: string; // Track the directory of the current file being evaluated
 	private fs: typeof defaultFs;
 	private path: typeof defaultPath;
+	private traitRegistry?: any; // NEW: Trait registry for runtime trait resolution
 
-	constructor(opts?: { fs?: typeof defaultFs; path?: typeof defaultPath }) {
+	constructor(opts?: { fs?: typeof defaultFs; path?: typeof defaultPath; traitRegistry?: any }) {
 		this.fs = opts?.fs ?? defaultFs;
 		this.path = opts?.path ?? defaultPath;
+		this.traitRegistry = opts?.traitRegistry;
 		this.environment = new Map();
 		this.environmentStack = [];
 		this.initializeBuiltins();
@@ -789,25 +792,8 @@ export class Evaluator {
 
 	addConstraintFunctions(typeState: TypeState): void {
 		// Add specialized constraint functions from type checking to runtime environment
-		const decoratedState =
-			decorateEnvironmentWithConstraintFunctions(typeState);
-
-		// Transfer specialized functions to runtime environment
-		for (const [name] of decoratedState.environment) {
-			if (name.startsWith('__')) {
-				// This is a specialized constraint function
-				// For now, create a placeholder function
-				// The actual implementation should come from the typeScheme
-				this.environment.set(
-					name,
-					createFunction(() => {
-						throw new Error(
-							`Specialized constraint function ${name} not implemented in runtime`
-						);
-					})
-				);
-			}
-		}
+		// Legacy constraint system removed - this is now a no-op
+		// TODO: Replace with trait function dispatch when needed
 	}
 
 	private loadStdlib(): void {
@@ -1060,6 +1046,16 @@ export class Evaluator {
 	private evaluateVariable(expr: VariableExpression): Value {
 		const value = this.environment.get(expr.name);
 		if (value === undefined) {
+			// NEW: Check if this is a trait function before throwing error
+			if (this.traitRegistry && this.isTraitFunction(expr.name)) {
+				// Return a special trait function value that will be resolved during application
+				return {
+					tag: 'trait-function',
+					name: expr.name,
+					traitRegistry: this.traitRegistry
+				};
+			}
+			
 			const error = createError(
 				'RuntimeError',
 				`Undefined variable: ${expr.name}`,
@@ -1146,6 +1142,11 @@ export class Evaluator {
 
 	private evaluateApplication(expr: ApplicationExpression): Value {
 		const func = this.evaluateExpression(expr.func);
+
+		// NEW: Handle trait function application
+		if (func.tag === 'trait-function') {
+			return this.evaluateTraitFunctionApplication(func as any, expr.args);
+		}
 
 		// Only apply the function to the arguments present in the AST
 		const args = expr.args;
@@ -1302,7 +1303,7 @@ export class Evaluator {
 		} else if (expr.operator === '|?') {
 			// The |? operator should be desugared to a bind call by the type checker
 			// However, if constraint resolution failed, we might still see |? here
-			// Fall back to calling the stdlib bind function directly
+			// Fall back to calling the trait bind function directly
 			const left = this.evaluateExpression(expr.left);
 			const right = this.evaluateExpression(expr.right);
 
@@ -1313,33 +1314,35 @@ export class Evaluator {
 				);
 			}
 
-			// Try to call the stdlib bind function directly as fallback
-			let bindFunction = this.environment.get('bind');
-			if (bindFunction) {
-				// Handle Cell wrapper
-				if (isCell(bindFunction)) {
-					bindFunction = bindFunction.value;
+			// Try to resolve bind as a trait function
+			if (this.traitRegistry && this.isTraitFunction('bind')) {
+				try {
+					// Use trait function resolution for bind
+					const result = this.resolveTraitFunctionWithArgs('bind', [left, right], this.traitRegistry);
+					if (result) {
+						return this.ensureMonadicResult(result, left);
+					}
+				} catch (e) {
+					// Fall through to legacy lookup
 				}
+			}
 
-				if (isFunction(bindFunction)) {
-					const partiallyApplied = bindFunction.fn(left);
-					if (isFunction(partiallyApplied)) {
-						const result = partiallyApplied.fn(right);
-						// Check if result needs to be wrapped in the monad
-						return this.ensureMonadicResult(result, left);
-					} else if (isNativeFunction(partiallyApplied)) {
-						const result = partiallyApplied.fn(right);
-						return this.ensureMonadicResult(result, left);
+			// If trait resolution failed, try to implement a simple bind for Option types
+			if (isConstructor(left)) {
+				if (left.name === 'None') {
+					return left; // Short-circuit for None
+				} else if (left.name === 'Some' && left.args.length === 1) {
+					// Apply the function to the value inside Some
+					const value = left.args[0];
+					const result = isFunction(right) ? right.fn(value) : right.fn(value);
+					
+					// If the result is already an Option, return it as-is
+					if (isConstructor(result) && (result.name === 'Some' || result.name === 'None')) {
+						return result;
 					}
-				} else if (isNativeFunction(bindFunction)) {
-					const partiallyApplied = bindFunction.fn(left);
-					if (isFunction(partiallyApplied)) {
-						const result = partiallyApplied.fn(right);
-						return this.ensureMonadicResult(result, left);
-					} else if (isNativeFunction(partiallyApplied)) {
-						const result = partiallyApplied.fn(right);
-						return this.ensureMonadicResult(result, left);
-					}
+					
+					// Otherwise wrap it in Some
+					return createConstructor('Some', [result]);
 				}
 			}
 
@@ -1718,37 +1721,100 @@ export class Evaluator {
 	private evaluateConstraintDefinition(
 		expr: ConstraintDefinitionExpression
 	): Value {
-		// Constraint definitions create runtime dispatcher functions for each constraint function
-		for (const func of expr.functions) {
-			// Create a dispatcher function that will resolve to the right implementation at runtime
-			const dispatcherFunction = createFunction((arg: Value) => {
-				// Try to find the specialized function for this argument type
-				const argType = this.getValueTypeName(arg);
-				const specializedName = `__${expr.name}_${func.name}_${argType}`;
-				const specializedImpl = this.environment.get(specializedName);
+		// NEW TRAIT SYSTEM: Constraint definitions don't need runtime registration
+		// The trait functions will be resolved at call sites using the trait registry
+		// This just returns unit - trait definitions are purely for type checking
+		return createUnit();
+	}
 
-				if (specializedImpl) {
-					// Handle cells
-					let impl = specializedImpl;
-					if (isCell(impl)) {
-						impl = impl.value;
-					}
+	// NEW: Check if a function name is a trait function
+	private isTraitFunction(functionName: string): boolean {
+		if (!this.traitRegistry) return false;
+		
+		// Check if any trait defines this function
+		for (const [traitName, traitDef] of this.traitRegistry.definitions) {
+			if (traitDef.functions.has(functionName)) {
+				return true;
+			}
+		}
+		return false;
+	}
 
-					if (isFunction(impl)) {
-						return impl.fn(arg);
-					} else if (isNativeFunction(impl)) {
-						return impl.fn(arg);
-					}
-				}
-
-				throw new Error(`No implementation of ${expr.name} for ${argType}`);
-			});
-
-			// Register the dispatcher under the constraint function name
-			this.environment.set(func.name, dispatcherFunction);
+	// NEW: Handle trait function application at runtime  
+	private evaluateTraitFunctionApplication(traitFunc: any, argExprs: Expression[]): Value {
+		if (!this.traitRegistry) {
+			throw new Error(`No trait registry available for trait function ${traitFunc.name}`);
 		}
 
-		return createUnit();
+		// Evaluate the arguments to get their runtime values
+		const argValues = argExprs.map(arg => this.evaluateExpression(arg));
+		
+		// For partial application, return a curried function that accumulates arguments
+		// until we have enough information to do trait dispatch
+		if (traitFunc.partialArgs) {
+			// This is already a partially applied trait function - add more arguments
+			const allArgs = [...traitFunc.partialArgs, ...argValues];
+			return this.resolveTraitFunctionWithArgs(traitFunc.name, allArgs, traitFunc.traitRegistry);
+		} else {
+			// This is the first application - start accumulating arguments
+			return this.resolveTraitFunctionWithArgs(traitFunc.name, argValues, this.traitRegistry);
+		}
+	}
+
+	private resolveTraitFunctionWithArgs(functionName: string, argValues: Value[], traitRegistry: any): Value {
+		// Get the type names of the arguments for trait resolution
+		const argTypeNames = argValues.map(val => this.getValueTypeName(val));
+		
+		// Try to resolve the trait function based on different arguments
+		// For Functor map: try the last argument (container) first
+		const possibleDispatchIndices = argTypeNames.length > 1 ? [argTypeNames.length - 1, 0] : [0];
+		
+		for (const dispatchIndex of possibleDispatchIndices) {
+			const dispatchTypeName = argTypeNames[dispatchIndex];
+			if (dispatchTypeName === 'Unknown') continue;
+			
+			for (const [traitName, traitDef] of traitRegistry.definitions) {
+				if (traitDef.functions.has(functionName)) {
+					const traitImpls = traitRegistry.implementations.get(traitName);
+					if (traitImpls) {
+						const impl = traitImpls.get(dispatchTypeName);
+						if (impl && impl.functions.has(functionName)) {
+							// Found the implementation! Create a curried function call
+							const implExpr = impl.functions.get(functionName);
+							
+							// Apply the implementation to all accumulated arguments
+							let result: any = this.evaluateExpression(implExpr);
+							for (const argValue of argValues) {
+								if (isFunction(result)) {
+									result = result.fn(argValue);
+								} else if (isNativeFunction(result)) {
+									result = result.fn(argValue);
+								} else {
+									throw new Error(`Cannot apply argument to non-function during trait resolution`);
+								}
+							}
+							return result;
+						}
+					}
+				}
+			}
+		}
+		
+		// If we get here, we don't have enough type info yet - return a partial application
+		// that will try again when more arguments are provided
+		if (argTypeNames.every(t => t === 'Unknown') || argTypeNames.length < 2) {
+			return {
+				tag: 'trait-function',
+				name: functionName,
+				traitRegistry: traitRegistry,
+				partialArgs: argValues
+			};
+		}
+		
+		// No implementation found even with type info
+		const knownTypes = argTypeNames.filter(t => t !== 'Unknown');
+		const typeStr = knownTypes.length > 0 ? knownTypes.join(', ') : 'Unknown';
+		throw new Error(`No implementation of trait function ${functionName} for ${typeStr}`);
 	}
 
 	private getValueTypeName(value: Value): string {
@@ -1771,19 +1837,9 @@ export class Evaluator {
 	private evaluateImplementDefinition(
 		expr: ImplementDefinitionExpression
 	): Value {
-		// Implementation definitions need to register specialized function names
-		// in the runtime environment for type-directed dispatch
-
-		// Generate the type name from the type expression
-		const typeName = this.typeExpressionToString(expr.typeExpr);
-
-		// Register each implementation with a specialized name
-		for (const impl of expr.implementations) {
-			const specializedName = `__${expr.constraintName}_${impl.name}_${typeName}`;
-			const implementation = this.evaluateExpression(impl.value);
-			this.environment.set(specializedName, implementation);
-		}
-
+		// NEW TRAIT SYSTEM: Implementation definitions don't need runtime registration
+		// The trait implementations are stored in the trait registry during type checking
+		// and resolved at call sites. This just returns unit.
 		return createUnit();
 	}
 
