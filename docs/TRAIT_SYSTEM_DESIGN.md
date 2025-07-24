@@ -127,15 +127,22 @@ map_increment = map (fn x => x + 1);  # : f Int -> f Int given f implements Func
 3. ✅ Modify type inference to handle constraint propagation
 4. ✅ Implement basic constraint unification rules
 
-### Phase 2: Nominal Traits ✅ COMPLETE
+### Phase 2: Nominal Traits ✅ MOSTLY COMPLETE
 1. ✅ Parse `constraint` and `implement` definitions
 2. ✅ Implement trait function dispatch in variable lookup
 3. ✅ Support basic traits: `Functor`, `Show`, `Eq` (Monad pending)
 4. ✅ Handle partial application with constraint propagation
 5. ✅ **Parser fixes**: Right-associative `->`, type constructor variables (`f a`), correct match syntax
 6. ✅ **Remove type whitelisting**: Support complex types in implement definitions (`List Int`, `a -> b`, etc.)
+7. ⚠️ **Critical gap found**: Type checking works, but evaluator integration incomplete
 
-### Phase 3: Structural Constraints ⏳ NEXT
+### Phase 2.5: Evaluator Integration ⚠️ CRITICAL
+1. **Fix trait-evaluator integration**: Update evaluator to use new trait system instead of old constraint dispatchers
+2. **Resolve built-in function conflicts**: Handle cases where trait functions conflict with built-ins like `map`
+3. **End-to-end trait execution**: Ensure `map (fn x => x + 1) [1, 2, 3]` works in evaluation, not just type checking
+4. **Testing**: Comprehensive integration tests for type checking + evaluation
+
+### Phase 3: Structural Constraints ⏳ LATER
 1. Implement `HasField` constraint for record accessors
 2. Add `@field` syntax sugar (`@key` → `accessor "key"`)
 3. Support record type inference with field constraints
@@ -276,12 +283,16 @@ Error: Cannot resolve constraint: m implements Monad
 ## Implementation Summary
 
 ### ✅ What Works Now
-1. **Basic trait function dispatch**: `show 42` → `"42"`
+1. **Basic trait function dispatch**: `show 42` → `"42"` (type checking + evaluation)
 2. **Complex function types**: `(a -> b) -> f a -> f b` parses correctly
 3. **Multiline syntax**: Constraint and implement definitions work across multiple lines
-4. **Type inference**: Trait calls are properly type-checked
-5. **Core traits**: `Show`, `Eq`, and `Functor` implemented and tested
+4. **Type inference**: Trait calls are properly type-checked ✅
+5. **Core traits**: `Show`, `Eq`, and `Functor` defined and registered
 6. **Complex type implementations**: `implement Show (List Int)`, `implement Show (a -> b)`, etc.
+
+### ⚠️ What's Partially Working
+1. **Built-in type traits**: `map [1, 2, 3]` type checks ✅ but evaluation fails ❌
+2. **Stdlib integration**: Traits load correctly but don't execute due to evaluator gap
 
 ### 🎯 Key Achievement
 **The target goal `map increment (Some 1)` is now working!**
