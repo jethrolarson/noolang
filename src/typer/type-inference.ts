@@ -104,6 +104,19 @@ export const typeVariableExpr = (
 			// Get the trait function's type and constraint information
 			const traitInfo = getTraitFunctionInfo(state.traitRegistry, expr.name);
 			if (traitInfo) {
+				// Check if there are any implementations for this trait
+				const implementations = state.traitRegistry.implementations.get(traitInfo.traitName);
+				const hasImplementations = implementations && implementations.size > 0;
+				
+				// If there are implementations, use the old monomorphic behavior for backward compatibility
+				// If there are no implementations, use the new polymorphic ConstrainedType behavior
+				if (hasImplementations) {
+					// Old behavior: return a generic function type without constraints
+					const [argType, state1] = freshTypeVariable(state);
+					const [returnType, state2] = freshTypeVariable(state1);
+					const traitFunctionType = functionType([argType], returnType, emptyEffects());
+					return createPureTypeResult(traitFunctionType, state2);
+				}
 				// Create fresh type variables for the trait function type
 				const typeVarMapping = new Map<string, Type>();
 				
