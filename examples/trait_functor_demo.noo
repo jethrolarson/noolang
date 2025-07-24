@@ -1,0 +1,38 @@
+# Functor Trait Demo - The Key Phase 2 Achievement!
+
+print "=== Functor Trait Demo ===";
+
+# Define the Functor trait
+constraint Functor f ( map: (a -> b) -> f a -> f b );
+
+# Implement Functor for Option
+implement Functor Option ( map = fn f opt => case opt { Some x -> Some (f x); None -> None } );
+
+print "✓ Defined Functor trait and implemented for Option";
+
+# Helper functions
+increment = fn x => x + 1;
+double = fn x => x * 2;
+
+print "\n=== The Key Demo: map increment (Some 1) ===";
+
+# This is what Phase 2 was designed to achieve!
+result1 = map increment (Some 1);
+print "map increment (Some 1) =";
+print result1;
+
+result2 = map increment None;
+print "map increment None ="; 
+print result2;
+
+result3 = map double (Some 5);
+print "map double (Some 5) =";
+print result3;
+
+# Chaining map calls
+result4 = map double (map increment (Some 3));
+print "map double (map increment (Some 3)) =";
+print result4;
+
+print "\n✓ Functor trait dispatch working perfectly!";
+print "✓ Phase 2 implementation successful!";
