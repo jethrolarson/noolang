@@ -56,11 +56,7 @@ import {
 	createTypeResult,
 	unionEffects,
 	emptyEffects,
-	addConstraintDefinition,
-	addConstraintImplementation,
-	getConstraintSignature,
-	type ConstraintSignature,
-	type ConstraintImplementation,
+	// Legacy constraint imports removed
 	type TypeScheme,
 } from './types';
 // NOTE: validateConstraintName import removed - constraint validation disabled
@@ -976,7 +972,7 @@ export const typeConstraintDefinition = (
 ): TypeResult => {
 	const { name, typeParams, functions } = expr;
 
-	// Create constraint signature
+	// Create trait definition
 	const functionMap = new Map<string, Type>();
 
 	for (const func of functions) {
@@ -985,14 +981,15 @@ export const typeConstraintDefinition = (
 		functionMap.set(func.name, funcType);
 	}
 
-	const signature: ConstraintSignature = {
+	const traitDef = {
 		name,
-		typeParams,
+		typeParam: typeParams.length > 0 ? typeParams[0] : 'a', // Use first type param or default to 'a'
 		functions: functionMap,
 	};
 
-	// Add to constraint registry
-	addConstraintDefinition(state.constraintRegistry, name, signature);
+	// Add to trait registry using the new trait system
+	const { addTraitDefinition } = require('./trait-system');
+	addTraitDefinition(state.traitRegistry, traitDef);
 
 	// Constraint definitions have unit type
 	return createPureTypeResult(unitType(), state);
@@ -1018,30 +1015,27 @@ export const typeImplementDefinition = (
 		);
 	}
 
-	// Check if constraint exists
-	const constraintSig = getConstraintSignature(
-		state.constraintRegistry,
-		constraintName
-	);
-	if (!constraintSig) {
-		throw new Error(`Constraint '${constraintName}' not defined`);
+	// Check if trait exists in trait registry
+	const traitDef = state.traitRegistry.definitions.get(constraintName);
+	if (!traitDef) {
+		throw new Error(`Trait '${constraintName}' not defined`);
 	}
 
-	// Type each implementation
-	const implementationMap = new Map<string, TypeScheme>();
+	// Type each implementation and store as expressions
+	const implementationMap = new Map<string, Expression>();
 	let currentState = state;
 	let allEffects = emptyEffects();
 
 	for (const impl of implementations) {
-		// Check if function is required by constraint
-		const requiredType = constraintSig.functions.get(impl.name);
+		// Check if function is required by trait
+		const requiredType = traitDef.functions.get(impl.name);
 		if (!requiredType) {
 			throw new Error(
-				`Function '${impl.name}' not required by constraint '${constraintName}'`
+				`Function '${impl.name}' not required by trait '${constraintName}'`
 			);
 		}
 
-		// Type the implementation
+		// Type the implementation to ensure it's valid
 		const implResult = typeExpression(impl.value, currentState);
 		currentState = implResult.state;
 		allEffects = unionEffects(allEffects, implResult.effects);
@@ -1049,16 +1043,12 @@ export const typeImplementDefinition = (
 		// TODO: Check that implementation type matches required type
 		// For now, we'll trust the implementation
 
-		// Store in implementation map
-		implementationMap.set(impl.name, {
-			type: implResult.type,
-			quantifiedVars: [], // TODO: compute quantified variables
-			effects: implResult.effects,
-		});
+		// Store the expression (not the type scheme)
+		implementationMap.set(impl.name, impl.value);
 	}
 
 	// Check that all required functions are implemented
-	for (const [funcName] of constraintSig.functions) {
+	for (const [funcName] of traitDef.functions) {
 		if (!implementationMap.has(funcName)) {
 			throw new Error(
 				`Missing implementation for '${funcName}' in implementation of '${constraintName}' for '${typeName}'`
@@ -1066,24 +1056,15 @@ export const typeImplementDefinition = (
 		}
 	}
 
-	// Create constraint implementation
-	const implementation: ConstraintImplementation = {
+	// Create trait implementation
+	const traitImpl = {
+		typeName,
 		functions: implementationMap,
 	};
 
-	// Add to constraint registry
-	const success = addConstraintImplementation(
-		currentState.constraintRegistry,
-		constraintName,
-		typeName,
-		implementation
-	);
-
-	if (!success) {
-		throw new Error(
-			`Failed to add implementation of '${constraintName}' for '${typeName}'`
-		);
-	}
+	// Add to trait registry using the new trait system
+	const { addTraitImplementation } = require('./trait-system');
+	addTraitImplementation(currentState.traitRegistry, constraintName, traitImpl);
 
 	// Implement definitions have unit type
 	return createTypeResult(unitType(), allEffects, currentState);

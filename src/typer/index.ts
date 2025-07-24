@@ -68,7 +68,7 @@ export { typeMatch, typeTypeDefinition } from './pattern-matching';
 export { typeAndDecorate } from './decoration';
 
 // Re-export helper functions from their modules
-export { validateAllSubstitutionConstraints } from './constraints';
+// Legacy constraint exports removed
 // Export the main program typing function
 export const typeProgram = (program: Program): TypeResult => {
 	let state = createTypeState();

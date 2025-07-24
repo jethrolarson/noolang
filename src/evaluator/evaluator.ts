@@ -25,7 +25,7 @@ import type {
 	Type,
 } from '../ast';
 import type { TypeState } from '../typer/types';
-import { decorateEnvironmentWithConstraintFunctions } from '../typer/constraint-resolution';
+
 import { createError } from '../errors';
 import { formatValue } from '../format';
 import { Lexer } from '../lexer/lexer';
@@ -789,25 +789,8 @@ export class Evaluator {
 
 	addConstraintFunctions(typeState: TypeState): void {
 		// Add specialized constraint functions from type checking to runtime environment
-		const decoratedState =
-			decorateEnvironmentWithConstraintFunctions(typeState);
-
-		// Transfer specialized functions to runtime environment
-		for (const [name] of decoratedState.environment) {
-			if (name.startsWith('__')) {
-				// This is a specialized constraint function
-				// For now, create a placeholder function
-				// The actual implementation should come from the typeScheme
-				this.environment.set(
-					name,
-					createFunction(() => {
-						throw new Error(
-							`Specialized constraint function ${name} not implemented in runtime`
-						);
-					})
-				);
-			}
-		}
+		// Legacy constraint system removed - this is now a no-op
+		// TODO: Replace with trait function dispatch when needed
 	}
 
 	private loadStdlib(): void {

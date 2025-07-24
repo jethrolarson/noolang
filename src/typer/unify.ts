@@ -10,7 +10,7 @@ import {
 } from './type-errors';
 import { Constraint } from '../ast';
 import { mapSet, typeToString, occursIn } from './helpers';
-import { satisfiesConstraint, propagateConstraintToType } from './constraints';
+// Legacy constraint imports removed
 import { functionApplicationError } from './type-errors';
 
 // Performance tracking
