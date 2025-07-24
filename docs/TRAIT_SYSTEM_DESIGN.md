@@ -6,7 +6,7 @@ This document outlines the design and implementation plan for Noolang's trait sy
 
 ## Current Status
 
-**IMPORTANT**: Phase 2.5 implementation is complete and fully functional (2024-12):
+**IMPORTANT**: Phase 2.5 implementation is complete for monomorphic trait dispatch (2024-12):
 
 - ✅ **Legacy System Removed**: All old constraint files gutted, tests marked as skipped
 - ✅ **Core ADT/Generic Foundation**: Basic ADTs, generics, higher-order functions, and partial application work well
@@ -15,6 +15,21 @@ This document outlines the design and implementation plan for Noolang's trait sy
 - ✅ **Phase 2 Complete**: Nominal traits implemented - `map increment (Some 1)` works!
 - ✅ **Parser Issues Fixed**: Right-associative function types, type constructor variables, and multiline syntax
 - ✅ **Phase 2.5 Complete**: Evaluator integration fixed - end-to-end trait execution working!
+- ✅ **REPL Integration**: All trait functions now available in REPL
+
+## Phase 2 Limitations Identified
+
+**⚠️ Polymorphic Trait Functions Not Supported**:
+- `pure 1` should have type `m Int where Monad m` but returns `<unknown> : α`
+- Constrained expressions as first-class values not implemented
+- This affects: `pure`, `bind`, and other polymorphic trait functions
+- **Root cause**: Our trait dispatch is monomorphic - it requires concrete type information at call time
+
+**⚠️ Missing Work for Complete Phase 2**:
+1. **Constraint propagation**: Support for constrained types like `m Int where Monad m`
+2. **Lazy constraint resolution**: Allow unresolved constraints to exist as values
+3. **Constraint unification**: Merge and resolve constraints during type inference
+4. **Polymorphic trait dispatch**: Handle cases where type isn't fully determined at call time
 
 ## Why We're Rebuilding
 
@@ -31,7 +46,7 @@ The previous constraint system was "a mess of half built stuff and old assumptio
 3. **Constrained Polymorphism**: Support generic functions with trait bounds
 4. **First-class Constraints**: Allow unresolved constrained expressions to exist as values
 
-## Key Examples (Working!)
+## Key Examples
 
 ```noo
 # Trait definition
@@ -52,13 +67,15 @@ constraint Show a ( show : a -> String );
 implement Show Int ( show = toString );
 result = show 42;  # → "42"
 
-# Future: Constrained expressions as first-class values (Phase 3+)
-x = pure 1;              # x : m Int given m implements Monad
-head x;                  # Forces x to List Int, returns Option Int
-option_get_or 2 x;       # Forces x to Option Int, returns Int
+# ❌ NOT WORKING: Constrained expressions as first-class values (needs Phase 2 completion)
+x = pure 1;              # Should be: x : m Int given m implements Monad
+                         # Currently: x : α (unknown)
+head x;                  # Should force x to List Int, returns Option Int
+option_get_or 2 x;       # Should force x to Option Int, returns Int
 
-# Future: Partial application preserves constraints (Phase 3+)
-map_increment = map (fn x => x + 1);  # : f Int -> f Int given f implements Functor
+# ❌ NOT WORKING: Partial application preserves constraints (needs Phase 2 completion)
+map_increment = map (fn x => x + 1);  # Should be: f Int -> f Int given f implements Functor
+                                      # Currently: works but no constraint propagation
 
 # Future: Accessor constraints (Phase 3)
 @name;                   # : r -> a given r implements HasField "name" a
@@ -128,31 +145,40 @@ map_increment = map (fn x => x + 1);  # : f Int -> f Int given f implements Func
 3. ✅ Modify type inference to handle constraint propagation
 4. ✅ Implement basic constraint unification rules
 
-### Phase 2: Nominal Traits ✅ MOSTLY COMPLETE
+### Phase 2: Nominal Traits ⚠️ PARTIALLY COMPLETE
 1. ✅ Parse `constraint` and `implement` definitions
 2. ✅ Implement trait function dispatch in variable lookup
-3. ✅ Support basic traits: `Functor`, `Show`, `Eq` (Monad pending)
-4. ✅ Handle partial application with constraint propagation
-5. ✅ **Parser fixes**: Right-associative `->`, type constructor variables (`f a`), correct match syntax
-6. ✅ **Remove type whitelisting**: Support complex types in implement definitions (`List Int`, `a -> b`, etc.)
-7. ⚠️ **Critical gap found**: Type checking works, but evaluator integration incomplete
+3. ✅ Support basic traits: `Functor`, `Show`, `Eq` (monomorphic cases)
+4. ❌ **Missing**: Handle polymorphic trait functions like `pure`, `bind`
+5. ❌ **Missing**: Constrained types and constraint propagation
+6. ❌ **Missing**: Lazy constraint resolution for first-class constrained values
+7. ✅ **Parser fixes**: Right-associative `->`, type constructor variables (`f a`), correct match syntax
+8. ✅ **Remove type whitelisting**: Support complex types in implement definitions (`List Int`, `a -> b`, etc.)
 
 ### Phase 2.5: Evaluator Integration ✅ COMPLETE
 1. ✅ **Fix trait-evaluator integration**: Updated evaluator to use new trait system instead of old constraint dispatchers
 2. ✅ **Resolve built-in function conflicts**: Implemented runtime trait function resolution with partial application support
 3. ✅ **End-to-end trait execution**: `map (fn x => x + 1) [1, 2, 3]` now works perfectly in both type checking and evaluation
 4. ✅ **Testing**: Full integration working - see `examples/trait_truly_multiline_demo.noo` for comprehensive examples
+5. ✅ **REPL integration**: All trait functions now available in REPL
+
+### Phase 2 Completion Tasks ⏳ NEXT
+1. **Implement constrained types**: Extend type system to support `m Int where Monad m`
+2. **Add constraint propagation**: Constraints flow through type inference and unification
+3. **Implement lazy constraint resolution**: Allow unresolved constraints as first-class values
+4. **Polymorphic trait dispatch**: Handle trait functions without concrete type information
+5. **Constraint unification**: Merge constraints during type inference
+6. **Fix `pure`, `bind`, and other polymorphic trait functions**
 
 ### Phase 3: Structural Constraints ⏳ LATER
 1. Implement `HasField` constraint for record accessors
 2. Add `@field` syntax sugar (`@key` → `accessor "key"`)
 3. Support record type inference with field constraints
 
-### Phase 4: Polish
+### Phase 4: Polish ⏳ LATER
 1. Improve error messages with constraint origin tracking
 2. Runtime constraint representation for REPL
 3. Optimization and performance improvements
-4. Add `Monad` trait support
 
 ## Type System Extensions
 
@@ -283,23 +309,32 @@ Error: Cannot resolve constraint: m implements Monad
 
 ## Implementation Summary
 
-### ✅ What Works Now
+### ✅ What Works Now (Monomorphic Trait Dispatch)
 1. **Basic trait function dispatch**: `show 42` → `"42"` (type checking + evaluation)
 2. **Complex function types**: `(a -> b) -> f a -> f b` parses correctly
 3. **Multiline syntax**: Constraint and implement definitions work across multiple lines
 4. **Type inference**: Trait calls are properly type-checked ✅
-5. **Core traits**: `Show`, `Eq`, and `Functor` defined and registered
+5. **Core traits**: `Show`, `Eq`, and `Functor` defined and registered for concrete types
 6. **Complex type implementations**: `implement Show (List Int)`, `implement Show (a -> b)`, etc.
+7. **Built-in type traits**: `map [1, 2, 3]` type checks ✅ and evaluation works ✅
+8. **Stdlib integration**: All traits load correctly and execute properly
+9. **Partial application**: `map increment` returns a partially applied function that works with any container
+10. **Multi-type support**: Works with `Option`, `List`, `Result`, and all primitive types
+11. **End-to-end pipeline**: Type checking → trait resolution → evaluation all working seamlessly
+12. **REPL integration**: All trait functions available in interactive mode
 
-### ✅ What's Fully Working
-1. **Built-in type traits**: `map [1, 2, 3]` type checks ✅ and evaluation works ✅
-2. **Stdlib integration**: All traits load correctly and execute properly
-3. **Partial application**: `map increment` returns a partially applied function that works with any container
-4. **Multi-type support**: Works with `Option`, `List`, `Result`, and all primitive types
-5. **End-to-end pipeline**: Type checking → trait resolution → evaluation all working seamlessly
+### ❌ What's Missing (Polymorphic Constraint Support)
+1. **Constrained types**: `pure 1` should have type `m Int where Monad m`
+2. **Constraint propagation**: Constraints should flow through expressions
+3. **Lazy constraint resolution**: Unresolved constraints should exist as first-class values
+4. **Polymorphic trait dispatch**: Handle trait functions without concrete type information
+5. **Complex monadic operations**: `bind`, `pure`, and composition of polymorphic functions
 
 ### 🎯 Key Achievement
 **The target goal `map increment (Some 1)` is now working!**
+
+### 🎯 Current Limitation
+**Polymorphic trait functions like `pure 1` don't work yet - this is the main Phase 2 completion task.**
 
 ### 🔧 Parser Fixes Applied
 During Phase 2 implementation, several critical parser issues were identified and fixed:
@@ -316,6 +351,13 @@ See `examples/trait_truly_multiline_demo.noo` and `examples/minimal_trait_test.n
 
 ## Next Steps for Implementation
 
+**Priority 1 - Complete Phase 2**:
+1. **Implement constrained types**: Add support for `m Int where Monad m` type representation
+2. **Add constraint propagation**: Constraints flow through type inference and unification
+3. **Implement lazy constraint resolution**: Allow unresolved constraints as first-class values
+4. **Fix polymorphic trait functions**: Make `pure 1`, `bind`, etc. work correctly
+
+**Priority 2 - Phase 3**:
 1. **Phase 3**: Implement structural constraints (`HasField`)
 2. **Add Monad trait**: Complete the core trait collection
 3. **Improve error messages**: Better constraint resolution error reporting
