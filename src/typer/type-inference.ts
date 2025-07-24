@@ -176,43 +176,15 @@ export const typeVariableExpr = (
 				const [freshenedType, state1] = freshenType(traitInfo.functionType, state);
 				
 				// Create constraints for any type variables that correspond to the trait type parameter
-				// For pure : a -> m a, we need to add constraint "m implements Monad"
+				// We need to find which freshened type variable corresponds to the original trait type parameter
 				const constraintsMap = new Map<string, Array<{ kind: 'implements'; trait: string }>>();
 				
-				// Find type variables in the freshened type that should have constraints
-				const addConstraintsToType = (type: Type): Type => {
-					switch (type.kind) {
-						case 'variable':
-							// If this variable name matches the trait type parameter position, add constraint
-							// For "pure : a -> m a", the 'm' parameter gets the Monad constraint
-							if (traitInfo.typeParam === 'm' || traitInfo.typeParam === 'f') {
-								// This is a heuristic: if we see a return type that's a type application,
-								// the outer type variable should get the constraint
-								constraintsMap.set(type.name, [{ kind: 'implements', trait: traitInfo.traitName }]);
-							}
-							return type;
-						case 'function':
-							// For function types, we need to examine the return type
-							// to find the constrained type variable
-							return type;
-						default:
-							return type;
-					}
-				};
-				
-				// For now, let's handle the specific case of pure : a -> m a
-				// We need to add the constraint to the type variable representing 'm'
-				if (expr.name === 'pure' && freshenedType.kind === 'function') {
-					// pure has type a -> m a, so the return type should get the constraint
-					// The return type might be a variant type (m a) where m is the constrained type
-					if (freshenedType.return.kind === 'variable') {
-						constraintsMap.set(freshenedType.return.name, [{ kind: 'implements', trait: traitInfo.traitName }]);
-					} else if (freshenedType.return.kind === 'variant') {
-						// For variant types like "m a", the constraint applies to the variant name 'm'
-						// The variant name is now a fresh type variable name from typeVarMapping
-						constraintsMap.set(freshenedType.return.name, [{ kind: 'implements', trait: traitInfo.traitName }]);
-					}
+				// Find the freshened type variable that corresponds to the trait type parameter
+				const traitTypeParamVar = typeVarMapping.get(traitInfo.typeParam);
+				if (traitTypeParamVar && traitTypeParamVar.kind === 'variable') {
+					constraintsMap.set(traitTypeParamVar.name, [{ kind: 'implements', trait: traitInfo.traitName }]);
 				}
+
 				
 				// If we have constraints, create a ConstrainedType
 				if (constraintsMap.size > 0) {

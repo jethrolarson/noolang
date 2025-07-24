@@ -17,19 +17,21 @@ This document outlines the design and implementation plan for Noolang's trait sy
 - ✅ **Phase 2.5 Complete**: Evaluator integration fixed - end-to-end trait execution working!
 - ✅ **REPL Integration**: All trait functions now available in REPL
 
-## Phase 2 Limitations Identified
+## Phase 2 Complete! ✅
 
-**⚠️ Polymorphic Trait Functions Not Supported**:
-- `pure 1` should have type `m Int where Monad m` but returns `<unknown> : α`
-- Constrained expressions as first-class values not implemented
-- This affects: `pure`, `bind`, and other polymorphic trait functions
-- **Root cause**: Our trait dispatch is monomorphic - it requires concrete type information at call time
+**Phase 2 Polymorphic Trait Functions Now Working**:
+- ✅ `pure 1` correctly has type `α2 Int given α2 implements Monad`
+- ✅ `map increment` correctly has type `(α6 Int) -> α6 Int given α6 implements Functor`
+- ✅ Constrained polymorphic types fully supported
+- ✅ Constraint propagation through function application working
+- ✅ Partial application preserves constraints correctly
 
-**⚠️ Missing Work for Complete Phase 2**:
-1. **Constraint propagation**: Support for constrained types like `m Int where Monad m`
-2. **Lazy constraint resolution**: Allow unresolved constraints to exist as values
-3. **Constraint unification**: Merge and resolve constraints during type inference
-4. **Polymorphic trait dispatch**: Handle cases where type isn't fully determined at call time
+**Phase 2 Implementation Complete**:
+1. ✅ **Constraint propagation**: Support for constrained types like `m Int where Monad m`
+2. ✅ **ConstrainedType infrastructure**: Proper type creation and constraint preservation
+3. ✅ **Function application handling**: ConstrainedType support in type inference
+4. ✅ **Polymorphic trait function types**: Proper constraint detection and mapping
+5. ✅ **Type display**: Constraints shown correctly in REPL output
 
 ## Why We're Rebuilding
 
