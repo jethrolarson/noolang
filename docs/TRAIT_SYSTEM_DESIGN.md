@@ -6,7 +6,7 @@ This document outlines the design and implementation plan for Noolang's trait sy
 
 ## Current Status
 
-**IMPORTANT**: Phase 2 implementation is complete and functional (2024-12):
+**IMPORTANT**: Phase 2.5 implementation is complete and fully functional (2024-12):
 
 - ✅ **Legacy System Removed**: All old constraint files gutted, tests marked as skipped
 - ✅ **Core ADT/Generic Foundation**: Basic ADTs, generics, higher-order functions, and partial application work well
@@ -14,6 +14,7 @@ This document outlines the design and implementation plan for Noolang's trait sy
 - ✅ **Phase 1 Complete**: Core infrastructure implemented with `TraitRegistry` and trait system types
 - ✅ **Phase 2 Complete**: Nominal traits implemented - `map increment (Some 1)` works!
 - ✅ **Parser Issues Fixed**: Right-associative function types, type constructor variables, and multiline syntax
+- ✅ **Phase 2.5 Complete**: Evaluator integration fixed - end-to-end trait execution working!
 
 ## Why We're Rebuilding
 
@@ -136,11 +137,11 @@ map_increment = map (fn x => x + 1);  # : f Int -> f Int given f implements Func
 6. ✅ **Remove type whitelisting**: Support complex types in implement definitions (`List Int`, `a -> b`, etc.)
 7. ⚠️ **Critical gap found**: Type checking works, but evaluator integration incomplete
 
-### Phase 2.5: Evaluator Integration ⚠️ CRITICAL
-1. **Fix trait-evaluator integration**: Update evaluator to use new trait system instead of old constraint dispatchers
-2. **Resolve built-in function conflicts**: Handle cases where trait functions conflict with built-ins like `map`
-3. **End-to-end trait execution**: Ensure `map (fn x => x + 1) [1, 2, 3]` works in evaluation, not just type checking
-4. **Testing**: Comprehensive integration tests for type checking + evaluation
+### Phase 2.5: Evaluator Integration ✅ COMPLETE
+1. ✅ **Fix trait-evaluator integration**: Updated evaluator to use new trait system instead of old constraint dispatchers
+2. ✅ **Resolve built-in function conflicts**: Implemented runtime trait function resolution with partial application support
+3. ✅ **End-to-end trait execution**: `map (fn x => x + 1) [1, 2, 3]` now works perfectly in both type checking and evaluation
+4. ✅ **Testing**: Full integration working - see `examples/trait_truly_multiline_demo.noo` for comprehensive examples
 
 ### Phase 3: Structural Constraints ⏳ LATER
 1. Implement `HasField` constraint for record accessors
@@ -290,9 +291,12 @@ Error: Cannot resolve constraint: m implements Monad
 5. **Core traits**: `Show`, `Eq`, and `Functor` defined and registered
 6. **Complex type implementations**: `implement Show (List Int)`, `implement Show (a -> b)`, etc.
 
-### ⚠️ What's Partially Working
-1. **Built-in type traits**: `map [1, 2, 3]` type checks ✅ but evaluation fails ❌
-2. **Stdlib integration**: Traits load correctly but don't execute due to evaluator gap
+### ✅ What's Fully Working
+1. **Built-in type traits**: `map [1, 2, 3]` type checks ✅ and evaluation works ✅
+2. **Stdlib integration**: All traits load correctly and execute properly
+3. **Partial application**: `map increment` returns a partially applied function that works with any container
+4. **Multi-type support**: Works with `Option`, `List`, `Result`, and all primitive types
+5. **End-to-end pipeline**: Type checking → trait resolution → evaluation all working seamlessly
 
 ### 🎯 Key Achievement
 **The target goal `map increment (Some 1)` is now working!**

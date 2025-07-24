@@ -41,7 +41,7 @@ export type Value =
 	| { tag: 'function'; fn: (...args: Value[]) => Value }
 	| { tag: 'native'; name: string; fn: unknown }
 	| { tag: 'constructor'; name: string; args: Value[] }
-	| { tag: 'trait-function'; name: string; traitRegistry: any }
+	| { tag: 'trait-function'; name: string; traitRegistry: any; partialArgs?: Value[] }
 	| { tag: 'unit' };
 
 // --- Mutable Cell type ---
@@ -1738,7 +1738,7 @@ export class Evaluator {
 		return false;
 	}
 
-	// NEW: Handle trait function application at runtime
+	// NEW: Handle trait function application at runtime  
 	private evaluateTraitFunctionApplication(traitFunc: any, argExprs: Expression[]): Value {
 		if (!this.traitRegistry) {
 			throw new Error(`No trait registry available for trait function ${traitFunc.name}`);
@@ -1747,37 +1747,72 @@ export class Evaluator {
 		// Evaluate the arguments to get their runtime values
 		const argValues = argExprs.map(arg => this.evaluateExpression(arg));
 		
+		// For partial application, return a curried function that accumulates arguments
+		// until we have enough information to do trait dispatch
+		if (traitFunc.partialArgs) {
+			// This is already a partially applied trait function - add more arguments
+			const allArgs = [...traitFunc.partialArgs, ...argValues];
+			return this.resolveTraitFunctionWithArgs(traitFunc.name, allArgs, traitFunc.traitRegistry);
+		} else {
+			// This is the first application - start accumulating arguments
+			return this.resolveTraitFunctionWithArgs(traitFunc.name, argValues, this.traitRegistry);
+		}
+	}
+
+	private resolveTraitFunctionWithArgs(functionName: string, argValues: Value[], traitRegistry: any): Value {
 		// Get the type names of the arguments for trait resolution
 		const argTypeNames = argValues.map(val => this.getValueTypeName(val));
 		
-		// Try to resolve the trait function
-		for (const [traitName, traitDef] of this.traitRegistry.definitions) {
-			if (traitDef.functions.has(traitFunc.name)) {
-				// Check if we have an implementation for the first argument's type
-				const traitImpls = this.traitRegistry.implementations.get(traitName);
-				if (traitImpls && argTypeNames.length > 0) {
-					const impl = traitImpls.get(argTypeNames[0]);
-					if (impl && impl.functions.has(traitFunc.name)) {
-						// Found the implementation! Evaluate it with the arguments
-						const implExpr = impl.functions.get(traitFunc.name);
-						
-						// Create an application expression with the implementation
-						const appExpr: ApplicationExpression = {
-							kind: 'application',
-							func: implExpr,
-							args: argExprs,
-							location: { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } }
-						};
-						
-						return this.evaluateApplication(appExpr);
+		// Try to resolve the trait function based on different arguments
+		// For Functor map: try the last argument (container) first
+		const possibleDispatchIndices = argTypeNames.length > 1 ? [argTypeNames.length - 1, 0] : [0];
+		
+		for (const dispatchIndex of possibleDispatchIndices) {
+			const dispatchTypeName = argTypeNames[dispatchIndex];
+			if (dispatchTypeName === 'Unknown') continue;
+			
+			for (const [traitName, traitDef] of traitRegistry.definitions) {
+				if (traitDef.functions.has(functionName)) {
+					const traitImpls = traitRegistry.implementations.get(traitName);
+					if (traitImpls) {
+						const impl = traitImpls.get(dispatchTypeName);
+						if (impl && impl.functions.has(functionName)) {
+							// Found the implementation! Create a curried function call
+							const implExpr = impl.functions.get(functionName);
+							
+							// Apply the implementation to all accumulated arguments
+							let result: any = this.evaluateExpression(implExpr);
+							for (const argValue of argValues) {
+								if (isFunction(result)) {
+									result = result.fn(argValue);
+								} else if (isNativeFunction(result)) {
+									result = result.fn(argValue);
+								} else {
+									throw new Error(`Cannot apply argument to non-function during trait resolution`);
+								}
+							}
+							return result;
+						}
 					}
 				}
 			}
 		}
 		
-		// No implementation found
-		const argTypeName = argTypeNames.length > 0 ? argTypeNames[0] : 'Unknown';
-		throw new Error(`No implementation of trait function ${traitFunc.name} for ${argTypeName}`);
+		// If we get here, we don't have enough type info yet - return a partial application
+		// that will try again when more arguments are provided
+		if (argTypeNames.every(t => t === 'Unknown') || argTypeNames.length < 2) {
+			return {
+				tag: 'trait-function',
+				name: functionName,
+				traitRegistry: traitRegistry,
+				partialArgs: argValues
+			};
+		}
+		
+		// No implementation found even with type info
+		const knownTypes = argTypeNames.filter(t => t !== 'Unknown');
+		const typeStr = knownTypes.length > 0 ? knownTypes.join(', ') : 'Unknown';
+		throw new Error(`No implementation of trait function ${functionName} for ${typeStr}`);
 	}
 
 	private getValueTypeName(value: Value): string {
