@@ -21,10 +21,15 @@ This document outlines the design and implementation plan for Noolang's trait sy
 
 **Phase 2 Polymorphic Trait Functions Now Working**:
 - ✅ `pure 1` correctly has type `α2 Int given α2 implements Monad`
-- ✅ `map increment` correctly has type `(α6 Int) -> α6 Int given α6 implements Functor`
-- ✅ Constrained polymorphic types fully supported
-- ✅ Constraint propagation through function application working
-- ✅ Partial application preserves constraints correctly
+- ✅ `map increment` correctly has type `(α6 Int) -> α6 Int given α6 implements Functor`  
+- ✅ Constrained polymorphic types properly created and preserved
+- ✅ Function application with constraints works for polymorphic functions
+- ✅ Trait functions display as `<function>` instead of `<unknown>`
+
+**Phase 2 Limitation Identified**:
+- ❌ **Constraint resolution during unification**: `map (fn x => x + 1) [1,2,3]` fails
+- **Issue**: Cannot unify `(α Int) -> α Int given α implements Functor` with `List Int` 
+- **Needs**: Phase 3 constraint resolution to resolve `α = List` from `implement Functor List`
 
 **Phase 2 Implementation Complete**:
 1. ✅ **Constraint propagation**: Support for constrained types like `m Int where Monad m`
@@ -172,7 +177,20 @@ map_increment = map (fn x => x + 1);  # Should be: f Int -> f Int given f implem
 5. **Constraint unification**: Merge constraints during type inference
 6. **Fix `pure`, `bind`, and other polymorphic trait functions**
 
-### Phase 3: Structural Constraints ⏳ LATER
+### Phase 3: Constraint Resolution ⏳ NEXT
+**Critical Missing Feature**: Constraint resolution during type unification
+1. **Implement constraint resolution during unification**:
+   - When unifying `(α Int) -> α Int given α implements Functor` with `List Int`
+   - System should resolve `α = List` using `implement Functor List`
+   - Test case: `map (fn x => x + 1) [1,2,3]` should work
+2. **Add constraint satisfaction checking**:
+   - Check that resolved types satisfy their constraints
+   - Proper error messages when constraints can't be satisfied
+3. **Optimize constraint resolution**:
+   - Efficient lookup of implementations
+   - Handle multiple possible resolutions
+
+### Phase 4: Structural Constraints ⏳ LATER  
 1. Implement `HasField` constraint for record accessors
 2. Add `@field` syntax sugar (`@key` → `accessor "key"`)
 3. Support record type inference with field constraints
