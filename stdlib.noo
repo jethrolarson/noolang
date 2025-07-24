@@ -76,7 +76,7 @@ option_get_or = fn default opt => match opt with (
 
 # Map over Option (using Monad constraint)
 implement Monad Option (
-  bind = fn f opt => match opt with (
+  bind = fn opt f => match opt with (
     Some x => f x;
     None => None
   );
@@ -187,7 +187,7 @@ implement Functor List (
 );
 
 implement Monad List (
-  bind = fn f list => reduce (fn acc x => append acc (f x)) [] list;
+  bind = fn list f => reduce (fn acc x => append acc (f x)) [] list;
   pure = fn x => [x]
 );
 

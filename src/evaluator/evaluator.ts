@@ -1323,7 +1323,6 @@ export class Evaluator {
 						return this.ensureMonadicResult(result, left);
 					}
 				} catch (e) {
-					console.log('Trait bind resolution failed:', (e as Error).message);
 					// Fall through to legacy lookup
 				}
 			}
