@@ -183,18 +183,18 @@ join = fn separator list =>
   reduce (fn acc x => if acc == "" then x else concat acc (concat separator x)) "" list;
 
 implement Functor List (
-  map = fn f list => map f list
+  map = fn f list => list_map f list
 );
 
 implement Monad List (
-  bind = fn f list => list_map f list;
+  bind = fn f list => flatten (list_map f list);
   pure = fn x => [x]
 );
 
 # Implement Show for Lists (if elements are showable)
-# implement Show (List a) given Show a (
-#   show = fn list => concat "[" $ concat (join ", " (map show list)) "]"
-# );
+implement Show (List a) (
+  show = fn list => concat "[" (concat (join ", " (list_map show list)) "]")
+);
 
 # ========================================
 # Constrint implementations for basic types
