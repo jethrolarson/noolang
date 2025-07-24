@@ -112,10 +112,48 @@ export const typeVariableExpr = (
 				// If there are no implementations, use the new polymorphic ConstrainedType behavior
 				if (hasImplementations) {
 					// Old behavior: return a generic function type without constraints
-					const [argType, state1] = freshTypeVariable(state);
-					const [returnType, state2] = freshTypeVariable(state1);
-					const traitFunctionType = functionType([argType], returnType, emptyEffects());
-					return createPureTypeResult(traitFunctionType, state2);
+					// Use the actual trait function signature but with fresh type variables
+					const typeVarMapping = new Map<string, Type>();
+					
+					// Helper function to freshen type variables for backward compatibility
+					const freshenTypeSimple = (type: Type, currentState: TypeState): [Type, TypeState] => {
+						switch (type.kind) {
+							case 'variable': {
+								if (!typeVarMapping.has(type.name)) {
+									const [freshVar, newState] = freshTypeVariable(currentState);
+									typeVarMapping.set(type.name, freshVar);
+									return [freshVar, newState];
+								}
+								return [typeVarMapping.get(type.name)!, currentState];
+							}
+							case 'function': {
+								let currentState2 = currentState;
+								const freshenedParams: Type[] = [];
+								for (const param of type.params) {
+									const [freshenedParam, nextState] = freshenTypeSimple(param, currentState2);
+									freshenedParams.push(freshenedParam);
+									currentState2 = nextState;
+								}
+								const [freshenedReturn, finalState] = freshenTypeSimple(type.return, currentState2);
+								return [functionType(freshenedParams, freshenedReturn, type.effects), finalState];
+							}
+							case 'variant': {
+								let currentState2 = currentState;
+								const freshenedArgs: Type[] = [];
+								for (const arg of type.args) {
+									const [freshenedArg, nextState] = freshenTypeSimple(arg, currentState2);
+									freshenedArgs.push(freshenedArg);
+									currentState2 = nextState;
+								}
+								return [{ kind: 'variant', name: type.name, args: freshenedArgs }, currentState2];
+							}
+							default:
+								return [type, currentState];
+						}
+					};
+					
+					const [freshenedType, finalState] = freshenTypeSimple(traitInfo.functionType, state);
+					return createPureTypeResult(freshenedType, finalState);
 				}
 				// Create fresh type variables for the trait function type
 				const typeVarMapping = new Map<string, Type>();
