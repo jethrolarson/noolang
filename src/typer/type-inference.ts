@@ -1008,6 +1008,9 @@ export const typeImplementDefinition = (
 		typeName = typeExpr.name;
 	} else if (typeExpr.kind === 'variable') {
 		typeName = typeExpr.name;
+	} else if (typeExpr.kind === 'variant') {
+		// Handle variant types like Option, Result
+		typeName = typeExpr.name;
 	} else {
 		// For now, throw error for complex type expressions - we'll improve this later
 		throw new Error(

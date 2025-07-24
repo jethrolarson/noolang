@@ -1,0 +1,1 @@
+constraint Show a ( show : a -> String ); implement Show Int ( show = toString )
