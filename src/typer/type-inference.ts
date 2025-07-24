@@ -63,7 +63,7 @@ import {
 	type ConstraintImplementation,
 	type TypeScheme,
 } from './types';
-import { validateConstraintName } from './constraints';
+// NOTE: validateConstraintName import removed - constraint validation disabled
 import {
 	freshTypeVariable,
 	generalize,
@@ -71,11 +71,9 @@ import {
 	freshenTypeVariables,
 	flattenStatements,
 } from './type-operations';
-import {
-	createConstraintFunctionType,
-	resolveConstraintVariable,
-} from './constraint-resolution';
+// NOTE: Constraint resolution imports removed - trait system will replace
 import { typeApplication } from './function-application';
+import { isTraitFunction } from './trait-system';
 
 // Note: Main typeExpression is now in expression-dispatcher.ts
 // This file only contains the individual type inference functions
@@ -103,19 +101,15 @@ export const typeVariableExpr = (
 ): TypeResult => {
 	const scheme = state.environment.get(expr.name);
 	if (!scheme) {
-		// Check if this is a constraint function before throwing error
-		const constraintResult = resolveConstraintVariable(expr.name, state);
-
-		if (constraintResult.resolved && constraintResult.needsResolution) {
-			// This is a constraint function - create its type
-			const constraintType = createConstraintFunctionType(
-				constraintResult.constraintName!,
-				constraintResult.functionName!,
-				state
-			);
-			return createPureTypeResult(constraintType, state);
+		// NEW: Check if this is a trait function before throwing error
+		if (isTraitFunction(state.traitRegistry, expr.name)) {
+			// For now, return a generic function type - constraint resolution happens during application
+			const [argType, state1] = freshTypeVariable(state);
+			const [returnType, state2] = freshTypeVariable(state1);
+			const traitFunctionType = functionType([argType], returnType, emptyEffects());
+			return createPureTypeResult(traitFunctionType, state2);
 		}
-
+		
 		throwTypeError(
 			location => undefinedVariableError(expr.name, location),
 			getExprLocation(expr)
@@ -139,8 +133,7 @@ const countFunctionParams = (type: Type): number => {
 const flattenConstraintExpr = (expr: ConstraintExpr): Constraint[] => {
 	switch (expr.kind) {
 		case 'is':
-			// Validate constraint name
-			validateConstraintName(expr.constraint);
+			// NOTE: Constraint name validation removed
 			return [expr];
 		case 'hasField':
 		case 'implements':

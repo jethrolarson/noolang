@@ -2,7 +2,7 @@ import { Lexer } from '../../../src/lexer/lexer';
 import { parse } from '../../../src/parser/parser';
 import { typeAndDecorate } from '../../../src/typer/decoration';
 
-describe('Top-level Constraint and Implement Definitions', () => {
+describe.skip('Top-level Constraint and Implement Definitions (LEGACY - REMOVED)', () => {
 	const runConstraintCode = (code: string) => {
 		const lexer = new Lexer(code);
 		const tokens = lexer.tokenize();

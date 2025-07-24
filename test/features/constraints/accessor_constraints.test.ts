@@ -9,7 +9,7 @@ const parseProgram = (code: string) => {
 	return parse(tokens);
 };
 
-describe('Accessor Constraints', () => {
+describe.skip('Accessor Constraints (LEGACY - REMOVED)', () => {
 	describe('hasField constraint generation', () => {
 		it('should generate hasField constraints for record accessors', () => {
 			const program = parseProgram('getName = @name; getName {@name "Alice"}');

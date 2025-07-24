@@ -29,9 +29,9 @@ const runNoolang = (code: string) => {
 
 describe('ADT Language Limitations', () => {
 	describe('Multiple ADT Definitions', () => {
-		it('should now work with map and multiple ADTs (polymorphism fixed)', () => {
-			// This test was previously failing due to lack of polymorphism in map
-			// Now that map is properly polymorphic, it should work
+		it('should now work with list_map and multiple ADTs (polymorphism fixed)', () => {
+			// This test was previously failing due to lack of polymorphism in list_map
+			// Now that list_map is properly polymorphic, it should work
 			expect(() =>
 				runNoolang(`
         type Color = Red | Green | Blue;
@@ -40,8 +40,8 @@ describe('ADT Language Limitations', () => {
         shapes = [Circle 3, Rectangle 5 4];
         color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
         calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
-        color_numbers = map color_to_number colors;
-        areas = map calculate_area shapes;
+        color_numbers = list_map color_to_number colors;
+        areas = list_map calculate_area shapes;
         color_numbers
       `)
 			).not.toThrow();
@@ -53,7 +53,7 @@ describe('ADT Language Limitations', () => {
         type Color = Red | Green | Blue;
         colors = [Red, Green, Blue];
         color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
-        color_numbers = map color_to_number colors;
+        color_numbers = list_map color_to_number colors;
         color_numbers
       `);
 
@@ -70,7 +70,7 @@ describe('ADT Language Limitations', () => {
         type Shape a = Circle a | Rectangle a a | Triangle a a a;
         shapes = [Circle 3, Rectangle 5 4];
         calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
-        areas = map calculate_area shapes;
+        areas = list_map calculate_area shapes;
         areas
       `);
 
@@ -83,8 +83,8 @@ describe('ADT Language Limitations', () => {
 			});
 		});
 
-		it('should work when ADTs are used sequentially without map', () => {
-			// This shows that the issue is specifically with map + multiple ADTs
+		it('should work when ADTs are used sequentially without list_map', () => {
+			// This shows that the issue is specifically with list_map + multiple ADTs
 			const result = runNoolang(`
         type Color = Red | Green | Blue;
         type Shape a = Circle a | Rectangle a a | Triangle a a a;
@@ -109,7 +109,7 @@ describe('ADT Language Limitations', () => {
 		it('should demonstrate that the type unification issue is now fixed', () => {
 			// The issue was in the type system when it tried to unify
 			// type variables that had been associated with different ADT types
-			// This is now fixed with proper let-polymorphism for map
+			// This is now fixed with proper let-polymorphism for list_map
 			expect(() =>
 				runNoolang(`
         type Color = Red | Green | Blue;
@@ -120,9 +120,9 @@ describe('ADT Language Limitations', () => {
         # This also works - separate operations
         color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
         calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
-        # This now works - map is properly polymorphic
-        color_numbers = map color_to_number colors;
-        areas = map calculate_area shapes;
+        # This now works - list_map is properly polymorphic
+        color_numbers = list_map color_to_number colors;
+        areas = list_map calculate_area shapes;
         color_numbers
       `)
 			).not.toThrow();
@@ -136,7 +136,7 @@ describe('ADT Language Limitations', () => {
         type Color = Red | Green | Blue;
         colors = [Red, Green, Blue];
         color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
-        map color_to_number colors
+        list_map color_to_number colors
       `);
 
 			expect(result1.finalValue).toEqual({
@@ -149,14 +149,14 @@ describe('ADT Language Limitations', () => {
 			});
 		});
 
-		it('should work with manual iteration instead of map', () => {
-			// Workaround 2: Use manual iteration instead of map
+		it('should work with manual iteration instead of list_map', () => {
+			// Workaround 2: Use manual iteration instead of list_map
 			const result = runNoolang(`
         type Color = Red | Green | Blue;
         type Shape a = Circle a | Rectangle a a | Triangle a a a;
         color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
         calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
-        # Manual iteration instead of map
+        # Manual iteration instead of list_map
         colors = [Red, Green, Blue];
         shapes = [Circle 3, Rectangle 5 4];
         color1 = color_to_number Red;

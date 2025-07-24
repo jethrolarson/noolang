@@ -112,18 +112,18 @@ describe('Dollar Operator ($)', () => {
 
 	describe('Precedence with Other Operators', () => {
 		test('$ has lower precedence than |', () => {
-			const result = runCode('add = fn x y => x + y; [1, 2] | map $ add 1');
+			const result = runCode('add = fn x y => x + y; [1, 2] | list_map $ add 1');
 			expect(unwrapValue(result.finalResult)).toEqual([2, 3]);
 		});
 
 		test('$ has lower precedence than function application', () => {
-			const result = runCode('add = fn x y => x + y; map (add 1) $ [1, 2, 3]');
+			const result = runCode('add = fn x y => x + y; list_map (add 1) $ [1, 2, 3]');
 			expect(unwrapValue(result.finalResult)).toEqual([2, 3, 4]);
 		});
 
 		test('$ works with complex expressions', () => {
 			const result = runCode(
-				'map (fn x => x * 2) $ filter (fn x => x > 5) $ [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]'
+				'list_map (fn x => x * 2) $ filter (fn x => x > 5) $ [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]'
 			);
 			expect(unwrapValue(result.finalResult)).toEqual([12, 14, 16, 18, 20]);
 		});
@@ -134,7 +134,7 @@ describe('Dollar Operator ($)', () => {
 			// Just verify it doesn't throw type errors
 			expect(() => {
 				runCode(
-					'add = fn x y => x + y; result = map $ add 1; result [1, 2, 3]'
+					'add = fn x y => x + y; result = list_map $ add 1; result [1, 2, 3]'
 				);
 			}).not.toThrow();
 		});
@@ -142,7 +142,7 @@ describe('Dollar Operator ($)', () => {
 		test('$ with user-defined functions type checks correctly', () => {
 			expect(() => {
 				runCode(
-					'add = fn x y => x + y; mymap = fn f list => map f list; result = mymap $ add 1; result [1, 2, 3]'
+					'add = fn x y => x + y; mylist_map = fn f list => list_map f list; result = mylist_map $ add 1; result [1, 2, 3]'
 				);
 			}).not.toThrow();
 		});
@@ -157,7 +157,7 @@ describe('Dollar Operator ($)', () => {
 
 	describe('Integration with Other Features', () => {
 		test('$ with pipeline operators', () => {
-			const result = runCode('add = fn x y => x + y; [1, 2, 3] | map $ add 10');
+			const result = runCode('add = fn x y => x + y; [1, 2, 3] | list_map $ add 10');
 			expect(unwrapValue(result.finalResult)).toEqual([11, 12, 13]);
 		});
 
@@ -198,7 +198,7 @@ describe('Dollar Operator ($)', () => {
 
 		test('$ in complex data flow', () => {
 			const result = runCode(`
-        process = fn f list => map f list;
+        process = fn f list => list_map f list;
         transform = fn x => x * 2 + 1;
         data = [1, 2, 3];
         data | process $ transform

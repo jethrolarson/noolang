@@ -1,0 +1,15 @@
+# Test what we'll need for trait dispatch
+type Option a = Some a | None;
+type List a = a;  # Simplified
+
+# This is what we want traits to generate automatically
+map_option = fn f opt => match opt with (Some x => Some (f x); None => None);
+map_list = fn f list => list_map f list;
+
+# For now, manual dispatch (what we want traits to automate)
+map = fn f container => 
+  if True then map_option f container  # Would need real type checking
+  else map_list f container;
+
+increment = fn x => x + 1;
+map increment (Some 42)

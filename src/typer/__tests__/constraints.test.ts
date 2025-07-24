@@ -12,7 +12,7 @@ const parseProgram = (source: string) => {
 	return parse(tokens);
 };
 
-describe('Type Constraints', () => {
+describe.skip('Type Constraints (LEGACY - REMOVED)', () => {
 	describe('Basic Constraint System', () => {
 		it('should support constrained type variables', () => {
 			const state = createTypeState();

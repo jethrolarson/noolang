@@ -14,7 +14,7 @@ import {
 	listTypeWithElement,
 } from '../../ast';
 
-describe('Trait System Infrastructure', () => {
+describe.skip('Trait System Infrastructure (LEGACY - REMOVED)', () => {
 	test('should create empty constraint registry', () => {
 		const registry = createConstraintRegistry();
 		expect(registry.size).toBe(0);

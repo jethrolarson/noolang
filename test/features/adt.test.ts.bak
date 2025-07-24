@@ -340,11 +340,11 @@ describe('Algebraic Data Types (ADTs)', () => {
 	});
 
 	describe('Integration with Built-in Functions', () => {
-		it('should work with list_map and Option', () => {
+		it('should work with map and Option', () => {
 			const result = runNoolang(`
         options = [Some 1, None, Some 3];
         extractValue = fn opt => match opt with (Some x => x; None => 0);
-        result = list_map extractValue options;
+        result = map extractValue options;
         result
       `);
 
@@ -413,9 +413,9 @@ describe('Algebraic Data Types (ADTs)', () => {
 			expect(result.finalValue).toEqual({ tag: 'number', value: 1 });
 		});
 
-		it('should now work with list_map and multiple ADTs (polymorphism fixed)', () => {
+		it('should now work with map and multiple ADTs (polymorphism fixed)', () => {
 			// This test was previously failing due to lack of polymorphism in map
-			// Now that list_map is properly polymorphic, it should work
+			// Now that map is properly polymorphic, it should work
 			expect(() =>
 				runNoolang(`
         type Color = Red | Green | Blue;
@@ -424,8 +424,8 @@ describe('Algebraic Data Types (ADTs)', () => {
         shapes = [Circle 3, Rectangle 5 4];
         color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
         calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
-        color_numbers = list_map color_to_number colors;
-        areas = list_map calculate_area shapes;
+        color_numbers = map color_to_number colors;
+        areas = map calculate_area shapes;
         color_numbers
       `)
 			).not.toThrow();
@@ -437,7 +437,7 @@ describe('Algebraic Data Types (ADTs)', () => {
         type Shape a = Circle a | Rectangle a a | Triangle a a a;
         colors = [Red, Green, Blue];
         color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
-        color_numbers = list_map color_to_number colors;
+        color_numbers = map color_to_number colors;
         color_numbers
       `);
 
@@ -457,7 +457,7 @@ describe('Algebraic Data Types (ADTs)', () => {
         type Shape a = Circle a | Rectangle a a | Triangle a a a;
         shapes = [Circle 3, Rectangle 5 4];
         calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
-        areas = list_map calculate_area shapes;
+        areas = map calculate_area shapes;
         areas
       `);
 

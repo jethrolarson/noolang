@@ -19,7 +19,7 @@ import {
 	listTypeWithElement,
 } from '../../ast';
 
-describe('Constraint Resolution', () => {
+describe.skip('Constraint Resolution (LEGACY - REMOVED)', () => {
 	test('should resolve constraint function calls', () => {
 		const state = createTypeState();
 

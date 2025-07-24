@@ -8,6 +8,7 @@ import {
 	type ListType,
 	type TupleType,
 	type RecordType,
+	type ConstrainedType,
 	type UnionType,
 	type VariantType,
 	ConstraintExpr,
@@ -194,6 +195,38 @@ const typesEqualUncached = (t1: Type, t2: Type): boolean => {
 
 		case 'unit':
 			return true;
+
+		case 'constrained': {
+			const t2_constrained = t2 as ConstrainedType;
+			if (!typesEqual(t1.baseType, t2_constrained.baseType)) {
+				return false;
+			}
+			// For now, just check constraint equality by comparison
+			// TODO: More sophisticated constraint equivalence checking
+			if (t1.constraints.size !== t2_constrained.constraints.size) {
+				return false;
+			}
+			for (const [varName, constraints1] of t1.constraints) {
+				const constraints2 = t2_constrained.constraints.get(varName);
+				if (!constraints2 || constraints1.length !== constraints2.length) {
+					return false;
+				}
+				// Simple constraint comparison - could be improved
+				for (let i = 0; i < constraints1.length; i++) {
+					const c1 = constraints1[i];
+					const c2 = constraints2[i];
+					if (c1.kind !== c2.kind) return false;
+					if (c1.kind === 'implements' && c2.kind === 'implements') {
+						if (c1.trait !== c2.trait) return false;
+					} else if (c1.kind === 'hasField' && c2.kind === 'hasField') {
+						if (c1.field !== c2.field || !typesEqual(c1.fieldType, c2.fieldType)) {
+							return false;
+						}
+					}
+				}
+			}
+			return true;
+		}
 
 		case 'variant': {
 			const t2_variant = t2 as VariantType;
@@ -416,6 +449,25 @@ export const typeToString = (
 				}
 			case 'unit':
 				return 'unit';
+			case 'constrained': {
+				// Show base type with constraints
+				const constrainedType = type as ConstrainedType;
+				const baseStr = norm(constrainedType.baseType);
+				if (constrainedType.constraints.size === 0) {
+					return baseStr;
+				}
+				const constraintStrs: string[] = [];
+				for (const [varName, constraints] of constrainedType.constraints) {
+					for (const constraint of constraints) {
+						if (constraint.kind === 'implements') {
+							constraintStrs.push(`${varName} implements ${constraint.trait}`);
+						} else if (constraint.kind === 'hasField') {
+							constraintStrs.push(`${varName} has ${constraint.field}: ${norm(constraint.fieldType)}`);
+						}
+					}
+				}
+				return `${baseStr} given ${constraintStrs.join(', ')}`;
+			}
 			case 'unknown':
 				return '?';
 			default:
@@ -516,6 +568,16 @@ export const occursIn = (varName: string, type: Type): boolean => {
 			return type.types.some(t => occursIn(varName, t));
 		case 'variant':
 			return type.args.some(arg => occursIn(varName, arg));
+		case 'constrained': {
+			const constrainedType = type as ConstrainedType;
+			return occursIn(varName, constrainedType.baseType) ||
+				Array.from(constrainedType.constraints.values()).flat().some(constraint => {
+					if (constraint.kind === 'hasField') {
+						return occursIn(varName, constraint.fieldType);
+					}
+					return false;
+				});
+		}
 		default:
 			return false;
 	}

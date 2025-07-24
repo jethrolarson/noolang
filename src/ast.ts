@@ -85,6 +85,17 @@ export type UnknownType = {
 	kind: 'unknown';
 };
 
+// New trait constraint types for Phase 1
+export type TraitConstraint = 
+	| { kind: 'implements'; trait: string }
+	| { kind: 'hasField'; field: string; fieldType: Type };
+
+export type ConstrainedType = {
+	kind: 'constrained';
+	baseType: Type;
+	constraints: Map<string, TraitConstraint[]>; // variable name -> constraints
+};
+
 export type Type =
 	| PrimitiveType
 	| FunctionType
@@ -96,7 +107,8 @@ export type Type =
 	| VariantType
 	| ADTType
 	| UnitType
-	| UnknownType;
+	| UnknownType
+	| ConstrainedType;
 
 // Expressions
 export type Expression =

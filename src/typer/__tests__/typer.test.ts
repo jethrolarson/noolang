@@ -318,7 +318,7 @@ describe('Functional Type Inference', () => {
 
 		it('should handle mutation with built-in functions', () => {
 			const program = parseProgram(
-				'mut list = [1, 2, 3]; mut! list = map (fn x => x * 2) list; length list'
+				'mut list = [1, 2, 3]; mut! list = list_map (fn x => x * 2) list; length list'
 			);
 			const result = typeProgram(program);
 			expect(typeToString(result.type, result.state.substitution)).toBe('Int');

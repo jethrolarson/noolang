@@ -12,13 +12,13 @@ constraint Show a (
 
 # Constraint for monads
 constraint Monad m ( 
-  bind a b : m a -> (a -> m b) -> m b; 
-  pure a : a -> m a 
+  bind : m a -> (a -> m b) -> m b; 
+  pure : a -> m a 
 );
 
 # Constraint for functors
 constraint Functor f ( 
-  map a b : (a -> b) -> f a -> f b 
+  map : (a -> b) -> f a -> f b 
 );
 
 constraint Eq a ( 
@@ -189,6 +189,11 @@ implement Functor List (
 implement Monad List (
   bind = fn f list => map f list;
   pure = fn x => [x]
+);
+
+# Implement Show for Lists (if elements are showable)
+implement Show (List a) given Show a (
+  show = fn list => "[" + (join ", " (map show list)) + "]"
 );
 
 # ========================================

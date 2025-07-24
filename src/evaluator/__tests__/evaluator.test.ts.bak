@@ -135,7 +135,7 @@ describe('Evaluator', () => {
 	});
 
 	test('should evaluate map function', () => {
-		const lexer = new Lexer('list_map (fn x => x * 2) [1, 2, 3]');
+		const lexer = new Lexer('map (fn x => x * 2) [1, 2, 3]');
 		const tokens = lexer.tokenize();
 		const program = parse(tokens);
 		const result = evaluator.evaluateProgram(program);
@@ -530,7 +530,7 @@ describe('Evaluator', () => {
 
 	test('should evaluate chained thrush operators', () => {
 		const lexer = new Lexer(
-			'[1, 2, 3] | list_map (fn x => x + 1) | list_map (fn x => x * x)'
+			'[1, 2, 3] | map (fn x => x + 1) | map (fn x => x * x)'
 		);
 		const tokens = lexer.tokenize();
 		const program = parse(tokens);
@@ -1022,7 +1022,7 @@ describe('Additional Coverage Tests', () => {
 		});
 
 		test('should handle map function', () => {
-			const result = runCode('list_map (fn x => x * 2) [1, 2, 3]');
+			const result = runCode('map (fn x => x * 2) [1, 2, 3]');
 			expect(result.finalResult.tag).toBe('list');
 			if (result.finalResult.tag === 'list') {
 				expect(result.finalResult.values).toHaveLength(3);

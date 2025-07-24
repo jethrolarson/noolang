@@ -1,4 +1,5 @@
 import type { Constraint, Type, Effect } from '../ast';
+import type { TraitRegistry } from './trait-system';
 
 // ADT registry for tracking defined algebraic data types
 export type ADTRegistry = Map<
@@ -47,7 +48,8 @@ export type TypeState = {
 	constraints: Constraint[]; // Track constraints during inference
 	adtRegistry: ADTRegistry; // Track ADT definitions
 	accessorCache: Map<string, Type>; // Cache accessor types by field name
-	constraintRegistry: ConstraintRegistry; // Track constraint definitions and implementations
+	constraintRegistry: ConstraintRegistry; // Track constraint definitions and implementations (LEGACY)
+	traitRegistry: TraitRegistry; // NEW: Simple trait system
 };
 
 // Type inference result with separated effects

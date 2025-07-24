@@ -9,6 +9,7 @@ import {
 	type TypeScheme,
 	createConstraintRegistry,
 } from './types';
+import { createTraitRegistry } from './trait-system';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
 import { constraintsEqual } from './helpers';
@@ -278,7 +279,8 @@ export const createTypeState = (): TypeState => ({
 	constraints: [],
 	adtRegistry: new Map(),
 	accessorCache: new Map(),
-	constraintRegistry: createConstraintRegistry(),
+	constraintRegistry: createConstraintRegistry(), // LEGACY
+	traitRegistry: createTraitRegistry(), // NEW: Simple trait system
 });
 
 // Clean substitutions from type state while preserving environment and other state

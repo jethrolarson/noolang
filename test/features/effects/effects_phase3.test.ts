@@ -237,7 +237,7 @@ describe('Effects Phase 3: Effect Validation and Built-in Functions', () => {
 				`
 				numbers = [1, 2, 3];
 				logger = fn x => print x;
-				map logger numbers
+				list_map logger numbers
 			`,
 				['write']
 			);

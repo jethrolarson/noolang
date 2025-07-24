@@ -203,7 +203,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	});
 
 	// List utility functions (pure)
-	newEnv.set('map', {
+	newEnv.set('list_map', {
 		type: functionType(
 			[
 				functionType([typeVariable('a')], typeVariable('b')),

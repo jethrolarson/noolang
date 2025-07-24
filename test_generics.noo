@@ -1,0 +1,16 @@
+# Test generic functions and type inference
+
+# Generic function that should work with any type
+id = fn x => x;
+
+# Should infer different types
+int_result = id 42;
+string_result = id "hello";
+bool_result = id True;
+
+# Generic function with multiple type parameters  
+pair = fn x y => {first: x, second: y};
+my_pair = pair 1 "test";
+
+# Return a value to see final type
+my_pair

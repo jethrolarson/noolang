@@ -88,6 +88,12 @@ const substituteWithCache =
 					...type,
 					args: type.args.map(substituteWithCache(substitution, seen)),
 				};
+			case 'constrained':
+				return {
+					...type,
+					baseType: substituteWithCache(substitution, seen)(type.baseType),
+					// Keep constraints as-is for now - they reference type variables by name
+				};
 			default:
 				return type;
 		}

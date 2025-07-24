@@ -25,16 +25,10 @@ import {
 	createTypeResult,
 	unionEffects,
 } from './types';
-import { satisfiesConstraint } from './constraints';
 import { substitute } from './substitute';
 import { unify } from './unify';
 import { freshTypeVariable, instantiate } from './type-operations';
 import { typeExpression } from './expression-dispatcher';
-import {
-	tryResolveConstraintFunction,
-	generateConstraintError,
-	decorateEnvironmentWithConstraintFunctions,
-} from './constraint-resolution';
 
 // Helper function to continue function application with a specialized constraint function
 function continueWithSpecializedFunction(
@@ -110,51 +104,15 @@ function continueWithSpecializedFunction(
 	return createTypeResult(resultType, finalEffects, currentState);
 }
 
-// Comprehensive constraint validation
+// LEGACY CONSTRAINT VALIDATION - REMOVED
+// Will be replaced with new trait system
 export const validateConstraints = (
-	type: Type,
+	_type: Type,
 	state: TypeState,
-	location?: { line: number; column: number }
+	_location?: { line: number; column: number }
 ): TypeState => {
-	let currentState = state;
-
-	// Apply substitution to get the concrete type
-	const substitutedType = substitute(type, state.substitution);
-
-	// If it's a function type, check constraints on parameters and return type
-	if (substitutedType.kind === 'function') {
-		// Check constraints on parameters
-		for (const param of substitutedType.params) {
-			currentState = validateConstraints(param, currentState, location);
-		}
-
-		// Check constraints on return type
-		currentState = validateConstraints(
-			substitutedType.return,
-			currentState,
-			location
-		);
-
-		// TODO Check function-level constraints
-	}
-
-	// If it's a list type, check constraints on element type
-	if (substitutedType.kind === 'list') {
-		currentState = validateConstraints(
-			substitutedType.element,
-			currentState,
-			location
-		);
-	}
-
-	// If it's a record type, check constraints on field types
-	if (substitutedType.kind === 'record') {
-		for (const fieldType of Object.values(substitutedType.fields)) {
-			currentState = validateConstraints(fieldType, currentState, location);
-		}
-	}
-
-	return currentState;
+	// No-op: constraint validation removed
+	return state;
 };
 
 // Update typeApplication to thread state through freshenTypeVariables
@@ -179,80 +137,21 @@ export const typeApplication = (
 		allEffects = unionEffects(allEffects, argResult.effects);
 	}
 
-	// Check if this is a constraint function call that needs resolution
-	// ONLY apply to functions that are explicitly defined in constraints
-	if (
-		expr.func.kind === 'variable' &&
-		currentState.constraintRegistry.size > 0
-	) {
-		// Only check constraint resolution if the function is explicitly in a constraint
-		let isDefinedInConstraint = false;
-		for (const [, constraintInfo] of currentState.constraintRegistry) {
-			if (constraintInfo.signature.functions.has(expr.func.name)) {
-				isDefinedInConstraint = true;
-				break;
-			}
-		}
-
-		// ONLY apply constraint resolution to explicitly defined constraint functions
-		// This excludes ADT constructors like Point, Rectangle, etc.
-		if (isDefinedInConstraint) {
-			const constraintResolution = tryResolveConstraintFunction(
+	// NEW: Try trait function resolution if we have arguments
+	if (argTypes.length > 0) {
+		// Check if this could be a trait function call
+		if (expr.func.kind === 'variable') {
+			const { resolveTraitFunction } = require('./trait-system');
+			const resolution = resolveTraitFunction(
+				currentState.traitRegistry,
 				expr.func.name,
-				expr.args,
-				argTypes,
-				currentState
+				argTypes
 			);
-
-			if (
-				constraintResolution.resolved &&
-				constraintResolution.specializedName
-			) {
-				// This is a constraint function call with a concrete resolution
-				// Look up the specialized function in the environment
-				const decoratedState =
-					decorateEnvironmentWithConstraintFunctions(currentState);
-				const specializedScheme = decoratedState.environment.get(
-					constraintResolution.specializedName
-				);
-
-				if (specializedScheme) {
-					// Use the specialized implementation
-					const [instantiatedType, newState] = instantiate(
-						specializedScheme,
-						decoratedState
-					);
-
-					// The specialized function should match the call pattern
-					if (instantiatedType.kind === 'function') {
-						// Continue with normal function application using the specialized type
-						const specializedFuncType = instantiatedType;
-						// Replace funcType with specializedFuncType for the rest of the function
-						return continueWithSpecializedFunction(
-							expr,
-							specializedFuncType,
-							argTypes,
-							allEffects,
-							newState
-						);
-					}
-				} else {
-					// Could not resolve - generate helpful error
-					const firstArgType =
-						argTypes.length > 0
-							? substitute(argTypes[0], currentState.substitution)
-							: null;
-					if (firstArgType && firstArgType.kind !== 'variable') {
-						// We have a concrete type but no implementation
-						const errorMessage = generateConstraintError(
-							expr.func.name, // This should be parsed differently, but for now using function name
-							expr.func.name,
-							firstArgType,
-							currentState
-						);
-						throw new Error(errorMessage);
-					}
-				}
+			
+			if (resolution.found && resolution.impl) {
+				// We found a trait implementation - evaluate it with the arguments
+				// For now, just continue with normal function application
+				// TODO: Properly substitute the trait implementation
 			}
 		}
 	}
@@ -299,120 +198,17 @@ export const typeApplication = (
 				currentState.substitution
 			);
 
-			// Check if the parameter has constraints that need to be validated
-			if (
-				substitutedParam.kind === 'variable' &&
-				substitutedParam.constraints
-			) {
-				// Validate each constraint
-				for (const constraint of substitutedParam.constraints) {
-					if (constraint.kind === 'is') {
-						// Check if the type variable has been unified to a concrete type
-						const concreteType = currentState.substitution.get(
-							constraint.typeVar
-						);
-						if (concreteType && concreteType.kind !== 'variable') {
-							// The type variable has been unified to a concrete type, validate the constraint
-							if (!satisfiesConstraint(concreteType, constraint.constraint)) {
-								throw new Error(
-									formatTypeError(
-										createTypeError(
-											`Type ${typeToString(
-												concreteType,
-												currentState.substitution
-											)} does not satisfy constraint '${
-												constraint.constraint
-											}'`,
-											{},
-											{
-												line: expr.location?.start.line || 1,
-												column: expr.location?.start.column || 1,
-											}
-										)
-									)
-								);
-							}
-						}
-					}
-				}
-			}
-
-			// Also validate constraints on the argument type
-			const substitutedArg = substitute(argTypes[i], currentState.substitution);
-			if (substitutedArg.kind === 'variable' && substitutedArg.constraints) {
-				for (const constraint of substitutedArg.constraints) {
-					if (constraint.kind === 'is') {
-						const concreteType = currentState.substitution.get(
-							constraint.typeVar
-						);
-						if (concreteType && concreteType.kind !== 'variable') {
-							if (!satisfiesConstraint(concreteType, constraint.constraint)) {
-								throw new Error(
-									formatTypeError(
-										createTypeError(
-											`Type ${typeToString(
-												concreteType,
-												currentState.substitution
-											)} does not satisfy constraint '${
-												constraint.constraint
-											}'`,
-											{},
-											{
-												line: expr.location?.start.line || 1,
-												column: expr.location?.start.column || 1,
-											}
-										)
-									)
-								);
-							}
-						}
-					}
-				}
-			}
-
-			// CRITICAL: Also check if the argument type itself satisfies constraints
-			// This is needed for cases where the argument is a concrete type that should satisfy constraints
-			if (substitutedArg.kind !== 'variable') {
-				// Check if the parameter has constraints that the argument should satisfy
-				if (
-					substitutedParam.kind === 'variable' &&
-					substitutedParam.constraints
-				) {
-					for (const constraint of substitutedParam.constraints) {
-						if (constraint.kind === 'is') {
-							if (!satisfiesConstraint(substitutedArg, constraint.constraint)) {
-								throw new Error(
-									formatTypeError(
-										createTypeError(
-											`Type ${typeToString(
-												substitutedArg,
-												currentState.substitution
-											)} does not satisfy constraint '${
-												constraint.constraint
-											}'`,
-											{},
-											{
-												line: expr.location?.start.line || 1,
-												column: expr.location?.start.column || 1,
-											}
-										)
-									)
-								);
-							}
-						}
-					}
-				}
-			}
+			// LEGACY CONSTRAINT VALIDATION - COMMENTED OUT
+			// Will be replaced with new trait system
+			
+			// The old constraint validation logic has been removed
+			// New trait system will handle constraint checking differently
 		}
 
 		// Apply substitution to get the return type
 		const returnType = substitute(funcType.return, currentState.substitution);
 
-		// Validate constraints on the return type
-		currentState = validateConstraints(returnType, currentState, {
-			line: expr.location?.start.line || 1,
-			column: expr.location?.start.column || 1,
-		});
+		// NOTE: Return type constraint validation removed - will be handled by new trait system
 
 		// Phase 3: Add effect validation for function calls
 		// Add function's effects to the collected effects
