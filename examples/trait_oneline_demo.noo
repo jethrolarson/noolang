@@ -1,1 +1,0 @@
-constraint Functor f ( map: (a -> b) -> f a -> f b ); implement Functor Option ( map = fn f opt => case opt { Some x -> Some (f x); None -> None } ); increment = fn x => x + 1; result = map increment (Some 1); print "map increment (Some 1) ="; print result

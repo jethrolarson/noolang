@@ -1,3 +1,0 @@
-constraint Functor f ( map: (a -> b) -> f a -> f b );
-implement Functor Option ( map = fn f opt => match opt with ( Some x -> Some (f x); None -> None ) );
-print "Functor defined";
