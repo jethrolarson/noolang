@@ -66,10 +66,12 @@ import {
 	instantiate,
 	freshenTypeVariables,
 	flattenStatements,
+	createConstrainedType,
+	addConstraintToType,
 } from './type-operations';
 // NOTE: Constraint resolution imports removed - trait system will replace
 import { typeApplication } from './function-application';
-import { isTraitFunction } from './trait-system';
+import { isTraitFunction, getTraitFunctionInfo } from './trait-system';
 
 // Note: Main typeExpression is now in expression-dispatcher.ts
 // This file only contains the individual type inference functions
@@ -99,7 +101,129 @@ export const typeVariableExpr = (
 	if (!scheme) {
 		// NEW: Check if this is a trait function before throwing error
 		if (isTraitFunction(state.traitRegistry, expr.name)) {
-			// For now, return a generic function type - constraint resolution happens during application
+			// Get the trait function's type and constraint information
+			const traitInfo = getTraitFunctionInfo(state.traitRegistry, expr.name);
+			if (traitInfo) {
+				// Create fresh type variables for the trait function type
+				const typeVarMapping = new Map<string, Type>();
+				
+				// Helper function to recursively freshen type variables
+				const freshenType = (type: Type, currentState: TypeState): [Type, TypeState] => {
+					switch (type.kind) {
+						case 'variable': {
+							if (!typeVarMapping.has(type.name)) {
+								const [freshVar, newState] = freshTypeVariable(currentState);
+								typeVarMapping.set(type.name, freshVar);
+								return [freshVar, newState];
+							}
+							return [typeVarMapping.get(type.name)!, currentState];
+						}
+						case 'function': {
+							let currentState2 = currentState;
+							const freshenedParams: Type[] = [];
+							for (const param of type.params) {
+								const [freshenedParam, nextState] = freshenType(param, currentState2);
+								freshenedParams.push(freshenedParam);
+								currentState2 = nextState;
+							}
+							const [freshenedReturn, finalState] = freshenType(type.return, currentState2);
+							return [functionType(freshenedParams, freshenedReturn, type.effects), finalState];
+						}
+						case 'variant': {
+							// For variant types like "m a", freshen the name and args
+							if (!typeVarMapping.has(type.name)) {
+								const [freshVar, newState] = freshTypeVariable(currentState);
+								typeVarMapping.set(type.name, freshVar);
+								
+								// Also freshen the args
+								let currentState2 = newState;
+								const freshenedArgs: Type[] = [];
+								for (const arg of type.args) {
+									const [freshenedArg, nextState] = freshenType(arg, currentState2);
+									freshenedArgs.push(freshenedArg);
+									currentState2 = nextState;
+								}
+								
+								// Return a variant type with the fresh variable name and freshened args
+								return [{
+									kind: 'variant',
+									name: (freshVar as any).name, // Use the fresh variable name
+									args: freshenedArgs
+								}, currentState2];
+							} else {
+								// Use existing mapping
+								const existingVar = typeVarMapping.get(type.name)!;
+								let currentState2 = currentState;
+								const freshenedArgs: Type[] = [];
+								for (const arg of type.args) {
+									const [freshenedArg, nextState] = freshenType(arg, currentState2);
+									freshenedArgs.push(freshenedArg);
+									currentState2 = nextState;
+								}
+								
+								return [{
+									kind: 'variant',
+									name: (existingVar as any).name,
+									args: freshenedArgs
+								}, currentState2];
+							}
+						}
+						default:
+							return [type, currentState];
+					}
+				};
+				
+				const [freshenedType, state1] = freshenType(traitInfo.functionType, state);
+				
+				// Create constraints for any type variables that correspond to the trait type parameter
+				// For pure : a -> m a, we need to add constraint "m implements Monad"
+				const constraintsMap = new Map<string, Array<{ kind: 'implements'; trait: string }>>();
+				
+				// Find type variables in the freshened type that should have constraints
+				const addConstraintsToType = (type: Type): Type => {
+					switch (type.kind) {
+						case 'variable':
+							// If this variable name matches the trait type parameter position, add constraint
+							// For "pure : a -> m a", the 'm' parameter gets the Monad constraint
+							if (traitInfo.typeParam === 'm' || traitInfo.typeParam === 'f') {
+								// This is a heuristic: if we see a return type that's a type application,
+								// the outer type variable should get the constraint
+								constraintsMap.set(type.name, [{ kind: 'implements', trait: traitInfo.traitName }]);
+							}
+							return type;
+						case 'function':
+							// For function types, we need to examine the return type
+							// to find the constrained type variable
+							return type;
+						default:
+							return type;
+					}
+				};
+				
+				// For now, let's handle the specific case of pure : a -> m a
+				// We need to add the constraint to the type variable representing 'm'
+				if (expr.name === 'pure' && freshenedType.kind === 'function') {
+					// pure has type a -> m a, so the return type should get the constraint
+					// The return type might be a variant type (m a) where m is the constrained type
+					if (freshenedType.return.kind === 'variable') {
+						constraintsMap.set(freshenedType.return.name, [{ kind: 'implements', trait: traitInfo.traitName }]);
+					} else if (freshenedType.return.kind === 'variant') {
+						// For variant types like "m a", the constraint applies to the variant name 'm'
+						// The variant name is now a fresh type variable name from typeVarMapping
+						constraintsMap.set(freshenedType.return.name, [{ kind: 'implements', trait: traitInfo.traitName }]);
+					}
+				}
+				
+				// If we have constraints, create a ConstrainedType
+				if (constraintsMap.size > 0) {
+					const constrainedType = createConstrainedType(freshenedType, constraintsMap);
+					return createPureTypeResult(constrainedType, state1);
+				} else {
+					return createPureTypeResult(freshenedType, state1);
+				}
+			}
+			
+			// Fallback: return a generic function type if trait info not found
 			const [argType, state1] = freshTypeVariable(state);
 			const [returnType, state2] = freshTypeVariable(state1);
 			const traitFunctionType = functionType([argType], returnType, emptyEffects());

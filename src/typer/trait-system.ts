@@ -136,6 +136,23 @@ export function isTraitFunction(
 	return false;
 }
 
+// Get trait definition and function type for a trait function
+export function getTraitFunctionInfo(
+	registry: TraitRegistry,
+	functionName: string
+): { traitName: string; functionType: Type; typeParam: string } | null {
+	for (const [traitName, traitDef] of registry.definitions) {
+		if (traitDef.functions.has(functionName)) {
+			return {
+				traitName,
+				functionType: traitDef.functions.get(functionName)!,
+				typeParam: traitDef.typeParam,
+			};
+		}
+	}
+	return null;
+}
+
 // Add trait registry to TypeState
 export function addTraitRegistryToState(state: TypeState): TypeState {
 	return {
