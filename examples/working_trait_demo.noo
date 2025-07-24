@@ -1,0 +1,31 @@
+# Working Trait System Demo
+print "=== Trait System Phase 2 Demo ===";
+
+# Basic Show trait
+constraint Show a ( show: a -> String );
+implement Show Int ( show = toString );
+
+print "✓ Show trait defined and implemented for Int";
+
+# Test basic trait dispatch
+result1 = show 42;
+print "show 42 =";
+print result1;
+
+# Functor trait
+constraint Functor f ( map: (a -> b) -> f a -> f b );
+implement Functor Option ( map = fn f opt => match opt with ( Some x -> Some (f x); None -> None ) );
+
+print "✓ Functor trait defined and implemented for Option";
+
+# Test Functor map - the key Phase 2 achievement!
+increment = fn x => x + 1;
+result2 = map increment (Some 1);
+print "map increment (Some 1) =";
+print result2;
+
+result3 = map increment None;
+print "map increment None =";
+print result3;
+
+print "✓ Phase 2 complete - trait function dispatch working!";

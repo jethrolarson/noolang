@@ -1,0 +1,4 @@
+constraint Show a ( show: a -> String );
+implement Show Int ( show = toString );
+result = show 42;
+print result;
