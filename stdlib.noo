@@ -187,14 +187,15 @@ implement Functor List (
 );
 
 implement Monad List (
-  bind = fn f list => reduce (fn acc x => acc ++ (f x)) [] list;
+  bind = fn f list => reduce (fn acc x => append acc (f x)) [] list;
   pure = fn x => [x]
 );
 
 # Implement Show for Lists (if elements are showable)
-implement Show (List a) (
-  show = fn list => concat "[" (concat (join ", " (list_map show list)) "]")
-);
+# TODO: This needs constrained types support
+# implement Show (List a) (
+#   show = fn list => concat "[" (concat (join ", " (list_map show list)) "]")
+# );
 
 # ========================================
 # Constrint implementations for basic types
