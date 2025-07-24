@@ -1303,7 +1303,7 @@ export class Evaluator {
 		} else if (expr.operator === '|?') {
 			// The |? operator should be desugared to a bind call by the type checker
 			// However, if constraint resolution failed, we might still see |? here
-			// Fall back to calling the stdlib bind function directly
+			// Fall back to calling the trait bind function directly
 			const left = this.evaluateExpression(expr.left);
 			const right = this.evaluateExpression(expr.right);
 
@@ -1314,33 +1314,36 @@ export class Evaluator {
 				);
 			}
 
-			// Try to call the stdlib bind function directly as fallback
-			let bindFunction = this.environment.get('bind');
-			if (bindFunction) {
-				// Handle Cell wrapper
-				if (isCell(bindFunction)) {
-					bindFunction = bindFunction.value;
+			// Try to resolve bind as a trait function
+			if (this.traitRegistry && this.isTraitFunction('bind')) {
+				try {
+					// Use trait function resolution for bind
+					const result = this.resolveTraitFunctionWithArgs('bind', [left, right], this.traitRegistry);
+					if (result) {
+						return this.ensureMonadicResult(result, left);
+					}
+				} catch (e) {
+					console.log('Trait bind resolution failed:', (e as Error).message);
+					// Fall through to legacy lookup
 				}
+			}
 
-				if (isFunction(bindFunction)) {
-					const partiallyApplied = bindFunction.fn(left);
-					if (isFunction(partiallyApplied)) {
-						const result = partiallyApplied.fn(right);
-						// Check if result needs to be wrapped in the monad
-						return this.ensureMonadicResult(result, left);
-					} else if (isNativeFunction(partiallyApplied)) {
-						const result = partiallyApplied.fn(right);
-						return this.ensureMonadicResult(result, left);
+			// If trait resolution failed, try to implement a simple bind for Option types
+			if (isConstructor(left)) {
+				if (left.name === 'None') {
+					return left; // Short-circuit for None
+				} else if (left.name === 'Some' && left.args.length === 1) {
+					// Apply the function to the value inside Some
+					const value = left.args[0];
+					const result = isFunction(right) ? right.fn(value) : right.fn(value);
+					
+					// If the result is already an Option, return it as-is
+					if (isConstructor(result) && (result.name === 'Some' || result.name === 'None')) {
+						return result;
 					}
-				} else if (isNativeFunction(bindFunction)) {
-					const partiallyApplied = bindFunction.fn(left);
-					if (isFunction(partiallyApplied)) {
-						const result = partiallyApplied.fn(right);
-						return this.ensureMonadicResult(result, left);
-					} else if (isNativeFunction(partiallyApplied)) {
-						const result = partiallyApplied.fn(right);
-						return this.ensureMonadicResult(result, left);
-					}
+					
+					// Otherwise wrap it in Some
+					return createConstructor('Some', [result]);
 				}
 			}
 

@@ -232,6 +232,8 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 	) {
 		const typeNameResult = C.identifier()(tokens);
 		if (typeNameResult.success) {
+			const typeName = typeNameResult.value.value;
+			
 			// Try to parse type arguments
 			const argsResult = C.many(C.lazy(() => parseTypeAtom))(
 				typeNameResult.remaining
@@ -242,18 +244,33 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 					success: true as const,
 					value: {
 						kind: 'variant',
-						name: typeNameResult.value.value,
+						name: typeName,
 						args: argsResult.value,
 					} as Type,
 					remaining: argsResult.remaining,
 				};
 			} else {
-				// Simple type variable or type name without arguments
-				return {
-					success: true as const,
-					value: typeVariable(typeNameResult.value.value),
-					remaining: typeNameResult.remaining,
-				};
+				// Check if it's a type constructor (uppercase) or type variable (lowercase)
+				const isUpperCase = typeName[0] === typeName[0].toUpperCase();
+				if (isUpperCase) {
+					// Type constructor without arguments (like Bool, Option, etc.)
+					return {
+						success: true as const,
+						value: {
+							kind: 'variant',
+							name: typeName,
+							args: [],
+						} as Type,
+						remaining: typeNameResult.remaining,
+					};
+				} else {
+					// Type variable (like a, b, etc.)
+					return {
+						success: true as const,
+						value: typeVariable(typeName),
+						remaining: typeNameResult.remaining,
+					};
+				}
 			}
 		}
 	}

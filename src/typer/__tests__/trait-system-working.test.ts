@@ -23,7 +23,7 @@ describe('Trait System Phase 2: Working Implementation', () => {
 	});
 
 	test('implement definition should work', () => {
-		const code = 'constraint Functor f ( map: (a -> b) -> f a -> f b ); implement Functor (Option a) ( map = toString )';
+		const code = 'constraint MyFunctor f ( map: (a -> b) -> f a -> f b ); implement MyFunctor (Option a) ( map = toString )';
 		
 		const lexer = new Lexer(code);
 		const tokens = lexer.tokenize();
@@ -34,10 +34,10 @@ describe('Trait System Phase 2: Working Implementation', () => {
 		
 		// Should succeed 
 		expect(typeResult.type.kind).toBe('unit');
-		expect(typeResult.state.traitRegistry.definitions.has('Functor')).toBe(true);
+		expect(typeResult.state.traitRegistry.definitions.has('MyFunctor')).toBe(true);
 		
 		// Should have implementation registered
-		const functorImpls = typeResult.state.traitRegistry.implementations.get('Functor');
+		const functorImpls = typeResult.state.traitRegistry.implementations.get('MyFunctor');
 		expect(functorImpls?.has('Option')).toBe(true);
 		
 		const optionImpl = functorImpls?.get('Option');

@@ -44,31 +44,31 @@ describe('Trait System: Complex Type Support', () => {
 
 	test('should support nested parameterized types', () => {
 		const code = `
-			constraint Show a ( show: a -> String );
-			implement Show (Option (List String)) ( show = fn _ => "option of list of strings" )
+			constraint MyShow a ( show: a -> String );
+			implement MyShow (Option (List String)) ( show = fn _ => "option of list of strings" )
 		`;
 		
 		const result = parseAndType(code);
 		
 		expect(result.type.kind).toBe('unit');
-		expect(result.state.traitRegistry.definitions.has('Show')).toBe(true);
+		expect(result.state.traitRegistry.definitions.has('MyShow')).toBe(true);
 		
-		const showImpls = result.state.traitRegistry.implementations.get('Show');
+		const showImpls = result.state.traitRegistry.implementations.get('MyShow');
 		expect(showImpls?.has('Option')).toBe(true);
 	});
 
 	test('should support multiple concrete type parameters', () => {
 		const code = `
-			constraint Functor f ( map: (a -> b) -> f a -> f b );
-			implement Functor (Result String) ( map = fn f result => result )
+			constraint MyFunctor f ( map: (a -> b) -> f a -> f b );
+			implement MyFunctor (Result String) ( map = fn f result => result )
 		`;
 		
 		const result = parseAndType(code);
 		
 		expect(result.type.kind).toBe('unit');
-		expect(result.state.traitRegistry.definitions.has('Functor')).toBe(true);
+		expect(result.state.traitRegistry.definitions.has('MyFunctor')).toBe(true);
 		
-		const functorImpls = result.state.traitRegistry.implementations.get('Functor');
+		const functorImpls = result.state.traitRegistry.implementations.get('MyFunctor');
 		expect(functorImpls?.has('Result')).toBe(true);
 	});
 
@@ -87,16 +87,16 @@ describe('Trait System: Complex Type Support', () => {
 
 	test('should support all primitive types', () => {
 		const code = `
-			constraint Show a ( show: a -> String );
-			implement Show String ( show = fn s => "string" );
-			implement Show Int ( show = toString );
-			implement Show Unit ( show = fn _ => "unit" )
+			constraint MyShow a ( show: a -> String );
+			implement MyShow String ( show = fn s => "string" );
+			implement MyShow Int ( show = toString );
+			implement MyShow Unit ( show = fn _ => "unit" )
 		`;
 		
 		const result = parseAndType(code);
 		
 		expect(result.type.kind).toBe('unit');
-		const showImpls = result.state.traitRegistry.implementations.get('Show');
+		const showImpls = result.state.traitRegistry.implementations.get('MyShow');
 		
 		expect(showImpls?.has('String')).toBe(true);
 		expect(showImpls?.has('Int')).toBe(true);
@@ -116,14 +116,14 @@ describe('Trait System: Complex Type Support', () => {
 
 	test('should handle type variables in complex expressions', () => {
 		const code = `
-			constraint Show a ( show: a -> String );
-			implement Show (Option a) ( show = fn opt => "some option" )
+			constraint MyShow a ( show: a -> String );
+			implement MyShow (Option a) ( show = fn opt => "some option" )
 		`;
 		
 		const result = parseAndType(code);
 		
 		expect(result.type.kind).toBe('unit');
-		const showImpls = result.state.traitRegistry.implementations.get('Show');
+		const showImpls = result.state.traitRegistry.implementations.get('MyShow');
 		expect(showImpls?.has('Option')).toBe(true);
 	});
 });

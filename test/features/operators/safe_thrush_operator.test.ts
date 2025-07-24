@@ -35,7 +35,9 @@ describe('Safe Thrush Operator (|?)', () => {
 		const tokens = new Lexer(source).tokenize();
 		const ast = parse(tokens);
 		const decoratedResult = typeAndDecorate(ast);
-		const result = evaluator.evaluateProgram(decoratedResult.program);
+		// Create evaluator with trait registry from type checking
+		const testEvaluator = new Evaluator({ traitRegistry: decoratedResult.state.traitRegistry });
+		const result = testEvaluator.evaluateProgram(decoratedResult.program);
 		return unwrapValue(result.finalResult);
 	}
 
@@ -47,6 +49,7 @@ describe('Safe Thrush Operator (|?)', () => {
 	}
 
 	beforeEach(() => {
+		// This evaluator is not used in evalExpression anymore, but keeping for compatibility
 		evaluator = new Evaluator();
 	});
 

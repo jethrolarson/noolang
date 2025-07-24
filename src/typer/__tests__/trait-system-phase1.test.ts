@@ -130,7 +130,7 @@ describe('Trait System Phase 1 Infrastructure', () => {
 
 	describe('Type System Integration', () => {
 		it('should handle undefined trait functions gracefully', () => {
-			const program = parseProgram('show 42'); // No trait definitions yet
+			const program = parseProgram('nonexistent_function 42'); // Actually undefined function
 			
 			expect(() => typeProgram(program)).toThrow(/Undefined variable/);
 		});
@@ -232,9 +232,9 @@ describe('Trait System Phase 1 Infrastructure', () => {
 			const program = parseProgram('42');
 			const result = typeProgram(program);
 			
-			// Should have empty trait registry initially
+			// Should have trait registry with stdlib definitions
 			expect(result.state.traitRegistry).toBeDefined();
-			expect(result.state.traitRegistry.definitions.size).toBe(0);
+			expect(result.state.traitRegistry.definitions.size).toBeGreaterThan(0);
 		});
 	});
 });

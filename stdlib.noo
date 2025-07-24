@@ -198,7 +198,7 @@ implement Monad List (
 # );
 
 # ========================================
-# Constrint implementations for basic types
+# Constraint implementations for basic types
 # ========================================
 
 implement Show Int (
