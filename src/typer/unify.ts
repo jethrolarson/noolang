@@ -579,8 +579,23 @@ function tryUnifyConstrainedVariant(
 	} else if (isTypeKind(s2, 'variant') && !isTypeKind(s1, 'variant')) {
 		variantType = s2;
 		concreteType = s1;
+	} else if (isTypeKind(s1, 'variant') && isTypeKind(s2, 'variant')) {
+		// Both are variants - check if one is a constrained type variable
+		const s1Name = (s1 as any).name;
+		const s2Name = (s2 as any).name;
+		
+		// Check if s1 is a constrained type variable
+		if (context.constraintContext.has(s1Name)) {
+			variantType = s1;
+			concreteType = s2;
+		} else if (context.constraintContext.has(s2Name)) {
+			variantType = s2;
+			concreteType = s1;
+		} else {
+			return null; // Neither variant is constrained
+		}
 	} else {
-		return null; // Both are variants or neither is - not the case we're handling
+		return null; // Neither is variant
 	}
 	
 	// Check if this variant type variable has constraints
@@ -636,8 +651,35 @@ function tryUnifyConstrainedVariant(
 					}
 				}
 				
-				// TODO: PHASE 3 - Add variant type handling later
-				// Currently disabled due to TypeScript type issues
+				// PHASE 3 FIX: Handle variant types like Option, Result, etc.
+				// Use runtime check to work around TypeScript type issues
+				if ((concreteType as any).kind === 'variant') {
+					const concreteVariant = concreteType as any; // Type assertion for now
+					
+					// For variant types, substitute the type constructor variable with the variant name
+					newSubstitution.set(variantType.name, { kind: 'primitive', name: concreteVariant.name });
+					
+					// Transform α130 Int -> Option Int (variant)
+					const substitutedVariant = substitute(variantType, newSubstitution);
+					
+					if (substitutedVariant.kind === 'variant' && 
+						substitutedVariant.name === concreteVariant.name && 
+						substitutedVariant.args && concreteVariant.args &&
+						substitutedVariant.args.length === concreteVariant.args.length) {
+						
+						// Unify the type arguments
+						let currentState = { ...state, substitution: newSubstitution };
+						for (let i = 0; i < substitutedVariant.args.length; i++) {
+							currentState = unify(
+								substitutedVariant.args[i], 
+								concreteVariant.args[i], 
+								currentState, 
+								location
+							);
+						}
+						return currentState;
+					}
+				}
 				
 				// For other types, try direct substitution
 				newSubstitution.set(variantType.name, concreteType);
