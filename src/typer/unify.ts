@@ -598,17 +598,31 @@ function tryUnifyConstrainedVariant(
 		return null; // Neither is variant
 	}
 	
-	// Check if this variant type variable has constraints
+		// Check if this variant type variable has constraints
 	const constraints = context.constraintContext.get(variantType.name);
 	if (!constraints) {
 		return null; // No constraints on this type variable
 	}
-	
+
 	const concreteTypeName = getTypeName(concreteType);
 	const traitRegistry = state.traitRegistry;
 	if (!traitRegistry) {
 		return null;
 	}
+
+	// Special case: if concreteType is also a type variable, check for constraint compatibility
+	if (concreteType.kind === 'variable' || 
+		(concreteType.kind === 'variant' && concreteTypeName.startsWith('α')) ||
+		(concreteType.kind === 'constrained' && concreteTypeName.startsWith('α'))) {
+
+		// Both are type variables - we can unify them by propagating constraints
+		// For now, substitute the variant type with the concrete type
+		const newSubstitution = new Map(state.substitution);
+		newSubstitution.set(variantType.name, concreteType);
+		return { ...state, substitution: newSubstitution };
+	}
+	
+
 	
 	// Check if any constraint can be satisfied by the concrete type
 	for (const constraint of constraints) {

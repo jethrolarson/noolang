@@ -211,6 +211,8 @@ export const typeApplication = (
 		// Unify each argument with the corresponding parameter type
 		for (let i = 0; i < argTypes.length; i++) {
 			// PHASE 3: Pass constraint context to unification if we have function constraints
+
+			
 			const unificationContext = {
 				reason: 'function_application' as const,
 				operation: `applying argument ${i + 1}`,

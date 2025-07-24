@@ -79,6 +79,9 @@ export function getTypeName(type: Type): string {
 			return 'record';
 		case 'tuple':
 			return 'tuple';
+		case 'constrained':
+			// For constrained types, get the name from the base type
+			return getTypeName(type.baseType);
 		default:
 			// For any other types, use the kind as the name
 			return type.kind;

@@ -394,6 +394,8 @@ export const typeToString = (
 	let next = 0;
 
 	function norm(t: Type): string {
+
+		
 		switch (t.kind) {
 			case 'primitive':
 				return t.name;
@@ -451,7 +453,8 @@ export const typeToString = (
 				return 'unit';
 			case 'constrained': {
 				// Show base type with constraints
-				const constrainedType = type as ConstrainedType;
+				const constrainedType = t as ConstrainedType;
+
 				const baseStr = norm(constrainedType.baseType);
 				if (constrainedType.constraints.size === 0) {
 					return baseStr;
