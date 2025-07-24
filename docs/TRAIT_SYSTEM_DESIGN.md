@@ -377,3 +377,8 @@ See `examples/trait_truly_multiline_demo.noo` and `examples/minimal_trait_test.n
 - PureScript type class implementation
 - Rust trait system design
 - Swift protocol system
+
+
+
+# things the human found
+* Multiple constraints that introduce conflicting functions seem to be permitted if they have different names, this can't be right or safe.
