@@ -90,18 +90,18 @@ implement Functor Option (
   )
 );
 
-implement Eq Option (
-  equals = fn opt1 opt2 => match opt1 with (
-    Some x => match opt2 with (
-      Some y => equals x y;
-      None => False
-    );
-    None => match opt2 with (   
-      Some y => False;
-      None => True
-    )
-  )
-);
+#implement Eq Option (
+#  equals = fn opt1 opt2 => match opt1 with (
+#    Some x => match opt2 with (
+#      Some y => equals x y;
+#      None => False
+#    );
+#    None => match opt2 with (   
+#      Some y => False;
+#      None => True
+#    )
+#  )
+#);
 
 implement Applicative Option (
   apply = fn f opt => match opt with (
@@ -146,19 +146,19 @@ implement Functor Result (
   )
 );
 
-implement Eq Result (
-  equals = fn res1 res2 => match res1 with (
-    Ok x => match res2 with (
-      Ok y => equals x y;
-      Err e => False
-    );
-
-    Err e => match res2 with (
-      Ok y => False;
-      Err e => equals e e
-    )
-  )
-);
+#implement Eq Result (
+#  equals = fn res1 res2 => match res1 with (
+#    Ok x => match res2 with (
+#      Ok y => equals x y;
+#      Err e => False
+#    );
+#
+#    Err e => match res2 with (
+#      Ok y => False;
+#      Err e => equals e e
+#    )
+#  )
+#);
 
 implement Applicative Result (
   apply = fn f res => match res with (

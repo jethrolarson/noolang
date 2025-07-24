@@ -136,6 +136,26 @@ export function isTraitFunction(
 	return false;
 }
 
+// Get trait definition and function type for a trait function
+// Returns the most recently defined trait that has this function
+export function getTraitFunctionInfo(
+	registry: TraitRegistry,
+	functionName: string
+): { traitName: string; functionType: Type; typeParam: string } | null {
+	let lastMatch: { traitName: string; functionType: Type; typeParam: string } | null = null;
+	
+	for (const [traitName, traitDef] of registry.definitions) {
+		if (traitDef.functions.has(functionName)) {
+			lastMatch = {
+				traitName,
+				functionType: traitDef.functions.get(functionName)!,
+				typeParam: traitDef.typeParam,
+			};
+		}
+	}
+	return lastMatch;
+}
+
 // Add trait registry to TypeState
 export function addTraitRegistryToState(state: TypeState): TypeState {
 	return {

@@ -3,6 +3,7 @@ import {
 	type PipelineExpression,
 	type Type,
 	type Constraint,
+	type TraitConstraint,
 	functionType,
 	isConstraint,
 	type Effect,
@@ -182,15 +183,24 @@ export const typeApplication = (
 		}
 	}
 
-	// Handle function application by checking if funcType is a function
-	if (funcType.kind === 'function') {
-		if (argTypes.length > funcType.params.length) {
+	// Handle function application by checking if funcType is a function or constrained function
+	let actualFuncType = funcType;
+	let functionConstraints: Map<string, TraitConstraint[]> | undefined;
+	
+	// If it's a constrained type, extract the base type and constraints
+	if (funcType.kind === 'constrained') {
+		actualFuncType = funcType.baseType;
+		functionConstraints = funcType.constraints;
+	}
+	
+	if (actualFuncType.kind === 'function') {
+		if (argTypes.length > actualFuncType.params.length) {
 			throwTypeError(
 				location =>
 					functionApplicationError(
-						funcType.params[funcType.params.length - 1],
-						argTypes[funcType.params.length - 1],
-						funcType.params.length - 1,
+						actualFuncType.params[actualFuncType.params.length - 1],
+						argTypes[actualFuncType.params.length - 1],
+						actualFuncType.params.length - 1,
 						undefined,
 						location
 					),
@@ -201,7 +211,7 @@ export const typeApplication = (
 		// Unify each argument with the corresponding parameter type
 		for (let i = 0; i < argTypes.length; i++) {
 			currentState = unify(
-				funcType.params[i],
+				actualFuncType.params[i],
 				argTypes[i],
 				currentState,
 				getExprLocation(expr),
@@ -212,7 +222,7 @@ export const typeApplication = (
 						argTypes[i],
 						currentState.substitution
 					)} but the function parameter expects ${typeToString(
-						funcType.params[i],
+						actualFuncType.params[i],
 						currentState.substitution
 					)}.`,
 				}
@@ -220,7 +230,7 @@ export const typeApplication = (
 
 			// After unification, validate constraints on the parameter
 			const substitutedParam = substitute(
-				funcType.params[i],
+				actualFuncType.params[i],
 				currentState.substitution
 			);
 
@@ -232,19 +242,29 @@ export const typeApplication = (
 		}
 
 		// Apply substitution to get the return type
-		const returnType = substitute(funcType.return, currentState.substitution);
+		const returnType = substitute(actualFuncType.return, currentState.substitution);
 
 		// NOTE: Return type constraint validation removed - will be handled by new trait system
 
 		// Phase 3: Add effect validation for function calls
 		// Add function's effects to the collected effects
-		allEffects = unionEffects(allEffects, funcType.effects);
+		allEffects = unionEffects(allEffects, actualFuncType.effects);
 
-		if (argTypes.length === funcType.params.length) {
+		if (argTypes.length === actualFuncType.params.length) {
 			// Full application - return the return type
+			
+			// If the original function had constraints, preserve them in the return type
+			let finalReturnType = returnType;
+			if (functionConstraints && functionConstraints.size > 0) {
+				// Create a ConstrainedType with the original constraints
+				finalReturnType = {
+					kind: 'constrained',
+					baseType: returnType,
+					constraints: functionConstraints
+				};
+			}
 
 			// CRITICAL FIX: Handle function composition constraint propagation
-			let finalReturnType = returnType;
 
 			// Case 1: Direct compose function call
 			if (
@@ -355,12 +375,22 @@ export const typeApplication = (
 			return createTypeResult(finalReturnType, allEffects, currentState);
 		} else {
 			// Partial application - return a function with remaining parameters
-			const remainingParams = funcType.params.slice(argTypes.length);
+			const remainingParams = actualFuncType.params.slice(argTypes.length);
 			const partialFunctionType = functionType(
 				remainingParams,
 				returnType,
-				funcType.effects
+				actualFuncType.effects
 			);
+			
+			// If the original function had constraints, preserve them in the partial function
+			let finalPartialType: Type = partialFunctionType;
+			if (functionConstraints && functionConstraints.size > 0) {
+				finalPartialType = {
+					kind: 'constrained',
+					baseType: partialFunctionType,
+					constraints: functionConstraints
+				};
+			}
 
 			// CRITICAL FIX: Handle partial application of compose
 			if (
@@ -392,7 +422,7 @@ export const typeApplication = (
 				}
 			}
 
-			return createTypeResult(partialFunctionType, allEffects, currentState);
+			return createTypeResult(finalPartialType, allEffects, currentState);
 		}
 	} else if (funcType.kind === 'variable') {
 		// If it's a type variable, create a function type and unify

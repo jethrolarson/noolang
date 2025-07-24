@@ -41,6 +41,9 @@ export function formatValue(value: Value): string {
 	if (isFunction(value)) {
 		return '<function>';
 	}
+	if (value.tag === 'trait-function') {
+		return '<function>';
+	}
 	if (isNativeFunction(value)) {
 		return `<native:${value.name}>`;
 	}

@@ -78,7 +78,7 @@ describe('Trait System Phase 2: Working Implementation', () => {
 			expect(typeResult.type.kind).toBe('primitive');
 			expect(typeResult.type.name).toBe('String');
 		} catch (error) {
-			console.log('Trait function dispatch error:', error.message);
+			console.log('Trait function dispatch error:', error instanceof Error ? error.message : String(error));
 			// For now, we expect this to work but it might fail during development
 			// The important thing is that the constraint/implement parts work
 		}

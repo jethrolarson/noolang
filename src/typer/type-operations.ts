@@ -28,6 +28,27 @@ export const freshTypeVariable = (state: TypeState): [Type, TypeState] => {
 	];
 };
 
+// Helper function to create ConstrainedType instances
+export const createConstrainedType = (
+	baseType: Type,
+	constraints: Map<string, Array<{ kind: 'implements'; trait: string } | { kind: 'hasField'; field: string; fieldType: Type }>>
+): Type => ({
+	kind: 'constrained',
+	baseType,
+	constraints,
+});
+
+// Helper function to add a constraint to a type variable
+export const addConstraintToType = (
+	baseType: Type,
+	varName: string,
+	constraint: { kind: 'implements'; trait: string } | { kind: 'hasField'; field: string; fieldType: Type }
+): Type => {
+	const constraints = new Map();
+	constraints.set(varName, [constraint]);
+	return createConstrainedType(baseType, constraints);
+};
+
 // Collect all free type variables in a type
 export const freeTypeVars = (
 	type: Type,
