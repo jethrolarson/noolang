@@ -1,0 +1,58 @@
+# Trait System Phase 2 - Truly Multiline Demo
+print "=== Trait System Phase 2 Demo ===";
+
+# Define the Show trait with proper multiline formatting
+constraint Show a (
+    show: a -> String
+);
+
+# Implement Show for Int
+implement Show Int (
+    show = toString
+);
+
+print "✓ Show trait defined and implemented for Int";
+
+# Define the Functor trait with complex function type
+constraint Functor f (
+    map: (a -> b) -> f a -> f b
+);
+
+# Implement Functor for Option with match expression
+implement Functor Option (
+    map = fn f opt => match opt with ( Some x -> Some (f x); None -> None )
+);
+
+print "✓ Functor trait defined and implemented for Option";
+
+# Test basic trait function dispatch
+print "\n=== Testing Trait Function Dispatch ===";
+
+result1 = show 42;
+print "show 42 =";
+print result1;
+
+# Test the key Phase 2 achievement: Functor map
+print "\n=== The Key Demo: Functor map ===";
+
+increment = fn x => x + 1;
+double = fn x => x * 2;
+
+result2 = map increment (Some 1);
+print "map increment (Some 1) =";
+print result2;
+
+result3 = map increment None;
+print "map increment None =";
+print result3;
+
+result4 = map double (Some 5);
+print "map double (Some 5) =";
+print result4;
+
+# Chained map operations
+result5 = map double (map increment (Some 3));
+print "map double (map increment (Some 3)) =";
+print result5;
+
+print "\n✓ Phase 2 complete - multiline parsing and trait dispatch working!";
