@@ -374,6 +374,11 @@ export class Evaluator {
 		this.environment.set(
 			'$',
 			createNativeFunction('$', (func: Value) => (arg: Value) => {
+				// DEBUG: Log what we're trying to apply
+				console.log('DEBUG: Dollar operator called with func:', func);
+				console.log('DEBUG: func.tag:', func?.tag);
+				console.log('DEBUG: typeof func:', typeof func);
+				
 				if (isFunction(func)) return func.fn(arg);
 				if (isNativeFunction(func)) return func.fn(arg);
 				throw new Error(
