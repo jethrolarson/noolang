@@ -133,6 +133,7 @@ map_increment = map (fn x => x + 1);  # : f Int -> f Int given f implements Func
 3. ✅ Support basic traits: `Functor`, `Show`, `Eq` (Monad pending)
 4. ✅ Handle partial application with constraint propagation
 5. ✅ **Parser fixes**: Right-associative `->`, type constructor variables (`f a`), correct match syntax
+6. ✅ **Remove type whitelisting**: Support complex types in implement definitions (`List Int`, `a -> b`, etc.)
 
 ### Phase 3: Structural Constraints ⏳ NEXT
 1. Implement `HasField` constraint for record accessors
@@ -280,6 +281,7 @@ Error: Cannot resolve constraint: m implements Monad
 3. **Multiline syntax**: Constraint and implement definitions work across multiple lines
 4. **Type inference**: Trait calls are properly type-checked
 5. **Core traits**: `Show`, `Eq`, and `Functor` implemented and tested
+6. **Complex type implementations**: `implement Show (List Int)`, `implement Show (a -> b)`, etc.
 
 ### 🎯 Key Achievement
 **The target goal `map increment (Some 1)` is now working!**

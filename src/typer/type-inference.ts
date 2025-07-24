@@ -1002,21 +1002,9 @@ export const typeImplementDefinition = (
 ): TypeResult => {
 	const { constraintName, typeExpr, implementations } = expr;
 
-	// Extract type name from type expression for simple cases
-	let typeName: string;
-	if (typeExpr.kind === 'primitive') {
-		typeName = typeExpr.name;
-	} else if (typeExpr.kind === 'variable') {
-		typeName = typeExpr.name;
-	} else if (typeExpr.kind === 'variant') {
-		// Handle variant types like Option, Result
-		typeName = typeExpr.name;
-	} else {
-		// For now, throw error for complex type expressions - we'll improve this later
-		throw new Error(
-			`Complex type expressions in implement definitions not yet supported: ${JSON.stringify(typeExpr)}`
-		);
-	}
+	// Extract type name from type expression - support all type kinds
+	const { getTypeName } = require('./trait-system');
+	const typeName = getTypeName(typeExpr);
 
 	// Check if trait exists in trait registry
 	const traitDef = state.traitRegistry.definitions.get(constraintName);
