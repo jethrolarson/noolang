@@ -167,10 +167,12 @@ export const typeApplication = (
 					return typeApplication(traitApp, currentState);
 				} else {
 					// The trait implementation should be a function
+					const funcName = expr.func.kind === 'variable' ? expr.func.name : 'unknown';
 					throwTypeError(
 						location => ({
+							type: 'TypeError' as const,
 							kind: 'general',
-							message: `Trait implementation for ${expr.func.name} is not a function`,
+							message: `Trait implementation for ${funcName} is not a function`,
 							location
 						}),
 						getExprLocation(expr)
