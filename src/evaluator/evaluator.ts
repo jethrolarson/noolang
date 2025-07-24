@@ -41,6 +41,7 @@ export type Value =
 	| { tag: 'function'; fn: (...args: Value[]) => Value }
 	| { tag: 'native'; name: string; fn: unknown }
 	| { tag: 'constructor'; name: string; args: Value[] }
+	| { tag: 'trait-function'; name: string; traitRegistry: any }
 	| { tag: 'unit' };
 
 // --- Mutable Cell type ---
@@ -195,10 +196,12 @@ export class Evaluator {
 	private currentFileDir?: string; // Track the directory of the current file being evaluated
 	private fs: typeof defaultFs;
 	private path: typeof defaultPath;
+	private traitRegistry?: any; // NEW: Trait registry for runtime trait resolution
 
-	constructor(opts?: { fs?: typeof defaultFs; path?: typeof defaultPath }) {
+	constructor(opts?: { fs?: typeof defaultFs; path?: typeof defaultPath; traitRegistry?: any }) {
 		this.fs = opts?.fs ?? defaultFs;
 		this.path = opts?.path ?? defaultPath;
+		this.traitRegistry = opts?.traitRegistry;
 		this.environment = new Map();
 		this.environmentStack = [];
 		this.initializeBuiltins();
@@ -1043,6 +1046,16 @@ export class Evaluator {
 	private evaluateVariable(expr: VariableExpression): Value {
 		const value = this.environment.get(expr.name);
 		if (value === undefined) {
+			// NEW: Check if this is a trait function before throwing error
+			if (this.traitRegistry && this.isTraitFunction(expr.name)) {
+				// Return a special trait function value that will be resolved during application
+				return {
+					tag: 'trait-function',
+					name: expr.name,
+					traitRegistry: this.traitRegistry
+				};
+			}
+			
 			const error = createError(
 				'RuntimeError',
 				`Undefined variable: ${expr.name}`,
@@ -1129,6 +1142,11 @@ export class Evaluator {
 
 	private evaluateApplication(expr: ApplicationExpression): Value {
 		const func = this.evaluateExpression(expr.func);
+
+		// NEW: Handle trait function application
+		if (func.tag === 'trait-function') {
+			return this.evaluateTraitFunctionApplication(func as any, expr.args);
+		}
 
 		// Only apply the function to the arguments present in the AST
 		const args = expr.args;
@@ -1701,37 +1719,65 @@ export class Evaluator {
 	private evaluateConstraintDefinition(
 		expr: ConstraintDefinitionExpression
 	): Value {
-		// Constraint definitions create runtime dispatcher functions for each constraint function
-		for (const func of expr.functions) {
-			// Create a dispatcher function that will resolve to the right implementation at runtime
-			const dispatcherFunction = createFunction((arg: Value) => {
-				// Try to find the specialized function for this argument type
-				const argType = this.getValueTypeName(arg);
-				const specializedName = `__${expr.name}_${func.name}_${argType}`;
-				const specializedImpl = this.environment.get(specializedName);
+		// NEW TRAIT SYSTEM: Constraint definitions don't need runtime registration
+		// The trait functions will be resolved at call sites using the trait registry
+		// This just returns unit - trait definitions are purely for type checking
+		return createUnit();
+	}
 
-				if (specializedImpl) {
-					// Handle cells
-					let impl = specializedImpl;
-					if (isCell(impl)) {
-						impl = impl.value;
-					}
+	// NEW: Check if a function name is a trait function
+	private isTraitFunction(functionName: string): boolean {
+		if (!this.traitRegistry) return false;
+		
+		// Check if any trait defines this function
+		for (const [traitName, traitDef] of this.traitRegistry.definitions) {
+			if (traitDef.functions.has(functionName)) {
+				return true;
+			}
+		}
+		return false;
+	}
 
-					if (isFunction(impl)) {
-						return impl.fn(arg);
-					} else if (isNativeFunction(impl)) {
-						return impl.fn(arg);
-					}
-				}
-
-				throw new Error(`No implementation of ${expr.name} for ${argType}`);
-			});
-
-			// Register the dispatcher under the constraint function name
-			this.environment.set(func.name, dispatcherFunction);
+	// NEW: Handle trait function application at runtime
+	private evaluateTraitFunctionApplication(traitFunc: any, argExprs: Expression[]): Value {
+		if (!this.traitRegistry) {
+			throw new Error(`No trait registry available for trait function ${traitFunc.name}`);
 		}
 
-		return createUnit();
+		// Evaluate the arguments to get their runtime values
+		const argValues = argExprs.map(arg => this.evaluateExpression(arg));
+		
+		// Get the type names of the arguments for trait resolution
+		const argTypeNames = argValues.map(val => this.getValueTypeName(val));
+		
+		// Try to resolve the trait function
+		for (const [traitName, traitDef] of this.traitRegistry.definitions) {
+			if (traitDef.functions.has(traitFunc.name)) {
+				// Check if we have an implementation for the first argument's type
+				const traitImpls = this.traitRegistry.implementations.get(traitName);
+				if (traitImpls && argTypeNames.length > 0) {
+					const impl = traitImpls.get(argTypeNames[0]);
+					if (impl && impl.functions.has(traitFunc.name)) {
+						// Found the implementation! Evaluate it with the arguments
+						const implExpr = impl.functions.get(traitFunc.name);
+						
+						// Create an application expression with the implementation
+						const appExpr: ApplicationExpression = {
+							kind: 'application',
+							func: implExpr,
+							args: argExprs,
+							location: { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } }
+						};
+						
+						return this.evaluateApplication(appExpr);
+					}
+				}
+			}
+		}
+		
+		// No implementation found
+		const argTypeName = argTypeNames.length > 0 ? argTypeNames[0] : 'Unknown';
+		throw new Error(`No implementation of trait function ${traitFunc.name} for ${argTypeName}`);
 	}
 
 	private getValueTypeName(value: Value): string {
@@ -1754,19 +1800,9 @@ export class Evaluator {
 	private evaluateImplementDefinition(
 		expr: ImplementDefinitionExpression
 	): Value {
-		// Implementation definitions need to register specialized function names
-		// in the runtime environment for type-directed dispatch
-
-		// Generate the type name from the type expression
-		const typeName = this.typeExpressionToString(expr.typeExpr);
-
-		// Register each implementation with a specialized name
-		for (const impl of expr.implementations) {
-			const specializedName = `__${expr.constraintName}_${impl.name}_${typeName}`;
-			const implementation = this.evaluateExpression(impl.value);
-			this.environment.set(specializedName, implementation);
-		}
-
+		// NEW TRAIT SYSTEM: Implementation definitions don't need runtime registration
+		// The trait implementations are stored in the trait registry during type checking
+		// and resolved at call sites. This just returns unit.
 		return createUnit();
 	}
 

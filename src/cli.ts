@@ -310,7 +310,7 @@ async function main() {
 			const { program: decoratedProgram, state } = typeAndDecorate(program);
 			const typeTime = performance.now();
 
-			const evaluator = new Evaluator();
+			const evaluator = new Evaluator({ traitRegistry: state.traitRegistry });
 			const finalResult = evaluator.evaluateProgram(decoratedProgram);
 			const evalTime = performance.now();
 
@@ -391,10 +391,7 @@ async function main() {
 		const { program: decoratedProgram, state } = typeAndDecorate(program);
 		const typeTime = performance.now();
 
-		const evaluator = new Evaluator();
-
-		// Transfer specialized constraint functions to evaluator
-		evaluator.addConstraintFunctions(state);
+		const evaluator = new Evaluator({ traitRegistry: state.traitRegistry });
 
 		const finalResult = evaluator.evaluateProgram(decoratedProgram);
 		const evalTime = performance.now();
