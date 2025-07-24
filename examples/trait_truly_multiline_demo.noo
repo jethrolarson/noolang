@@ -20,7 +20,7 @@ constraint Functor f (
 
 # Implement Functor for Option with match expression
 implement Functor Option (
-    map = fn f opt => match opt with ( Some x -> Some (f x); None -> None )
+    map = fn f opt => match opt with ( Some x => Some (f x); None => None )
 );
 
 print "✓ Functor trait defined and implemented for Option";
