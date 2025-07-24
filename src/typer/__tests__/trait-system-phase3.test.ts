@@ -47,7 +47,9 @@ describe('Trait System Phase 3: Constraint Resolution', () => {
 			
 			// Should succeed and return String
 			expect(typeResult.type.kind).toBe('primitive');
-			expect(typeResult.type.name).toBe('String');
+			if (typeResult.type.kind === 'primitive') {
+				expect(typeResult.type.name).toBe('String');
+			}
 		});
 
 		test('should resolve Monad constraint polymorphically', () => {
@@ -100,7 +102,9 @@ describe('Trait System Phase 3: Constraint Resolution', () => {
 			
 			// Should return a function type with constraints
 			expect(typeResult.type.kind).toBe('constrained');
-			expect(typeResult.type.baseType.kind).toBe('function');
+			if (typeResult.type.kind === 'constrained') {
+				expect(typeResult.type.baseType.kind).toBe('function');
+			}
 			
 			const typeString = typeToString(typeResult.type);
 			expect(typeString).toMatch(/implements Functor/);
@@ -162,11 +166,17 @@ describe('Trait System Phase 3: Constraint Resolution', () => {
 			expect(typeResult.type.kind).toBe('constrained');
 			
 			// The base type should be a variant representing the functor application
-			const baseType = typeResult.type.baseType;
-			expect(baseType.kind).toBe('variant');
-			expect(baseType.args.length).toBe(1);
-			expect(baseType.args[0].kind).toBe('primitive');
-			expect(baseType.args[0].name).toBe('Int');
+			if (typeResult.type.kind === 'constrained') {
+				const baseType = typeResult.type.baseType;
+				expect(baseType.kind).toBe('variant');
+				if (baseType.kind === 'variant') {
+					expect(baseType.args.length).toBe(1);
+					expect(baseType.args[0].kind).toBe('primitive');
+					if (baseType.args[0].kind === 'primitive') {
+						expect(baseType.args[0].name).toBe('Int');
+					}
+				}
+			}
 		});
 
 		test('should work with different functor types', () => {
@@ -204,7 +214,9 @@ describe('Trait System Phase 3: Constraint Resolution', () => {
 			
 			// Should work normally without constraints
 			expect(typeResult.type.kind).toBe('primitive');
-			expect(typeResult.type.name).toBe('Int');
+			if (typeResult.type.kind === 'primitive') {
+				expect(typeResult.type.name).toBe('Int');
+			}
 		});
 
 		test('should work with let polymorphism', () => {
@@ -222,7 +234,9 @@ describe('Trait System Phase 3: Constraint Resolution', () => {
 			
 			// Should succeed - polymorphic function used with different types
 			expect(typeResult.type.kind).toBe('primitive');
-			expect(typeResult.type.name).toBe('Int'); // Last definition wins
+			if (typeResult.type.kind === 'primitive') {
+				expect(typeResult.type.name).toBe('Int'); // Last definition wins
+			}
 		});
 
 		test('should integrate with ADT pattern matching', () => {
@@ -260,7 +274,7 @@ describe('Trait System Phase 3: Constraint Resolution', () => {
 				typeProgram(program);
 				fail('Expected error for missing trait implementation');
 			} catch (error) {
-				const message = error.message;
+				const message = (error as Error).message;
 				expect(message).toMatch(/Functor/);
 				expect(message).toMatch(/Int/);
 				// Should suggest how to fix it
@@ -279,7 +293,7 @@ describe('Trait System Phase 3: Constraint Resolution', () => {
 				typeProgram(program);
 				fail('Expected error for missing trait implementation');
 			} catch (error) {
-				const message = error.message;
+				const message = (error as Error).message;
 				// Should include location information
 				expect(message).toMatch(/line 1/);
 			}

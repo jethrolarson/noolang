@@ -1,4 +1,4 @@
-import { Type } from '../ast';
+import { Type, TraitConstraint, VariantType } from '../ast';
 import { substitute } from './substitute';
 import { TypeState } from './types';
 import { isTypeKind, typesEqual, constraintsEqual } from './helpers';
@@ -51,6 +51,7 @@ const unifyInternal = (
 		reason?: string;
 		operation?: string;
 		hint?: string;
+		constraintContext?: Map<string, TraitConstraint[]>;
 	}
 ): TypeState => {
 	// Early equality check before substitution for performance
@@ -65,6 +66,15 @@ const unifyInternal = (
 	// }
 
 	if (typesEqual(s1, s2)) return state;
+
+	// PHASE 3: Handle constraint resolution EARLY to provide better error messages
+	// Check if one type is a variant with a constrained type variable name
+	if (context?.constraintContext && (isTypeKind(s1, 'variant') || isTypeKind(s2, 'variant'))) {
+		const constraintResult = tryUnifyConstrainedVariant(s1, s2, state, location, context);
+		if (constraintResult) {
+			return constraintResult;
+		}
+	}
 
 	// Handle variables (either order)
 	if (isTypeKind(s1, 'variable')) return unifyVariable(s1, s2, state, location);
@@ -110,15 +120,6 @@ const unifyInternal = (
 		return unifyVariant(s1, s2, state, location);
 	}
 
-	// PHASE 3: Handle constraint resolution for variant type constructors
-	// Check if one type is a variant with a constrained type variable name
-	if (isTypeKind(s1, 'variant') || isTypeKind(s2, 'variant')) {
-		const constraintResult = tryUnifyConstrainedVariant(s1, s2, state, location, context);
-		if (constraintResult) {
-			return constraintResult;
-		}
-	}
-
 	// Handle constrained types
 	if (isTypeKind(s1, 'constrained') || isTypeKind(s2, 'constrained')) {
 		return unifyConstrained(s1, s2, state, location);
@@ -158,6 +159,7 @@ export const unify = (
 		reason?: string;
 		operation?: string;
 		hint?: string;
+		constraintContext?: Map<string, TraitConstraint[]>;
 	}
 ): TypeState => {
 	const start = Date.now();
@@ -558,7 +560,7 @@ function tryUnifyConstrainedVariant(
 		reason?: string;
 		operation?: string;
 		hint?: string;
-		constraintContext?: Map<string, Array<{ kind: 'implements'; trait: string }>>;
+		constraintContext?: Map<string, TraitConstraint[]>;
 	}
 ): TypeState | null {
 	// Only proceed if we have constraint context
@@ -634,9 +636,26 @@ function tryUnifyConstrainedVariant(
 					}
 				}
 				
+				// TODO: PHASE 3 - Add variant type handling later
+				// Currently disabled due to TypeScript type issues
+				
 				// For other types, try direct substitution
 				newSubstitution.set(variantType.name, concreteType);
 				return { ...state, substitution: newSubstitution };
+			} else {
+				// Constraint not satisfied - throw specific error
+				throw new Error(
+					formatTypeError(
+						createTypeError(
+							`No implementation of ${traitName} for ${concreteTypeName}`,
+							{
+								suggestion: `The constraint '${variantType.name} implements ${traitName}' cannot be satisfied by ${concreteTypeName}. ` +
+									       `You need to add: implement ${traitName} ${concreteTypeName} (...)`
+							},
+							location || { line: 1, column: 1 }
+						)
+					)
+				);
 			}
 		}
 	}
