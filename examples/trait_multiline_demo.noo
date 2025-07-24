@@ -4,20 +4,11 @@ constraint Show a (
     show: a -> String
 );
 
-implement Show Int (
-    show = toString
-);
+implement Show Int ( show = toString );
 
-constraint Functor f (
-    map: (a -> b) -> f a -> f b
-);
+constraint Functor f ( map: (a -> b) -> f a -> f b );
 
-implement Functor Option (
-    map = fn f opt => case opt {
-        Some x -> Some (f x);
-        None -> None
-    }
-);
+implement Functor Option ( map = fn f opt => case opt { Some x -> Some (f x); None -> None } );
 
 print "=== Trait System Working ===";
 
