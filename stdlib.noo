@@ -18,7 +18,7 @@ constraint Monad m (
 
 # Constraint for functors
 constraint Functor f ( 
-  map : (a -> b) -> (f a) -> f b
+  map : (a -> b) -> f a -> f b
 );
 
 constraint Eq a ( 
@@ -26,7 +26,7 @@ constraint Eq a (
 );
 
 constraint Applicative f ( 
-  apply : f (a -> b) -> (f a) -> f b 
+  apply : f (a -> b) -> f a -> f b 
 );
 
 # ========================================
@@ -183,7 +183,7 @@ join = fn separator list =>
   reduce (fn acc x => if acc == "" then x else concat acc (concat separator x)) "" list;
 
 implement Functor List (
-  map = fn f list => list_map f list
+  map = fn f list => map f list
 );
 
 implement Monad List (
