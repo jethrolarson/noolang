@@ -2,17 +2,171 @@
 # This file defines the global default environment that's automatically loaded
 
 # ========================================
+# TYPE CONSTRAINTS
+# ========================================
+
+# Constraint for showing a type
+constraint Show a (
+  show : a -> String
+);
+
+# Constraint for monads
+constraint Monad m ( 
+  bind : m a -> (a -> m b) -> m b; 
+  pure : a -> m a 
+);
+
+# Constraint for functors
+constraint Functor f ( 
+  map : (a -> b) -> (f a) -> f b
+);
+
+constraint Eq a ( 
+  equals : a -> a -> Bool 
+);
+
+constraint Applicative f ( 
+  apply : f (a -> b) -> (f a) -> f b 
+);
+
+# ========================================
+# UTILITY FUNCTIONS
+# ========================================
+
+# Identity function
+id = fn x => x;
+
+# ========================================
 # CORE ALGEBRAIC DATA TYPES
 # ========================================
 
-# Boolean type - replaces primitive Bool
+# ========================================
+# BOOLEAN TYPE
+# ========================================
+
 type Bool = True | False;
 
-# Option type for handling nullable values
+implement Show Bool (
+  show = fn b => match b with (
+    True => "True";
+    False => "False"
+  )
+);
+
+# Boolean negation
+not = fn b => match b with (True => False; False => True);
+
+# ========================================
+# OPTION TYPE
+# ========================================
+
 type Option a = Some a | None;
+
+implement Show Option (
+  show = fn showElement opt => match opt with (
+    Some x => concat "Some(" (concat (showElement x) ")");
+    None => "None"
+  )
+);
+
+option_get_or = fn default opt => match opt with (
+  Some value => value;
+  None => default
+);
+
+# Map over Option (using Monad constraint)
+implement Monad Option (
+  bind = fn f opt => match opt with (
+    Some x => f x;
+    None => None
+  );
+  pure = fn x => Some x
+);
+
+implement Functor Option (
+  map = fn f opt => match opt with (
+    Some x => Some (f x);
+    None => None
+  )
+);
+
+implement Eq Option (
+  equals = fn opt1 opt2 => match opt1 with (
+    Some x => match opt2 with (
+      Some y => equals x y;
+      None => False
+    );
+    None => match opt2 with (   
+      Some y => False;
+      None => True
+    )
+  )
+);
+
+implement Applicative Option (
+  apply = fn f opt => match opt with (
+    Some x => f x;
+    None => None
+  )
+);
+
+# ========================================
+# RESULT TYPE
+# ========================================
 
 # Result type for error handling  
 type Result a b = Ok a | Err b;
+
+implement Show Result (
+  show = fn showOk showErr res => match res with (
+    Ok x => concat "Ok(" (concat (showOk x) ")");
+    Err e => concat "Err(" (concat (showErr e) ")")
+  )
+);
+
+# Extract value from Result with default for errors
+result_get_or = fn default res => match res with (
+  Ok value => value;
+  Err error => default
+);
+
+# Map over Result value (using Monad constraint) 
+implement Monad Result (
+  bind = fn f res => match res with (
+    Ok x => f x;
+    Err e => Err e
+  );
+  pure = fn x => Ok x
+);
+
+implement Functor Result (
+  map = fn f res => match res with (
+    Ok x => Ok (f x);
+    Err e => Err e
+  )
+);
+
+implement Eq Result (
+  equals = fn res1 res2 => match res1 with (
+    Ok x => match res2 with (
+      Ok y => equals x y;
+      Err e => False
+    );
+
+    Err e => match res2 with (
+      Ok y => False;
+      Err e => equals e e
+    )
+  )
+);
+
+implement Applicative Result (
+  apply = fn f res => match res with (
+    Ok x => f x;
+    Err e => Err e
+  )
+);
+
 
 # ========================================
 # LIST OPERATIONS
@@ -28,96 +182,37 @@ head = fn list => if (length list) == 0
 join = fn separator list =>
   reduce (fn acc x => if acc == "" then x else concat acc (concat separator x)) "" list;
 
-
-# ========================================
-# UTILITY FUNCTIONS
-# ========================================
-
-# Identity function
-id = fn x => x;
-
-# Function composition
-compose = fn f g => fn x => f (g x);
-
-# Helper function for list equality - simplified for now
-listEqualsInt = fn list1 list2 => (length list1) == (length list2);
-
-# ========================================
-# MODERNIZED BUILT-INS (without full trait system for now)
-# ========================================
-
-# Show-like functions for basic types (until trait system is fully implemented)
-showInt = toString;  # Use built-in toString for now
-showString = fn s => s;
-showBool = fn b => match b with (True => "True"; False => "False");
-
-# Show for Option 
-showOption = fn showElement opt => match opt with (
-  Some x => concat "Some(" (concat (showElement x) ")");
-  None => "None"
+implement Functor List (
+  map = fn f list => list_map f list
 );
 
-# Show for Result
-showResult = fn showOk showErr res => match res with (
-  Ok x => concat "Ok(" (concat (showOk x) ")");
-  Err e => concat "Err(" (concat (showErr e) ")")
+implement Monad List (
+  bind = fn f list => list_map f list;
+  pure = fn x => [x]
+);
+
+# Implement Show for Lists (if elements are showable)
+# implement Show (List a) given Show a (
+#   show = fn list => concat "[" $ concat (join ", " (map show list)) "]"
+# );
+
+# ========================================
+# Constrint implementations for basic types
+# ========================================
+
+implement Show Int (
+  show = fn i => toString i
+);
+
+implement Show String (
+  show = id
 );
 
 # Eq-like functions for basic types
-equalsInt = primitive_int_eq;
-equalsString = primitive_string_eq;
-equalsBool = fn a b => match a with (
-  True => match b with (True => True; False => False);
-  False => match b with (True => False; False => True)
+implement Eq Int (
+  equals = primitive_int_eq
 );
 
-# ========================================
-# MONAD CONSTRAINT AND IMPLEMENTATIONS  
-# ========================================
-
-# Bind and return functions for Option types (as before)
-bind = fn opt f => match opt with (
-  Some value => f value;
-  None => None
+implement Eq String (
+  equals = primitive_string_eq
 );
-
-return = fn x => Some x;
-
-# ========================================
-# BOOLEAN OPERATIONS
-# ========================================
-
-# Boolean negation
-not = fn b => match b with (True => False; False => True);
-
-# Boolean AND
-bool_and = fn a b => match a with (True => b; False => False);
-
-# Boolean OR  
-bool_or = fn a b => match a with (True => True; False => b);
-
-# ========================================
-# OPTION UTILITIES
-# ========================================
-
-# Extract value from Option with default
-option_get_or = fn default opt => match opt with (
-  Some value => value;
-  None => default
-);
-
-# Map over Option (using Monad constraint)
-option_map = fn f opt => bind opt (fn x => return (f x));
-
-# ========================================
-# RESULT UTILITIES
-# ========================================
-
-# Extract value from Result with default for errors
-result_get_or = fn default res => match res with (
-  Ok value => value;
-  Err error => default
-);
-
-# Map over Result value (using Monad constraint) 
-result_map = fn f res => bind res (fn x => return (f x));
