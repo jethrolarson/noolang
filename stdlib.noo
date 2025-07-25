@@ -63,8 +63,8 @@ not = fn b => match b with (True => False; False => True);
 type Option a = Some a | None;
 
 implement Show Option (
-  show = fn showElement opt => match opt with (
-    Some x => concat "Some(" (concat (showElement x) ")");
+  show = fn opt => match opt with (
+    Some x => concat "Some(" (concat (toString x) ")");
     None => "None"
   )
 );
