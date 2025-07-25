@@ -51,8 +51,8 @@ describe('Manual Constraint Resolution Testing', () => {
 		// list_map should work and return a list
 		expect(result.type.kind).toBe('list');
 		if (result.type.kind === 'list') {
-			expect(result.type.elementType.kind).toBe('primitive');
-			expect(result.type.elementType.name).toBe('Int');
+			expect(result.type.element.kind).toBe('primitive');
+			expect(result.type.element.name).toBe('Int');
 		}
 	});
 
