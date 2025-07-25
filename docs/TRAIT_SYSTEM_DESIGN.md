@@ -493,6 +493,58 @@ The trait system is **complete and ready for production use**. All core function
 - Safety mechanisms ✅
 - Comprehensive testing ✅
 
+## 🚨 CRITICAL BUG DISCOVERED: Implementation Signature Validation
+
+**HIGHEST PRIORITY**: The trait system currently has a **major safety hole** - it does not validate that trait implementations match the constraint signatures.
+
+### The Problem
+```noo
+constraint Show a ( show : a -> String );  # Expects 1 argument
+implement Show Option (
+  show = fn showElement opt => ...  # Takes 2 arguments - SHOULD ERROR!
+);
+```
+
+**Current behavior**: This invalid implementation is accepted and causes confusing runtime errors.
+**Expected behavior**: This should be rejected at implementation time.
+
+### Root Cause
+`addTraitImplementation()` in `src/typer/trait-system.ts` only checks:
+- ✅ Trait exists  
+- ✅ No duplicate implementations
+- ❌ **MISSING**: Function signature validation
+
+### Required Fix
+Add signature validation to `addTraitImplementation()`:
+1. Get the trait definition from the registry
+2. For each function in the implementation:
+   - Check it matches a function in the constraint
+   - Validate arity (number of parameters) matches
+   - Validate parameter and return types are compatible
+3. Reject implementations that don't match
+
+### Test Case to Add
+```typescript
+test('should reject implementation with wrong function signature', () => {
+  const registry = createTraitRegistry();
+  addTraitDefinition(registry, {
+    name: 'Test',
+    functions: new Map([['fn1', parseType('a -> String')]])
+  });
+  
+  const badImpl = { typeName: 'Int', functions: new Map([
+    ['fn1', /* function with wrong arity */]
+  ])};
+  
+  expect(() => addTraitImplementation(registry, 'Test', badImpl))
+    .toThrow('Function signature mismatch');
+});
+```
+
+This explains why `show (Some 123)` fails and many other mysterious type errors occur.
+
+---
+
 ## 🎯 Phase 4: Optional Enhancements
 
 The following features would be **nice-to-have** but are not essential for a functional trait system:
@@ -579,10 +631,16 @@ constraint Numeric a = Eq a + Ord a + Show a + Add a + Mul a;
 
 ### If Continuing Trait System Work:
 
-1. **First Priority**: Only work on **Phase 4: Structural Constraints** if specifically requested
-2. **Testing**: All new features must have comprehensive test coverage
-3. **Safety**: Maintain the existing safety mechanisms - don't break them
-4. **Documentation**: Update this document with progress
+1. **🚨 HIGHEST PRIORITY**: Fix the **Implementation Signature Validation** bug described above
+   - This is a critical safety hole that breaks trait system guarantees
+   - Must be fixed before any other trait system work
+   - Add comprehensive tests for signature validation
+   - Update stdlib.noo to fix broken `Show` implementations
+
+2. **Second Priority**: Only work on **Phase 4: Structural Constraints** if specifically requested
+3. **Testing**: All new features must have comprehensive test coverage
+4. **Safety**: Maintain the existing safety mechanisms - don't break them
+5. **Documentation**: Update this document with progress
 
 ### If Working on Other Features:
 
