@@ -543,6 +543,46 @@ test('should reject implementation with wrong function signature', () => {
 
 This explains why `show (Some 123)` fails and many other mysterious type errors occur.
 
+## 🚨 NEWLY DISCOVERED GAP: Conditional Implementations Missing
+
+**SECOND PRIORITY**: The trait system documentation claims conditional implementations with `given` syntax are complete, but they are **not actually implemented**.
+
+### The Documentation Lie
+**README.md claims this works:**
+```noo
+# Show for Lists only if elements are showable
+implement Show (List a) given Show a (
+  show = fn list => "[" + (joinStrings ", " (map show list)) + "]"
+);
+```
+
+**Reality**: The parser **does not support** `given` syntax in implement statements.
+
+### Current Parser Support
+```typescript
+// Current parser only supports:
+implement TraitName TypeExpression ( functions )
+
+// Missing support for:
+implement TraitName TypeExpression given Constraints ( functions )
+```
+
+### Impact
+Without conditional implementations, we cannot properly implement:
+- `Show (Option a)` - needs `given Show a`
+- `Show (List a)` - needs `given Show a` 
+- `Eq (List a)` - needs `given Eq a`
+- Any other polymorphic trait implementations
+
+### Required Implementation
+1. **Extend AST**: Add `givenConstraints?: ConstraintExpr` to `ImplementDefinitionExpression`
+2. **Extend parser**: Support optional `given ConstraintExpr` in implement statements
+3. **Extend trait system**: Handle conditional implementations in trait registry
+4. **Update type checking**: Validate given constraints are satisfied
+5. **Fix stdlib.noo**: Use proper conditional implementations
+
+This is **not Phase 4 work** - it's a missing piece of the supposedly complete trait system.
+
 ---
 
 ## 🎯 Phase 4: Optional Enhancements
