@@ -374,10 +374,12 @@ export class Evaluator {
 		this.environment.set(
 			'$',
 			createNativeFunction('$', (func: Value) => (arg: Value) => {
-				// DEBUG: Log what we're trying to apply
-				console.log('DEBUG: Dollar operator called with func:', func);
-				console.log('DEBUG: func.tag:', func?.tag);
-				console.log('DEBUG: typeof func:', typeof func);
+				// Handle trait function application (same as evaluateApplication)
+				if (func.tag === 'trait-function') {
+					// Create a synthetic argument expression for the trait function
+					const argExpr = { kind: 'literal', value: arg, location: { line: 1, column: 1 } };
+					return this.evaluateTraitFunctionApplication(func as any, [argExpr as any]);
+				}
 				
 				if (isFunction(func)) return func.fn(arg);
 				if (isNativeFunction(func)) return func.fn(arg);
