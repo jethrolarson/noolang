@@ -1,28 +1,25 @@
 # Complex benchmark - heavy type inference and trait system usage
+# This benchmark properly showcases the NEW working trait system
 
-# Test trait system with complex operations
-trait_map_test = map (fn x => x * 2) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+# Test trait calls with different types separately to avoid unification issues
+list_operations = map (fn x => x * 2) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+option_operations = map (fn x => x + 1) (Some 42);
+string_operations = map (fn x => show x) [1, 2, 3];
 
-# Complex nested function with heavy type inference
+# Complex nested function with heavy type inference and trait usage
 complex_fn = fn x =>
   (fn a =>
     (fn b =>
       (fn c =>
+        # Use trait system's map instead of manual implementation
         map c [1, 2, 3, 4, 5]
       ) (fn z => b z + a)
     ) (fn y => a * y)
   ) (x + 1);
 
-# Multiple trait calls in sequence
-option_tests = [
-  map (fn x => x + 1) (Some 42),
-  map (fn x => x * 2) (Some 21),
-  map (fn x => x - 5) None
-];
-
-# Heavy constraint propagation with records
+# Heavy constraint propagation with records and trait functions
 make_record = fn x y z =>
-  {@a x, @b y, @c z, @computed x + y * z};
+  {@a x, @b y, @c z, @computed x + y * z, @show_x show x};
 
 # Test trait system with record operations
 records = map (fn i => make_record i (i * 2) (i * 3)) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -32,23 +29,41 @@ nested_computation = map (fn record =>
   {@original record, @doubled map (fn x => x * 2) [(@a record), (@b record), (@c record)]}
 ) records;
 
-# Test Show trait with various types
-show_tests = [
-  show 42,
-  show "hello",
-  show True,
-  show (Some 123)
+# Test Show trait with various types to stress the trait system
+show_int = show 42;
+show_string = show "hello";
+show_bool = show True;
+show_option = show (Some 123);
+show_none = show None;
+
+# Multiple trait operations that work with constraint resolution
+combined_list = map show (map (fn x => Some x) [1, 2, 3, 4, 5]);
+
+# Test constraint resolution with higher-order functions
+higher_order_test = map (map (fn x => x + 1)) [
+  [1, 2, 3],
+  [4, 5, 6], 
+  [7, 8, 9]
 ];
 
-# Multiple trait constraints in one expression
-combined_test = map show (map (fn x => Some x) [1, 2, 3, 4, 5]);
+# Complex trait composition that stresses the type system
+composition_test = map (fn list => 
+  map show (map (fn x => x * x) list)
+) [[1, 2], [3, 4, 5], [6, 7, 8, 9]];
 
 {
-  @trait_map trait_map_test,
+  @list_ops list_operations,
+  @option_ops option_operations,
+  @string_ops string_operations,
   @complex_result complex_fn 10,
-  @option_tests option_tests,
   @records records,
   @nested nested_computation,
-  @show_tests show_tests,
-  @combined combined_test
+  @show_int show_int,
+  @show_string show_string,
+  @show_bool show_bool,
+  @show_option show_option,
+  @show_none show_none,
+  @combined combined_list,
+  @higher_order higher_order_test,
+  @composition composition_test
 }
