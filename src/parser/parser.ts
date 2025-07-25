@@ -1512,6 +1512,13 @@ const parseImplementDefinition: C.Parser<ImplementDefinitionExpression> = C.map(
 		C.keyword('implement'),
 		C.identifier(), // constraint name like "Monad"
 		C.lazy(() => parseTypeExpression), // type expression like "Option" or "(Result e)"
+		// Optional given constraints
+		C.optional(
+			C.seq(
+				C.keyword('given'),
+				C.lazy(() => parseConstraintExpr)
+			)
+		),
 		C.punctuation('('),
 		C.sepBy(parseImplementationFunction, C.punctuation(';')),
 		C.punctuation(')')
@@ -1520,6 +1527,7 @@ const parseImplementDefinition: C.Parser<ImplementDefinitionExpression> = C.map(
 		implementKeyword,
 		constraintName,
 		typeExpr,
+		givenClause,
 		_openParen,
 		implementations,
 		closeParen,
@@ -1527,6 +1535,7 @@ const parseImplementDefinition: C.Parser<ImplementDefinitionExpression> = C.map(
 		kind: 'implement-definition',
 		constraintName: constraintName.value,
 		typeExpr,
+		givenConstraints: givenClause ? givenClause[1] : undefined,
 		implementations,
 		location: createLocation(
 			implementKeyword.location.start,

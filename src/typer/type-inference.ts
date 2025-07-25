@@ -1096,7 +1096,7 @@ export const typeImplementDefinition = (
 	expr: ImplementDefinitionExpression,
 	state: TypeState
 ): TypeResult => {
-	const { constraintName, typeExpr, implementations } = expr;
+	const { constraintName, typeExpr, implementations, givenConstraints } = expr;
 
 	// Extract type name from type expression - support all type kinds
 	const { getTypeName } = require('./trait-system');
@@ -1147,6 +1147,7 @@ export const typeImplementDefinition = (
 	const traitImpl = {
 		typeName,
 		functions: implementationMap,
+		givenConstraints, // Include given constraints if present
 	};
 
 	// Add to trait registry using the new trait system

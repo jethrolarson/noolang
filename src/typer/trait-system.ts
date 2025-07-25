@@ -1,7 +1,7 @@
 // NEW MINIMAL TRAIT SYSTEM
 // Designed to make `map increment (Some 1)` work with simple dispatch
 
-import { Type, Expression, FunctionExpression } from '../ast';
+import { Type, Expression, FunctionExpression, ConstraintExpr } from '../ast';
 import { TypeState } from './types';
 
 // Simple trait definition - just a name and function signatures
@@ -15,6 +15,7 @@ export type TraitDefinition = {
 export type TraitImplementation = {
 	typeName: string; // e.g., "Option", "List", "Int"
 	functions: Map<string, Expression>; // function name -> implementation expression
+	givenConstraints?: ConstraintExpr; // Optional given constraints for conditional implementations
 };
 
 // Registry holding all traits and their implementations
@@ -114,6 +115,8 @@ export function addTraitImplementation(
 		}
 	}
 	
+	// TODO: Validate given constraints are satisfied
+	// For now, just store the implementation with its given constraints
 	traitImpls.set(impl.typeName, impl);
 	return true;
 }
