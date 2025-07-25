@@ -66,6 +66,114 @@ describe('Trait System Phase 1 Infrastructure', () => {
 			
 			expect(success).toBe(false);
 		});
+
+		it('should reject implementation with wrong function signature', () => {
+			const registry = createTraitRegistry();
+			const trait = {
+				name: 'Show',
+				typeParam: 'a',
+				functions: new Map([['show', functionType([typeVariable('a')], stringType())]]),
+			};
+			addTraitDefinition(registry, trait);
+
+			// This is the exact case from the documentation: Show takes 1 param, but implementation takes 2
+			const badImpl = {
+				typeName: 'Option',
+				functions: new Map([['show', {
+					kind: 'function',
+					params: ['showElement', 'opt'], // 2 parameters - WRONG!
+					body: { kind: 'literal', value: 'dummy' }
+				} as any]]),
+			};
+			
+			expect(() => addTraitImplementation(registry, 'Show', badImpl))
+				.toThrow('Function signature mismatch for \'show\' in Show implementation for Option: expected 1 parameters, got 2');
+		});
+
+		it('should reject implementation with too few parameters', () => {
+			const registry = createTraitRegistry();
+			const trait = {
+				name: 'Test',
+				typeParam: 'a',
+				functions: new Map([['fn2', functionType([typeVariable('a'), typeVariable('a')], stringType())]]),
+			};
+			addTraitDefinition(registry, trait);
+
+			const badImpl = {
+				typeName: 'Int',
+				functions: new Map([['fn2', {
+					kind: 'function',
+					params: ['x'], // 1 parameter, expected 2
+					body: { kind: 'literal', value: 'dummy' }
+				} as any]]),
+			};
+			
+			expect(() => addTraitImplementation(registry, 'Test', badImpl))
+				.toThrow('Function signature mismatch for \'fn2\' in Test implementation for Int: expected 2 parameters, got 1');
+		});
+
+		it('should accept implementation with correct function signature', () => {
+			const registry = createTraitRegistry();
+			const trait = {
+				name: 'Show',
+				typeParam: 'a',
+				functions: new Map([['show', functionType([typeVariable('a')], stringType())]]),
+			};
+			addTraitDefinition(registry, trait);
+
+			const correctImpl = {
+				typeName: 'Option',
+				functions: new Map([['show', {
+					kind: 'function',
+					params: ['opt'], // 1 parameter - CORRECT!
+					body: { kind: 'literal', value: 'dummy' }
+				} as any]]),
+			};
+			
+			const success = addTraitImplementation(registry, 'Show', correctImpl);
+			expect(success).toBe(true);
+		});
+
+		it('should accept variable references (unknown arity)', () => {
+			const registry = createTraitRegistry();
+			const trait = {
+				name: 'Show',
+				typeParam: 'a',
+				functions: new Map([['show', functionType([typeVariable('a')], stringType())]]),
+			};
+			addTraitDefinition(registry, trait);
+
+			// Variable references can't be validated at this stage
+			const variableImpl = {
+				typeName: 'Int',
+				functions: new Map([['show', { kind: 'variable', name: 'intToString' } as any]]),
+			};
+			
+			const success = addTraitImplementation(registry, 'Show', variableImpl);
+			expect(success).toBe(true);
+		});
+
+		it('should reject function not defined in trait', () => {
+			const registry = createTraitRegistry();
+			const trait = {
+				name: 'Show',
+				typeParam: 'a',
+				functions: new Map([['show', functionType([typeVariable('a')], stringType())]]),
+			};
+			addTraitDefinition(registry, trait);
+
+			const badImpl = {
+				typeName: 'Int',
+				functions: new Map([['nonExistentFunction', {
+					kind: 'function',
+					params: ['x'],
+					body: { kind: 'literal', value: 'dummy' }
+				} as any]]),
+			};
+			
+			expect(() => addTraitImplementation(registry, 'Show', badImpl))
+				.toThrow('Function \'nonExistentFunction\' not defined in trait Show');
+		});
 	});
 
 	describe('Trait Function Resolution', () => {
