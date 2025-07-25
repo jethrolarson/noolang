@@ -21,6 +21,8 @@ export type TraitImplementation = {
 export type TraitRegistry = {
 	definitions: Map<string, TraitDefinition>;
 	implementations: Map<string, Map<string, TraitImplementation>>; // trait -> type -> impl
+	// Track which traits define each function name for conflict detection
+	functionTraits: Map<string, string[]>; // function name -> trait names that define it
 };
 
 // Create empty trait registry
@@ -28,6 +30,7 @@ export function createTraitRegistry(): TraitRegistry {
 	return {
 		definitions: new Map(),
 		implementations: new Map(),
+		functionTraits: new Map(),
 	};
 }
 
@@ -36,9 +39,19 @@ export function addTraitDefinition(
 	registry: TraitRegistry,
 	trait: TraitDefinition
 ): void {
+	// Add the trait definition
 	registry.definitions.set(trait.name, trait);
 	if (!registry.implementations.has(trait.name)) {
 		registry.implementations.set(trait.name, new Map());
+	}
+
+	// Track function names for this trait (allow multiple traits to define same function)
+	for (const functionName of trait.functions.keys()) {
+		const existingTraits = registry.functionTraits.get(functionName) || [];
+		if (!existingTraits.includes(trait.name)) {
+			existingTraits.push(trait.name);
+			registry.functionTraits.set(functionName, existingTraits);
+		}
 	}
 }
 
@@ -104,7 +117,13 @@ export function resolveTraitFunction(
 		return { found: false };
 	}
 
-	// Search through all traits to find one that has this function
+	// Find all traits that define this function and have implementations for this type
+	const candidateImplementations: Array<{
+		traitName: string;
+		impl: Expression;
+	}> = [];
+
+	// Search through all traits to find implementations
 	for (const [traitName, traitDef] of registry.definitions) {
 		if (traitDef.functions.has(functionName)) {
 			// Check if we have an implementation for this type
@@ -112,15 +131,33 @@ export function resolveTraitFunction(
 			if (traitImpls) {
 				const impl = traitImpls.get(firstArgTypeName);
 				if (impl && impl.functions.has(functionName)) {
-					return {
-						found: true,
+					candidateImplementations.push({
 						traitName,
-						typeName: firstArgTypeName,
 						impl: impl.functions.get(functionName)!,
-					};
+					});
 				}
 			}
 		}
+	}
+
+	// Check for ambiguity - multiple traits providing implementations for the same type
+	if (candidateImplementations.length > 1) {
+		const traitNames = candidateImplementations.map(c => c.traitName);
+		throw new Error(
+			`Ambiguous function call '${functionName}' for type '${firstArgTypeName}': ` +
+			`multiple implementations found in traits: ${traitNames.join(', ')}. ` +
+			`Cannot determine which implementation to use.`
+		);
+	}
+
+	if (candidateImplementations.length === 1) {
+		const candidate = candidateImplementations[0];
+		return {
+			found: true,
+			traitName: candidate.traitName,
+			typeName: firstArgTypeName,
+			impl: candidate.impl,
+		};
 	}
 
 	return { found: false };
@@ -131,32 +168,30 @@ export function isTraitFunction(
 	registry: TraitRegistry,
 	functionName: string
 ): boolean {
-	for (const traitDef of registry.definitions.values()) {
-		if (traitDef.functions.has(functionName)) {
-			return true;
-		}
-	}
-	return false;
+	return registry.functionTraits.has(functionName);
 }
 
 // Get trait definition and function type for a trait function
-// Returns the most recently defined trait that has this function
+// For ambiguous cases, returns the first trait found (maintain backward compatibility)
 export function getTraitFunctionInfo(
 	registry: TraitRegistry,
 	functionName: string
 ): { traitName: string; functionType: Type; typeParam: string } | null {
-	let lastMatch: { traitName: string; functionType: Type; typeParam: string } | null = null;
+	const definingTraits = registry.functionTraits.get(functionName) || [];
 	
-	for (const [traitName, traitDef] of registry.definitions) {
-		if (traitDef.functions.has(functionName)) {
-			lastMatch = {
-				traitName,
-				functionType: traitDef.functions.get(functionName)!,
-				typeParam: traitDef.typeParam,
-			};
-		}
+	if (definingTraits.length === 0) {
+		return null;
 	}
-	return lastMatch;
+	
+	// For type inference purposes, we can use any trait that defines this function
+	// The ambiguity will be detected later during function resolution if multiple implementations exist
+	const traitName = definingTraits[0];
+	const traitDef = registry.definitions.get(traitName)!;
+	return {
+		traitName,
+		functionType: traitDef.functions.get(functionName)!,
+		typeParam: traitDef.typeParam,
+	};
 }
 
 // Add trait registry to TypeState

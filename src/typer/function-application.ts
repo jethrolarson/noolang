@@ -131,10 +131,11 @@ export const typeApplication = (
 	// Type each argument and collect effects
 	const argTypes: Type[] = [];
 	let allEffects = funcResult.effects;
+	
 	for (const arg of expr.args) {
 		const argResult = typeExpression(arg, currentState);
-		argTypes.push(argResult.type);
 		currentState = argResult.state;
+		argTypes.push(argResult.type);
 		allEffects = unionEffects(allEffects, argResult.effects);
 	}
 
