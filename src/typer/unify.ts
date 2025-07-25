@@ -1,4 +1,4 @@
-import { Type } from '../ast';
+import { Type, TraitConstraint, VariantType } from '../ast';
 import { substitute } from './substitute';
 import { TypeState } from './types';
 import { isTypeKind, typesEqual, constraintsEqual } from './helpers';
@@ -51,6 +51,7 @@ const unifyInternal = (
 		reason?: string;
 		operation?: string;
 		hint?: string;
+		constraintContext?: Map<string, TraitConstraint[]>;
 	}
 ): TypeState => {
 	// Early equality check before substitution for performance
@@ -59,7 +60,21 @@ const unifyInternal = (
 	const s1 = substitute(t1, state.substitution);
 	const s2 = substitute(t2, state.substitution);
 
+	// PHASE 3: Constraint resolution debug logging (can be removed in production)
+	// if (context?.reason === 'function_application' && (s1.kind === 'variant' || s2.kind === 'variant')) {
+	// 	console.log('PHASE 3: Constraint unification:', s1.kind, 'with', s2.kind);
+	// }
+
 	if (typesEqual(s1, s2)) return state;
+
+	// PHASE 3: Handle constraint resolution EARLY to provide better error messages
+	// Check if one type is a variant with a constrained type variable name
+	if (context?.constraintContext && (isTypeKind(s1, 'variant') || isTypeKind(s2, 'variant'))) {
+		const constraintResult = tryUnifyConstrainedVariant(s1, s2, state, location, context);
+		if (constraintResult) {
+			return constraintResult;
+		}
+	}
 
 	// Handle variables (either order)
 	if (isTypeKind(s1, 'variable')) return unifyVariable(s1, s2, state, location);
@@ -144,6 +159,7 @@ export const unify = (
 		reason?: string;
 		operation?: string;
 		hint?: string;
+		constraintContext?: Map<string, TraitConstraint[]>;
 	}
 ): TypeState => {
 	const start = Date.now();
@@ -524,12 +540,278 @@ function unifyConstrained(
 		
 		return currentState;
 	} else if (isTypeKind(s1, 'constrained')) {
-		// s1 is constrained, s2 is not - unify base type with s2
-		return unify(s1.baseType, s2, state, location);
+		// PHASE 3: s1 is constrained, s2 is not - attempt constraint resolution
+		return unifyConstrainedWithConcrete(s1, s2, state, location);
 	} else if (isTypeKind(s2, 'constrained')) {
-		// s2 is constrained, s1 is not - unify s1 with base type  
-		return unify(s1, s2.baseType, state, location);
+		// PHASE 3: s2 is constrained, s1 is not - attempt constraint resolution
+		return unifyConstrainedWithConcrete(s2, s1, state, location);
 	}
 	
 	throw new Error('unifyConstrained called with non-constrained types');
+}
+
+// PHASE 3: Try to unify a variant type with a constrained type variable against a concrete type
+function tryUnifyConstrainedVariant(
+	s1: Type,
+	s2: Type,
+	state: TypeState,
+	location?: { line: number; column: number },
+	context?: {
+		reason?: string;
+		operation?: string;
+		hint?: string;
+		constraintContext?: Map<string, TraitConstraint[]>;
+	}
+): TypeState | null {
+	// Only proceed if we have constraint context
+	if (!context?.constraintContext) {
+		return null;
+	}
+	
+	const { getTypeName } = require('./trait-system');
+	
+	let variantType: Type & { kind: 'variant' };
+	let concreteType: Type;
+	
+	if (isTypeKind(s1, 'variant') && !isTypeKind(s2, 'variant')) {
+		variantType = s1;
+		concreteType = s2;
+	} else if (isTypeKind(s2, 'variant') && !isTypeKind(s1, 'variant')) {
+		variantType = s2;
+		concreteType = s1;
+	} else if (isTypeKind(s1, 'variant') && isTypeKind(s2, 'variant')) {
+		// Both are variants - check if one is a constrained type variable
+		const s1Name = (s1 as any).name;
+		const s2Name = (s2 as any).name;
+		
+		// Check if s1 is a constrained type variable
+		if (context.constraintContext.has(s1Name)) {
+			variantType = s1;
+			concreteType = s2;
+		} else if (context.constraintContext.has(s2Name)) {
+			variantType = s2;
+			concreteType = s1;
+		} else {
+			return null; // Neither variant is constrained
+		}
+	} else {
+		return null; // Neither is variant
+	}
+	
+		// Check if this variant type variable has constraints
+	const constraints = context.constraintContext.get(variantType.name);
+	if (!constraints) {
+		return null; // No constraints on this type variable
+	}
+
+	const concreteTypeName = getTypeName(concreteType);
+	const traitRegistry = state.traitRegistry;
+	if (!traitRegistry) {
+		return null;
+	}
+
+	// Special case: if concreteType is also a type variable, check for constraint compatibility
+	if (concreteType.kind === 'variable' || 
+		(concreteType.kind === 'variant' && concreteTypeName.startsWith('α')) ||
+		(concreteType.kind === 'constrained' && concreteTypeName.startsWith('α'))) {
+
+		// Both are type variables - we can unify them by propagating constraints
+		// For now, substitute the variant type with the concrete type
+		const newSubstitution = new Map(state.substitution);
+		newSubstitution.set(variantType.name, concreteType);
+		return { ...state, substitution: newSubstitution };
+	}
+	
+
+	
+	// Check if any constraint can be satisfied by the concrete type
+	for (const constraint of constraints) {
+		if (constraint.kind === 'implements') {
+			const traitName = constraint.trait;
+			const traitImpls = traitRegistry.implementations.get(traitName);
+			
+			if (traitImpls && traitImpls.has(concreteTypeName)) {
+				// Constraint is satisfied! Perform the substitution
+				const newSubstitution = new Map(state.substitution);
+				
+				if (concreteType.kind === 'list') {
+					// For List types, substitute the type constructor
+					newSubstitution.set(variantType.name, { kind: 'primitive', name: 'List' });
+					
+					// Transform α130 Int -> List Int
+					const substitutedVariant = substitute(variantType, newSubstitution);
+					
+					if (substitutedVariant.kind === 'variant' && 
+						substitutedVariant.name === 'List' && 
+						substitutedVariant.args.length === 1) {
+						
+						// Create the proper List type
+						const listType = {
+							kind: 'list' as const,
+							element: substitutedVariant.args[0]
+						};
+						
+						// Check if types match
+						if (concreteType.kind === 'list') {
+							// Unify the element types
+							const elementUnificationState = unify(
+								listType.element, 
+								concreteType.element, 
+								{ ...state, substitution: newSubstitution }, 
+								location
+							);
+							return elementUnificationState;
+						}
+					}
+				}
+				
+				// PHASE 3 FIX: Handle variant types like Option, Result, etc.
+				// Use runtime check to work around TypeScript type issues
+				if ((concreteType as any).kind === 'variant') {
+					const concreteVariant = concreteType as any; // Type assertion for now
+					
+					// For variant types, substitute the type constructor variable with the variant name
+					newSubstitution.set(variantType.name, { kind: 'primitive', name: concreteVariant.name });
+					
+					// Transform α130 Int -> Option Int (variant)
+					const substitutedVariant = substitute(variantType, newSubstitution);
+					
+					if (substitutedVariant.kind === 'variant' && 
+						substitutedVariant.name === concreteVariant.name && 
+						substitutedVariant.args && concreteVariant.args &&
+						substitutedVariant.args.length === concreteVariant.args.length) {
+						
+						// Unify the type arguments
+						let currentState = { ...state, substitution: newSubstitution };
+						for (let i = 0; i < substitutedVariant.args.length; i++) {
+							currentState = unify(
+								substitutedVariant.args[i], 
+								concreteVariant.args[i], 
+								currentState, 
+								location
+							);
+						}
+						return currentState;
+					}
+				}
+				
+				// For other types, try direct substitution
+				newSubstitution.set(variantType.name, concreteType);
+				return { ...state, substitution: newSubstitution };
+			} else {
+				// Constraint not satisfied - throw specific error
+				throw new Error(
+					formatTypeError(
+						createTypeError(
+							`No implementation of ${traitName} for ${concreteTypeName}`,
+							{
+								suggestion: `The constraint '${variantType.name} implements ${traitName}' cannot be satisfied by ${concreteTypeName}. ` +
+									       `You need to add: implement ${traitName} ${concreteTypeName} (...)`
+							},
+							location || { line: 1, column: 1 }
+						)
+					)
+				);
+			}
+		}
+	}
+	
+	return null; // No constraint resolution possible
+}
+
+// PHASE 3: Constraint resolution during unification
+function unifyConstrainedWithConcrete(
+	constrainedType: Type & { kind: 'constrained' },
+	concreteType: Type,
+	state: TypeState,
+	location?: { line: number; column: number }
+): TypeState {
+	const { getTypeName } = require('./trait-system');
+	
+	// Get the concrete type name for trait lookup
+	const concreteTypeName = getTypeName(concreteType);
+	
+	// Find which constrained type variable can be resolved to the concrete type
+	let resolvedVarName: string | null = null;
+	let resolvedConstraint: string | null = null;
+	
+	// Check each constraint to see if the concrete type satisfies it
+	for (const [varName, constraints] of constrainedType.constraints) {
+		for (const constraint of constraints) {
+			if (constraint.kind === 'implements') {
+				const traitName = constraint.trait;
+				
+				// Check if we have an implementation of this trait for the concrete type
+				const traitRegistry = state.traitRegistry;
+				if (!traitRegistry) {
+					throw new Error(
+						formatTypeError(
+							createTypeError(
+								`No trait registry available for constraint resolution`,
+								{},
+								location || { line: 1, column: 1 }
+							)
+						)
+					);
+				}
+				
+				const traitImpls = traitRegistry.implementations.get(traitName);
+				if (!traitImpls || !traitImpls.has(concreteTypeName)) {
+					throw new Error(
+						formatTypeError(
+							createTypeError(
+								`No implementation of ${traitName} for ${concreteTypeName}`,
+								{
+									suggestion: `The constraint '${varName} implements ${traitName}' cannot be satisfied by ${concreteTypeName}. ` +
+										       `You need to add: implement ${traitName} ${concreteTypeName} (...)`
+								},
+								location || { line: 1, column: 1 }
+							)
+						)
+					);
+				}
+				
+				// This constraint is satisfied - remember it for substitution
+				resolvedVarName = varName;
+				resolvedConstraint = traitName;
+			}
+		}
+	}
+	
+	if (!resolvedVarName) {
+		throw new Error(
+			formatTypeError(
+				createTypeError(
+					`No resolvable constraints found for ${concreteTypeName}`,
+					{},
+					location || { line: 1, column: 1 }
+				)
+			)
+		);
+	}
+	
+	// Create substitution mapping the constrained variable to the concrete type constructor
+	const newSubstitution = new Map(state.substitution);
+	
+	// PHASE 3 FIX: For higher-kinded types like functors, we need to substitute the type constructor
+	// If the constrained type has variant types like "α130 Int", we substitute α130 with List
+	// so that "α130 Int" becomes "List Int"
+	
+	if (concreteType.kind === 'list') {
+		// For List Int, we substitute the type constructor variable with List
+		newSubstitution.set(resolvedVarName, { kind: 'primitive', name: 'List' });
+	} else {
+		// For other types, substitute directly
+		newSubstitution.set(resolvedVarName, concreteType);
+	}
+	
+	const newState = { ...state, substitution: newSubstitution };
+	
+	// Now unify the base types with the new substitution
+	return unify(
+		substitute(constrainedType.baseType, newSubstitution),
+		concreteType,
+		newState,
+		location
+	);
 }

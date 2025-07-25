@@ -210,22 +210,29 @@ export const typeApplication = (
 
 		// Unify each argument with the corresponding parameter type
 		for (let i = 0; i < argTypes.length; i++) {
+			// PHASE 3: Pass constraint context to unification if we have function constraints
+
+			
+			const unificationContext = {
+				reason: 'function_application' as const,
+				operation: `applying argument ${i + 1}`,
+				hint: `Argument ${i + 1} has type ${typeToString(
+					argTypes[i],
+					currentState.substitution
+				)} but the function parameter expects ${typeToString(
+					actualFuncType.params[i],
+					currentState.substitution
+				)}.`,
+				// Pass constraint information if available
+				...(functionConstraints && { constraintContext: functionConstraints })
+			};
+			
 			currentState = unify(
 				actualFuncType.params[i],
 				argTypes[i],
 				currentState,
 				getExprLocation(expr),
-				{
-					reason: 'function_application',
-					operation: `applying argument ${i + 1}`,
-					hint: `Argument ${i + 1} has type ${typeToString(
-						argTypes[i],
-						currentState.substitution
-					)} but the function parameter expects ${typeToString(
-						actualFuncType.params[i],
-						currentState.substitution
-					)}.`,
-				}
+				unificationContext
 			);
 
 			// After unification, validate constraints on the parameter

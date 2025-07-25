@@ -222,4 +222,48 @@ describe('Dollar Operator ($)', () => {
 			}).not.toThrow();
 		});
 	});
+
+	describe('Trait Function Application', () => {
+		test('should work with built-in trait functions', () => {
+			// Test with list_map which is available as a built-in
+			const result = runCode(`
+				inc = fn x => x + 1;
+				mapInc = list_map inc;
+				result = mapInc $ [1, 2, 3]
+			`);
+			
+			expect(unwrapValue(result.finalResult)).toEqual([2, 3, 4]);
+		});
+
+		test('should match regular function application behavior', () => {
+			const directResult = runCode(`
+				inc = fn x => x + 1;
+				mapInc = list_map inc;
+				result = mapInc [1, 2, 3]
+			`);
+			
+			const dollarResult = runCode(`
+				inc = fn x => x + 1;
+				mapInc = list_map inc;
+				result = mapInc $ [1, 2, 3]
+			`);
+			
+			// Both should produce the same result
+			expect(unwrapValue(dollarResult.finalResult)).toEqual(
+				unwrapValue(directResult.finalResult)
+			);
+		});
+
+		test('should handle partial application with dollar operator', () => {
+			// This tests the specific case where a partially applied function 
+			// (which may have trait-function tag) is used with $
+			const result = runCode(`
+				add = fn x => fn y => x + y;
+				add5 = add 5;
+				result = add5 $ 3
+			`);
+			
+			expect(unwrapValue(result.finalResult)).toBe(8);
+		});
+	});
 });
