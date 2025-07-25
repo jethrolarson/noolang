@@ -222,4 +222,46 @@ describe('Dollar Operator ($)', () => {
 			}).not.toThrow();
 		});
 	});
+
+	describe('Trait Function Application', () => {
+		test('should work with trait functions (map inc)', () => {
+			const result = runCode(`
+				inc = fn x => x + 1;
+				mapInc = map inc;
+				result1 = mapInc $ [1, 2, 3];
+				result2 = mapInc $ Some 42
+			`);
+			
+			// Both should work without throwing
+			expect(unwrapValue(result.finalResult)).toEqual([2, 3, 4]);
+		});
+
+		test('should match regular function application behavior', () => {
+			const directResult = runCode(`
+				inc = fn x => x + 1;
+				mapInc = map inc;
+				result = mapInc (Some 42)
+			`);
+			
+			const dollarResult = runCode(`
+				inc = fn x => x + 1;
+				mapInc = map inc;
+				result = mapInc $ Some 42
+			`);
+			
+			// Both should produce the same result
+			expect(unwrapValue(dollarResult.finalResult)).toEqual(
+				unwrapValue(directResult.finalResult)
+			);
+		});
+
+		test('should work with other trait functions', () => {
+			const result = runCode(`
+				showInt = show;
+				result = showInt $ 42
+			`);
+			
+			expect(unwrapValue(result.finalResult)).toBe('42');
+		});
+	});
 });
