@@ -33,9 +33,13 @@ describe('Manual Constraint Resolution Testing', () => {
 		// Check what's in the trait registry
 		const registry = result.state.traitRegistry;
 		console.log('Trait definitions:', Array.from(registry.definitions.keys()));
-		console.log('Trait implementations:', Object.fromEntries(
-			Array.from(registry.implementations.entries()).map(([k, v]) => [k, Array.from(v.keys())])
-		));
+		
+		// Log trait implementations in a simpler way to avoid TypeScript issues
+		const implementations: Record<string, string[]> = {};
+		for (const [traitName, typeMap] of registry.implementations) {
+			implementations[traitName] = Array.from(typeMap.keys());
+		}
+		console.log('Trait implementations:', implementations);
 		
 		// The test constraint should be registered
 		expect(registry.definitions.has('TestShow')).toBe(true);
