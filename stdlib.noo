@@ -76,7 +76,7 @@ option_get_or = fn default opt => match opt with (
 
 # Map over Option (using Monad constraint)
 implement Monad Option (
-  bind = fn opt f => match opt with (
+  bind = fn opt => fn f => match opt with (
     Some x => f x;
     None => None
   );
