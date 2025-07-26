@@ -189,8 +189,8 @@ describe('Trait System Phase 3: Constraint Resolution', () => {
 
 		test('should work with different functor types', () => {
 			const tests = [
-				{ code: 'map (fn x => x + 1) [1, 2, 3]', description: 'List' },
-				{ code: 'map (fn x => x + 1) (Some 1)', description: 'Option' },
+				{ code: 'map (fn x => x + 1) [1, 2, 3]', description: 'List', expectedType: 'List Int', expectedKind: 'list' },
+				{ code: 'map (fn x => x + 1) (Some 1)', description: 'Option', expectedType: 'Option Int', expectedKind: 'variant' },
 			];
 
 			for (const testCase of tests) {
@@ -200,9 +200,11 @@ describe('Trait System Phase 3: Constraint Resolution', () => {
 				
 				const typeResult = typeProgram(program);
 				
-				expect(typeResult.type.kind).toBe('constrained');
+				// CONSTRAINT COLLAPSE: Should resolve to concrete types
+				expect(typeResult.type.kind).toBe(testCase.expectedKind);
 				const typeString = typeToString(typeResult.type);
-				expect(typeString).toMatch(/implements Functor/);
+				expect(typeString).toBe(testCase.expectedType);
+				expect(typeString).not.toMatch(/implements|given|α\d+/);
 			}
 		});
 	});
