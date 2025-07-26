@@ -422,8 +422,8 @@ export const typeToString = (
 				const constraintStr =
 					showConstraints && t.constraints && t.constraints.length > 0
 						? ` given ${
-								(t as any).originalConstraint
-									? formatConstraintExpr((t as any).originalConstraint)
+								t.originalConstraint
+									? formatConstraintExpr(t.originalConstraint)
 									: deduplicateConstraints(t.constraints)
 											.map(formatConstraint)
 											.join(' ')

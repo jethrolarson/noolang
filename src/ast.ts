@@ -56,6 +56,7 @@ export type FunctionType = {
 	return: Type;
 	effects: Set<Effect>;
 	constraints?: Constraint[];
+	originalConstraint?: ConstraintExpr; // For preserving the original constraint expression for display
 };
 
 export type VariableType = {

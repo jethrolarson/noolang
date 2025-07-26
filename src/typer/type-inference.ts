@@ -455,7 +455,7 @@ export const typeFunction = (
 			if (constraints.length > 0) {
 				funcType.constraints = constraints;
 				// Store the original constraint expression for display purposes
-				(funcType as any).originalConstraint = constrainedBody.constraint;
+				funcType.originalConstraint = constrainedBody.constraint;
 
 				// CRITICAL: Also propagate constraints to type variables in parameters
 				// This ensures constraint validation works during function application
