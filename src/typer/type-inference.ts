@@ -916,12 +916,14 @@ export const typeAccessor = (
 	const [fieldType, nextState] = freshTypeVariable(state);
 	// Create a simple type variable for the record (no constraints on the variable itself)
 	const [recordVar, finalState] = freshTypeVariable(nextState);
-	// Create a function type with constraints attached to the function type
+	// Create a function type with constraints attached to the parameter
 	const funcType = functionType([recordVar], fieldType);
-	// Add the constraint directly to the parameter variable
+	// Add the has constraint to the parameter type variable
 	if (recordVar.kind === 'variable') {
 		recordVar.constraints = [
-			hasFieldConstraint(recordVar.name, fieldName, fieldType),
+			hasConstraint(recordVar.name, {
+				fields: { [fieldName]: fieldType }
+			}),
 		];
 	}
 
