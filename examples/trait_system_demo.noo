@@ -36,24 +36,6 @@ implement Ord Float (
   greaterThan = fn a b => a > b
 );
 
-# 5. COMPLEX CONSTRAINT WITH GENERIC FUNCTIONS
-constraint Functor f (
-  fmap : (a -> b) -> f a -> f b
-);
-
-# Implement Functor for List
-implement Functor List (
-  fmap = map  # Use built-in map function
-);
-
-# 6. MONAD CONSTRAINT (ADVANCED)
-constraint Monad m (
-  return : a -> m a;
-  bind : m a -> (a -> m b) -> m b
-);
-
-# Note: Monad implementation would require Option/Result types
-# This demonstrates the syntax for advanced constraints
 
 # 7. TYPE-DIRECTED DISPATCH EXAMPLES
 
