@@ -302,15 +302,15 @@ given a has {{Int, Int}, String}    # First element is coordinate pair
 
 #### Tuple Accessor Functions
 ```noo
-# Generic tuple accessors using duck typing
+# Note: Tuple pattern matching not yet implemented - these are aspirational examples
+# Generic tuple accessors using duck typing (when tuple patterns are added)
 first = fn t => match t with ({x, ...} => x) 
   : a -> b given a has {b}
 
-second = fn t => match t with ({_, x, ...} => x)
-  : a -> b given a has {_, b}
-
-third = fn t => match t with ({_, _, x, ...} => x) 
-  : a -> b given a has {_, _, b}
+# Alternative implementation using built-in functions until tuple patterns exist
+first = tupleGet 0   # Get first element of tuple
+second = tupleGet 1  # Get second element of tuple  
+third = tupleGet 2   # Get third element of tuple
 
 # Works with any tuple that has enough elements
 first {42}                    # ✅ 42
@@ -320,7 +320,7 @@ first {42, "hello", True}     # ✅ 42 (extra elements ignored)
 #### Record Interface Functions
 ```noo
 # Functions that work with any record having required fields
-greet = fn person => "Hello " + (@name person)
+greet = fn person => concat "Hello " (@name person)
   : a -> String given a has {@name String}
 
 # Works with any record containing @name
@@ -331,15 +331,24 @@ greet {@name "Bob", @city "NYC", @id 123}         # ✅ Works (extra fields igno
 #### Coordinate/Geometry Functions
 ```noo
 # 2D operations that work with any tuple starting with two numbers
+# Note: Using Int instead of Float (no Float type yet)
 distance2D = fn p1 p2 => 
-  match {p1, p2} with ({{x1, y1, ...}, {x2, y2, ...}} => 
-    sqrt((x2-x1)^2 + (y2-y1)^2))
-  : a -> a -> Float given a has {Float, Float}
+  # When tuple patterns are implemented:
+  # match {p1, p2} with ({{x1, y1, ...}, {x2, y2, ...}} => 
+  #   sqrt((x2-x1)^2 + (y2-y1)^2))
+  
+  # Current implementation using tuple accessors:
+  x1 = tupleGet 0 p1;
+  y1 = tupleGet 1 p1;
+  x2 = tupleGet 0 p2;
+  y2 = tupleGet 1 p2;
+  sqrt ((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1))
+  : a -> a -> Int given a has {Int, Int}
 
 # Works with 2D, 3D, or higher dimensional points
-distance2D {0.0, 0.0}           # ✅ 2D point
-distance2D {1.0, 1.0, 2.0}      # ✅ 3D point (Z ignored)
-distance2D {3.0, 4.0, "label"}  # ✅ Labeled point (label ignored)
+distance2D {0, 0}           # ✅ 2D point
+distance2D {1, 1, 2}        # ✅ 3D point (Z ignored)
+distance2D {3, 4, "label"}  # ✅ Labeled point (label ignored)
 ```
 
 ### Integration with Existing System
@@ -353,7 +362,7 @@ processItems = fn container =>
 
 # Multiple has constraints
 validatePerson = fn data =>
-  (@name (@person data)) + " at " + (@street (@address data))
+  concat (concat (@name (@person data)) " at ") (@street (@address data))
   : a -> String given 
     a has {@person {@name String}} and 
     a has {@address {@street String}}
@@ -363,8 +372,10 @@ validatePerson = fn data =>
 ```noo
 # Type inference should derive has constraints from usage
 getCoordinateSum = fn point => 
-  match point with ({x, y, ...} => x + y)
-# Should infer: a -> b given a has {b, b} and Number b
+  # When tuple patterns exist: match point with ({x, y, ...} => x + y)
+  # Current: using tuple accessors
+  (tupleGet 0 point) + (tupleGet 1 point)
+# Should infer: a -> Int given a has {Int, Int}
 ```
 
 ### Implementation Plan
