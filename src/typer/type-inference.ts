@@ -312,10 +312,32 @@ export const typeFunction = (
 	const boundParams = new Set(expr.params);
 	const freeVars = collectFreeVars(expr.body, boundParams);
 
-	// Create function environment that includes outer environment
-	const functionEnv = new Map(state.environment);
+	// Create a minimal environment with only what's needed
+	const functionEnv = new Map<string, any>();
 
-	// Closure optimization: using minimal environment
+	// Always include built-ins and stdlib essentials
+	const essentials = [
+		'+', '-', '*', '/', '==', '!=', '<', '>', '<=', '>=',
+		'|', '|>', '<|', ';', '$', 'if',
+		'length', 'head', 'tail', 'map', 'filter', 'reduce', 'isEmpty', 'append',
+		'concat', 'toString', 'abs', 'max', 'min',
+		'print', 'println', 'readFile', 'writeFile', 'log', 'random', 'randomRange',
+		'mutSet', 'mutGet', 'hasKey', 'hasValue', 'set', 'tupleLength', 'tupleIsEmpty', 'list_get',
+		'True', 'False', 'None', 'Some', 'Ok', 'Err', 'Bool', 'Option', 'Result',
+		'not', // Add not to essentials for Bool operations
+	];
+	for (const essential of essentials) {
+		if (state.environment.has(essential)) {
+			functionEnv.set(essential, state.environment.get(essential)!);
+		}
+	}
+
+	// Include only the free variables actually used
+	for (const freeVar of freeVars) {
+		if (state.environment.has(freeVar)) {
+			functionEnv.set(freeVar, state.environment.get(freeVar)!);
+		}
+	}
 
 	let currentState = { ...state, environment: functionEnv };
 
