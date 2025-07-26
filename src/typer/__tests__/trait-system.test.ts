@@ -632,11 +632,13 @@ describe('Trait System - Consolidated Tests', () => {
 			
 			expect(typeResult.type.kind).toBe('constrained');
 			expect(evalResult.finalResult.tag).toBe('list');
-			expect(evalResult.finalResult.values).toEqual([
-				{ tag: 'number', value: 2 },
-				{ tag: 'number', value: 3 },
-				{ tag: 'number', value: 4 }
-			]);
+			if (evalResult.finalResult.tag === 'list') {
+				expect(evalResult.finalResult.values).toEqual([
+					{ tag: 'number', value: 2 },
+					{ tag: 'number', value: 3 },
+					{ tag: 'number', value: 4 }
+				]);
+			}
 		});
 
 		test('should work with custom trait function', () => {
@@ -649,7 +651,9 @@ describe('Trait System - Consolidated Tests', () => {
 			const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 			
 			expect(evalResult.finalResult.tag).toBe('number');
-			expect(evalResult.finalResult.value).toBe(42);
+			if (evalResult.finalResult.tag === 'number') {
+				expect(evalResult.finalResult.value).toBe(42);
+			}
 		});
 
 		test('should compare direct list_map vs trait map', () => {
@@ -658,11 +662,13 @@ describe('Trait System - Consolidated Tests', () => {
 			const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 			
 			expect(evalResult.finalResult.tag).toBe('list');
-			expect(evalResult.finalResult.values).toEqual([
-				{ tag: 'number', value: 11 },
-				{ tag: 'number', value: 12 },
-				{ tag: 'number', value: 13 }
-			]);
+			if (evalResult.finalResult.tag === 'list') {
+				expect(evalResult.finalResult.values).toEqual([
+					{ tag: 'number', value: 11 },
+					{ tag: 'number', value: 12 },
+					{ tag: 'number', value: 13 }
+				]);
+			}
 		});
 	});
 
