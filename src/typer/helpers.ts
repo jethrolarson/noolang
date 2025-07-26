@@ -123,12 +123,13 @@ export const typesEqual = (t1: Type, t2: Type): boolean => {
 		return false;
 	}
 
-	// Simple cache for primitive/variable types
+	// Simple cache for primitive/variable types (both have 'name' property)
 	if (
 		(t1.kind === 'primitive' || t1.kind === 'variable') &&
 		(t2.kind === 'primitive' || t2.kind === 'variable')
 	) {
-		const key = `${t1.kind}:${(t1 as any).name}-${t2.kind}:${(t2 as any).name}`;
+		// TypeScript knows these are PrimitiveType | VariableType, both have 'name'
+		const key = `${t1.kind}:${t1.name}-${t2.kind}:${t2.name}`;
 		const cached = typesEqualCache.get(key);
 		if (cached !== undefined) return cached;
 
