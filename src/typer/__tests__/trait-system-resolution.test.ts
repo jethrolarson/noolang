@@ -408,6 +408,25 @@ describe('Trait System Phase 3: Constraint Resolution', () => {
 				expect(typeString).toMatch(/implements Functor/);
 			});
 
+			test('should preserve constraints when return type depends on unresolved type variable', () => {
+				// IMPORTANT: Even with concrete arguments, preserve constraints if return type has unresolved variables
+				const code = 'pure 1';
+				
+				const lexer = new Lexer(code);
+				const tokens = lexer.tokenize();
+				const program = parse(tokens);
+				
+				const typeResult = typeProgram(program);
+				
+				// Should preserve constraint because we don't know which Monad to use
+				expect(typeResult.type.kind).toBe('constrained');
+				
+				const typeString = typeToString(typeResult.type);
+				expect(typeString).toMatch(/implements Monad/);
+				expect(typeString).toMatch(/Int/); // Should contain the concrete Int type
+				// Example: "α Int given α implements Monad"
+			});
+
 			test('should collapse multiple constraints correctly', () => {
 				// GREEN: Simplified test case without pipeline operators
 				const code = 'map (fn x => x * 2) (map (fn x => x + 1) [1, 2, 3])';
