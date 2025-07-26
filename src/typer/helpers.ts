@@ -437,11 +437,12 @@ export const typeToString = (
 				return `List ${norm(t.element)}`;
 			case 'tuple':
 				return `(${t.elements.map(norm).join(' ')})`;
-			case 'record':
+			case 'record': {
 				const fields = Object.entries(t.fields)
 					.map(([name, fieldType]) => `@${name} ${norm(fieldType)}`)
 					.join(', ');
 				return fields.length > 0 ? `{ ${fields} }` : `{ }`;
+			}
 			case 'union':
 				return `(${t.types.map(norm).join(' | ')})`;
 			case 'variant':
@@ -466,7 +467,9 @@ export const typeToString = (
 						if (constraint.kind === 'implements') {
 							constraintStrs.push(`${varName} implements ${constraint.trait}`);
 						} else if (constraint.kind === 'hasField') {
-							constraintStrs.push(`${varName} has ${constraint.field}: ${norm(constraint.fieldType)}`);
+							constraintStrs.push(
+								`${varName} has ${constraint.field}: ${norm(constraint.fieldType)}`
+							);
 						}
 					}
 				}
