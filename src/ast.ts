@@ -153,6 +153,7 @@ export interface LiteralExpression {
 	value: number | string | boolean | Expression[] | null; // null represents unit
 	type?: Type;
 	location: Location;
+	originalToken?: string; // For distinguishing 1 vs 1.0 in numeric literals
 }
 
 export interface VariableExpression {

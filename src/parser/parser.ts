@@ -498,6 +498,8 @@ const parseNumber = C.map(
 		kind: 'literal',
 		value: parseFloat(token.value),
 		location: token.location,
+		// Store original token for distinguishing 1 vs 1.0
+		originalToken: token.value,
 	})
 );
 
