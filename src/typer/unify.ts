@@ -13,8 +13,8 @@ import { mapSet, typeToString, occursIn } from './helpers';
 import { functionApplicationError } from './type-errors';
 
 // Valid primitive type names (must match PrimitiveType['name'] union)
-const VALID_PRIMITIVES = new Set(['Int', 'String', 'Bool', 'List'] as const);
-type ValidPrimitiveName = 'Int' | 'String' | 'Bool' | 'List';
+const VALID_PRIMITIVES = new Set(['Float', 'String', 'Bool', 'List'] as const);
+type ValidPrimitiveName = 'Float' | 'String' | 'Bool' | 'List';
 
 // Type guard for valid primitive names
 function isValidPrimitiveName(name: string): name is ValidPrimitiveName {

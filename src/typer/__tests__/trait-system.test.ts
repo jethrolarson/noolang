@@ -12,7 +12,7 @@ import {
 	resolveTraitFunction,
 	getTypeName 
 } from '../trait-system';
-import { functionType, typeVariable, stringType, intType, boolType } from '../../ast';
+import { functionType, typeVariable, stringType, floatType, boolType } from '../../ast';
 import { 
 	assertNumberValue, 
 	assertListValue, 
@@ -183,15 +183,15 @@ describe('Trait System - Consolidated Tests', () => {
 				addTraitDefinition(registry, trait);
 
 				const impl = {
-					typeName: 'Int',
+					typeName: 'Float',
 					functions: new Map([['testShow', { kind: 'variable', name: 'toString' } as any]]),
 				};
 				addTraitImplementation(registry, 'TestShow', impl);
 
-				const result = resolveTraitFunction(registry, 'testShow', [intType()]);
+				const result = resolveTraitFunction(registry, 'testShow', [floatType()]);
 				expect(result.found).toBe(true);
 				expect(result.traitName).toBe('TestShow');
-				expect(result.typeName).toBe('Int');
+				expect(result.typeName).toBe('Float');
 			});
 
 			test('should fail to resolve trait function without implementation', () => {
@@ -203,13 +203,13 @@ describe('Trait System - Consolidated Tests', () => {
 				};
 				addTraitDefinition(registry, trait);
 
-				const result = resolveTraitFunction(registry, 'testShow', [intType()]);
+				const result = resolveTraitFunction(registry, 'testShow', [floatType()]);
 				expect(result.found).toBe(false);
 			});
 
 			test('should fail to resolve non-trait function', () => {
 				const registry = createTraitRegistry();
-				const result = resolveTraitFunction(registry, 'nonTraitFunction', [intType()]);
+				const result = resolveTraitFunction(registry, 'nonTraitFunction', [floatType()]);
 				expect(result.found).toBe(false);
 			});
 		});
@@ -600,7 +600,7 @@ describe('Trait System - Consolidated Tests', () => {
 			addTraitImplementation(registry, 'Renderable', renderImpl);
 
 			// Should detect conflict when resolving
-			expect(() => resolveTraitFunction(registry, 'display', [intType()]))
+							expect(() => resolveTraitFunction(registry, 'display', [floatType()]))
 				.toThrow(/Ambiguous function call.*multiple implementations.*Printable, Renderable/);
 		});
 
@@ -681,11 +681,11 @@ describe('Trait System - Consolidated Tests', () => {
 	// ================================================================
 	describe('Type Name Resolution', () => {
 		test('should correctly identify type names for resolution', () => {
-			expect(getTypeName(intType())).toBe('Int');
+			expect(getTypeName(floatType())).toBe('Float');
 			expect(getTypeName(stringType())).toBe('String');
 			expect(getTypeName(boolType())).toBe('Bool');
-			expect(getTypeName({ kind: 'list', element: intType() })).toBe('List');
-			expect(getTypeName({ kind: 'variant', name: 'Option', args: [intType()] })).toBe('Option');
+			expect(getTypeName({ kind: 'list', element: floatType() })).toBe('List');
+			expect(getTypeName({ kind: 'variant', name: 'Option', args: [floatType()] })).toBe('Option');
 		});
 	});
 });

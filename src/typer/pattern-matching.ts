@@ -7,7 +7,7 @@ import {
 	typeVariable,
 	functionType,
 	unitType,
-	intType,
+	floatType,
 	stringType,
 } from '../ast';
 import {
@@ -283,7 +283,7 @@ const typePattern = (
 			// Literal patterns need to match the expected type
 			let literalType: Type;
 			if (typeof pattern.value === 'number') {
-				literalType = intType();
+				literalType = floatType();
 			} else if (typeof pattern.value === 'string') {
 				literalType = stringType();
 			} else {
