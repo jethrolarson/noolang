@@ -10,6 +10,15 @@ constraint Show a (
   show : a -> String
 );
 
+# Basic Show implementations (must come before conditional implementations)
+implement Show Int (
+  show = fn i => toString i
+);
+
+implement Show String (
+  show = fn s => s
+);
+
 # Constraint for monads
 constraint Monad m ( 
   bind : m a -> (a -> m b) -> m b; 
@@ -62,9 +71,9 @@ not = fn b => match b with (True => False; False => True);
 
 type Option a = Some a | None;
 
-implement Show Option (
+implement Show (Option a) given a implements Show (
   show = fn opt => match opt with (
-    Some x => concat "Some(" (concat (toString x) ")");
+    Some x => concat "Some(" (concat (show x) ")");
     None => "None"
   )
 );
@@ -200,14 +209,6 @@ implement Monad List (
 # ========================================
 # Constraint implementations for basic types
 # ========================================
-
-implement Show Int (
-  show = fn i => toString i
-);
-
-implement Show String (
-  show = id
-);
 
 # Eq-like functions for basic types
 implement Eq Int (
