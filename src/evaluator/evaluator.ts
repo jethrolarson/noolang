@@ -23,6 +23,7 @@ import type {
 	ConstraintDefinitionExpression,
 	ImplementDefinitionExpression,
 	Type,
+	Location,
 } from '../ast';
 import type { TraitRegistry } from '../typer/trait-system';
 import type { TypeState } from '../typer/types';
@@ -386,22 +387,19 @@ export class Evaluator {
 			createNativeFunction('$', (func: Value) => (arg: Value) => {
 				// Handle trait function application (same as evaluateApplication)
 				if (func.tag === 'trait-function') {
-					// Create a synthetic argument expression for the trait function
-					const argExpr: LiteralExpression = {
-						kind: 'literal',
-						value: arg as unknown as LiteralExpression['value'],
-						location: {
-							start: { line: 1, column: 1 },
-							end: { line: 1, column: 1 },
-						},
-					};
+					// Convert runtime Value back to AST LiteralExpression for trait function
+					const argExpr: LiteralExpression = this.valueToLiteralExpression(arg);
 					return this.evaluateTraitFunctionApplication(func, [argExpr]);
 				}
 
 				if (isFunction(func)) return func.fn(arg);
 				if (isNativeFunction(func)) return func.fn(arg);
+				
+				// Improved error message with actual value inspection
+				const funcTag = func?.tag || 'undefined';
+				const funcInfo = func ? JSON.stringify(func, null, 2) : 'undefined';
 				throw new Error(
-					`Cannot apply non-function in dollar operator: ${func?.tag || 'unit'}`
+					`Cannot apply non-function in dollar operator. Got value with tag: ${funcTag}\nFull value: ${funcInfo}`
 				);
 			})
 		);
@@ -2067,6 +2065,43 @@ export class Evaluator {
 
 		// For other types, just return the result unwrapped
 		return result;
+	}
+
+	// Convert runtime Value back to AST LiteralExpression
+	// This is needed for trait function applications that expect AST nodes
+	private valueToLiteralExpression(value: Value): LiteralExpression {
+		const syntheticLocation: Location = {
+			start: { line: 1, column: 1 },
+			end: { line: 1, column: 1 },
+		};
+
+		switch (value.tag) {
+			case 'number':
+				return {
+					kind: 'literal',
+					value: value.value,
+					location: syntheticLocation,
+				};
+			case 'string':
+				return {
+					kind: 'literal',
+					value: value.value,
+					location: syntheticLocation,
+				};
+			case 'unit':
+				return {
+					kind: 'literal',
+					value: null,
+					location: syntheticLocation,
+				};
+			default:
+				// For complex types (records, lists, etc.), we can't represent them as literals
+				// This is a fundamental limitation of the AST ↔ Value conversion
+				throw new Error(
+					`Cannot convert ${value.tag} value to literal expression for trait function application. ` +
+					`Trait functions with dollar operator only support primitive values (numbers, strings, unit).`
+				);
+		}
 	}
 }
 
