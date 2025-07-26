@@ -129,10 +129,12 @@ describe('Trait System Phase 3: Constraint Resolution', () => {
 			
 			const typeResult = typeProgram(program);
 			
-			// Should succeed with constraint resolution at each step
-			expect(typeResult.type.kind).toBe('constrained');
+			// CONSTRAINT COLLAPSE: Should succeed and resolve to concrete List Int
+			// map increment [1,2,3] -> List Int, then map double (List Int) -> List Int
+			expect(typeResult.type.kind).toBe('list');
 			const typeString = typeToString(typeResult.type);
-			expect(typeString).toMatch(/implements Functor/);
+			expect(typeString).toBe('List Int');
+			expect(typeString).not.toMatch(/implements|given|α\d+/);
 		});
 
 		test('should handle multiple different constraints', () => {
@@ -147,11 +149,15 @@ describe('Trait System Phase 3: Constraint Resolution', () => {
 			
 			const typeResult = typeProgram(program);
 			
-			// Should handle both Functor constraint on map and implicit Show constraint
-			expect(typeResult.type.kind).toBe('constrained');
+			// PARTIAL CONSTRAINT COLLAPSE: Functor constraint gets resolved to List,
+			// but Show constraint from within the mapped function is preserved
+			// This is a more complex case that would need additional refinement
+			expect(typeResult.type.kind).toBe('list');
 			const typeString = typeToString(typeResult.type);
-			expect(typeString).toMatch(/String/);
-			expect(typeString).toMatch(/implements Functor/);
+			// Currently: "List String given α125 implements Show"
+			// Eventually should be: "List String"
+			expect(typeString).toMatch(/List String/);
+			expect(typeString).toMatch(/implements Show/); // Show constraint preserved for now
 		});
 	});
 
@@ -166,21 +172,19 @@ describe('Trait System Phase 3: Constraint Resolution', () => {
 			
 			const typeResult = typeProgram(program);
 			
-			// The constraint should be properly resolved during unification
-			expect(typeResult.type.kind).toBe('constrained');
+			// CONSTRAINT COLLAPSE: The constraint should be properly resolved to concrete List Int
+			expect(typeResult.type.kind).toBe('list');
 			
-			// The base type should be a variant representing the functor application
-			if (typeResult.type.kind === 'constrained') {
-				const baseType = typeResult.type.baseType;
-				expect(baseType.kind).toBe('variant');
-				if (baseType.kind === 'variant') {
-					expect(baseType.args.length).toBe(1);
-					expect(baseType.args[0].kind).toBe('primitive');
-					if (baseType.args[0].kind === 'primitive') {
-						expect(baseType.args[0].name).toBe('Int');
-					}
+			// Should be List Int with Int element type
+			if (typeResult.type.kind === 'list') {
+				expect(typeResult.type.element.kind).toBe('primitive');
+				if (typeResult.type.element.kind === 'primitive') {
+					expect(typeResult.type.element.name).toBe('Int');
 				}
 			}
+			
+			const typeString = typeToString(typeResult.type);
+			expect(typeString).toBe('List Int');
 		});
 
 		test('should work with different functor types', () => {
