@@ -64,7 +64,7 @@ describe('REPL Type Annotation Tests', () => {
 
 		test('should handle record type annotation', () => {
 			expect(() => {
-				repl.processInput('person = { @name "Alice", @age 30 } : { name: String, age: Int }');
+				repl.processInput('person = { @name "Alice", @age 30 } : { @name String, @age Int }');
 			}).not.toThrow();
 		});
 	});

@@ -54,9 +54,9 @@ describe('Type Annotation Fix Verification', () => {
 			}).not.toThrow();
 		});
 
-		test('record type annotations should work with correct syntax', () => {
+		test('record type annotations should work with @field syntax', () => {
 			expect(() => {
-				repl.processInput('person = { @name "Alice", @age 30 } : { name: String, age: Int }');
+				repl.processInput('person = { @name "Alice", @age 30 } : { @name String, @age Int }');
 			}).not.toThrow();
 		});
 

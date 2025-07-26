@@ -127,7 +127,37 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 		}
 	}
 
-	// Try record type
+	// Try record type with accessor syntax (without colons): { @field Type, @field2 Type }
+	const accessorRecordResult = C.seq(
+		C.punctuation('{'),
+		C.optional(
+			C.sepBy(
+				C.map(
+					C.seq(
+						C.accessor(),
+						C.lazy(() => parseTypeExpression)
+					),
+					([accessor, type]) => [accessor.value, type] as [string, Type]
+				),
+				C.punctuation(',')
+			)
+		),
+		C.punctuation('}')
+	)(tokens);
+	if (accessorRecordResult.success) {
+		const fields: Array<[string, Type]> = accessorRecordResult.value[1] || [];
+		const fieldObj: Record<string, Type> = {};
+		for (const [name, type] of fields) {
+			fieldObj[name] = type;
+		}
+		return {
+			success: true as const,
+			value: recordType(fieldObj),
+			remaining: accessorRecordResult.remaining,
+		};
+	}
+
+	// Try record type with colon syntax: { field: Type, @field: Type }
 	const recordResult = C.seq(
 		C.punctuation('{'),
 		C.optional(
@@ -135,10 +165,10 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 				C.map(
 					C.seq(
 						C.choice(
-							// Support @field syntax for consistency with values
+							// Support @field syntax (ACCESSOR tokens)
 							C.map(
-								C.seq(C.punctuation('@'), C.identifier()),
-								([_, name]) => name
+								C.accessor(),
+								(accessor) => ({ value: accessor.value })
 							),
 							// Also support plain identifier for backward compatibility
 							C.identifier()
