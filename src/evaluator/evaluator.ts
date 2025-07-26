@@ -1486,14 +1486,24 @@ export class Evaluator {
 			const leftVal = isCell(left) ? left.value : left;
 			const rightVal = isCell(right) ? right.value : right;
 
-			// Special handling for + operator using Add trait
-			if (expr.operator === '+' && this.traitRegistry && this.isTraitFunction('add')) {
-				try {
-					const result = this.resolveTraitFunctionWithArgs('add', [leftVal, rightVal], this.traitRegistry);
-					return result;
-				} catch (e) {
-					// Fall through to legacy lookup if trait resolution fails
+			// Special handling for + operator - use primitive operations for basic types
+			if (expr.operator === '+') {
+				if (isNumber(leftVal) && isNumber(rightVal)) {
+					return createNumber(leftVal.value + rightVal.value);
 				}
+				if (isString(leftVal) && isString(rightVal)) {
+					return createString(leftVal.value + rightVal.value);
+				}
+				// For complex types, try trait resolution
+				if (this.traitRegistry && this.isTraitFunction('add')) {
+					try {
+						const result = this.resolveTraitFunctionWithArgs('add', [leftVal, rightVal], this.traitRegistry);
+						return result;
+					} catch (e) {
+						// Fall through to error
+					}
+				}
+				throw new Error(`Cannot add ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`);
 			}
 
 			const operator = this.environment.get(expr.operator);

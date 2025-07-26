@@ -365,5 +365,22 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a'],
 	});
 
-	return { ...state, environment: newEnv };
+	const newState = { ...state, environment: newEnv };
+	
+	// Register basic trait implementations to avoid loading order issues
+	const { addTraitDefinition, addTraitImplementation } = require('./trait-system');
+	
+	// Add the Add trait definition if not already present
+	if (!newState.traitRegistry.definitions.has('Add')) {
+		addTraitDefinition(newState.traitRegistry, {
+			name: 'Add',
+			typeParam: 'a',
+			functions: new Map([['add', functionType([typeVariable('a'), typeVariable('a')], typeVariable('a'))]])
+		});
+	}
+	
+	// Basic trait implementations are handled directly in constraint resolution
+	// to avoid circular dependency issues with primitive function loading
+	
+	return newState;
 };
