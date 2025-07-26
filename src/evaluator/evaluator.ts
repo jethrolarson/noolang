@@ -1486,7 +1486,7 @@ export class Evaluator {
 			const leftVal = isCell(left) ? left.value : left;
 			const rightVal = isCell(right) ? right.value : right;
 
-			// Special handling for + operator - use primitive operations for basic types
+			// Special handling for arithmetic operators - use primitive operations for basic types
 			if (expr.operator === '+') {
 				if (isNumber(leftVal) && isNumber(rightVal)) {
 					return createNumber(leftVal.value + rightVal.value);
@@ -1504,6 +1504,57 @@ export class Evaluator {
 					}
 				}
 				throw new Error(`Cannot add ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`);
+			}
+
+			if (expr.operator === '-') {
+				if (isNumber(leftVal) && isNumber(rightVal)) {
+					return createNumber(leftVal.value - rightVal.value);
+				}
+				// For complex types, try trait resolution
+				if (this.traitRegistry && this.isTraitFunction('subtract')) {
+					try {
+						const result = this.resolveTraitFunctionWithArgs('subtract', [leftVal, rightVal], this.traitRegistry);
+						return result;
+					} catch (e) {
+						// Fall through to error
+					}
+				}
+				throw new Error(`Cannot subtract ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`);
+			}
+
+			if (expr.operator === '*') {
+				if (isNumber(leftVal) && isNumber(rightVal)) {
+					return createNumber(leftVal.value * rightVal.value);
+				}
+				// For complex types, try trait resolution
+				if (this.traitRegistry && this.isTraitFunction('multiply')) {
+					try {
+						const result = this.resolveTraitFunctionWithArgs('multiply', [leftVal, rightVal], this.traitRegistry);
+						return result;
+					} catch (e) {
+						// Fall through to error
+					}
+				}
+				throw new Error(`Cannot multiply ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`);
+			}
+
+			if (expr.operator === '/') {
+				if (isNumber(leftVal) && isNumber(rightVal)) {
+					if (rightVal.value === 0) {
+						return createConstructor('None', []); // None for division by zero
+					}
+					return createConstructor('Some', [createNumber(leftVal.value / rightVal.value)]); // Some(result)
+				}
+				// For complex types, try trait resolution
+				if (this.traitRegistry && this.isTraitFunction('divide')) {
+					try {
+						const result = this.resolveTraitFunctionWithArgs('divide', [leftVal, rightVal], this.traitRegistry);
+						return result;
+					} catch (e) {
+						// Fall through to error
+					}
+				}
+				throw new Error(`Cannot divide ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`);
 			}
 
 			const operator = this.environment.get(expr.operator);

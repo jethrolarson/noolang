@@ -10,19 +10,16 @@ constraint Show a (
   show : a -> String
 );
 
-# Constraint for addition operation
+# Constraint for addition operation (supports numbers and strings)
 constraint Add a (
   add : a -> a -> a
 );
 
-# Constraint for subtraction operation
-constraint Subtract a (
-  subtract : a -> a -> a
-);
-
-# Constraint for multiplication operation
-constraint Multiply a (
-  multiply : a -> a -> a
+# Constraint for numeric operations (numbers only)
+constraint Numeric a (
+  subtract : a -> a -> a;
+  multiply : a -> a -> a;
+  divide : a -> a -> Option a
 );
 
 # Basic Show implementations (must come before conditional implementations)

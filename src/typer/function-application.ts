@@ -53,12 +53,10 @@ export function tryResolveConstraints(
 					// Check if we have an implementation of this trait for this argument type
 					let hasImplementation = false;
 					
-					// Built-in implementations for math traits to avoid circular dependency
+					// Built-in implementations for traits to avoid circular dependency
 					if (traitName === 'Add' && (argTypeName === 'Int' || argTypeName === 'Float' || argTypeName === 'String')) {
 						hasImplementation = true;
-					} else if (traitName === 'Subtract' && (argTypeName === 'Int' || argTypeName === 'Float')) {
-						hasImplementation = true;
-					} else if (traitName === 'Multiply' && (argTypeName === 'Int' || argTypeName === 'Float')) {
+					} else if (traitName === 'Numeric' && (argTypeName === 'Int' || argTypeName === 'Float')) {
 						hasImplementation = true;
 					} else {
 						// Check trait registry for user-defined implementations

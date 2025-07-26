@@ -30,7 +30,7 @@ const createBinaryFunctionType = (
 export const initializeBuiltins = (state: TypeState): TypeState => {
 	const newEnv = new Map(state.environment);
 
-	// Arithmetic operators - + now uses Add trait
+	// Addition operator - uses Add trait (supports strings)
 	const addOpType = functionType(
 		[typeVariable('a'), typeVariable('a')], 
 		typeVariable('a'),
@@ -41,31 +41,41 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		type: addOpType,
 		quantifiedVars: ['a'],
 	});
-	// Subtraction operator - uses Subtract trait
+
+	// Numeric operators - use Numeric trait (numbers only)
 	const subtractOpType = functionType(
 		[typeVariable('a'), typeVariable('a')], 
 		typeVariable('a'),
 		new Set()
 	);
-	subtractOpType.constraints = [implementsConstraint('a', 'Subtract')];
+	subtractOpType.constraints = [implementsConstraint('a', 'Numeric')];
 	newEnv.set('-', {
 		type: subtractOpType,
 		quantifiedVars: ['a'],
 	});
 
-	// Multiplication operator - uses Multiply trait
 	const multiplyOpType = functionType(
 		[typeVariable('a'), typeVariable('a')], 
 		typeVariable('a'),
 		new Set()
 	);
-	multiplyOpType.constraints = [implementsConstraint('a', 'Multiply')];
+	multiplyOpType.constraints = [implementsConstraint('a', 'Numeric')];
 	newEnv.set('*', {
 		type: multiplyOpType,
 		quantifiedVars: ['a'],
 	});
 
-	// Division operator removed - unsafe due to division by zero
+	// Division operator - returns Option a for safety
+	const divideOpType = functionType(
+		[typeVariable('a'), typeVariable('a')], 
+		optionType(typeVariable('a')),
+		new Set()
+	);
+	divideOpType.constraints = [implementsConstraint('a', 'Numeric')];
+	newEnv.set('/', {
+		type: divideOpType,
+		quantifiedVars: ['a'],
+	});
 
 	// Comparison operators
 	newEnv.set('==', {
@@ -354,6 +364,17 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: [],
 	});
 
+	// Primitive Divide trait implementations for type checking
+	newEnv.set('primitive_int_divide', {
+		type: createBinaryFunctionType(intType(), intType(), optionType(intType())),
+		quantifiedVars: [],
+	});
+
+	newEnv.set('primitive_float_divide', {
+		type: createBinaryFunctionType(floatType(), floatType(), optionType(floatType())),
+		quantifiedVars: [],
+	});
+
 	// Record utilities
 	newEnv.set('hasKey', {
 		type: createBinaryFunctionType(recordType({}), stringType(), boolType()),
@@ -414,21 +435,16 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		});
 	}
 
-	// Add the Subtract trait definition if not already present
-	if (!newState.traitRegistry.definitions.has('Subtract')) {
+	// Add the Numeric trait definition if not already present
+	if (!newState.traitRegistry.definitions.has('Numeric')) {
 		addTraitDefinition(newState.traitRegistry, {
-			name: 'Subtract',
+			name: 'Numeric',
 			typeParam: 'a',
-			functions: new Map([['subtract', functionType([typeVariable('a'), typeVariable('a')], typeVariable('a'))]])
-		});
-	}
-
-	// Add the Multiply trait definition if not already present
-	if (!newState.traitRegistry.definitions.has('Multiply')) {
-		addTraitDefinition(newState.traitRegistry, {
-			name: 'Multiply',
-			typeParam: 'a',
-			functions: new Map([['multiply', functionType([typeVariable('a'), typeVariable('a')], typeVariable('a'))]])
+			functions: new Map([
+				['subtract', functionType([typeVariable('a'), typeVariable('a')], typeVariable('a'))],
+				['multiply', functionType([typeVariable('a'), typeVariable('a')], typeVariable('a'))],
+				['divide', functionType([typeVariable('a'), typeVariable('a')], optionType(typeVariable('a')))]
+			])
 		});
 	}
 	
