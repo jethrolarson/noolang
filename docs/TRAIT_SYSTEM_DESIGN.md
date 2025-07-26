@@ -115,6 +115,77 @@ This document outlines the design and implementation plan for Noolang's trait sy
 
 ---
 
+## 🚨 CRITICAL BUG DISCOVERED: Variable Scoping in Implement Blocks
+
+**HIGHEST PRIORITY**: The trait system has a **fundamental language infrastructure bug** where implement blocks cannot access top-level variable definitions.
+
+### The Problem
+```noo
+# This definition exists at top level
+not = fn b => match b with (True => False; False => True);
+
+# But this implement block cannot see it
+implement Eq Bool (
+  equals = fn a b => match a with (
+    True => b;
+    False => not b  # ERROR: Undefined variable 'not'
+  )
+);
+```
+
+**Current behavior**: `TypeError: Undefined variable: not` at line where `not` is used
+**Expected behavior**: Should find `not` in the environment since it's defined earlier
+
+### Root Cause Analysis
+1. **Variable references work fine** in normal function definitions
+2. **The bug is specific to implement blocks** - regular functions can reference other top-level functions
+3. **Closure optimization in `typeFunction`** creates a minimal environment with only:
+   - Built-in operators (`+`, `-`, `*`, etc.)
+   - Hardcoded "essentials" list
+   - Detected "free variables"
+4. **Free variable analysis is broken** - `collectFreeVars()` doesn't handle `match` expressions
+5. **Since `not b` appears inside a match expression**, `not` is never detected as a free variable
+6. **Result**: `not` gets excluded from the function environment
+
+### Technical Details
+- **File**: `src/typer/type-inference.ts`
+- **Function**: `typeFunction()` around line 310-320
+- **Issue**: `collectFreeVars()` missing `match` case in switch statement
+- **Impact**: Any variable used inside match expressions in implement blocks is invisible
+
+### Attempted Fixes (All Wrong)
+1. ❌ Adding `'not'` to hardcoded essentials list - just hacking around the symptom
+2. ❌ Modifying environment restoration logic - didn't address root cause  
+3. ❌ Changing `typeImplementDefinition` state handling - wrong level of fix
+
+### The Real Fix Required
+**Fix `collectFreeVars()` to handle match expressions properly**:
+```typescript
+case 'match':
+  walk(e.expr, bound);
+  e.cases.forEach(matchCase => {
+    // Handle pattern variables and walk case bodies
+    const caseBound = new Set([...bound, ...extractPatternVars(matchCase.pattern)]);
+    walk(matchCase.body, caseBound);
+  });
+  break;
+```
+
+### Current Status
+- ✅ **Root cause identified**: Broken free variable analysis
+- ✅ **Scoping confirmed working elsewhere**: Regular functions can reference other functions fine
+- ❌ **Fix incomplete**: Started implementing match case but may need more expression types
+- ❌ **Testing needed**: Need to verify fix works and doesn't break other functionality
+
+### Impact on Trait System
+- **stdlib.noo fails to load** due to this bug
+- **Any implement block using match expressions** will have scoping issues  
+- **Limits usefulness of trait system** until fixed
+
+This is a **language infrastructure bug**, not a trait system bug specifically.
+
+---
+
 ## Legacy Documentation (Pre-December 2024)
 
 The sections below are kept for historical reference but represent the **previous state** before completion.
