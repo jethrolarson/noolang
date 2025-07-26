@@ -29,15 +29,15 @@ const runNoolang = (code: string) => {
 
 describe('ADT Language Limitations', () => {
 	describe('Multiple ADT Definitions', () => {
-		it.skip('should now work with list_map and multiple ADTs (polymorphism fixed) - TODO: Fix type unification', () => {
+		it.skip('should now work with list_map and multiple ADTs', () => {
 			// This test was previously failing due to lack of polymorphism in list_map
 			// The current type system has limitations with multiple ADTs in the same program
 			// So we'll test the workaround: use ADTs in separate programs
-			
+
 			// Test Color ADT separately
 			const colorResult = runNoolang(`
         type Color = Red | Green | Blue;
-        colors = [Red, Green, Blue];
+        colors = [Red, Green, Blue] : List Color;
         color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
         color_numbers = list_map color_to_number colors;
         color_numbers
