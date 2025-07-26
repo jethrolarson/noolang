@@ -453,9 +453,10 @@ export const typeToString = (
 			case 'tuple':
 				return `(${t.elements.map(norm).join(' ')})`;
 			case 'record':
-				return `{ ${Object.entries(t.fields)
-					.map(([name, fieldType]) => `${name}: ${norm(fieldType)}`)
-					.join(' ')} }`;
+				const fields = Object.entries(t.fields)
+					.map(([name, fieldType]) => `@${name} ${norm(fieldType)}`)
+					.join(', ');
+				return fields.length > 0 ? `{ ${fields} }` : `{ }`;
 			case 'union':
 				return `(${t.types.map(norm).join(' | ')})`;
 			case 'variant':

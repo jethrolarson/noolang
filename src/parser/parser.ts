@@ -115,15 +115,54 @@ const parseListType = (tokens: Token[]): C.ParseResult<Type> => {
 	return { success: false, error: 'Expected List type', position: tokens[0]?.location.start.line || 0 };
 };
 
-// Parse record type {field: Type, ...}
+// Parse record type {field: Type, ...} or {@field Type, ...}
 const parseRecordType = (tokens: Token[]): C.ParseResult<Type> => {
+	// Try record type with accessor syntax (without colons): { @field Type, @field2 Type }
+	const accessorRecordResult = C.seq(
+		C.punctuation('{'),
+		C.optional(
+			C.sepBy(
+				C.map(
+					C.seq(
+						C.accessor(),
+						C.lazy(() => parseTypeExpression)
+					),
+					([accessor, type]) => [accessor.value, type] as [string, Type]
+				),
+				C.punctuation(',')
+			)
+		),
+		C.punctuation('}')
+	)(tokens);
+	if (accessorRecordResult.success) {
+		const fields: Array<[string, Type]> = accessorRecordResult.value[1] || [];
+		const fieldObj: Record<string, Type> = {};
+		for (const [name, type] of fields) {
+			fieldObj[name] = type;
+		}
+		return {
+			success: true as const,
+			value: recordType(fieldObj),
+			remaining: accessorRecordResult.remaining,
+		};
+	}
+
+	// Try record type with colon syntax: { field: Type, @field: Type }
 	const recordResult = C.seq(
 		C.punctuation('{'),
 		C.optional(
 			C.sepBy(
 				C.map(
 					C.seq(
-						C.identifier(),
+						C.choice(
+							// Support @field syntax (ACCESSOR tokens)
+							C.map(
+								C.accessor(),
+								(accessor) => ({ value: accessor.value })
+							),
+							// Also support plain identifier for backward compatibility
+							C.identifier()
+						),
 						C.punctuation(':'),
 						C.lazy(() => parseTypeExpression)
 					),
@@ -1938,18 +1977,18 @@ const parseExprWithType: C.Parser<Expression> = C.choice(
 			location: expr.location,
 		})
 	),
-	parseThrush // Fallback to regular expressions
+	C.lazy(() => parseSequenceTermWithIf) // Fallback to regular expressions
 );
 
 // --- Sequence (semicolon) ---
 // Accepts a sequence of definitions and/or expressions, separated by semicolons
 const parseSequence: C.Parser<Expression> = C.map(
 	C.seq(
-		C.lazy(() => parseSequenceTermWithIf),
+		C.lazy(() => parseExprWithType),
 		C.many(
 			C.seq(
 				C.punctuation(';'),
-				C.lazy(() => parseSequenceTermWithIf)
+				C.lazy(() => parseExprWithType)
 			)
 		)
 	),

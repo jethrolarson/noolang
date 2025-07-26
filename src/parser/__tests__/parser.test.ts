@@ -1475,6 +1475,54 @@ describe('Type annotation parsing', () => {
 		expect(result.value.fields.person.kind).toBe('record');
 		expect(result.value.fields.active.kind).toBe('variant');
 	});
+
+	test('parses record type with @field syntax', () => {
+		const result = parseType('{ @name String, @age Float }');
+		assertParseSuccess(result);
+		assertRecordType(result.value);
+		expect(result.value.kind).toBe('record');
+		expect(result.value.fields).toHaveProperty('name');
+		expect(result.value.fields).toHaveProperty('age');
+		expect(result.value.fields.name.kind).toBe('primitive');
+		expect(result.value.fields.age.kind).toBe('primitive');
+	});
+
+	test('parses empty record type with @field syntax', () => {
+		const result = parseType('{ }');
+		assertParseSuccess(result);
+		assertRecordType(result.value);
+		expect(result.value.kind).toBe('record');
+		expect(Object.keys(result.value.fields)).toHaveLength(0);
+	});
+
+	test('parses single field record type with @field syntax', () => {
+		const result = parseType('{ @name String }');
+		assertParseSuccess(result);
+		assertRecordType(result.value);
+		expect(result.value.kind).toBe('record');
+		expect(result.value.fields).toHaveProperty('name');
+		expect(result.value.fields.name.kind).toBe('primitive');
+	});
+
+	test('parses nested record type with @field syntax', () => {
+		const result = parseType('{ @person { @name String, @age Float }, @active Bool }');
+		assertParseSuccess(result);
+		assertRecordType(result.value);
+		expect(result.value.fields).toHaveProperty('person');
+		expect(result.value.fields).toHaveProperty('active');
+		expect(result.value.fields.person.kind).toBe('record');
+		expect(result.value.fields.active.kind).toBe('variant');
+	});
+
+	test('parses mixed record type with both syntaxes', () => {
+		const result = parseType('{ @name: String, age: Float }');
+		assertParseSuccess(result);
+		assertRecordType(result.value);
+		expect(result.value.fields).toHaveProperty('name');
+		expect(result.value.fields).toHaveProperty('age');
+		expect(result.value.fields.name.kind).toBe('primitive');
+		expect(result.value.fields.age.kind).toBe('primitive');
+	});
 });
 
 describe('Top-level definitions with type annotations', () => {
@@ -1518,6 +1566,32 @@ describe('Top-level definitions with type annotations', () => {
 		expect(typed.type.kind).toBe('list'); // List types have kind "list"
 		expect((typed.type as any).element.kind).toBe('primitive'); // Float is a primitive type
 		expect((typed.type as any).element.name).toBe('Float');
+	});
+
+	test('parses definition with record type annotation using @field syntax', () => {
+		const result = parseDefinition('person = { @name "Alice", @age 30 } : { @name String, @age Float };');
+		expect(result.statements).toHaveLength(1);
+		const def = assertDefinitionExpression(result.statements[0]);
+		expect(def.name).toBe('person');
+		const typed = assertTypedExpression(def.value);
+		expect(typed.expression.kind).toBe('record');
+		expect(typed.type.kind).toBe('record');
+		assertRecordType(typed.type);
+		expect(typed.type.fields).toHaveProperty('name');
+		expect(typed.type.fields).toHaveProperty('age');
+		expect(typed.type.fields.name.kind).toBe('primitive');
+		expect(typed.type.fields.age.kind).toBe('primitive');
+	});
+
+	test('parses standalone record type annotation with @field syntax', () => {
+		const result = parseDefinition('{ @name "Bob", @active true } : { @name String, @active Bool };');
+		expect(result.statements).toHaveLength(1);
+		const typed = assertTypedExpression(result.statements[0]);
+		expect(typed.expression.kind).toBe('record');
+		expect(typed.type.kind).toBe('record');
+		assertRecordType(typed.type);
+		expect(typed.type.fields).toHaveProperty('name');
+		expect(typed.type.fields).toHaveProperty('active');
 	});
 
 	test('parses multiple definitions with type annotations', () => {
