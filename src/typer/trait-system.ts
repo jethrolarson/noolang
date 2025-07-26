@@ -36,10 +36,11 @@ function countExpressionParams(expr: Expression): number {
 	return -1;
 }
 
-// Helper function to count parameters in a function type
+// Helper function to count parameters in a function type (handles curried types)
 function countTypeParams(type: Type): number {
 	if (type.kind !== 'function') return 0;
-	return type.params.length;
+	// Count current parameters plus any parameters in the return type (for curried functions)
+	return type.params.length + countTypeParams(type.return);
 }
 
 // Create empty trait registry
