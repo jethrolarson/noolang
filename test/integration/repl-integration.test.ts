@@ -141,7 +141,7 @@ describe('REPL Integration Tests', () => {
 		});
 
 		test('should handle tuples', async () => {
-			const result = await sendInput('(42, "hello", true)');
+			const result = await sendInput('{42; "hello"; 1}');
 			expect(result).toContain('42');
 			expect(result).toContain('hello');
 		});
