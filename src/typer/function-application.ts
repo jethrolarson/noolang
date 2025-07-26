@@ -61,7 +61,7 @@ export function tryResolveConstraints(
 						const traitRegistry = state.traitRegistry;
 						if (traitRegistry) {
 							const traitImpls = traitRegistry.implementations.get(traitName);
-							hasImplementation = traitImpls && traitImpls.has(argTypeName);
+							hasImplementation = !!traitImpls && traitImpls.has(argTypeName);
 						}
 					}
 					
