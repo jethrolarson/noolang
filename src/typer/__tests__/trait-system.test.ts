@@ -13,6 +13,13 @@ import {
 	getTypeName 
 } from '../trait-system';
 import { functionType, typeVariable, stringType, intType, boolType } from '../../ast';
+import { 
+	assertNumberValue, 
+	assertListValue, 
+	assertConstrainedType, 
+	assertPrimitiveType,
+	assertVariantType 
+} from '../../../test/utils';
 
 describe('Trait System - Consolidated Tests', () => {
 	// Helper functions
@@ -232,10 +239,8 @@ describe('Trait System - Consolidated Tests', () => {
 				const program = parseProgram(code);
 				const typeResult = typeProgram(program);
 				
-				expect(typeResult.type.kind).toBe('primitive');
-				if (typeResult.type.kind === 'primitive') {
-					expect(typeResult.type.name).toBe('Int');
-				}
+				assertPrimitiveType(typeResult.type);
+				expect(typeResult.type.name).toBe('Int');
 			});
 
 			test('should work with ConstrainedType infrastructure', () => {
@@ -247,7 +252,7 @@ describe('Trait System - Consolidated Tests', () => {
 				const program = parseProgram(code);
 				const typeResult = typeProgram(program);
 				
-				expect(typeResult.type.kind).toBe('constrained');
+				assertConstrainedType(typeResult.type);
 				const typeString = typeToString(typeResult.type);
 				expect(typeString).toMatch(/implements TestFunctor/);
 			});
@@ -263,7 +268,7 @@ describe('Trait System - Consolidated Tests', () => {
 				const program = parseProgram(code);
 				const typeResult = typeProgram(program);
 				
-				expect(typeResult.type.kind).toBe('variant');
+				assertVariantType(typeResult.type);
 			});
 
 			test('should maintain polymorphic function types', () => {
@@ -311,7 +316,7 @@ describe('Trait System - Consolidated Tests', () => {
 				const typeResult = typeProgram(program);
 				
 				// Should succeed and return a constrained type
-				expect(typeResult.type.kind).toBe('constrained');
+				assertConstrainedType(typeResult.type);
 				const typeString = typeToString(typeResult.type);
 				expect(typeString).toMatch(/implements Functor/);
 			});
@@ -323,7 +328,7 @@ describe('Trait System - Consolidated Tests', () => {
 				const typeResult = typeProgram(program);
 				
 				// Should succeed and return a constrained type
-				expect(typeResult.type.kind).toBe('constrained');
+				assertConstrainedType(typeResult.type);
 				const typeString = typeToString(typeResult.type);
 				expect(typeString).toMatch(/implements Functor/);
 			});
@@ -335,10 +340,8 @@ describe('Trait System - Consolidated Tests', () => {
 				const typeResult = typeProgram(program);
 				
 				// Should succeed and return String
-				expect(typeResult.type.kind).toBe('primitive');
-				if (typeResult.type.kind === 'primitive') {
-					expect(typeResult.type.name).toBe('String');
-				}
+				assertPrimitiveType(typeResult.type);
+				expect(typeResult.type.name).toBe('String');
 			});
 
 			test('should resolve Monad constraint polymorphically', () => {
@@ -433,10 +436,8 @@ describe('Trait System - Consolidated Tests', () => {
 				const typeResult = typeProgram(program);
 				
 				// Should work normally without constraints
-				expect(typeResult.type.kind).toBe('primitive');
-				if (typeResult.type.kind === 'primitive') {
-					expect(typeResult.type.name).toBe('Int');
-				}
+				assertPrimitiveType(typeResult.type);
+				expect(typeResult.type.name).toBe('Int');
 			});
 
 			test('should work with let polymorphism', () => {
@@ -450,10 +451,8 @@ describe('Trait System - Consolidated Tests', () => {
 				const typeResult = typeProgram(program);
 				
 				// Should succeed - polymorphic function used with different types
-				expect(typeResult.type.kind).toBe('primitive');
-				if (typeResult.type.kind === 'primitive') {
-					expect(typeResult.type.name).toBe('Int'); // Last definition wins
-				}
+				assertPrimitiveType(typeResult.type);
+				expect(typeResult.type.name).toBe('Int'); // Last definition wins
 			});
 
 			test('should integrate with ADT pattern matching', () => {
@@ -614,10 +613,8 @@ describe('Trait System - Consolidated Tests', () => {
 			const typeResult = typeProgram(program);
 			
 			// Should succeed - same function name but different types
-			expect(typeResult.type.kind).toBe('primitive');
-			if (typeResult.type.kind === 'primitive') {
-				expect(typeResult.type.name).toBe('String');
-			}
+			assertPrimitiveType(typeResult.type);
+			expect(typeResult.type.name).toBe('String');
 		});
 	});
 
@@ -630,15 +627,13 @@ describe('Trait System - Consolidated Tests', () => {
 			
 			const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 			
-			expect(typeResult.type.kind).toBe('constrained');
-			expect(evalResult.finalResult.tag).toBe('list');
-			if (evalResult.finalResult.tag === 'list') {
-				expect(evalResult.finalResult.values).toEqual([
-					{ tag: 'number', value: 2 },
-					{ tag: 'number', value: 3 },
-					{ tag: 'number', value: 4 }
-				]);
-			}
+			assertConstrainedType(typeResult.type);
+			assertListValue(evalResult.finalResult);
+			expect(evalResult.finalResult.values).toEqual([
+				{ tag: 'number', value: 2 },
+				{ tag: 'number', value: 3 },
+				{ tag: 'number', value: 4 }
+			]);
 		});
 
 		test('should work with custom trait function', () => {
@@ -650,10 +645,8 @@ describe('Trait System - Consolidated Tests', () => {
 			
 			const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 			
-			expect(evalResult.finalResult.tag).toBe('number');
-			if (evalResult.finalResult.tag === 'number') {
-				expect(evalResult.finalResult.value).toBe(42);
-			}
+			assertNumberValue(evalResult.finalResult);
+			expect(evalResult.finalResult.value).toBe(42);
 		});
 
 		test('should compare direct list_map vs trait map', () => {
@@ -661,14 +654,12 @@ describe('Trait System - Consolidated Tests', () => {
 			
 			const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 			
-			expect(evalResult.finalResult.tag).toBe('list');
-			if (evalResult.finalResult.tag === 'list') {
-				expect(evalResult.finalResult.values).toEqual([
-					{ tag: 'number', value: 11 },
-					{ tag: 'number', value: 12 },
-					{ tag: 'number', value: 13 }
-				]);
-			}
+			assertListValue(evalResult.finalResult);
+			expect(evalResult.finalResult.values).toEqual([
+				{ tag: 'number', value: 11 },
+				{ tag: 'number', value: 12 },
+				{ tag: 'number', value: 13 }
+			]);
 		});
 	});
 

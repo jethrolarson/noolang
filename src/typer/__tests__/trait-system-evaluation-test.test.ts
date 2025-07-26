@@ -2,6 +2,7 @@ import { describe, test, expect } from '@jest/globals';
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
 import { Evaluator } from '../../evaluator/evaluator';
+import { assertListValue, assertNumberValue, assertConstrainedType } from '../../../test/utils';
 
 describe('Trait System Evaluation Test', () => {
 	const parseTypeAndEvaluate = (code: string) => {
@@ -29,13 +30,11 @@ describe('Trait System Evaluation Test', () => {
 		console.log('Evaluation result:', evalResult.finalResult);
 		
 		// If Phase 3 is complete, this should actually work
-		expect(evalResult.finalResult.tag).toBe('list');
-		if (evalResult.finalResult.tag === 'list') {
-			expect(evalResult.finalResult.values).toHaveLength(3);
-			expect(evalResult.finalResult.values[0]).toEqual({ tag: 'number', value: 2 });
-			expect(evalResult.finalResult.values[1]).toEqual({ tag: 'number', value: 3 });
-			expect(evalResult.finalResult.values[2]).toEqual({ tag: 'number', value: 4 });
-		}
+		assertListValue(evalResult.finalResult);
+		expect(evalResult.finalResult.values).toHaveLength(3);
+		expect(evalResult.finalResult.values[0]).toEqual({ tag: 'number', value: 2 });
+		expect(evalResult.finalResult.values[1]).toEqual({ tag: 'number', value: 3 });
+		expect(evalResult.finalResult.values[2]).toEqual({ tag: 'number', value: 4 });
 	});
 
 	test('should work with custom trait function', () => {
@@ -52,13 +51,11 @@ describe('Trait System Evaluation Test', () => {
 		console.log('Custom trait evaluation result:', evalResult.finalResult);
 		
 		// This should also work if constraint resolution is functional
-		expect(evalResult.finalResult.tag).toBe('list');
-		if (evalResult.finalResult.tag === 'list') {
-			expect(evalResult.finalResult.values).toHaveLength(3);
-			expect(evalResult.finalResult.values[0]).toEqual({ tag: 'number', value: 2 });
-			expect(evalResult.finalResult.values[1]).toEqual({ tag: 'number', value: 4 });
-			expect(evalResult.finalResult.values[2]).toEqual({ tag: 'number', value: 6 });
-		}
+		assertListValue(evalResult.finalResult);
+		expect(evalResult.finalResult.values).toHaveLength(3);
+		expect(evalResult.finalResult.values[0]).toEqual({ tag: 'number', value: 2 });
+		expect(evalResult.finalResult.values[1]).toEqual({ tag: 'number', value: 4 });
+		expect(evalResult.finalResult.values[2]).toEqual({ tag: 'number', value: 6 });
 	});
 
 	test('should compare direct list_map vs trait map', () => {
