@@ -1,7 +1,7 @@
 import { spawn, ChildProcess } from 'child_process';
 
 describe('REPL Integration Tests', () => {
-	let replProcess: ChildProcess;
+	let replProcess: ChildProcess | null = null;
 	let output: string;
 	let errorOutput: string;
 	let processManuallyExited: boolean = false;
@@ -35,10 +35,11 @@ describe('REPL Integration Tests', () => {
 			}, 100);
 
 			// Timeout after 10 seconds
-			setTimeout(() => {
+			const startupTimeout = setTimeout(() => {
 				clearInterval(checkInterval);
 				reject(new Error('REPL startup timeout'));
 			}, 10000);
+			startupTimeout.unref();
 		});
 	};
 
@@ -46,70 +47,111 @@ describe('REPL Integration Tests', () => {
 		return new Promise((resolve, reject) => {
 			const beforeLength = output.length;
 			let responseReceived = false;
-			
-			replProcess.stdin?.write(input + '\n');
+			let checkInterval: NodeJS.Timeout;
+			let timeoutHandle: NodeJS.Timeout;
+
+			replProcess?.stdin?.write(input + '\n');
 
 			// Check for response every 100ms
-			const checkInterval = setInterval(() => {
+			checkInterval = setInterval(() => {
 				const currentOutput = output.substring(beforeLength);
-				
+
 				// Count number of noolang> prompts to see if we got a response
 				const promptCount = (currentOutput.match(/noolang>/g) || []).length;
-				
+
 				// Look for successful command completion (has result with ➡)
-				if (currentOutput.includes('noolang>') && currentOutput.includes('➡')) {
+				if (
+					currentOutput.includes('noolang>') &&
+					currentOutput.includes('➡')
+				) {
 					clearInterval(checkInterval);
+					clearTimeout(timeoutHandle);
 					responseReceived = true;
-					
+
 					// Extract just the result line (between ➡ and the next noolang>)
 					const lines = currentOutput.split('\n');
 					const resultLine = lines.find(line => line.includes('➡'));
 					resolve(resultLine || currentOutput.trim());
 				}
 				// Look for error completion (has error and returned to prompt)
-				else if (promptCount >= 2 && (currentOutput.includes('Error:') || 
-					currentOutput.includes('TypeError:') || currentOutput.includes('Parse error:'))) {
+				else if (
+					promptCount >= 2 &&
+					(currentOutput.includes('Error:') ||
+						currentOutput.includes('TypeError:') ||
+						currentOutput.includes('Parse error:'))
+				) {
 					clearInterval(checkInterval);
+					clearTimeout(timeoutHandle);
 					responseReceived = true;
 					resolve(currentOutput.trim());
 				}
 				// Look for help or other command responses
-				else if (promptCount >= 2 && (currentOutput.includes('Commands:') || 
-					currentOutput.includes('Noolang REPL'))) {
+				else if (
+					promptCount >= 2 &&
+					(currentOutput.includes('Commands:') ||
+						currentOutput.includes('Noolang REPL'))
+				) {
 					clearInterval(checkInterval);
+					clearTimeout(timeoutHandle);
 					responseReceived = true;
 					resolve(currentOutput.trim());
 				}
 			}, 100);
 
 			// Timeout after 3 seconds
-			setTimeout(() => {
+			timeoutHandle = setTimeout(() => {
 				if (!responseReceived) {
 					clearInterval(checkInterval);
+					responseReceived = true;
 					resolve(output.substring(beforeLength));
 				}
 			}, 3000);
+
+			// Prevent timers from keeping the process alive
+			checkInterval.unref();
+			timeoutHandle.unref();
 		});
 	};
 
 	const stopREPL = (): Promise<void> => {
 		return new Promise(resolve => {
-			if (replProcess && !replProcess.killed && !processManuallyExited) {
-				// Set a timeout in case the process doesn't exit cleanly
-				const timeout = setTimeout(() => {
-					if (!replProcess.killed) {
-						replProcess.kill('SIGKILL');
-					}
-					resolve();
-				}, 5000);
+			if (!replProcess) {
+				resolve();
+				return;
+			}
 
-				replProcess.on('exit', () => {
-					clearTimeout(timeout);
-					resolve();
-				});
+			// If already killed or manually exited, just resolve
+			if (replProcess.killed || processManuallyExited) {
+				resolve();
+				return;
+			}
 
+			// Force kill after short timeout
+			const timeout = setTimeout(() => {
+				if (replProcess && !replProcess.killed) {
+					replProcess.kill('SIGKILL');
+				}
+				// Always resolve even if kill fails
+				const finalResolve = setTimeout(resolve, 100);
+				finalResolve.unref();
+			}, 1000); // Reduced timeout to 1 second
+			timeout.unref();
+
+			replProcess.once('exit', () => {
+				clearTimeout(timeout);
+				resolve();
+			});
+
+			replProcess.once('error', () => {
+				clearTimeout(timeout);
+				resolve();
+			});
+
+			// Try graceful shutdown first
+			try {
 				replProcess.kill('SIGTERM');
-			} else {
+			} catch (e) {
+				clearTimeout(timeout);
 				resolve();
 			}
 		});
@@ -122,6 +164,10 @@ describe('REPL Integration Tests', () => {
 
 	afterEach(async () => {
 		await stopREPL();
+		// Clear references
+		replProcess = null;
+		output = '';
+		errorOutput = '';
 	});
 
 	describe('Basic Arithmetic', () => {
@@ -222,12 +268,16 @@ describe('REPL Integration Tests', () => {
 	describe('Error Handling', () => {
 		test.skip('should handle syntax errors gracefully (timing issue with error detection)', async () => {
 			const result = await sendInput('2 + +');
-			expect(result.includes('Parse error') || result.includes('Error')).toBe(true);
+			expect(result.includes('Parse error') || result.includes('Error')).toBe(
+				true
+			);
 		});
 
 		test.skip('should handle undefined variable errors (timing issue with error detection)', async () => {
 			const result = await sendInput('undefinedVar');
-			expect(result.includes('TypeError') || result.includes('Undefined variable')).toBe(true);
+			expect(
+				result.includes('TypeError') || result.includes('Undefined variable')
+			).toBe(true);
 		});
 
 		test('should continue after errors', async () => {
