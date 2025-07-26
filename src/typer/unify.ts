@@ -793,13 +793,21 @@ function unifyConstrainedWithConcrete(
 	// Create substitution mapping the constrained variable to the concrete type constructor
 	const newSubstitution = new Map(state.substitution);
 	
-	// PHASE 3 FIX: For higher-kinded types like functors, we need to substitute the type constructor
-	// If the constrained type has variant types like "α130 Int", we substitute α130 with List
-	// so that "α130 Int" becomes "List Int"
+	// CONSTRAINT COLLAPSE FIX: When we have a concrete type that satisfies the constraint,
+	// we should substitute the type variable with the concrete type constructor
 	
 	if (concreteType.kind === 'list') {
 		// For List Int, we substitute the type constructor variable with List
 		newSubstitution.set(resolvedVarName, { kind: 'primitive', name: 'List' });
+	} else if (concreteType.kind === 'variant') {
+		// For Option Int, Maybe String, etc., we need to substitute with a type constructor
+		// We can't create a primitive with variant name, so we substitute with the variant type itself
+		// but extract just the constructor part
+		newSubstitution.set(resolvedVarName, {
+			kind: 'variant',
+			name: concreteType.name,
+			args: [] // Empty args since this is just the constructor
+		});
 	} else {
 		// For other types, substitute directly
 		newSubstitution.set(resolvedVarName, concreteType);
@@ -807,9 +815,24 @@ function unifyConstrainedWithConcrete(
 	
 	const newState = { ...state, substitution: newSubstitution };
 	
-	// Now unify the base types with the new substitution
+	// Apply the substitution to the base type
+	const substitutedBaseType = substitute(constrainedType.baseType, newSubstitution);
+	
+	// CRITICAL FIX: Instead of calling unify recursively (which might preserve constraints),
+	// check if the substituted base type now equals the concrete type.
+	// If so, the constraint is fully resolved and we can return the new state.
+	
+	// Apply the substitution to make the comparison
+	const finalSubstitutedType = substitute(substitutedBaseType, newSubstitution);
+	
+	// If the types are now equal after substitution, constraint is resolved
+	if (typesEqual(finalSubstitutedType, concreteType)) {
+		return newState;
+	}
+	
+	// Otherwise, continue with normal unification
 	return unify(
-		substitute(constrainedType.baseType, newSubstitution),
+		substitutedBaseType,
 		concreteType,
 		newState,
 		location

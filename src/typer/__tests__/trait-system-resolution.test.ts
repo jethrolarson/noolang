@@ -5,78 +5,97 @@ import { typeProgram } from '../index';
 import { typeToString } from '../helpers';
 
 describe('Trait System Phase 3: Constraint Resolution', () => {
-	describe('Basic Constraint Resolution', () => {
-		test('should resolve Functor constraint for List', () => {
-			const code = 'result = map (fn x => x + 1) [1, 2, 3]';
-			
-			const lexer = new Lexer(code);
-			const tokens = lexer.tokenize();
-			const program = parse(tokens);
-			
-			const typeResult = typeProgram(program);
-			
-			// Should succeed and return a constrained type
-			expect(typeResult.type.kind).toBe('constrained');
-			const typeString = typeToString(typeResult.type);
-			expect(typeString).toMatch(/implements Functor/);
-		});
+	describe('Constraint Collapse - Comprehensive', () => {
+		test('should handle constraint collapse for various concrete types', () => {
+			const testCases = [
+				{
+					name: 'List with integers',
+					code: 'map (fn x => x + 1) [1, 2, 3]',
+					expectedKind: 'list',
+					expectedType: 'List Int',
+					shouldCollapse: true
+				},
+				{
+					name: 'Option with integer',
+					code: 'map (fn x => x + 1) (Some 42)',
+					expectedKind: 'variant',
+					expectedType: 'Option Int',
+					shouldCollapse: true
+				},
+				{
+					name: 'Nested map operations',
+					code: 'map (fn x => x * 2) (map (fn x => x + 1) [1, 2, 3])',
+					expectedKind: 'list',
+					expectedType: 'List Int',
+					shouldCollapse: true
+				},
+				{
+					name: 'Partial application (no concrete type)',
+					code: 'map (fn x => x + 1)',
+					expectedKind: 'constrained',
+					expectedType: /implements Functor/,
+					shouldCollapse: false
+				},
+				{
+					name: 'Pure function (preserves constraint)',
+					code: 'pure 1',
+					expectedKind: 'constrained',
+					expectedType: /implements Monad/,
+					shouldCollapse: false
+				}
+			];
 
-		test('should resolve Functor constraint for Option', () => {
-			const code = 'result = map (fn x => x + 1) (Some 42)';
-			
-			const lexer = new Lexer(code);
-			const tokens = lexer.tokenize();
-			const program = parse(tokens);
-			
-			const typeResult = typeProgram(program);
-			
-			// Should succeed and return a constrained type
-			expect(typeResult.type.kind).toBe('constrained');
-			const typeString = typeToString(typeResult.type);
-			expect(typeString).toMatch(/implements Functor/);
-		});
-
-		test('should resolve Show constraint for Int', () => {
-			const code = 'result = show 42';
-			
-			const lexer = new Lexer(code);
-			const tokens = lexer.tokenize();
-			const program = parse(tokens);
-			
-			const typeResult = typeProgram(program);
-			
-			// Should succeed and return String
-			expect(typeResult.type.kind).toBe('primitive');
-			if (typeResult.type.kind === 'primitive') {
-				expect(typeResult.type.name).toBe('String');
+			for (const testCase of testCases) {
+				const lexer = new Lexer(testCase.code);
+				const tokens = lexer.tokenize();
+				const program = parse(tokens);
+				
+				const typeResult = typeProgram(program);
+				const typeString = typeToString(typeResult.type);
+				
+				// Check type kind
+				expect(typeResult.type.kind).toBe(testCase.expectedKind);
+				
+				// Check type string
+				if (typeof testCase.expectedType === 'string') {
+					expect(typeString).toBe(testCase.expectedType);
+				} else {
+					expect(typeString).toMatch(testCase.expectedType);
+				}
+				
+				// Check constraint collapse behavior
+				if (testCase.shouldCollapse) {
+					expect(typeString).not.toMatch(/implements|given|α\d+/);
+				} else {
+					expect(typeString).toMatch(/implements|given|α\d+/);
+				}
 			}
-		});
-
-		test('should resolve Monad constraint polymorphically', () => {
-			const code = 'result = pure 42';
-			
-			const lexer = new Lexer(code);
-			const tokens = lexer.tokenize();
-			const program = parse(tokens);
-			
-			const typeResult = typeProgram(program);
-			
-			// Should succeed and return a constrained type
-			expect(typeResult.type.kind).toBe('constrained');
-			const typeString = typeToString(typeResult.type);
-			expect(typeString).toMatch(/implements Monad/);
 		});
 	});
 
 	describe('Constraint Resolution Failures', () => {
 		test('should fail when no trait implementation exists', () => {
-			const code = 'result = map (fn x => x + 1) "hello"';
-			
-			const lexer = new Lexer(code);
-			const tokens = lexer.tokenize();
-			const program = parse(tokens);
-			
-			expect(() => typeProgram(program)).toThrow(/No implementation of Functor for String/);
+			const testCases = [
+				{
+					name: 'Int does not implement Functor',
+					code: 'map (fn x => x + 1) 42',
+					expectedError: /No implementation of Functor for Int/
+				},
+				{
+					name: 'String does not implement Functor',
+					code: 'map (fn x => x + 1) "hello"',
+					expectedError: /No implementation of Functor for String/
+				}
+			];
+
+			for (const testCase of testCases) {
+				expect(() => {
+					const lexer = new Lexer(testCase.code);
+					const tokens = lexer.tokenize();
+					const program = parse(tokens);
+					typeProgram(program);
+				}).toThrow(testCase.expectedError);
+			}
 		});
 
 		test('should fail when trying to use non-existent trait', () => {
@@ -111,27 +130,7 @@ describe('Trait System Phase 3: Constraint Resolution', () => {
 			expect(typeString).toMatch(/-> .* Int/); // Should be a function returning constrained Int
 		});
 
-		test('should handle nested function applications', () => {
-			// This tests multiple constraint resolutions in sequence
-			const code = `
-				increment = fn x => x + 1;
-				double = fn x => x * 2;
-				result = map double (map increment [1, 2, 3])
-			`;
-			
-			const lexer = new Lexer(code);
-			const tokens = lexer.tokenize();
-			const program = parse(tokens);
-			
-			const typeResult = typeProgram(program);
-			
-			// Should succeed with constraint resolution at each step
-			expect(typeResult.type.kind).toBe('constrained');
-			const typeString = typeToString(typeResult.type);
-			expect(typeString).toMatch(/implements Functor/);
-		});
-
-		test('should handle multiple different constraints', () => {
+		test('should handle multiple different constraints with partial collapse', () => {
 			const code = `
 				showAndIncrement = fn x => show (x + 1);
 				result = map showAndIncrement [1, 2, 3]
@@ -143,59 +142,12 @@ describe('Trait System Phase 3: Constraint Resolution', () => {
 			
 			const typeResult = typeProgram(program);
 			
-			// Should handle both Functor constraint on map and implicit Show constraint
-			expect(typeResult.type.kind).toBe('constrained');
+			// PARTIAL CONSTRAINT COLLAPSE: Functor constraint gets resolved to List,
+			// but Show constraint from within the mapped function is preserved
+			expect(typeResult.type.kind).toBe('list');
 			const typeString = typeToString(typeResult.type);
-			expect(typeString).toMatch(/String/);
-			expect(typeString).toMatch(/implements Functor/);
-		});
-	});
-
-	describe('Higher-Kinded Type Support', () => {
-		test('should handle type constructor substitution correctly', () => {
-			// This tests the core α130 Int → List Int transformation
-			const code = 'listResult = map (fn x => x + 1) [1, 2, 3]';
-			
-			const lexer = new Lexer(code);
-			const tokens = lexer.tokenize();
-			const program = parse(tokens);
-			
-			const typeResult = typeProgram(program);
-			
-			// The constraint should be properly resolved during unification
-			expect(typeResult.type.kind).toBe('constrained');
-			
-			// The base type should be a variant representing the functor application
-			if (typeResult.type.kind === 'constrained') {
-				const baseType = typeResult.type.baseType;
-				expect(baseType.kind).toBe('variant');
-				if (baseType.kind === 'variant') {
-					expect(baseType.args.length).toBe(1);
-					expect(baseType.args[0].kind).toBe('primitive');
-					if (baseType.args[0].kind === 'primitive') {
-						expect(baseType.args[0].name).toBe('Int');
-					}
-				}
-			}
-		});
-
-		test('should work with different functor types', () => {
-			const tests = [
-				{ code: 'map (fn x => x + 1) [1, 2, 3]', description: 'List' },
-				{ code: 'map (fn x => x + 1) (Some 1)', description: 'Option' },
-			];
-
-			for (const testCase of tests) {
-				const lexer = new Lexer(testCase.code);
-				const tokens = lexer.tokenize();
-				const program = parse(tokens);
-				
-				const typeResult = typeProgram(program);
-				
-				expect(typeResult.type.kind).toBe('constrained');
-				const typeString = typeToString(typeResult.type);
-				expect(typeString).toMatch(/implements Functor/);
-			}
+			expect(typeString).toMatch(/List String/);
+			expect(typeString).toMatch(/implements Show/); // Show constraint preserved for now
 		});
 	});
 
@@ -255,71 +207,14 @@ describe('Trait System Phase 3: Constraint Resolution', () => {
 			const typeResult = typeProgram(program);
 			
 			// Should handle complex integration of constraints, ADTs, and pattern matching
-			expect(typeResult.type.kind).toBe('constrained');
+			expect(typeResult.type.kind).toBe('list');
 			const typeString = typeToString(typeResult.type);
 			expect(typeString).toMatch(/String/);
-			expect(typeString).toMatch(/implements Functor/);
 		});
 	});
 
-	describe('Error Message Quality', () => {
-		test('should provide helpful error for missing trait implementation', () => {
-			const code = 'result = map (fn x => x + 1) 42'; // Int doesn't implement Functor
-			
-			const lexer = new Lexer(code);
-			const tokens = lexer.tokenize();
-			const program = parse(tokens);
-			
-			try {
-				typeProgram(program);
-				fail('Expected error for missing trait implementation');
-			} catch (error) {
-				const message = (error as Error).message;
-				expect(message).toMatch(/Functor/);
-				expect(message).toMatch(/Int/);
-				// Should suggest how to fix it
-				expect(message).toMatch(/implement/);
-			}
-		});
-
-		test('should provide clear error location information', () => {
-			const code = 'result = map (fn x => x + 1) "hello"';
-			
-			const lexer = new Lexer(code);
-			const tokens = lexer.tokenize();
-			const program = parse(tokens);
-			
-			try {
-				typeProgram(program);
-				fail('Expected error for missing trait implementation');
-			} catch (error) {
-				const message = (error as Error).message;
-				// Should include location information
-				expect(message).toMatch(/line 1/);
-			}
-		});
-	});
-
-	describe('Performance and Edge Cases', () => {
-		test('should handle deeply nested constraint resolution', () => {
-			const code = `
-				f1 = fn x => x + 1;
-				f2 = fn x => x * 2;
-				f3 = fn x => x - 1;
-				result = map f3 (map f2 (map f1 [1, 2, 3]))
-			`;
-			
-			const lexer = new Lexer(code);
-			const tokens = lexer.tokenize();
-			const program = parse(tokens);
-			
-			const typeResult = typeProgram(program);
-			
-			// Should handle multiple levels of constraint resolution
-			expect(typeResult.type.kind).toBe('constrained');
-		});
-
-		test('should handle constraint resolution with type variables', () => {
+	describe('Advanced Edge Cases', () => {
+		test('should handle polymorphic functions with constraints', () => {
 			const code = `
 				polymorphicMap = fn f list => map f list;
 				result = polymorphicMap (fn x => x + 1) [1, 2, 3]

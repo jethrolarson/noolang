@@ -315,10 +315,12 @@ describe('Trait System - Consolidated Tests', () => {
 				const program = parseProgram(code);
 				const typeResult = typeProgram(program);
 				
-				// Should succeed and return a constrained type
-				assertConstrainedType(typeResult.type);
+				// CONSTRAINT COLLAPSE: Should succeed and return concrete List Int type
+				expect(typeResult.type.kind).toBe('list');
 				const typeString = typeToString(typeResult.type);
-				expect(typeString).toMatch(/implements Functor/);
+				expect(typeString).toBe('List Int');
+				// Should NOT have constraint annotations anymore
+				expect(typeString).not.toMatch(/implements|given|α\d+/);
 			});
 
 			test('should resolve Functor constraint for Option', () => {
@@ -327,10 +329,12 @@ describe('Trait System - Consolidated Tests', () => {
 				const program = parseProgram(code);
 				const typeResult = typeProgram(program);
 				
-				// Should succeed and return a constrained type
-				assertConstrainedType(typeResult.type);
+				// CONSTRAINT COLLAPSE: Should succeed and return concrete Option Int type
+				expect(typeResult.type.kind).toBe('variant');
 				const typeString = typeToString(typeResult.type);
-				expect(typeString).toMatch(/implements Functor/);
+				expect(typeString).toBe('Option Int');
+				// Should NOT have constraint annotations anymore
+				expect(typeString).not.toMatch(/implements|given|α\d+/);
 			});
 
 			test('should resolve Show constraint for Int', () => {
@@ -402,10 +406,11 @@ describe('Trait System - Consolidated Tests', () => {
 				const program = parseProgram(code);
 				const typeResult = typeProgram(program);
 				
-				// Should succeed with constraint resolution at each step
-				expect(typeResult.type.kind).toBe('constrained');
+				// CONSTRAINT COLLAPSE: Should succeed and resolve to concrete List Int
+				expect(typeResult.type.kind).toBe('list');
 				const typeString = typeToString(typeResult.type);
-				expect(typeString).toMatch(/implements Functor/);
+				expect(typeString).toBe('List Int');
+				expect(typeString).not.toMatch(/implements|given|α\d+/);
 			});
 
 			test('should handle multiple different constraints', () => {
@@ -417,11 +422,12 @@ describe('Trait System - Consolidated Tests', () => {
 				const program = parseProgram(code);
 				const typeResult = typeProgram(program);
 				
-				// Should handle both Functor constraint on map and implicit Show constraint
-				expect(typeResult.type.kind).toBe('constrained');
+				// PARTIAL CONSTRAINT COLLAPSE: Functor constraint gets resolved to List,
+				// but Show constraint from within the mapped function is preserved
+				expect(typeResult.type.kind).toBe('list');
 				const typeString = typeToString(typeResult.type);
-				expect(typeString).toMatch(/String/);
-				expect(typeString).toMatch(/implements Functor/);
+				expect(typeString).toMatch(/List String/);
+				expect(typeString).toMatch(/implements Show/); // Show constraint preserved
 			});
 		});
 
@@ -467,11 +473,10 @@ describe('Trait System - Consolidated Tests', () => {
 				const program = parseProgram(code);
 				const typeResult = typeProgram(program);
 				
-				// Should handle complex integration of constraints, ADTs, and pattern matching
-				expect(typeResult.type.kind).toBe('constrained');
+				// CONSTRAINT COLLAPSE: Should handle complex integration and resolve to concrete List String
+				expect(typeResult.type.kind).toBe('list');
 				const typeString = typeToString(typeResult.type);
-				expect(typeString).toMatch(/String/);
-				expect(typeString).toMatch(/implements Functor/);
+				expect(typeString).toMatch(/List String/);
 			});
 		});
 
@@ -627,7 +632,15 @@ describe('Trait System - Consolidated Tests', () => {
 			
 			const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 			
-			assertConstrainedType(typeResult.type);
+			// CONSTRAINT COLLAPSE: Should be concrete List Int, not constrained
+			expect(typeResult.type.kind).toBe('list');
+			if (typeResult.type.kind === 'list') {
+				expect(typeResult.type.element.kind).toBe('primitive');
+				if (typeResult.type.element.kind === 'primitive') {
+					expect(typeResult.type.element.name).toBe('Int');
+				}
+			}
+			
 			assertListValue(evalResult.finalResult);
 			expect(evalResult.finalResult.values).toEqual([
 				{ tag: 'number', value: 2 },
