@@ -33,5 +33,6 @@ export const typeAndDecorate = (program: Program, initialState?: TypeState) => {
 	return {
 		program: { ...program },
 		state: currentState,
+		finalType: finalType,
 	};
 };

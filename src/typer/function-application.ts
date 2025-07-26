@@ -32,7 +32,7 @@ import { typeExpression } from './expression-dispatcher';
 import { freshTypeVariable } from './type-operations';
 
 // CONSTRAINT COLLAPSE FIX: Function to try resolving constraints using argument types
-function tryResolveConstraints(
+export function tryResolveConstraints(
 	returnType: Type,
 	functionConstraints: Map<string, TraitConstraint[]>,
 	argTypes: Type[],
