@@ -48,16 +48,18 @@ describe('Functional Type Inference', () => {
 		it('should infer function with multiple parameters', () => {
 			const program = parseProgram('fn x y => x + y');
 			const result = typeProgram(program);
+			// With trait system, + operator is polymorphic: Add a => a -> a -> a
 			expect(typeToString(result.type, result.state.substitution)).toBe(
-				'(Int) -> (Int) -> Int'
+				'(α) -> (α) -> α'
 			);
 		});
 
 		it('should infer nested function', () => {
 			const program = parseProgram('fn x => fn y => x + y');
 			const result = typeProgram(program);
+			// With trait system, + operator is polymorphic: Add a => a -> a -> a
 			expect(typeToString(result.type, result.state.substitution)).toBe(
-				'(Int) -> (Int) -> Int'
+				'(α) -> (α) -> α'
 			);
 		});
 	});
