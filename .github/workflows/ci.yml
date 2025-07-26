@@ -27,9 +27,37 @@ on:
       - '.github/workflows/ci.yml'
 
 jobs:
+  # TypeScript type checking for both source and test files
+  # This ensures all TypeScript code (including tests) compiles without errors
+  # Source files use main tsconfig.json, test files use tsconfig.test.json
+  typescript-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: TypeScript check - source files
+      run: npm run typecheck
+      
+    - name: TypeScript check - test files (including assert helpers)
+      run: npm run typecheck:test
+      
+    - name: Report TypeScript status
+      run: echo "✅ TypeScript checking passed for source and test files"
+
   # Run core Jest tests once with fast SWC compilation
   core-tests:
     runs-on: ubuntu-latest
+    needs: typescript-check  # Only run tests if TypeScript checking passes
     
     steps:
     - uses: actions/checkout@v4
@@ -58,7 +86,7 @@ jobs:
   # Run REPL-specific tests separately  
   repl-tests:
     runs-on: ubuntu-latest
-    needs: core-tests  # Only run if core tests pass
+    needs: [typescript-check, core-tests]  # Only run if TypeScript check and core tests pass
     
     steps:
     - uses: actions/checkout@v4
@@ -92,7 +120,7 @@ jobs:
   # Run LSP tests separately
   lsp-tests:
     runs-on: ubuntu-latest
-    needs: core-tests  # Only run if core tests pass
+    needs: [typescript-check, core-tests]  # Only run if TypeScript check and core tests pass
     
     steps:
     - uses: actions/checkout@v4
