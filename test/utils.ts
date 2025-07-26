@@ -73,13 +73,13 @@ export const assertFunctionType = assertKind<FunctionType, 'function'>(
 export const assertVariableType = assertKind<VariableType, 'variable'>(
 	'variable'
 );
-export const assertConstrainedType = assertKind<ConstrainedType, 'constrained'>(
+export const assertConstrainedType: (type: Type) => asserts type is ConstrainedType = assertKind<ConstrainedType, 'constrained'>(
 	'constrained'
 );
-export const assertPrimitiveType = assertKind<PrimitiveType, 'primitive'>(
+export const assertPrimitiveType: (type: Type) => asserts type is PrimitiveType = assertKind<PrimitiveType, 'primitive'>(
 	'primitive'
 );
-export const assertVariantType = assertKind<VariantType, 'variant'>(
+export const assertVariantType: (type: Type) => asserts type is VariantType = assertKind<VariantType, 'variant'>(
 	'variant'
 );
 
@@ -127,25 +127,25 @@ export const assertParseError = <T>(
 };
 
 // Value assertions for evaluator results
-export const assertNumberValue = (value: Value): asserts value is Extract<Value, { tag: 'number' }> => {
+export const assertNumberValue: (value: Value) => asserts value is Extract<Value, { tag: 'number' }> = (value: Value): asserts value is Extract<Value, { tag: 'number' }> => {
 	if (value.tag !== 'number') {
 		throw new Error(`Expected number value, got ${value.tag}`);
 	}
 };
 
-export const assertStringValue = (value: Value): asserts value is Extract<Value, { tag: 'string' }> => {
+export const assertStringValue: (value: Value) => asserts value is Extract<Value, { tag: 'string' }> = (value: Value): asserts value is Extract<Value, { tag: 'string' }> => {
 	if (value.tag !== 'string') {
 		throw new Error(`Expected string value, got ${value.tag}`);
 	}
 };
 
-export const assertUnitValue = (value: Value): asserts value is Extract<Value, { tag: 'unit' }> => {
+export const assertUnitValue: (value: Value) => asserts value is Extract<Value, { tag: 'unit' }> = (value: Value): asserts value is Extract<Value, { tag: 'unit' }> => {
 	if (value.tag !== 'unit') {
 		throw new Error(`Expected unit value, got ${value.tag}`);
 	}
 };
 
-export const assertListValue = (value: Value): asserts value is Extract<Value, { tag: 'list' }> => {
+export const assertListValue: (value: Value) => asserts value is Extract<Value, { tag: 'list' }> = (value: Value): asserts value is Extract<Value, { tag: 'list' }> => {
 	if (value.tag !== 'list') {
 		throw new Error(`Expected list value, got ${value.tag}`);
 	}
