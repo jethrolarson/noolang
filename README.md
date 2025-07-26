@@ -48,6 +48,10 @@ add = fn x y => x + y
 # Function application doesn't require parens and `,` is only used for separating items in data structures like `Tuple`, `Record` and `List`
 add 2 3
 
+# The + operator works for both numbers and strings
+1 + 2           # => 3 : Int
+"hello" + " world"  # => "hello world" : String
+
 # all functions are curried so if you pass less than their full number of arguments you get back a partially applied function
 increment = add 1;
 increment 2 
