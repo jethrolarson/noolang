@@ -55,6 +55,9 @@ id = fn x => x;
 
 type Bool = True | False;
 
+# Boolean negation
+not = fn b => match b with (True => False; False => True);
+
 implement Show Bool (
   show = fn b => match b with (
     True => "True";
@@ -62,13 +65,10 @@ implement Show Bool (
   )
 );
 
-# Boolean negation
-not = fn b => match b with (True => False; False => True);
-
 implement Eq Bool (
   equals = fn a b => match a with (
     True => b;
-    False => match b with (True => False; False => True)
+    False => not b
   )
 )
 
