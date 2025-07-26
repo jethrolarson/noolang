@@ -259,15 +259,16 @@ stdlib.noo                   # Standard library traits
 - Document trait best practices
 - Performance benchmarking guidelines
 
-## Phase 4: Structural Constraints with `has` (Planned)
+## Phase 4: Record Structural Constraints with `has` (Planned)
 
 ### Overview
-Extend the constraint system with structural constraints using the `has` keyword for duck-typed records and tuples. This maintains Noolang's duck typing philosophy while adding compile-time structural verification.
+Extend the constraint system with structural constraints using the `has` keyword for duck-typed records. This maintains Noolang's duck typing philosophy while adding compile-time structural verification. Tuple structural constraints are planned for a future phase once tuple pattern matching is implemented.
 
 ### Core Design Principles
-- **Duck Typing Preserved**: `has` constraints mean "at least this structure" (extra fields/elements allowed)
-- **Concrete Types for Exactness**: Use concrete types like `{Int, String}` when you need exactly that structure
-- **Natural Syntax**: Use record/tuple literal syntax on RHS of `has`
+- **Duck Typing Preserved**: `has` constraints mean "at least this structure" (extra fields allowed)
+- **Concrete Types for Exactness**: Use concrete record types when you need exactly that structure
+- **Natural Syntax**: Use record literal syntax on RHS of `has`
+- **Safe Accessor Integration**: Works seamlessly with existing `@field` accessor system
 
 ### Syntax Design
 
@@ -277,51 +278,23 @@ Extend the constraint system with structural constraints using the `has` keyword
 given a has {@name String, @age Int}
 
 # Nested record constraints  
-given a has {@person {@name String}, @coords {Int, Int}}
+given a has {@person {@name String}, @address {@street String, @city String}}
 
 # Mixed with other constraints
 given a has {@items List b} and Show b
+
+# Wildcard for "don't care about this field's type"
+given a has {@name String, @metadata _}
 ```
 
-#### Tuple Structural Constraints
+#### Future: Tuple Structural Constraints (When Pattern Matching Ready)
 ```noo
-# Basic tuple constraints
-given a has {Int, String}           # At least Int, String (extra elements OK)
-given a has {_, Int, String}        # Second element Int, third String
-
-# Nested tuple constraints
-given a has {{Int, Int}, String}    # First element is coordinate pair
+# These will be supported once tuple pattern matching is implemented
+# given a has {Int, String}           # At least Int, String
+# given a has {_, Int, String}        # Second element Int, third String
 ```
-
-#### Wildcard Syntax
-- **`_`** - "Any type, don't care" (like pattern matching wildcards)
-- Avoids `any` keyword which has negative TypeScript associations
-- Represents "I don't care about this position" rather than type weakness
 
 ### Use Cases
-
-#### Tuple Accessor Functions
-```noo
-# Generic tuple accessors using structural constraints
-first = fn t => tupleGet 0 t
-  : a -> b given a has {b}
-
-second = fn t => tupleGet 1 t  
-  : a -> b given a has {_, b}
-
-third = fn t => tupleGet 2 t
-  : a -> b given a has {_, _, b}
-
-# Safe accessor that works with any tuple having at least 2 elements
-getSecond = fn coords => tupleGet 1 coords
-  : a -> Int given a has {_, Int}
-
-# Works with any tuple that has enough elements
-first {42}                    # ✅ 42
-first {42, "hello", True}     # ✅ 42 (extra elements ignored)
-getSecond {10, 20}            # ✅ 20
-getSecond {10, 20, 30}        # ✅ 20 (third element ignored)
-```
 
 #### Record Interface Functions
 ```noo
