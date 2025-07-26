@@ -12,6 +12,15 @@ import { mapSet, typeToString, occursIn } from './helpers';
 // Legacy constraint imports removed
 import { functionApplicationError } from './type-errors';
 
+// Valid primitive type names (must match PrimitiveType['name'] union)
+const VALID_PRIMITIVES = new Set(['Int', 'String', 'Bool', 'List'] as const);
+type ValidPrimitiveName = 'Int' | 'String' | 'Bool' | 'List';
+
+// Type guard for valid primitive names
+function isValidPrimitiveName(name: string): name is ValidPrimitiveName {
+	return VALID_PRIMITIVES.has(name as ValidPrimitiveName);
+}
+
 // Performance tracking
 let unifyCallCount = 0;
 let totalUnifyTime = 0;
@@ -726,15 +735,20 @@ function tryUnifyConstrainedVariant(
 				}
 
 				// PHASE 3 FIX: Handle variant types like Option, Result, etc.
-				// Use runtime check to work around TypeScript type issues
 				if (concreteType.kind === 'variant') {
-					const concreteVariant = concreteType as any; // Type assertion for now
-
-					// For variant types, substitute the type constructor variable with the variant name
-					newSubstitution.set(variantType.name, {
-						kind: 'primitive',
-						name: concreteVariant.name,
-					});
+					const concreteVariant = concreteType; // Type-safe access
+					
+					// Validate that we're not trying to create an invalid primitive
+					if (isValidPrimitiveName(concreteVariant.name)) {
+						// Only valid primitives can be substituted as primitives
+						newSubstitution.set(variantType.name, {
+							kind: 'primitive',
+							name: concreteVariant.name, // TypeScript now knows this is ValidPrimitiveName
+						});
+					} else {
+						// For non-primitive variants (Option, Result, etc.), substitute with the variant type itself
+						newSubstitution.set(variantType.name, concreteVariant);
+					}
 
 					// Transform α130 Int -> Option Int (variant)
 					const substitutedVariant = substitute(variantType, newSubstitution);
