@@ -389,9 +389,8 @@ export class Evaluator {
 				
 				// Handle trait function application
 				if (func.tag === 'trait-function') {
-					// Convert runtime Value back to AST LiteralExpression for trait function
-					const argExpr: LiteralExpression = this.valueToLiteralExpression(arg);
-					return this.evaluateTraitFunctionApplication(func, [argExpr]);
+					// Call trait function directly with values (no need to convert back to AST)
+					return this.applyTraitFunctionWithValues(func, [arg]);
 				}
 
 				if (isFunction(func)) {
@@ -2083,41 +2082,45 @@ export class Evaluator {
 		return result;
 	}
 
-	// Convert runtime Value back to AST LiteralExpression
-	// This is needed for trait function applications that expect AST nodes
-	private valueToLiteralExpression(value: Value): LiteralExpression {
-		const syntheticLocation: Location = {
-			start: { line: 1, column: 1 },
-			end: { line: 1, column: 1 },
-		};
 
-		switch (value.tag) {
-			case 'number':
-				return {
-					kind: 'literal',
-					value: value.value,
-					location: syntheticLocation,
-				};
-			case 'string':
-				return {
-					kind: 'literal',
-					value: value.value,
-					location: syntheticLocation,
-				};
-			case 'unit':
-				return {
-					kind: 'literal',
-					value: null,
-					location: syntheticLocation,
-				};
-			default:
-				// For complex types (records, lists, etc.), we can't represent them as literals
-				// This is a fundamental limitation of the AST ↔ Value conversion
-				throw new Error(
-					`Cannot convert ${value.tag} value to literal expression for trait function application. ` +
-					`Trait functions with dollar operator only support primitive values (numbers, strings, unit).`
-				);
+
+	// Apply trait function directly with runtime values (used by $ operator)
+	private applyTraitFunctionWithValues(
+		traitFunc: {
+			name: string;
+			partialArgs?: Value[];
+			traitRegistry: TraitRegistry;
+		},
+		argValues: Value[]
+	): Value {
+		if (!this.traitRegistry) {
+			throw new Error(
+				`No trait registry available for trait function ${traitFunc.name}`
+			);
 		}
+
+		// For partial application, return a curried function that accumulates arguments
+		// until we have enough information to do trait dispatch
+		if (traitFunc.partialArgs) {
+			// This is already a partially applied trait function - add more arguments
+			const allArgs = [...traitFunc.partialArgs, ...argValues];
+			return this.resolveTraitFunctionWithArgs(
+				traitFunc.name,
+				allArgs,
+				traitFunc.traitRegistry
+			);
+		} else {
+			// This is the first application - start accumulating arguments
+			return this.resolveTraitFunctionWithArgs(
+				traitFunc.name,
+				argValues,
+				traitFunc.traitRegistry
+			);
+		}
+	}
+
+	private ensureEnvironment(): Environment {
+		return this.environment;
 	}
 }
 
