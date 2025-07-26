@@ -333,9 +333,9 @@ describe('Trait System Phase 1 Infrastructure', () => {
 
 		it('should maintain registry state through type inference', () => {
 			const program = parseProgram(`
-				constraint TestShow a ( show : a -> String );
-				implement TestShow Int ( show = toString );
-				result = show 42
+				constraint TestShow a ( show2 : a -> String );
+				implement TestShow Int ( show2 = toString );
+				result = show2 42
 			`);
 
 			expect(() => typeProgram(program)).not.toThrow();

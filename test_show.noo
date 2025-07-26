@@ -1,1 +1,0 @@
-result = show (Some 123)

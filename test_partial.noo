@@ -1,4 +1,0 @@
-# Test partial application  
-add = fn x y => x + y;
-add5 = add 5;
-add5 10

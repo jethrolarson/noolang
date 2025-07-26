@@ -292,7 +292,7 @@ const collectFreeVars = (
 				walk(e.else, bound);
 				break;
 			case 'match':
-				walk(e.expr, bound);
+				walk(e.expression, bound);
 				e.cases.forEach(matchCase => {
 					// Pattern variables are bound in the case body
 					const patternVars = new Set<string>();
@@ -305,13 +305,73 @@ const collectFreeVars = (
 					};
 					extractPatternVars(matchCase.pattern);
 					const caseBound = new Set([...bound, ...patternVars]);
-					walk(matchCase.body, caseBound);
+					walk(matchCase.expression, caseBound);
 				});
 				break;
-			// Add other expression types as needed
+			case 'list':
+				e.elements.forEach(element => walk(element, bound));
+				break;
+			case 'record':
+				e.fields.forEach(field => walk(field.value, bound));
+				break;
+			case 'tuple':
+				e.elements.forEach(element => walk(element, bound));
+				break;
+			case 'accessor':
+				// Accessors don't have sub-expressions to walk
+				break;
+			case 'literal':
+				// Literals don't have sub-expressions to walk
+				break;
+			case 'unit':
+				// Unit expressions don't have sub-expressions to walk
+				break;
+			case 'pipeline':
+				e.steps.forEach(step => walk(step, bound));
+				break;
+			case 'where':
+				walk(e.main, bound);
+				e.definitions.forEach(def => {
+					if (def.kind === 'definition') {
+						const defBound = new Set([...bound, def.name]);
+						walk(def.value, defBound);
+					} else if (def.kind === 'mutable-definition') {
+						const defBound = new Set([...bound, def.name]);
+						walk(def.value, defBound);
+					}
+				});
+				break;
+			case 'typed':
+				walk(e.expression, bound);
+				break;
+			case 'constrained':
+				walk(e.expression, bound);
+				break;
+			case 'mutable-definition':
+				const mutDefBound = new Set([...bound, e.name]);
+				walk(e.value, mutDefBound);
+				break;
+			case 'mutation':
+				walk(e.value, bound);
+				break;
+			case 'import':
+				// Import expressions don't have sub-expressions to walk
+				break;
+			case 'type-definition':
+				// Type definitions don't have sub-expressions to walk
+				break;
+			case 'constraint-definition':
+				// Constraint definitions don't have sub-expressions to walk
+				break;
+			case 'implement-definition':
+				// Implement definitions don't have sub-expressions to walk
+				break;
+			case 'ffi':
+				// FFI expressions don't have sub-expressions to walk
+				break;
 			default:
-				// For other types, recursively walk any sub-expressions
-				// This is a simplified approach - in practice you'd handle each type
+				// For any other types, recursively walk any sub-expressions
+				// This is a fallback approach
 				break;
 		}
 	};

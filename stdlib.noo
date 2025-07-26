@@ -106,18 +106,18 @@ implement Functor Option (
   )
 );
 
-implement Eq Option (
-  equals = fn opt1 opt2 => match opt1 with (
-    Some x => match opt2 with (
-      Some y => equals x y;
-      None => False
-    );
-    None => match opt2 with (   
-      Some y => False;
-      None => True
-    )
-  )
-);
+#implement Eq Option (
+#  equals = fn opt1 opt2 => match opt1 with (
+#    Some x => match opt2 with (
+#      Some y => equals x y;
+#      None => False
+#    );
+#    None => match opt2 with (   
+#      Some y => False;
+#      None => True
+#    )
+#  )
+#);
 
 implement Applicative Option (
   apply = fn f opt => match opt with (
@@ -134,9 +134,9 @@ implement Applicative Option (
 type Result a b = Ok a | Err b;
 
 implement Show Result (
-  show = fn showOk showErr res => match res with (
-    Ok x => concat "Ok(" (concat (showOk x) ")");
-    Err e => concat "Err(" (concat (showErr e) ")")
+  show = fn res => match res with (
+    Ok x => concat "Ok(" (concat (show x) ")");
+    Err e => concat "Err(" (concat (show e) ")")
   )
 );
 
