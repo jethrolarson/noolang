@@ -452,8 +452,8 @@ validateUser = fn user =>
 
 #### Wildcard Syntax for Tuples
 - **`_`** - "Any type, don't care" (consistent with pattern matching)
-- **`...`** - "Any additional elements" for minimum length requirements
-- **`{_, Int, ...}`** - "At least 2 elements, second must be Int"
+- **Duck typing default**: Extra elements beyond constraint automatically allowed
+- **`{_, Int}`** - "At least 2 elements, second must be Int" (extra elements OK)
 
 #### Implementation Requirements
 1. **Pattern Parser**: Extend parser to handle `{x, y, z}` tuple patterns
