@@ -291,6 +291,23 @@ const collectFreeVars = (
 				walk(e.then, bound);
 				walk(e.else, bound);
 				break;
+			case 'match':
+				walk(e.expr, bound);
+				e.cases.forEach(matchCase => {
+					// Pattern variables are bound in the case body
+					const patternVars = new Set<string>();
+					// Extract pattern variables (simplified - should handle all pattern types)
+					const extractPatternVars = (pattern: any) => {
+						if (pattern && pattern.kind === 'variable') {
+							patternVars.add(pattern.name);
+						}
+						// Handle other pattern types as needed
+					};
+					extractPatternVars(matchCase.pattern);
+					const caseBound = new Set([...bound, ...patternVars]);
+					walk(matchCase.body, caseBound);
+				});
+				break;
 			// Add other expression types as needed
 			default:
 				// For other types, recursively walk any sub-expressions
