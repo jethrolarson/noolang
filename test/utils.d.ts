@@ -19,9 +19,9 @@ export declare const assertTupleType: (value: TupleType) => asserts value is Tup
 export declare const assertListType: (value: ListType) => asserts value is ListType;
 export declare const assertFunctionType: (value: FunctionType) => asserts value is FunctionType;
 export declare const assertVariableType: (value: VariableType) => asserts value is VariableType;
-export declare const assertConstrainedType: (value: ConstrainedType) => asserts value is ConstrainedType;
-export declare const assertPrimitiveType: (value: PrimitiveType) => asserts value is PrimitiveType;
-export declare const assertVariantType: (value: VariantType) => asserts value is VariantType;
+export declare const assertConstrainedType: (type: Type) => asserts type is ConstrainedType;
+export declare const assertPrimitiveType: (type: Type) => asserts type is PrimitiveType;
+export declare const assertVariantType: (type: Type) => asserts type is VariantType;
 export declare const assertDefinitionExpression: (value: DefinitionExpression) => asserts value is DefinitionExpression;
 export declare const assertTypedExpression: (value: TypedExpression) => asserts value is TypedExpression;
 export declare const assertMatchExpression: (value: MatchExpression) => asserts value is MatchExpression;
@@ -30,16 +30,16 @@ export declare const assertImplementDefinitionExpression: (value: ImplementDefin
 export declare const assertParseSuccess: <T>(result: ParseResult<T>) => asserts result is ParseSuccess<T>;
 export declare const assertParseError: <T>(result: ParseResult<T>) => asserts result is ParseError;
 export declare const assertNumberValue: (value: Value) => asserts value is Extract<Value, {
-    tag: "number";
+    tag: 'number';
 }>;
 export declare const assertStringValue: (value: Value) => asserts value is Extract<Value, {
-    tag: "string";
+    tag: 'string';
 }>;
 export declare const assertUnitValue: (value: Value) => asserts value is Extract<Value, {
-    tag: "unit";
+    tag: 'unit';
 }>;
 export declare const assertListValue: (value: Value) => asserts value is Extract<Value, {
-    tag: "list";
+    tag: 'list';
 }>;
 export declare const assertRecordValue: (value: Value) => asserts value is Extract<Value, {
     tag: "record";

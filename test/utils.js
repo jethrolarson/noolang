@@ -20,9 +20,24 @@ exports.assertTupleType = (0, exports.assertKind)('tuple');
 exports.assertListType = (0, exports.assertKind)('list');
 exports.assertFunctionType = (0, exports.assertKind)('function');
 exports.assertVariableType = (0, exports.assertKind)('variable');
-exports.assertConstrainedType = (0, exports.assertKind)('constrained');
-exports.assertPrimitiveType = (0, exports.assertKind)('primitive');
-exports.assertVariantType = (0, exports.assertKind)('variant');
+const assertConstrainedType = (type) => {
+    if (type.kind !== "constrained") {
+        throw new Error(`Expected kind constrained, got '${type.kind}'`);
+    }
+};
+exports.assertConstrainedType = assertConstrainedType;
+const assertPrimitiveType = (type) => {
+    if (type.kind !== "primitive") {
+        throw new Error(`Expected kind primitive, got '${type.kind}'`);
+    }
+};
+exports.assertPrimitiveType = assertPrimitiveType;
+const assertVariantType = (type) => {
+    if (type.kind !== "variant") {
+        throw new Error(`Expected kind variant, got '${type.kind}'`);
+    }
+};
+exports.assertVariantType = assertVariantType;
 exports.assertDefinitionExpression = (0, exports.assertKind)('definition');
 exports.assertTypedExpression = (0, exports.assertKind)('typed');
 exports.assertMatchExpression = (0, exports.assertKind)('match');
