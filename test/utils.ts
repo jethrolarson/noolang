@@ -135,65 +135,65 @@ export const assertParseError = <T>(
 };
 
 // Value assertions for evaluator results
-export const assertNumberValue: (value: Value) => asserts value is Extract<Value, { tag: 'number' }> = (value: Value): asserts value is Extract<Value, { tag: 'number' }> => {
+export function assertNumberValue(value: Value): asserts value is Extract<Value, { tag: 'number' }> {
 	if (value.tag !== 'number') {
 		throw new Error(`Expected number value, got ${value.tag}`);
 	}
-};
+}
 
-export const assertStringValue: (value: Value) => asserts value is Extract<Value, { tag: 'string' }> = (value: Value): asserts value is Extract<Value, { tag: 'string' }> => {
+export function assertStringValue(value: Value): asserts value is Extract<Value, { tag: 'string' }> {
 	if (value.tag !== 'string') {
 		throw new Error(`Expected string value, got ${value.tag}`);
 	}
-};
+}
 
-export const assertUnitValue: (value: Value) => asserts value is Extract<Value, { tag: 'unit' }> = (value: Value): asserts value is Extract<Value, { tag: 'unit' }> => {
+export function assertUnitValue(value: Value): asserts value is Extract<Value, { tag: 'unit' }> {
 	if (value.tag !== 'unit') {
 		throw new Error(`Expected unit value, got ${value.tag}`);
 	}
-};
+}
 
-export const assertListValue: (value: Value) => asserts value is Extract<Value, { tag: 'list' }> = (value: Value): asserts value is Extract<Value, { tag: 'list' }> => {
+export function assertListValue(value: Value): asserts value is Extract<Value, { tag: 'list' }> {
 	if (value.tag !== 'list') {
 		throw new Error(`Expected list value, got ${value.tag}`);
 	}
-};
+}
 
-export const assertRecordValue = (value: Value): asserts value is Extract<Value, { tag: 'record' }> => {
+export function assertRecordValue(value: Value): asserts value is Extract<Value, { tag: 'record' }> {
 	if (value.tag !== 'record') {
 		throw new Error(`Expected record value, got ${value.tag}`);
 	}
-};
+}
 
-export const assertFunctionValue = (value: Value): asserts value is Extract<Value, { tag: 'function' }> => {
+export function assertFunctionValue(value: Value): asserts value is Extract<Value, { tag: 'function' }> {
 	if (value.tag !== 'function') {
 		throw new Error(`Expected function value, got ${value.tag}`);
 	}
-};
+}
 
-export const assertTupleValue = (value: Value): asserts value is Extract<Value, { tag: 'tuple' }> => {
+export function assertTupleValue(value: Value): asserts value is Extract<Value, { tag: 'tuple' }> {
 	if (value.tag !== 'tuple') {
 		throw new Error(`Expected tuple value, got ${value.tag}`);
 	}
-};
+}
 
-export const assertConstructorValue = (value: Value): asserts value is Extract<Value, { tag: 'constructor' }> => {
+export function assertConstructorValue(value: Value): asserts value is Extract<Value, { tag: 'constructor' }> {
 	if (value.tag !== 'constructor') {
 		throw new Error(`Expected constructor value, got ${value.tag}`);
 	}
-};
+}
 
-export const assertNativeValue = (value: Value): asserts value is Extract<Value, { tag: 'native' }> => {
+export function assertNativeValue(value: Value): asserts value is Extract<Value, { tag: 'native' }> {
 	if (value.tag !== 'native') {
 		throw new Error(`Expected native value, got ${value.tag}`);
 	}
-};
+}
 
-export const assertTraitFunctionValue = (value: Value): asserts value is Extract<Value, { tag: 'trait-function' }> => {
+export function assertTraitFunctionValue(value: Value): asserts value is Extract<Value, { tag: 'trait-function' }> {
 	if (value.tag !== 'trait-function') {
 		throw new Error(`Expected trait-function value, got ${value.tag}`);
 	}
-};
+}
 
 // Utility for asserting specific type kinds
 export const assertTypeKind = <K extends Type['kind']>(expectedKind: K) => 
