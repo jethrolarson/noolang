@@ -302,19 +302,25 @@ given a has {{Int, Int}, String}    # First element is coordinate pair
 
 #### Tuple Accessor Functions
 ```noo
-# Note: Tuple pattern matching not yet implemented - these are aspirational examples
-# Generic tuple accessors using duck typing (when tuple patterns are added)
-first = fn t => match t with ({x, ...} => x) 
+# Generic tuple accessors using structural constraints
+first = fn t => tupleGet 0 t
   : a -> b given a has {b}
 
-# Alternative implementation using built-in functions until tuple patterns exist
-first = tupleGet 0   # Get first element of tuple
-second = tupleGet 1  # Get second element of tuple  
-third = tupleGet 2   # Get third element of tuple
+second = fn t => tupleGet 1 t  
+  : a -> b given a has {_, b}
+
+third = fn t => tupleGet 2 t
+  : a -> b given a has {_, _, b}
+
+# Safe accessor that works with any tuple having at least 2 elements
+getSecond = fn coords => tupleGet 1 coords
+  : a -> Int given a has {_, Int}
 
 # Works with any tuple that has enough elements
 first {42}                    # ✅ 42
 first {42, "hello", True}     # ✅ 42 (extra elements ignored)
+getSecond {10, 20}            # ✅ 20
+getSecond {10, 20, 30}        # ✅ 20 (third element ignored)
 ```
 
 #### Record Interface Functions
@@ -331,24 +337,26 @@ greet {@name "Bob", @city "NYC", @id 123}         # ✅ Works (extra fields igno
 #### Coordinate/Geometry Functions
 ```noo
 # 2D operations that work with any tuple starting with two numbers
-# Note: Using Int instead of Float (no Float type yet)
-distance2D = fn p1 p2 => 
-  # When tuple patterns are implemented:
-  # match {p1, p2} with ({{x1, y1, ...}, {x2, y2, ...}} => 
-  #   sqrt((x2-x1)^2 + (y2-y1)^2))
-  
-  # Current implementation using tuple accessors:
+manhattanDistance = fn p1 p2 => 
   x1 = tupleGet 0 p1;
   y1 = tupleGet 1 p1;
   x2 = tupleGet 0 p2;
   y2 = tupleGet 1 p2;
-  sqrt ((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1))
+  abs (x2 - x1) + abs (y1 - y2)
   : a -> a -> Int given a has {Int, Int}
 
+# Extract X coordinate from any point-like tuple
+getX = fn point => tupleGet 0 point
+  : a -> Int given a has {Int}
+
+# Extract Y coordinate, ensuring it's the second element
+getY = fn point => tupleGet 1 point  
+  : a -> Int given a has {_, Int}
+
 # Works with 2D, 3D, or higher dimensional points
-distance2D {0, 0}           # ✅ 2D point
-distance2D {1, 1, 2}        # ✅ 3D point (Z ignored)
-distance2D {3, 4, "label"}  # ✅ Labeled point (label ignored)
+manhattanDistance {0, 0} {3, 4}        # ✅ 7 (2D points)
+manhattanDistance {1, 1, 5} {4, 5, 10} # ✅ 7 (3D points, Z ignored)
+getX {10, 20, "label"}                 # ✅ 10 (extra data ignored)
 ```
 
 ### Integration with Existing System
@@ -372,10 +380,13 @@ validatePerson = fn data =>
 ```noo
 # Type inference should derive has constraints from usage
 getCoordinateSum = fn point => 
-  # When tuple patterns exist: match point with ({x, y, ...} => x + y)
-  # Current: using tuple accessors
   (tupleGet 0 point) + (tupleGet 1 point)
 # Should infer: a -> Int given a has {Int, Int}
+
+# Using record accessors should infer record constraints
+getPersonInfo = fn p => 
+  concat (@name p) (concat " is " (toString (@age p)))
+# Should infer: a -> String given a has {@name String, @age Int}
 ```
 
 ### Implementation Plan
