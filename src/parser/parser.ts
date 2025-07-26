@@ -1978,50 +1978,47 @@ const parseSequence: C.Parser<Expression> = C.map(
 const parseExpr: C.Parser<Expression> = parseSequence;
 
 // --- Main Parse Function ---
-export const parse = (tokens: Token[]): Program => {
-	// Filter out EOF tokens for parsing
-	const nonEOFTokens = tokens.filter(t => t.type !== 'EOF');
-
-	// Parse multiple top-level expressions separated by semicolons
-	const statements: Expression[] = [];
-	let rest = nonEOFTokens;
-	while (rest.length > 0) {
-		// Skip leading semicolons
-		while (
-			rest.length > 0 &&
-			rest[0].type === 'PUNCTUATION' &&
-			rest[0].value === ';'
-		) {
-			rest = rest.slice(1);
-		}
-		if (rest.length === 0) break;
-		const result = parseExpr(rest);
-		if (!result.success) {
-			// Include line and column information in parse error
-			const errorLocation =
-				result.position > 0 ? ` at line ${result.position}` : '';
-			throw new Error(`Parse error: ${result.error}${errorLocation}`);
-		}
-		statements.push(result.value);
-		rest = result.remaining;
-		// Skip trailing semicolons after each statement
-		while (
-			rest.length > 0 &&
-			rest[0].type === 'PUNCTUATION' &&
-			rest[0].value === ';'
-		) {
-			rest = rest.slice(1);
-		}
+// Helper: skip semicolons
+const skipSemicolons = (tokens: Token[]): Token[] => {
+	while (tokens.length > 0 && tokens[0].type === 'PUNCTUATION' && tokens[0].value === ';') {
+		tokens = tokens.slice(1);
 	}
-	// If there are still leftover tokens that aren't semicolons or EOF, throw an error
-	if (rest.length > 0) {
-		const next = rest[0];
+	return tokens;
+};
+
+// Clean combinator-based program parser  
+const parseStatements = (tokens: Token[]): C.ParseResult<Expression[]> => {
+	const statements: Expression[] = [];
+	let rest = skipSemicolons(tokens.filter(t => t.type !== 'EOF'));
+	
+	while (rest.length > 0) {
+		const result = parseExpr(rest);
+		if (!result.success) return result;
+		
+		statements.push(result.value);
+		rest = skipSemicolons(result.remaining);
+	}
+	
+	return { success: true, value: statements, remaining: [] };
+};
+
+export const parse = (tokens: Token[]): Program => {
+	const result = parseStatements(tokens);
+	if (!result.success) {
+		const errorLocation = result.position > 0 ? ` at line ${result.position}` : '';
+		throw new Error(`Parse error: ${result.error}${errorLocation}`);
+	}
+	
+	// Check for leftover tokens (should be none after successful parse)
+	if (result.remaining.length > 0) {
+		const next = result.remaining[0];
 		throw new Error(
 			`Unexpected token after expression: ${next.type} '${next.value}' at line ${next.location.start.line}, column ${next.location.start.column}`
 		);
 	}
+	
 	return {
-		statements,
+		statements: result.value,
 		location: createLocation({ line: 1, column: 1 }, { line: 1, column: 1 }),
 	};
 };
