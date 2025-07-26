@@ -484,7 +484,7 @@ describe('Trait System - Consolidated Tests', () => {
 				
 				try {
 					typeProgram(program);
-					expect.fail('Expected error for missing trait implementation');
+					throw new Error('Expected error for missing trait implementation');
 				} catch (error) {
 					const message = (error as Error).message;
 					expect(message).toMatch(/Functor/);
@@ -501,7 +501,7 @@ describe('Trait System - Consolidated Tests', () => {
 				
 				try {
 					typeProgram(program);
-					expect.fail('Expected error for missing trait implementation');
+					throw new Error('Expected error for missing trait implementation');
 				} catch (error) {
 					const message = (error as Error).message;
 					// Should include location information
