@@ -1,5 +1,0 @@
-constraint Display a ( display : a -> String );
-implement Display Int ( display = toString );
-implement Display (List a) given Display a (
-  display = fn list => "[test]"
-)
