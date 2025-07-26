@@ -892,7 +892,7 @@ const parseIfExpression: C.Parser<Expression> = C.map(
 const parsePrimary: C.Parser<Expression> = tokens => {
 	// DEBUG: Log tokens at entry
 	if (process.env.NOO_DEBUG_PARSE) {
-		// Debug: parsePrimary tokens
+			console.log('parsePrimary tokens:', tokens.map(t => t.value).join(' '));
 	}
 
 	// Fast token-based dispatch instead of sequential choice attempts
@@ -956,20 +956,36 @@ const parsePrimary: C.Parser<Expression> = tokens => {
 			break;
 	}
 
-	// Debug: parsePrimary result
+	// DEBUG: Log result
+	if (process.env.NOO_DEBUG_PARSE) {
+		console.log(
+			'parsePrimary result:',
+			result.success ? result.value : result.error
+		);
+	}
 	return result;
 };
 
 // --- Primary with Postfix (type annotations) ---
 const parsePrimaryWithPostfix: C.Parser<Expression> = tokens => {
-	// Debug: parsePrimaryWithPostfix tokens
+	if (process.env.NOO_DEBUG_PARSE) {
+		console.log(
+			'parsePrimaryWithPostfix tokens:',
+			tokens.map(t => t.value).join(' ')
+		);
+	}
 	const primaryResult = parsePrimary(tokens);
 	if (!primaryResult.success) return primaryResult;
 	const postfixResult = parsePostfixFromResult(
 		primaryResult.value,
 		primaryResult.remaining
 	);
-	// Debug: parsePrimaryWithPostfix result
+	if (process.env.NOO_DEBUG_PARSE) {
+		console.log(
+			'parsePrimaryWithPostfix result:',
+			postfixResult.success ? postfixResult.value : postfixResult.error
+		);
+	}
 	return postfixResult;
 };
 
