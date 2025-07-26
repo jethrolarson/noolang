@@ -1,4 +1,3 @@
-// @test-runner: uvu-ready
 import { Lexer } from '../../src/lexer/lexer';
 import { parse } from '../../src/parser/parser';
 

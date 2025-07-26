@@ -41,4 +41,10 @@ module.exports = {
 		'<rootDir>/src/**/__tests__/**/*.{ts,tsx}',
 		'<rootDir>/src/**/*.test.{ts,tsx}',
 	],
+
+	// Exclude files that have been migrated to uvu
+	testPathIgnorePatterns: [
+		'/node_modules/',
+		// Add patterns here to exclude uvu-migrated files
+	],
 };
