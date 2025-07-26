@@ -221,6 +221,10 @@ implement Monad List (
   pure = fn x => [x]
 );
 
+implement Add List (
+  add = fn list1 list2 => append list1 list2
+);
+
 # Implement Show for Lists (if elements are showable)
 # TODO: This needs constrained types support
 # implement Show (List a) (
