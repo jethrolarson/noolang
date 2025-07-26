@@ -49,7 +49,7 @@ describe('Functional Type Inference', () => {
 			const program = parseProgram('fn x y => x + y');
 			const result = typeProgram(program);
 			expect(typeToString(result.type, result.state.substitution)).toBe(
-				'(Int) -> (Int) -> Int'
+				'(α) -> (α) -> α'
 			);
 		});
 
@@ -57,7 +57,7 @@ describe('Functional Type Inference', () => {
 			const program = parseProgram('fn x => fn y => x + y');
 			const result = typeProgram(program);
 			expect(typeToString(result.type, result.state.substitution)).toBe(
-				'(Int) -> (Int) -> Int'
+				'(α) -> (α) -> α'
 			);
 		});
 	});

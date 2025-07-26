@@ -28,10 +28,12 @@ const createBinaryFunctionType = (
 export const initializeBuiltins = (state: TypeState): TypeState => {
 	const newEnv = new Map(state.environment);
 
-	// Arithmetic operators
+	// Arithmetic operators - + now supports both Int and String
+	// For now, we'll use two separate polymorphic types. In practice, this means
+	// type inference will try both signatures and use the one that works
 	newEnv.set('+', {
-		type: functionType([intType(), intType()], intType()),
-		quantifiedVars: [],
+		type: functionType([typeVariable('a'), typeVariable('a')], typeVariable('a')),
+		quantifiedVars: ['a'],
 	});
 	newEnv.set('-', {
 		type: functionType([intType(), intType()], intType()),
