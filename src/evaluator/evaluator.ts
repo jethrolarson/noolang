@@ -385,22 +385,38 @@ export class Evaluator {
 		this.environment.set(
 			'$',
 			createNativeFunction('$', (func: Value) => (arg: Value) => {
-				// Handle trait function application (same as evaluateApplication)
+				// Use the same logic as evaluateApplication for consistency
+				
+				// Handle trait function application
 				if (func.tag === 'trait-function') {
 					// Convert runtime Value back to AST LiteralExpression for trait function
 					const argExpr: LiteralExpression = this.valueToLiteralExpression(arg);
 					return this.evaluateTraitFunctionApplication(func, [argExpr]);
 				}
 
-				if (isFunction(func)) return func.fn(arg);
-				if (isNativeFunction(func)) return func.fn(arg);
-				
-				// Improved error message with actual value inspection
-				const funcTag = func?.tag || 'undefined';
-				const funcInfo = func ? JSON.stringify(func, null, 2) : 'undefined';
-				throw new Error(
-					`Cannot apply non-function in dollar operator. Got value with tag: ${funcTag}\nFull value: ${funcInfo}`
-				);
+				if (isFunction(func)) {
+					// Handle tagged function - apply one argument
+					if (typeof func.fn === 'function') {
+						return func.fn(arg);
+					} else {
+						throw new Error(`Cannot apply argument to non-function: ${typeof func.fn}`);
+					}
+				} else if (isNativeFunction(func)) {
+					// Handle native function - apply one argument
+					if (typeof func.fn === 'function') {
+						return func.fn(arg);
+					} else if (isFunction(func.fn)) {
+						return (func.fn as any).fn(arg);
+					} else if (isNativeFunction(func.fn)) {
+						return (func.fn as any).fn(arg);
+					} else {
+						throw new Error(`Cannot apply argument to non-function: ${typeof func.fn}`);
+					}
+				} else {
+					throw new Error(
+						`Cannot apply non-function: ${typeof func} (${func?.tag || 'unknown'})`
+					);
+				}
 			})
 		);
 
