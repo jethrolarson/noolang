@@ -385,8 +385,6 @@ export class Evaluator {
 		this.environment.set(
 			'$',
 			createNativeFunction('$', (func: Value) => (arg: Value) => {
-				// Use the same logic as evaluateApplication for consistency
-				
 				// Handle trait function application
 				if (func.tag === 'trait-function') {
 					// Call trait function directly with values (no need to convert back to AST)
@@ -394,22 +392,23 @@ export class Evaluator {
 				}
 
 				if (isFunction(func)) {
-					// Handle tagged function - apply one argument
+					// Handle tagged function - single argument application
 					if (typeof func.fn === 'function') {
 						return func.fn(arg);
 					} else {
 						throw new Error(`Cannot apply argument to non-function: ${typeof func.fn}`);
 					}
 				} else if (isNativeFunction(func)) {
-					// Handle native function - apply one argument
-					if (typeof func.fn === 'function') {
-						return func.fn(arg);
-					} else if (isFunction(func.fn)) {
-						return (func.fn as any).fn(arg);
-					} else if (isNativeFunction(func.fn)) {
-						return (func.fn as any).fn(arg);
+					// Handle native function - single argument application  
+					let result: any = func.fn;
+					if (typeof result === 'function') {
+						return result(arg);
+					} else if (isFunction(result)) {
+						return result.fn(arg);
+					} else if (isNativeFunction(result)) {
+						return result.fn(arg);
 					} else {
-						throw new Error(`Cannot apply argument to non-function: ${typeof func.fn}`);
+						throw new Error(`Cannot apply argument to non-function: ${typeof result}`);
 					}
 				} else {
 					throw new Error(
