@@ -259,6 +259,142 @@ stdlib.noo                   # Standard library traits
 - Document trait best practices
 - Performance benchmarking guidelines
 
+## Phase 4: Structural Constraints with `has` (Planned)
+
+### Overview
+Extend the constraint system with structural constraints using the `has` keyword for duck-typed records and tuples. This maintains Noolang's duck typing philosophy while adding compile-time structural verification.
+
+### Core Design Principles
+- **Duck Typing Preserved**: `has` constraints mean "at least this structure" (extra fields/elements allowed)
+- **Concrete Types for Exactness**: Use concrete types like `{Int, String}` when you need exactly that structure
+- **Natural Syntax**: Use record/tuple literal syntax on RHS of `has`
+
+### Syntax Design
+
+#### Record Structural Constraints
+```noo
+# Basic record constraints
+given a has {@name String, @age Int}
+
+# Nested record constraints  
+given a has {@person {@name String}, @coords {Int, Int}}
+
+# Mixed with other constraints
+given a has {@items List b} and Show b
+```
+
+#### Tuple Structural Constraints
+```noo
+# Basic tuple constraints
+given a has {Int, String}           # At least Int, String (extra elements OK)
+given a has {_, Int, String}        # Second element Int, third String
+
+# Nested tuple constraints
+given a has {{Int, Int}, String}    # First element is coordinate pair
+```
+
+#### Wildcard Syntax
+- **`_`** - "Any type, don't care" (like pattern matching wildcards)
+- Avoids `any` keyword which has negative TypeScript associations
+- Represents "I don't care about this position" rather than type weakness
+
+### Use Cases
+
+#### Tuple Accessor Functions
+```noo
+# Generic tuple accessors using duck typing
+first = fn t => match t with ({x, ...} => x) 
+  : a -> b given a has {b}
+
+second = fn t => match t with ({_, x, ...} => x)
+  : a -> b given a has {_, b}
+
+third = fn t => match t with ({_, _, x, ...} => x) 
+  : a -> b given a has {_, _, b}
+
+# Works with any tuple that has enough elements
+first {42}                    # ✅ 42
+first {42, "hello", True}     # ✅ 42 (extra elements ignored)
+```
+
+#### Record Interface Functions
+```noo
+# Functions that work with any record having required fields
+greet = fn person => "Hello " + (@name person)
+  : a -> String given a has {@name String}
+
+# Works with any record containing @name
+greet {@name "Alice", @age 30}                    # ✅ Works
+greet {@name "Bob", @city "NYC", @id 123}         # ✅ Works (extra fields ignored)
+```
+
+#### Coordinate/Geometry Functions
+```noo
+# 2D operations that work with any tuple starting with two numbers
+distance2D = fn p1 p2 => 
+  match {p1, p2} with ({{x1, y1, ...}, {x2, y2, ...}} => 
+    sqrt((x2-x1)^2 + (y2-y1)^2))
+  : a -> a -> Float given a has {Float, Float}
+
+# Works with 2D, 3D, or higher dimensional points
+distance2D {0.0, 0.0}           # ✅ 2D point
+distance2D {1.0, 1.0, 2.0}      # ✅ 3D point (Z ignored)
+distance2D {3.0, 4.0, "label"}  # ✅ Labeled point (label ignored)
+```
+
+### Integration with Existing System
+
+#### Constraint Composition
+```noo
+# Combine has constraints with trait constraints
+processItems = fn container => 
+  map show (@items container)
+  : a -> List String given a has {@items List b} and Show b
+
+# Multiple has constraints
+validatePerson = fn data =>
+  (@name (@person data)) + " at " + (@street (@address data))
+  : a -> String given 
+    a has {@person {@name String}} and 
+    a has {@address {@street String}}
+```
+
+#### Type Inference Integration
+```noo
+# Type inference should derive has constraints from usage
+getCoordinateSum = fn point => 
+  match point with ({x, y, ...} => x + y)
+# Should infer: a -> b given a has {b, b} and Number b
+```
+
+### Implementation Plan
+
+#### Phase 4.1: Parser Extensions
+- Extend constraint parsing to support `has` keyword
+- Add support for record/tuple literal syntax in constraint expressions
+- Parse wildcard `_` in constraint contexts
+
+#### Phase 4.2: Type System Integration  
+- Extend `ConstraintExpr` AST to include structural constraints
+- Implement constraint validation logic for `has` constraints
+- Integrate with existing constraint resolution during unification
+
+#### Phase 4.3: Error Messages and Validation
+- Design helpful error messages for structural constraint violations
+- Implement constraint checking during type checking
+- Add constraint propagation through function composition
+
+#### Phase 4.4: Standard Library Integration
+- Add generic tuple accessor functions (`first`, `second`, `third`)
+- Provide utility functions for common structural patterns
+- Update existing functions to use structural constraints where appropriate
+
+### Future Considerations
+- **Performance**: Structural constraint checking should be efficient for large record/tuple types
+- **Error Messages**: Design clear, helpful messages for constraint violations (implementation detail)
+- **Type Derivation**: Automatic derivation of `has` constraints from accessor usage patterns
+- **Advanced Patterns**: Support for more complex structural requirements if needed
+
 ### 🎯 Potential Enhancements (Future)
 Only implement if specifically requested:
 - **Associated Types**: Types associated with trait instances
