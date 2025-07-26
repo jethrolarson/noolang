@@ -37,7 +37,7 @@ export type ConstraintExpr =
 // Extracted type definitions
 export type PrimitiveType = {
 	kind: 'primitive';
-	name: 'Int' | 'String' | 'Bool' | 'List';
+	name: 'Int' | 'String' | 'Bool' | 'List' | 'Float';
 };
 
 export type FunctionType = {
@@ -412,6 +412,10 @@ export const numberType = (): PrimitiveType => ({
 export const stringType = (): PrimitiveType => ({
 	kind: 'primitive',
 	name: 'String',
+});
+export const floatType = (): PrimitiveType => ({
+	kind: 'primitive',
+	name: 'Float',
 });
 export const boolType = (): VariantType => ({
 	kind: 'variant',

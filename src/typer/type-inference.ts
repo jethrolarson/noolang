@@ -24,6 +24,7 @@ import {
 	intType,
 	stringType,
 	boolType,
+	floatType,
 	functionType,
 	typeVariable,
 	unknownType,
@@ -84,7 +85,12 @@ export const typeLiteral = (
 	const value = expr.value;
 
 	if (typeof value === 'number') {
-		return createPureTypeResult(intType(), state);
+		// Check if it's an integer or float
+		if (Number.isInteger(value)) {
+			return createPureTypeResult(intType(), state);
+		} else {
+			return createPureTypeResult(floatType(), state);
+		}
 	} else if (typeof value === 'string') {
 		return createPureTypeResult(stringType(), state);
 	} else {
