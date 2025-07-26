@@ -1,9 +1,9 @@
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
-import { typeAndDecorate } from '../index';
-import { initializeTypeState } from '../types';
+import { typeAndDecorate, createTypeState } from '../index';
 import { typeToString } from '../helpers';
 import { floatType, intType, stringType } from '../../ast';
+import { Evaluator } from '../../evaluator/evaluator';
 
 describe('Add Trait System', () => {
 	describe('Type Checking', () => {
@@ -11,8 +11,7 @@ describe('Add Trait System', () => {
 			const code = '1 + 2';
 			const tokens = new Lexer(code).tokenize();
 			const program = parse(tokens);
-			const state = initializeTypeState();
-			const result = typeAndDecorate(program, state);
+			const result = typeAndDecorate(program);
 			
 			expect(result.finalType).toEqual(intType());
 		});
@@ -21,8 +20,7 @@ describe('Add Trait System', () => {
 			const code = '3.14 + 2.86';
 			const tokens = new Lexer(code).tokenize();
 			const program = parse(tokens);
-			const state = initializeTypeState();
-			const result = typeAndDecorate(program, state);
+			const result = typeAndDecorate(program);
 			
 			expect(result.finalType).toEqual(floatType());
 		});
@@ -31,8 +29,7 @@ describe('Add Trait System', () => {
 			const code = '"hello" + " world"';
 			const tokens = new Lexer(code).tokenize();
 			const program = parse(tokens);
-			const state = initializeTypeState();
-			const result = typeAndDecorate(program, state);
+			const result = typeAndDecorate(program);
 			
 			expect(result.finalType).toEqual(stringType());
 		});
@@ -41,27 +38,24 @@ describe('Add Trait System', () => {
 			const code = '1 + "hello"';
 			const tokens = new Lexer(code).tokenize();
 			const program = parse(tokens);
-			const state = initializeTypeState();
 			
-			expect(() => typeAndDecorate(program, state)).toThrow();
+			expect(() => typeAndDecorate(program)).toThrow();
 		});
 
 		test('should reject mixed type addition 3.14 + "test"', () => {
 			const code = '3.14 + "test"';
 			const tokens = new Lexer(code).tokenize();
 			const program = parse(tokens);
-			const state = initializeTypeState();
 			
-			expect(() => typeAndDecorate(program, state)).toThrow();
+			expect(() => typeAndDecorate(program)).toThrow();
 		});
 
 		test('should reject mixed numeric types 1 + 3.14', () => {
 			const code = '1 + 3.14';
 			const tokens = new Lexer(code).tokenize();
 			const program = parse(tokens);
-			const state = initializeTypeState();
 			
-			expect(() => typeAndDecorate(program, state)).toThrow();
+			expect(() => typeAndDecorate(program)).toThrow();
 		});
 
 		test('should work with variables of same type', () => {
@@ -72,8 +66,7 @@ describe('Add Trait System', () => {
 			`;
 			const tokens = new Lexer(code).tokenize();
 			const program = parse(tokens);
-			const state = initializeTypeState();
-			const result = typeAndDecorate(program, state);
+			const result = typeAndDecorate(program);
 			
 			expect(result.finalType).toEqual(intType());
 		});
@@ -86,8 +79,7 @@ describe('Add Trait System', () => {
 			`;
 			const tokens = new Lexer(code).tokenize();
 			const program = parse(tokens);
-			const state = initializeTypeState();
-			const result = typeAndDecorate(program, state);
+			const result = typeAndDecorate(program);
 			
 			expect(result.finalType).toEqual(floatType());
 		});
@@ -100,8 +92,7 @@ describe('Add Trait System', () => {
 			`;
 			const tokens = new Lexer(code).tokenize();
 			const program = parse(tokens);
-			const state = initializeTypeState();
-			const result = typeAndDecorate(program, state);
+			const result = typeAndDecorate(program);
 			
 			expect(result.finalType).toEqual(stringType());
 		});
@@ -109,15 +100,57 @@ describe('Add Trait System', () => {
 
 	describe('Runtime Evaluation', () => {
 		test('should evaluate 1 + 2 to 3', () => {
-			// This test will be written once we verify type checking works
+			const code = '1 + 2';
+			const tokens = new Lexer(code).tokenize();
+			const program = parse(tokens);
+			
+			// Type check first to get the trait registry
+			const typeResult = typeAndDecorate(program);
+			
+			// Initialize evaluator with the trait registry from type checking
+			const evaluator = new Evaluator({ traitRegistry: typeResult.state.traitRegistry });
+			const result = evaluator.evaluateProgram(program);
+			
+			expect(result.finalResult.tag).toBe('number');
+			if (result.finalResult.tag === 'number') {
+				expect(result.finalResult.value).toBe(3);
+			}
 		});
 
 		test('should evaluate 3.14 + 2.86 to 6.0', () => {
-			// This test will be written once we verify type checking works
+			const code = '3.14 + 2.86';
+			const tokens = new Lexer(code).tokenize();
+			const program = parse(tokens);
+			
+			// Type check first to get the trait registry
+			const typeResult = typeAndDecorate(program);
+			
+			// Initialize evaluator with the trait registry from type checking
+			const evaluator = new Evaluator({ traitRegistry: typeResult.state.traitRegistry });
+			const result = evaluator.evaluateProgram(program);
+			
+			expect(result.finalResult.tag).toBe('number');
+			if (result.finalResult.tag === 'number') {
+				expect(result.finalResult.value).toBe(6);
+			}
 		});
 
 		test('should evaluate "hello" + " world" to "hello world"', () => {
-			// This test will be written once we verify type checking works
+			const code = '"hello" + " world"';
+			const tokens = new Lexer(code).tokenize();
+			const program = parse(tokens);
+			
+			// Type check first to get the trait registry
+			const typeResult = typeAndDecorate(program);
+			
+			// Initialize evaluator with the trait registry from type checking
+			const evaluator = new Evaluator({ traitRegistry: typeResult.state.traitRegistry });
+			const result = evaluator.evaluateProgram(program);
+			
+			expect(result.finalResult.tag).toBe('string');
+			if (result.finalResult.tag === 'string') {
+				expect(result.finalResult.value).toBe('hello world');
+			}
 		});
 	});
 
@@ -126,9 +159,8 @@ describe('Add Trait System', () => {
 			const code = '1 + "hello"';
 			const tokens = new Lexer(code).tokenize();
 			const program = parse(tokens);
-			const state = initializeTypeState();
 			
-			expect(() => typeAndDecorate(program, state)).toThrow(/constraint.*Add/i);
+			expect(() => typeAndDecorate(program)).toThrow(/Operator type mismatch|Expected.*Int.*Got.*String/i);
 		});
 	});
 });

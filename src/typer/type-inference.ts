@@ -18,6 +18,7 @@ import {
 	type ConstrainedExpression,
 	type ConstraintExpr,
 	type ConstraintDefinitionExpression,
+	type TraitConstraint,
 	type ImplementDefinitionExpression,
 	type Type,
 	type Constraint,
@@ -50,6 +51,7 @@ import {
 import { unify } from './unify';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
+import { tryResolveConstraints } from './function-application';
 import {
 	type TypeState,
 	type TypeResult,
@@ -817,11 +819,51 @@ export const typeBinary = (
 	);
 
 	// Apply substitution to get final result type
-	const [finalResultType, finalResultState] = freshenTypeVariables(
+	const [preliminaryResultType, finalResultState] = freshenTypeVariables(
 		resultType,
 		new Map(),
 		currentState
 	);
+
+	// CONSTRAINT RESOLUTION: Try to resolve constraints using argument types
+	// Only attempt resolution if we have concrete (non-variable) argument types
+	let finalResultType = preliminaryResultType;
+	if (operatorType.kind === 'function' && operatorType.constraints && operatorType.constraints.length > 0) {
+		// Only apply constraint resolution to specific operators that need it
+		if (expr.operator === '+' || expr.operator === '-' || expr.operator === '*' || expr.operator === '/') {
+			// Check if both arguments are concrete types (not variables)
+			const leftIsConcrete = leftResult.type.kind !== 'variable' && leftResult.type.kind !== 'constrained';
+			const rightIsConcrete = rightResult.type.kind !== 'variable' && rightResult.type.kind !== 'constrained';
+			
+			if (leftIsConcrete && rightIsConcrete) {
+				// Extract constraints from the operator type
+				const functionConstraints = new Map<string, TraitConstraint[]>();
+				for (const constraint of operatorType.constraints) {
+					if (constraint.kind === 'implements') {
+						const varName = constraint.typeVar;
+						const traitConstraint: TraitConstraint = { kind: 'implements', trait: constraint.interfaceName };
+						if (!functionConstraints.has(varName)) {
+							functionConstraints.set(varName, []);
+						}
+						functionConstraints.get(varName)!.push(traitConstraint);
+					}
+				}
+
+				// Try to resolve constraints using the actual argument types
+				const resolvedType = tryResolveConstraints(
+					preliminaryResultType,
+					functionConstraints,
+					[leftResult.type, rightResult.type],
+					finalResultState
+				);
+
+				if (resolvedType) {
+					// Constraints were successfully resolved to a concrete type
+					finalResultType = resolvedType;
+				}
+			}
+		}
+	}
 
 	return createTypeResult(
 		finalResultType,
