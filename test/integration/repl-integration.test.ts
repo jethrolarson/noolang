@@ -1,6 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
 
-describe.skip('REPL Integration Tests', () => {
+describe('REPL Integration Tests', () => {
 	let replProcess: ChildProcess;
 	let output: string;
 	let errorOutput: string;
