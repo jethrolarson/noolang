@@ -34,6 +34,9 @@ import {
 	variantType,
 	hasFieldConstraint,
 	ApplicationExpression,
+	hasConstraint,
+	type RecordStructure,
+	type StructureFieldType,
 } from '../ast';
 import {
 	undefinedVariableError,
@@ -230,6 +233,7 @@ const flattenConstraintExpr = (expr: ConstraintExpr): Constraint[] => {
 		case 'hasField':
 		case 'implements':
 		case 'custom':
+		case 'has':
 			return [expr];
 		case 'and':
 			return [

@@ -17,6 +17,7 @@ import {
 	HasFieldConstraint,
 	ImplementsConstraint,
 	CustomConstraint,
+	HasConstraint,
 } from '../ast';
 import { formatTypeError } from './type-errors';
 import { NoolangError } from '../errors';
@@ -313,6 +314,19 @@ export const constraintsEqual = (c1: Constraint, c2: Constraint): boolean => {
 			return c1.interfaceName === (c2 as ImplementsConstraint).interfaceName;
 		case 'custom':
 			return c1.constraint === (c2 as CustomConstraint).constraint;
+		case 'has': {
+			const c2Has = c2 as HasConstraint;
+			const fields1 = Object.keys(c1.structure.fields);
+			const fields2 = Object.keys(c2Has.structure.fields);
+			if (fields1.length !== fields2.length) return false;
+			for (const fieldName of fields1) {
+				if (!fields2.includes(fieldName)) return false;
+				const fieldType1 = c1.structure.fields[fieldName] as Type;
+				const fieldType2 = c2Has.structure.fields[fieldName] as Type;
+				if (!typesSimilar(fieldType1, fieldType2)) return false;
+			}
+			return true;
+		}
 		default:
 			return false;
 	}
@@ -497,6 +511,13 @@ export const typeToString = (
 				const normalizedVarName3 = mapping.get(c.typeVar) || c.typeVar;
 				return `${normalizedVarName3} implements ${c.interfaceName}`;
 			}
+			case 'has': {
+				const normalizedVarName = mapping.get(c.typeVar) || c.typeVar;
+				const fieldDescs = Object.entries(c.structure.fields)
+					.map(([fieldName, fieldType]) => `@${fieldName} ${norm(fieldType as Type)}`)
+					.join(', ');
+				return `${normalizedVarName} has {${fieldDescs}}`;
+			}
 			case 'custom': {
 				const normalizedVarName4 = mapping.get(c.typeVar) || c.typeVar;
 				return `${normalizedVarName4} satisfies ${c.constraint} ${c.args
@@ -514,6 +535,7 @@ export const typeToString = (
 			case 'hasField':
 			case 'implements':
 			case 'custom':
+			case 'has':
 				return formatConstraint(expr);
 			case 'and':
 				return `${formatConstraintExpr(expr.left)} and ${formatConstraintExpr(

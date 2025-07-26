@@ -40,6 +40,9 @@ import {
 	type ConstraintFunction,
 	type ImplementationFunction,
 	type MutationExpression,
+	type RecordStructure,
+	type StructureFieldType,
+	recordStructure,
 } from '../ast';
 import * as C from './combinators';
 
@@ -1787,6 +1790,34 @@ const parseSequenceTermWithIfExceptRecord: C.Parser<Expression> = C.choice(
 	parseIfExpression
 );
 
+// --- Parse record structure for constraints ---
+const parseRecordStructure: C.Parser<RecordStructure> = C.map(
+	C.seq(
+		C.punctuation('{'),
+		C.sepBy(
+			C.map(
+				C.seq(
+					C.accessor(),
+					C.lazy(() => parseTypeExpression)
+				),
+				([accessor, type]): [string, StructureFieldType] => [
+					accessor.value, // Accessor value already excludes the @ prefix
+					type as StructureFieldType
+				]
+			),
+			C.punctuation(',')
+		),
+		C.punctuation('}')
+	),
+	([_open, fields, _close]): RecordStructure => {
+		const fieldMap: { [key: string]: StructureFieldType } = {};
+		for (const [fieldName, fieldType] of fields) {
+			fieldMap[fieldName] = fieldType;
+		}
+		return recordStructure(fieldMap);
+	}
+);
+
 // --- Parse atomic constraint ---
 const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
 	// Parenthesized constraint
@@ -1812,6 +1843,19 @@ const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
 			kind: 'is',
 			typeVar: typeVar.value,
 			constraint: constraint.value,
+		})
+	),
+	// a has {@name String, @age Int} - Try this first since it has distinct syntax
+	C.map(
+		C.seq(
+			C.identifier(),
+			C.keyword('has'),
+			parseRecordStructure
+		),
+		([typeVar, _has, structure]): ConstraintExpr => ({
+			kind: 'has',
+			typeVar: typeVar.value,
+			structure,
 		})
 	),
 	// a has field "name" of type T

@@ -26,13 +26,23 @@ export type Constraint =
 	| { kind: 'is'; typeVar: string; constraint: string } // a is Collection
 	| { kind: 'hasField'; typeVar: string; field: string; fieldType: Type } // a has field "length" of type Int
 	| { kind: 'implements'; typeVar: string; interfaceName: string } // a implements Show
-	| { kind: 'custom'; typeVar: string; constraint: string; args: Type[] }; // a satisfies MyConstraint T1 T2
+	| { kind: 'custom'; typeVar: string; constraint: string; args: Type[] } // a satisfies MyConstraint T1 T2
+	| { kind: 'has'; typeVar: string; structure: RecordStructure }; // a has {@name String, @age Int}
 
 export type ConstraintExpr =
 	| Constraint
 	| { kind: 'and'; left: ConstraintExpr; right: ConstraintExpr }
 	| { kind: 'or'; left: ConstraintExpr; right: ConstraintExpr }
 	| { kind: 'paren'; expr: ConstraintExpr };
+
+// Record structure for structural constraints
+export type RecordStructure = {
+	fields: { [fieldName: string]: StructureFieldType };
+};
+
+export type StructureFieldType = 
+	| Type
+	| { kind: 'nested'; structure: RecordStructure };
 
 // Extracted type definitions
 export type PrimitiveType = {
@@ -561,6 +571,27 @@ export const hasFieldConstraint = (
 	typeVar,
 	field,
 	fieldType,
+});
+
+export type HasConstraint = {
+	kind: 'has';
+	typeVar: string;
+	structure: RecordStructure;
+};
+
+export const hasConstraint = (
+	typeVar: string,
+	structure: RecordStructure
+): HasConstraint => ({
+	kind: 'has',
+	typeVar,
+	structure,
+});
+
+export const recordStructure = (
+	fields: { [fieldName: string]: StructureFieldType }
+): RecordStructure => ({
+	fields,
 });
 
 export type ImplementsConstraint = {

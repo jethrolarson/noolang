@@ -1,4 +1,4 @@
-import { type Type, type Constraint } from '../ast';
+import { type Type, type Constraint, type StructureFieldType } from '../ast';
 import { mapObject } from './helpers';
 
 
@@ -143,6 +143,18 @@ export const substituteConstraint = (
 			return {
 				...constraint,
 				args: constraint.args.map(arg => substitute(arg, substitution)),
+			};
+		case 'has':
+			return {
+				...constraint,
+				structure: {
+					fields: Object.fromEntries(
+						Object.entries(constraint.structure.fields).map(([fieldName, fieldType]) => [
+							fieldName,
+							substitute(fieldType as Type, substitution) as StructureFieldType,
+						])
+					),
+				},
 			};
 		default:
 			return constraint;

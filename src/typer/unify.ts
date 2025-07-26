@@ -1,4 +1,4 @@
-import { Type, TraitConstraint, VariantType } from '../ast';
+import { Type, TraitConstraint, VariantType, Constraint, RecordStructure, StructureFieldType } from '../ast';
 import { substitute } from './substitute';
 import { TypeState } from './types';
 import { isTypeKind, typesEqual, constraintsEqual } from './helpers';
@@ -8,7 +8,6 @@ import {
 	operatorTypeError,
 	unificationError,
 } from './type-errors';
-import { Constraint } from '../ast';
 import { mapSet, typeToString, occursIn } from './helpers';
 // Legacy constraint imports removed
 import { functionApplicationError } from './type-errors';
@@ -331,6 +330,33 @@ function unifyVariable(
 					newState,
 					location
 				);
+			} else if (constraint.kind === 'has' && isTypeKind(s2, 'record')) {
+				// Validate that s2 has all required fields with correct types
+				for (const [fieldName, expectedFieldType] of Object.entries(constraint.structure.fields)) {
+					if (!(fieldName in s2.fields)) {
+						throw new Error(
+							`Record missing required field @${fieldName} for constraint ${constraint.typeVar} has {${Object.keys(constraint.structure.fields).map(f => `@${f}`).join(', ')}}`
+						);
+					}
+					
+					// Handle StructureFieldType (can be Type or nested structure)
+					if (typeof expectedFieldType === 'object' && expectedFieldType !== null && 'kind' in expectedFieldType) {
+						if ((expectedFieldType as any).kind === 'nested') {
+							// TODO: Handle nested record structures
+							throw new Error('Nested record structures not yet implemented');
+						} else {
+							// It's a regular Type
+							newState = unify(
+								s2.fields[fieldName],
+								expectedFieldType as Type,
+								newState,
+								location
+							);
+						}
+					} else {
+						throw new Error(`Invalid field type in constraint: ${typeof expectedFieldType}`);
+					}
+				}
 			} else if (constraint.kind === 'is') {
 				// NOTE: Legacy constraint checking removed - handled by new trait system
 				// TODO: Implement proper constraint checking in Phase 2
