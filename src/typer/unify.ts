@@ -330,32 +330,40 @@ function unifyVariable(
 					newState,
 					location
 				);
-			} else if (constraint.kind === 'has' && isTypeKind(s2, 'record')) {
-				// Validate that s2 has all required fields with correct types
-				for (const [fieldName, expectedFieldType] of Object.entries(constraint.structure.fields)) {
-					if (!(fieldName in s2.fields)) {
-						throw new Error(
-							`Record missing required field @${fieldName} for constraint ${constraint.typeVar} has {${Object.keys(constraint.structure.fields).map(f => `@${f}`).join(', ')}}`
-						);
-					}
-					
-					// Handle StructureFieldType (can be Type or nested structure)
-					if (typeof expectedFieldType === 'object' && expectedFieldType !== null && 'kind' in expectedFieldType) {
-						if ((expectedFieldType as any).kind === 'nested') {
-							// TODO: Handle nested record structures
-							throw new Error('Nested record structures not yet implemented');
-						} else {
-							// It's a regular Type
-							newState = unify(
-								s2.fields[fieldName],
-								expectedFieldType as Type,
-								newState,
-								location
+			} else if (constraint.kind === 'has') {
+				if (isTypeKind(s2, 'record')) {
+					// Validate that s2 has all required fields with correct types
+					for (const [fieldName, expectedFieldType] of Object.entries(constraint.structure.fields)) {
+						if (!(fieldName in s2.fields)) {
+							throw new Error(
+								`Record missing required field @${fieldName} for constraint ${constraint.typeVar} has {${Object.keys(constraint.structure.fields).map(f => `@${f}`).join(', ')}}`
 							);
 						}
-					} else {
-						throw new Error(`Invalid field type in constraint: ${typeof expectedFieldType}`);
+						
+						// Handle StructureFieldType (can be Type or nested structure)
+						if (typeof expectedFieldType === 'object' && expectedFieldType !== null && 'kind' in expectedFieldType) {
+							if ((expectedFieldType as any).kind === 'nested') {
+								// TODO: Handle nested record structures
+								throw new Error('Nested record structures not yet implemented');
+							} else {
+								// It's a regular Type
+								newState = unify(
+									s2.fields[fieldName],
+									expectedFieldType as Type,
+									newState,
+									location
+								);
+							}
+						} else {
+							throw new Error(`Invalid field type in constraint: ${typeof expectedFieldType}`);
+						}
 					}
+				} else {
+					// s2 is not a record type, but the constraint requires record structure
+					const fieldNames = Object.keys(constraint.structure.fields).map(f => `@${f}`).join(', ');
+					throw new Error(
+						`Type ${s2.kind === 'primitive' ? s2.name : s2.kind} cannot satisfy constraint ${constraint.typeVar} has {${fieldNames}} - expected a record type`
+					);
 				}
 			} else if (constraint.kind === 'is') {
 				// NOTE: Legacy constraint checking removed - handled by new trait system
