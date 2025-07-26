@@ -65,10 +65,10 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a'],
 	});
 
-	// Division operator - returns Option a for safety
+	// Division operator - returns Option Float for safety
 	const divideOpType = functionType(
 		[typeVariable('a'), typeVariable('a')], 
-		optionType(typeVariable('a')),
+		optionType(floatType()),
 		new Set()
 	);
 	divideOpType.constraints = [implementsConstraint('a', 'Numeric')];
@@ -366,7 +366,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 
 	// Primitive Divide trait implementations for type checking
 	newEnv.set('primitive_int_divide', {
-		type: createBinaryFunctionType(intType(), intType(), optionType(intType())),
+		type: createBinaryFunctionType(intType(), intType(), optionType(floatType())),
 		quantifiedVars: [],
 	});
 
@@ -443,7 +443,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 			functions: new Map([
 				['subtract', functionType([typeVariable('a'), typeVariable('a')], typeVariable('a'))],
 				['multiply', functionType([typeVariable('a'), typeVariable('a')], typeVariable('a'))],
-				['divide', functionType([typeVariable('a'), typeVariable('a')], optionType(typeVariable('a')))]
+				['divide', functionType([typeVariable('a'), typeVariable('a')], optionType(floatType()))]
 			])
 		});
 	}

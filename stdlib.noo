@@ -19,7 +19,7 @@ constraint Add a (
 constraint Numeric a (
   subtract : a -> a -> a;
   multiply : a -> a -> a;
-  divide : a -> a -> Option a
+  divide : a -> a -> Option Float
 );
 
 # Basic Show implementations (must come before conditional implementations)
