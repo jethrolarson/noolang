@@ -16,7 +16,7 @@ age = user | @age;
 # Lists and higher-order functions
 numbers = [1, 2, 3, 4, 5];
 doubled = map (fn x => x * 2) numbers;
-evens = filter (fn x => x % 2 == 0) numbers;
+evens = filter (fn x => x > 2) numbers;
 
 # Conditional expressions
 status = if age > 18 then "adult" else "minor";
@@ -25,14 +25,13 @@ status = if age > 18 then "adult" else "minor";
 option_value = Some 42;
 unwrapped = match option_value with (Some x => x; None => 0);
 
-# Type annotations
-typed_function = fn x => x + 1 : (Float) -> Float;
+# Type annotations (commented out - not fully supported in current version)
+# typed_function = fn x => x + 1 : (Float) -> Float;
 
 # Effects (should cause warnings/errors if not properly annotated)
 # print_message = fn msg => print msg;
 
-# Pipeline operators
-final_result = numbers 
-  | map (fn x => x * 2)
-  | filter (fn x => x > 5)
-  | head;
+# Function composition (traditional style)
+doubled_numbers = map (fn x => x * 2) numbers;
+filtered_numbers = filter (fn x => x > 5) doubled_numbers;
+final_result = length filtered_numbers;

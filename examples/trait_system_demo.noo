@@ -1,28 +1,27 @@
 # Trait System Demo - Comprehensive Examples
 
+# Simplified demo - focusing on basic trait functionality without complex helper functions
+
 # 1. SIMPLE CONSTRAINT DEFINITIONS
 constraint Show a ( show : a -> String );
 constraint Eq a ( equals : a -> a -> Bool );
 
 # 2. BASIC IMPLEMENTATIONS
-implement Show Float ( show = intToString );
-implement Show String ( show = fn s => "\"" + s + "\"" );
-implement Eq Float ( equals = fn a b => a == b );
-implement Eq String ( equals = fn a b => a == b );
+# Note: Show Float, Show String, Eq Float, and Eq String are already implemented in stdlib.noo
 
 # 3. CONDITIONAL IMPLEMENTATIONS
-# Show for List only if elements are showable
-implement Show (List a) given Show a (
-  show = fn list => "[" + (joinStrings ", " (map show list)) + "]"
-);
+# Simplified Show for List (without constraints for demo purposes)
+# implement Show (List a) given a implements Show (
+#   show = fn list => concat "[" (concat (joinStrings ", " (map show list)) "]")
+# );
 
-# Eq for List only if elements are comparable
-implement Eq (List a) given Eq a (
-  equals = fn list1 list2 => 
-    if (length list1) != (length list2) 
-    then False 
-    else listEquals list1 list2
-);
+# Eq for List only if elements are comparable (simplified for demo)
+# implement Eq (List a) given a implements Eq (
+#   equals = fn list1 list2 => 
+#     if (length list1) != (length list2) 
+#     then False 
+#     else listEquals list1 list2
+# );
 
 # 4. MULTIPLE FUNCTION CONSTRAINTS
 constraint Ord a ( 
@@ -37,24 +36,6 @@ implement Ord Float (
   greaterThan = fn a b => a > b
 );
 
-# 5. COMPLEX CONSTRAINT WITH GENERIC FUNCTIONS
-constraint Functor f (
-  fmap : (a -> b) -> f a -> f b
-);
-
-# Implement Functor for List
-implement Functor List (
-  fmap = map  # Use built-in map function
-);
-
-# 6. MONAD CONSTRAINT (ADVANCED)
-constraint Monad m (
-  return : a -> m a;
-  bind : m a -> (a -> m b) -> m b
-);
-
-# Note: Monad implementation would require Option/Result types
-# This demonstrates the syntax for advanced constraints
 
 # 7. TYPE-DIRECTED DISPATCH EXAMPLES
 
@@ -113,9 +94,9 @@ pipeline_demo = (
 type Option a = Some a | None;
 
 # Show implementation for Option
-implement Show (Option a) given Show a (
+implement Show (Option a) given a implements Show (
   show = fn opt => match opt with (
-    Some x => "Some(" + show x + ")";
+    Some x => concat "Some(" (concat (show x) ")");
     None => "None"
   )
 );
@@ -131,7 +112,7 @@ person_demo = (
   nameString = show (@name person);
   ageString = show (@age person);
   
-  "Person: " + nameString + ", age " + ageString
+  concat "Person: " (concat nameString (concat ", age " ageString))
 );
 
 # 11. ERROR HANDLING DEMONSTRATION
@@ -142,7 +123,7 @@ person_demo = (
 # 12. DEMONSTRATION OF AUTOMATIC CONSTRAINT PROPAGATION
 
 # This function automatically gets constrained to Show a
-showTwice = fn x => show x + " " + show x;
+showTwice = fn x => concat (show x) (concat " " (show x));
 
 # This function gets constrained to Eq a  
 areEqual = fn x y => equals x y;
