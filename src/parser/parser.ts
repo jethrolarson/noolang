@@ -77,9 +77,10 @@ const parseTypeName: C.Parser<Token> = (tokens: Token[]) => {
 	};
 };
 
-// --- Helper: parse a single type atom (primitive, variable, record, tuple, list) ---
-function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
-	// Try primitive types first, but handle List as a parameterizable type constructor
+// --- Smaller focused type parsers ---
+
+// Parse primitive types (Int, String, etc.)
+const parsePrimitiveType = (tokens: Token[]): C.ParseResult<Type> => {
 	const primitiveTypes = ['Int', 'Number', 'String', 'Unit'];
 	for (const typeName of primitiveTypes) {
 		const result = C.keyword(typeName)(tokens);
@@ -87,50 +88,36 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 			switch (typeName) {
 				case 'Int':
 				case 'Number':
-					return {
-						success: true,
-						value: intType(),
-						remaining: result.remaining,
-					} as const;
+					return { success: true, value: intType(), remaining: result.remaining };
 				case 'String':
-					return {
-						success: true,
-						value: stringType(),
-						remaining: result.remaining,
-					} as const;
+					return { success: true, value: stringType(), remaining: result.remaining };
 				case 'Unit':
-					return {
-						success: true,
-						value: unitType(),
-						remaining: result.remaining,
-					} as const;
+					return { success: true, value: unitType(), remaining: result.remaining };
 			}
 		}
 	}
+	return { success: false, error: 'Expected primitive type', position: tokens[0]?.location.start.line || 0 };
+};
 
-	// Try List as a parameterizable type constructor
+// Parse List type with optional element type
+const parseListType = (tokens: Token[]): C.ParseResult<Type> => {
 	const listKeywordResult = C.keyword('List')(tokens);
 	if (listKeywordResult.success) {
 		// Try to parse a type argument for List
 		const argResult = C.lazy(() => parseTypeAtom)(listKeywordResult.remaining);
 		if (argResult.success) {
 			// List with specific element type: List Number, List String, etc.
-			return {
-				success: true,
-				value: listTypeWithElement(argResult.value),
-				remaining: argResult.remaining,
-			} as const;
+			return { success: true, value: listTypeWithElement(argResult.value), remaining: argResult.remaining };
 		} else {
 			// Just List (generic)
-			return {
-				success: true,
-				value: listTypeWithElement(typeVariable('a')),
-				remaining: listKeywordResult.remaining,
-			} as const;
+			return { success: true, value: listTypeWithElement(typeVariable('a')), remaining: listKeywordResult.remaining };
 		}
 	}
+	return { success: false, error: 'Expected List type', position: tokens[0]?.location.start.line || 0 };
+};
 
-	// Try record type
+// Parse record type {field: Type, ...}
+const parseRecordType = (tokens: Token[]): C.ParseResult<Type> => {
 	const recordResult = C.seq(
 		C.punctuation('{'),
 		C.optional(
@@ -154,14 +141,13 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 		for (const [name, type] of fields) {
 			fieldObj[name] = type;
 		}
-		return {
-			success: true,
-			value: recordType(fieldObj),
-			remaining: recordResult.remaining,
-		} as const;
+		return { success: true, value: recordType(fieldObj), remaining: recordResult.remaining };
 	}
+	return { success: false, error: 'Expected record type', position: tokens[0]?.location.start.line || 0 };
+};
 
-	// Try tuple type
+// Parse tuple type {Type, Type, ...}
+const parseTupleType = (tokens: Token[]): C.ParseResult<Type> => {
 	const tupleResult = C.seq(
 		C.punctuation('{'),
 		C.optional(
@@ -174,84 +160,40 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 	)(tokens);
 	if (tupleResult.success) {
 		const elements = tupleResult.value[1] || [];
-		return {
-			success: true,
-			value: tupleType(elements),
-			remaining: tupleResult.remaining,
-		} as const;
+		return { success: true, value: tupleType(elements), remaining: tupleResult.remaining };
 	}
+	return { success: false, error: 'Expected tuple type', position: tokens[0]?.location.start.line || 0 };
+};
 
-	// Try List type
-	const listResult = C.seq(
-		C.keyword('List'),
-		C.lazy(() => parseTypeExpression)
-	)(tokens);
-	if (listResult.success) {
-		return {
-			success: true,
-			value: listTypeWithElement(listResult.value[1]),
-			remaining: listResult.remaining,
-		} as const;
-	}
-
-	// Try Tuple type constructor: Tuple T1 T2 T3
-	if (
-		tokens.length > 0 &&
-		tokens[0].type === 'IDENTIFIER' &&
-		tokens[0].value === 'Tuple'
-	) {
-		const tupleConstructorResult = C.seq(
-			C.identifier(),
-			C.many(C.lazy(() => parseTypeExpression))
-		)(tokens);
-		if (tupleConstructorResult.success) {
-			const elementTypes = tupleConstructorResult.value[1];
-			return {
-				success: true,
-				value: tupleTypeConstructor(elementTypes),
-				remaining: tupleConstructorResult.remaining,
-			} as const;
-		}
-	}
-
-	// Try parenthesized type: (Type)
+// Parse parenthesized type (Type)
+const parseParenthesizedType = (tokens: Token[]): C.ParseResult<Type> => {
 	const parenResult = C.seq(
 		C.punctuation('('),
 		C.lazy(() => parseTypeExpression),
 		C.punctuation(')')
 	)(tokens);
 	if (parenResult.success) {
-		return {
-			success: true,
-			value: parenResult.value[1],
-			remaining: parenResult.remaining,
-		} as const;
+		return { success: true, value: parenResult.value[1], remaining: parenResult.remaining };
 	}
+	return { success: false, error: 'Expected parenthesized type', position: tokens[0]?.location.start.line || 0 };
+};
 
-	// Try type constructor (uppercase or lowercase): TypeName arg1 arg2 ... 
-	if (
-		tokens.length > 0 &&
-		tokens[0].type === 'IDENTIFIER'
-	) {
+// Parse type constructor or variable (TypeName, a, Option a, etc.)
+const parseTypeConstructorOrVariable = (tokens: Token[]): C.ParseResult<Type> => {
+	if (tokens.length > 0 && tokens[0].type === 'IDENTIFIER') {
 		const typeNameResult = C.identifier()(tokens);
 		if (typeNameResult.success) {
 			const typeName = typeNameResult.value.value;
 			
 			// Try to parse type arguments
-			const argsResult = C.many(C.lazy(() => parseTypeAtom))(
-				typeNameResult.remaining
-			);
+			const argsResult = C.many(C.lazy(() => parseTypeAtom))(typeNameResult.remaining);
 			if (argsResult.success && argsResult.value.length > 0) {
 				// Type constructor with arguments (like Option a, f a, List String)
 				return {
 					success: true,
-					value: {
-						kind: 'variant',
-						name: typeName,
-						args: argsResult.value,
-					},
+					value: { kind: 'variant', name: typeName, args: argsResult.value },
 					remaining: argsResult.remaining,
-				} as const;
+				};
 			} else {
 				// Check if it's a type constructor (uppercase) or type variable (lowercase)
 				const isUpperCase = typeName[0] === typeName[0].toUpperCase();
@@ -259,26 +201,57 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 					// Type constructor without arguments (like Bool, Option, etc.)
 					return {
 						success: true,
-						value: {
-							kind: 'variant',
-							name: typeName,
-							args: [],
-						},
+						value: { kind: 'variant', name: typeName, args: [] },
 						remaining: typeNameResult.remaining,
-					} as const;
+					};
 				} else {
 					// Type variable (like a, b, etc.)
 					return {
 						success: true,
 						value: typeVariable(typeName),
 						remaining: typeNameResult.remaining,
-					} as const;
+					};
 				}
 			}
 		}
 	}
+	return { success: false, error: 'Expected type constructor or variable', position: tokens[0]?.location.start.line || 0 };
+};
 
+// Parse Tuple type constructor: Tuple T1 T2 T3
+const parseTupleConstructor = (tokens: Token[]): C.ParseResult<Type> => {
+	if (tokens.length > 0 && tokens[0].type === 'IDENTIFIER' && tokens[0].value === 'Tuple') {
+		const tupleConstructorResult = C.seq(
+			C.identifier(),
+			C.many(C.lazy(() => parseTypeExpression))
+		)(tokens);
+		if (tupleConstructorResult.success) {
+			const elementTypes = tupleConstructorResult.value[1];
+			return { success: true, value: tupleTypeConstructor(elementTypes), remaining: tupleConstructorResult.remaining };
+		}
+	}
+	return { success: false, error: 'Expected Tuple constructor', position: tokens[0]?.location.start.line || 0 };
+};
 
+// Main type atom parser - now clean and focused
+function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
+	// Try each type parser in order
+	const parsers = [
+		parsePrimitiveType,
+		parseListType,
+		parseRecordType,
+		parseTupleType,
+		parseTupleConstructor,
+		parseParenthesizedType,
+		parseTypeConstructorOrVariable,
+	];
+
+	for (const parser of parsers) {
+		const result = parser(tokens);
+		if (result.success) {
+			return result;
+		}
+	}
 
 	return {
 		success: false,
