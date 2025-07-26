@@ -307,29 +307,34 @@ greet {@name "Alice", @age 30}                    # ✅ Works
 greet {@name "Bob", @city "NYC", @id 123}         # ✅ Works (extra fields ignored)
 ```
 
-#### Coordinate/Geometry Functions
+#### Domain Modeling Functions  
 ```noo
-# 2D operations that work with any tuple starting with two numbers
-manhattanDistance = fn p1 p2 => 
-  x1 = tupleGet 0 p1;
-  y1 = tupleGet 1 p1;
-  x2 = tupleGet 0 p2;
-  y2 = tupleGet 1 p2;
-  abs (x2 - x1) + abs (y1 - y2)
-  : a -> a -> Int given a has {Int, Int}
+# User profile functions that work with any record having required fields
+getUserDisplayName = fn user =>
+  concat (@firstName user) (concat " " (@lastName user))
+  : a -> String given a has {@firstName String, @lastName String}
 
-# Extract X coordinate from any point-like tuple
-getX = fn point => tupleGet 0 point
-  : a -> Int given a has {Int}
+# Address formatting that requires nested structure
+formatAddress = fn obj =>
+  addr = @address obj;
+  concat (@street addr) (concat ", " (@city addr))
+  : a -> String given a has {@address {@street String, @city String}}
 
-# Extract Y coordinate, ensuring it's the second element
-getY = fn point => tupleGet 1 point  
-  : a -> Int given a has {_, Int}
+# Function composition with structural constraints
+getFullUserInfo = fn user =>
+  name = getUserDisplayName user;
+  address = formatAddress user;
+  concat name (concat " lives at " address)
+  : a -> String given 
+    a has {@firstName String, @lastName String} and
+    a has {@address {@street String, @city String}}
 
-# Works with 2D, 3D, or higher dimensional points
-manhattanDistance {0, 0} {3, 4}        # ✅ 7 (2D points)
-manhattanDistance {1, 1, 5} {4, 5, 10} # ✅ 7 (3D points, Z ignored)
-getX {10, 20, "label"}                 # ✅ 10 (extra data ignored)
+# Works with any record having the required nested structure
+user1 = {@firstName "Alice", @lastName "Smith", @address {@street "123 Main St", @city "Boston"}, @age 30};
+user2 = {@firstName "Bob", @lastName "Jones", @address {@street "456 Oak Ave", @city "Portland"}, @id 12345, @department "Engineering"};
+
+getFullUserInfo user1  # ✅ "Alice Smith lives at 123 Main St, Boston"
+getFullUserInfo user2  # ✅ "Bob Jones lives at 456 Oak Ave, Portland" (extra fields ignored)
 ```
 
 ### Integration with Existing System
@@ -385,10 +390,82 @@ getPersonInfo = fn p =>
 - Update existing functions to use structural constraints where appropriate
 
 ### Future Considerations
-- **Performance**: Structural constraint checking should be efficient for large record/tuple types
+- **Performance**: Structural constraint checking should be efficient for large record types
 - **Error Messages**: Design clear, helpful messages for constraint violations (implementation detail)
 - **Type Derivation**: Automatic derivation of `has` constraints from accessor usage patterns
 - **Advanced Patterns**: Support for more complex structural requirements if needed
+
+## Phase 5: Tuple Structural Constraints (Future)
+
+### Prerequisites
+- **Tuple Pattern Matching**: Must be implemented first to enable safe tuple destructuring
+- **Pattern Syntax**: `{x, y, z}` tuple patterns with variable binding and wildcards
+
+### Design Plan
+
+#### Tuple Structural Constraints
+```noo
+# Basic tuple constraints (once pattern matching exists)
+given a has {Int, String}           # At least Int, String (extra elements OK)
+given a has {_, Int, String}        # Second element Int, third String  
+given a has {_, _, Float}           # Third element must be Float
+
+# Nested tuple constraints
+given a has {{Int, Int}, String}    # First element is coordinate pair
+```
+
+#### Tuple Accessor Functions with Pattern Matching
+```noo
+# Safe tuple accessors using pattern matching
+first = fn t => match t with ({x, ...} => x)
+  : a -> b given a has {b}
+
+second = fn t => match t with ({_, x, ...} => x)  
+  : a -> b given a has {_, b}
+
+# Coordinate operations with pattern matching
+distance2D = fn p1 p2 => 
+  match {p1, p2} with ({{x1, y1, ...}, {x2, y2, ...}} => 
+    abs (x2 - x1) + abs (y1 - y2))
+  : a -> a -> Int given a has {Int, Int}
+
+# Pattern matching provides safety - no runtime crashes
+getSecond = fn coords => match coords with 
+  ({_, x, ...} => Some x; _ => None)
+  : a -> Option b given a has {_, b}
+```
+
+#### Integration with Record Constraints
+```noo
+# Mixed record and tuple constraints
+processData = fn obj =>
+  match (@coordinates obj) with 
+    ({x, y, ...} => x + y)
+  : a -> Int given a has {@coordinates {Int, Int}}
+
+# Complex nested structures
+validateUser = fn user =>
+  match (@location (@profile user)) with
+    ({lat, lng, ...} => lat > 0 && lng > 0)
+  : a -> Bool given a has {@profile {@location {Int, Int}}}
+```
+
+#### Wildcard Syntax for Tuples
+- **`_`** - "Any type, don't care" (consistent with pattern matching)
+- **`...`** - "Any additional elements" for minimum length requirements
+- **`{_, Int, ...}`** - "At least 2 elements, second must be Int"
+
+#### Implementation Requirements
+1. **Pattern Parser**: Extend parser to handle `{x, y, z}` tuple patterns
+2. **Pattern Matcher**: Extend evaluator to match tuple patterns against tuple values
+3. **Type Checker**: Validate tuple patterns against tuple types
+4. **Constraint Integration**: Add tuple structure validation to constraint system
+
+### Benefits of Waiting
+- **Safety First**: Pattern matching provides compile-time guarantees about tuple structure
+- **Consistent Syntax**: Tuple constraints will use same patterns as tuple destructuring
+- **No Unsafe Operations**: Avoids need for `tupleGet` and other runtime-unsafe operations
+- **Complete Feature**: Tuple constraints will be fully integrated with pattern matching from day one
 
 ### 🎯 Potential Enhancements (Future)
 Only implement if specifically requested:
