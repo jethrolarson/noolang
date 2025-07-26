@@ -4,6 +4,7 @@ describe('REPL Integration Tests', () => {
 	let replProcess: ChildProcess;
 	let output: string;
 	let errorOutput: string;
+	let processManuallyExited: boolean = false;
 
 	const startREPL = (): Promise<void> => {
 		return new Promise((resolve, reject) => {
@@ -93,7 +94,7 @@ describe('REPL Integration Tests', () => {
 
 	const stopREPL = (): Promise<void> => {
 		return new Promise(resolve => {
-			if (replProcess && !replProcess.killed) {
+			if (replProcess && !replProcess.killed && !processManuallyExited) {
 				// Set a timeout in case the process doesn't exit cleanly
 				const timeout = setTimeout(() => {
 					if (!replProcess.killed) {
@@ -115,6 +116,7 @@ describe('REPL Integration Tests', () => {
 	};
 
 	beforeEach(async () => {
+		processManuallyExited = false;
 		await startREPL();
 	}, 15000);
 
@@ -213,9 +215,7 @@ describe('REPL Integration Tests', () => {
 			// Process should exit, so we don't expect more output
 			expect(result).toBeDefined();
 			// Mark process as manually quit to avoid cleanup timeout
-			if (replProcess) {
-				replProcess.killed = true;
-			}
+			processManuallyExited = true;
 		});
 	});
 
