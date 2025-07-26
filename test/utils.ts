@@ -74,21 +74,21 @@ export const assertVariableType = assertKind<VariableType, 'variable'>(
 	'variable'
 );
 
-export const assertConstrainedType = (type: Type): asserts type is ConstrainedType => {
+export const assertConstrainedType: (type: Type) => asserts type is ConstrainedType = (type: Type): asserts type is ConstrainedType => {
 	if (type.kind !== "constrained") {
-		throw new Error(`Expected kind constrained, got '${type.kind}'`);
+		throw new Error(`Expected kind 'constrained', got '${type.kind}'`);
 	}
 };
 
-export const assertPrimitiveType = (type: Type): asserts type is PrimitiveType => {
+export const assertPrimitiveType: (type: Type) => asserts type is PrimitiveType = (type: Type): asserts type is PrimitiveType => {
 	if (type.kind !== "primitive") {
-		throw new Error(`Expected kind primitive, got '${type.kind}'`);
+		throw new Error(`Expected kind 'primitive', got '${type.kind}'`);
 	}
 };
 
-export const assertVariantType = (type: Type): asserts type is VariantType => {
+export const assertVariantType: (type: Type) => asserts type is VariantType = (type: Type): asserts type is VariantType => {
 	if (type.kind !== "variant") {
-		throw new Error(`Expected kind variant, got '${type.kind}'`);
+		throw new Error(`Expected kind 'variant', got '${type.kind}'`);
 	}
 };
 
