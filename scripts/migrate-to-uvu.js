@@ -12,25 +12,28 @@ const migrateFile = (filePath) => {
   // Track changes for summary
   const changes = [];
   
-  // 1. Replace Jest imports
+  // 1. Add uvu imports at the top (CRITICAL - was missing before)
+  if (!content.includes("import { test } from 'uvu'")) {
+    // Find the first import or add at the beginning
+    const importMatch = content.match(/^(import.*\n)+/m);
+    if (importMatch) {
+      const firstImportEnd = content.indexOf(importMatch[0]) + importMatch[0].length;
+      content = content.slice(0, firstImportEnd) + 
+                "import { test } from 'uvu';\nimport * as assert from 'uvu/assert';\n" +
+                content.slice(firstImportEnd);
+    } else {
+      content = "import { test } from 'uvu';\nimport * as assert from 'uvu/assert';\n" + content;
+    }
+    changes.push('✓ Added uvu imports');
+  }
+  
+  // 2. Replace Jest imports (if any exist)
   if (content.includes("from '@jest/globals'")) {
-    content = content.replace(/import.*from '@jest\/globals'.*;?\n/g, "import { test } from 'uvu';\nimport * as assert from 'uvu/assert';\n");
-    changes.push('✓ Updated imports');
-  } else if (content.includes("'@jest/globals'")) {
-    content = content.replace(/import.*'@jest\/globals'.*;?\n/g, "import { test } from 'uvu';\nimport * as assert from 'uvu/assert';\n");
-    changes.push('✓ Updated imports');
+    content = content.replace(/import.*from '@jest\/globals'.*;?\n/g, "");
+    changes.push('✓ Removed Jest imports');
   }
   
-  // 2. Handle beforeEach/afterEach (convert to helper functions)
-  const beforeEachRegex = /beforeEach\(\(\)\s*=>\s*\{([^}]*)\}\);?/g;
-  let beforeEachMatch;
-  while ((beforeEachMatch = beforeEachRegex.exec(content)) !== null) {
-    const setupCode = beforeEachMatch[1].trim();
-    content = content.replace(beforeEachMatch[0], `// Setup function (was beforeEach)\nconst setup = () => {\n${setupCode}\n};`);
-    changes.push('⚠️  Converted beforeEach to setup function (manual review needed)');
-  }
-  
-  // 3. Convert describe blocks to comments
+  // 3. Convert describe blocks to comments and flatten structure
   content = content.replace(/describe\(['"`]([^'"`]+)['"`],\s*\(\)\s*=>\s*\{/g, '// Test suite: $1');
   if (content !== originalContent) {
     changes.push('✓ Flattened describe blocks');
@@ -42,16 +45,32 @@ const migrateFile = (filePath) => {
   // 5. Convert it/test calls to uvu test calls
   const itRegex = /(\s*)it\(['"`]([^'"`]+)['"`],\s*\(\)\s*=>\s*\{/g;
   content = content.replace(itRegex, "$1test('$2', () => {");
-  changes.push('✓ Converted it() to test()');
   
   // Also handle 'test(' calls from Jest
   const testRegex = /(\s*)test\(['"`]([^'"`]+)['"`],\s*\(\)\s*=>\s*\{/g;
   content = content.replace(testRegex, "$1test('$2', () => {");
+  changes.push('✓ Converted it() to test()');
   
-  // 6. Convert expect assertions
+  // 6. Convert expect assertions to assert
   const expectReplacements = [
-    { from: /expect\(([^)]+)\)\.toEqual\(([^)]+)\)/g, to: 'assert.equal($1, $2)', desc: 'toEqual → assert.equal' },
+    // expect().toBe() patterns
     { from: /expect\(([^)]+)\)\.toBe\(([^)]+)\)/g, to: 'assert.is($1, $2)', desc: 'toBe → assert.is' },
+    
+    // expect().toEqual() patterns  
+    { from: /expect\(([^)]+)\)\.toEqual\(([^)]+)\)/g, to: 'assert.equal($1, $2)', desc: 'toEqual → assert.equal' },
+    
+    // expect.anything() - remove these as they're Jest-specific
+    { from: /expect\.anything\(\)/g, to: 'undefined', desc: 'expect.anything() → undefined' },
+    
+    // expect().toThrow() patterns
+    { from: /expect\(\(\)\s*=>\s*([^)]+)\)\.toThrow\(\)/g, to: 'assert.throws(() => $1)', desc: 'toThrow → assert.throws' },
+    { from: /expect\(\(\)\s*=>\s*([^)]+)\)\.toThrow\(['"`]([^'"`]+)['"`]\)/g, to: 'assert.throws(() => $1, $2)', desc: 'toThrow with message → assert.throws' },
+    
+    // Basic expect().toThrow() without arrow function wrapper
+    { from: /expect\(([^)]+)\)\.toThrow\(\)/g, to: 'assert.throws($1)', desc: 'toThrow → assert.throws' },
+    { from: /expect\(([^)]+)\)\.toThrow\(['"`]([^'"`]+)['"`]\)/g, to: 'assert.throws($1, $2)', desc: 'toThrow with message → assert.throws' },
+    
+    // Other common patterns
     { from: /expect\(([^)]+)\)\.toBeNull\(\)/g, to: 'assert.is($1, null)', desc: 'toBeNull → assert.is(x, null)' },
     { from: /expect\(([^)]+)\)\.toBeUndefined\(\)/g, to: 'assert.is($1, undefined)', desc: 'toBeUndefined → assert.is(x, undefined)' },
     { from: /expect\(([^)]+)\)\.toBeTruthy\(\)/g, to: 'assert.ok($1)', desc: 'toBeTruthy → assert.ok' },
@@ -75,19 +94,30 @@ const migrateFile = (filePath) => {
   content = content.replace(/test\.skip\(/g, 'test.skip(');
   content = content.replace(/describe\.skip\(/g, '// test.skip(');
   
-  // 8. Remove closing braces from describe blocks (rough heuristic)
-  // This is tricky - we'll add a comment for manual review
-  if (content.includes('// Test suite:') || content.includes('// Test group:')) {
-    changes.push('⚠️  Describe block closing braces may need manual removal');
+  // 8. Remove extra closing braces from describe blocks
+  // This is a heuristic - look for standalone closing braces that are likely from describe blocks
+  content = content.replace(/^\s*\}\);\s*$/gm, '');
+  content = content.replace(/^\s*\}\);\s*$/gm, ''); // Run twice to catch nested ones
+  if (content !== originalContent) {
+    changes.push('✓ Removed describe block closing braces');
   }
   
-  // 9. Add test.run() at the end if not present
+  // 9. Handle beforeEach/afterEach (convert to helper functions)
+  const beforeEachRegex = /beforeEach\(\(\)\s*=>\s*\{([^}]*)\}\);?/g;
+  let beforeEachMatch;
+  while ((beforeEachMatch = beforeEachRegex.exec(content)) !== null) {
+    const setupCode = beforeEachMatch[1].trim();
+    content = content.replace(beforeEachMatch[0], `// Setup function (was beforeEach)\nconst setup = () => {\n${setupCode}\n};`);
+    changes.push('⚠️  Converted beforeEach to setup function (manual review needed)');
+  }
+  
+  // 10. Add test.run() at the end if not present
   if (!content.includes('test.run()')) {
     content += '\n\ntest.run();\n';
     changes.push('✓ Added test.run()');
   }
   
-  // 10. Handle common patterns that need manual review
+  // 11. Handle common patterns that need manual review
   if (content.includes('beforeAll') || content.includes('afterAll') || content.includes('afterEach')) {
     changes.push('⚠️  Lifecycle hooks detected - manual review needed');
   }
