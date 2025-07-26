@@ -2,9 +2,9 @@
 print "=== Trait System Phase 2 Demo ===";
 
 # All basic traits are already defined in stdlib:
-# - Show for Int, String, List, Option, etc.
+# - Show for Float, String, List, Option, etc.
 # - Functor for List, Option, Result
-# - Eq for Int, String, Option, etc.
+# - Eq for Float, String, Option, etc.
 
 print "✓ All basic traits loaded from stdlib";
 

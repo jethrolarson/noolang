@@ -26,7 +26,7 @@ option_value = Some 42;
 unwrapped = match option_value with (Some x => x; None => 0);
 
 # Type annotations
-typed_function = fn x => x + 1 : (Int) -> Int;
+typed_function = fn x => x + 1 : (Float) -> Float;
 
 # Effects (should cause warnings/errors if not properly annotated)
 # print_message = fn msg => print msg;

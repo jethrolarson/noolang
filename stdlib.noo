@@ -10,14 +10,28 @@ constraint Show a (
   show : a -> String
 );
 
+# Constraint for addition operation (supports numbers and strings)
+constraint Add a (
+  add : a -> a -> a
+);
+
+# Constraint for numeric operations (numbers only)
+constraint Numeric a (
+  subtract : a -> a -> a;
+  multiply : a -> a -> a;
+  divide : a -> a -> Option Float
+);
+
 # Basic Show implementations (must come before conditional implementations)
-implement Show Int (
-  show = fn i => toString i
+implement Show Float (
+  show = fn f => toString f
 );
 
 implement Show String (
   show = fn s => s
 );
+
+# Add trait implementations moved to builtins to avoid loading order issues
 
 # Constraint for monads
 constraint Monad m ( 
@@ -207,6 +221,10 @@ implement Monad List (
   pure = fn x => [x]
 );
 
+implement Add List (
+  add = fn list1 list2 => append list1 list2
+);
+
 # Implement Show for Lists (if elements are showable)
 # TODO: This needs constrained types support
 # implement Show (List a) (
@@ -218,8 +236,8 @@ implement Monad List (
 # ========================================
 
 # Eq-like functions for basic types
-implement Eq Int (
-  equals = primitive_int_eq
+implement Eq Float (
+  equals = primitive_float_eq
 );
 
 implement Eq String (

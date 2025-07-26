@@ -24,10 +24,10 @@ export type Effect =
 // Type constraints for constrained polymorphism
 export type Constraint =
 	| { kind: 'is'; typeVar: string; constraint: string } // a is Collection
-	| { kind: 'hasField'; typeVar: string; field: string; fieldType: Type } // a has field "length" of type Int
+	| { kind: 'hasField'; typeVar: string; field: string; fieldType: Type } // a has field "length" of type Float
 	| { kind: 'implements'; typeVar: string; interfaceName: string } // a implements Show
 	| { kind: 'custom'; typeVar: string; constraint: string; args: Type[] } // a satisfies MyConstraint T1 T2
-	| { kind: 'has'; typeVar: string; structure: RecordStructure }; // a has {@name String, @age Int}
+	| { kind: 'has'; typeVar: string; structure: RecordStructure }; // a has {@name String, @age Float}
 
 export type ConstraintExpr =
 	| Constraint
@@ -47,7 +47,7 @@ export type StructureFieldType =
 // Extracted type definitions
 export type PrimitiveType = {
 	kind: 'primitive';
-	name: 'Int' | 'String' | 'Bool' | 'List';
+	name: 'String' | 'Bool' | 'List' | 'Float';
 };
 
 export type FunctionType = {
@@ -153,6 +153,7 @@ export interface LiteralExpression {
 	value: number | string | boolean | Expression[] | null; // null represents unit
 	type?: Type;
 	location: Location;
+	originalToken?: string; // For distinguishing 1 vs 1.0 in numeric literals
 }
 
 export interface VariableExpression {
@@ -412,17 +413,13 @@ export const createPosition = (line: number, column: number): Position => ({
 });
 
 // Type constructors
-export const intType = (): PrimitiveType => ({
-	kind: 'primitive',
-	name: 'Int',
-});
-export const numberType = (): PrimitiveType => ({
-	kind: 'primitive',
-	name: 'Int',
-}); // Alias for backwards compatibility
 export const stringType = (): PrimitiveType => ({
 	kind: 'primitive',
 	name: 'String',
+});
+export const floatType = (): PrimitiveType => ({
+	kind: 'primitive',
+	name: 'Float',
 });
 export const boolType = (): VariantType => ({
 	kind: 'variant',
@@ -483,7 +480,7 @@ export const recordType = (fields: { [key: string]: Type }): RecordType => ({
 
 // Constructor functions for new types
 export const primitiveType = (
-	name: 'Int' | 'String' | 'Bool' | 'List'
+	name: 'Float' | 'String' | 'Bool' | 'List'
 ): PrimitiveType => ({
 	kind: 'primitive',
 	name,
@@ -536,7 +533,6 @@ export const resultType = (success: Type, error: Type): VariantType => ({
 });
 
 // Convenience functions for common types
-export const optionInt = (): VariantType => optionType(intType());
 export const resultString = (error: Type): VariantType =>
 	resultType(stringType(), error);
 

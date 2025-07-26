@@ -144,7 +144,7 @@ describe('Lexer', () => {
 		});
 
 		test('should recognize primitive type keywords', () => {
-			const primitives = ['Int', 'Number', 'String', 'Unit', 'List'];
+			const primitives = ['Float', 'Number', 'String', 'Unit', 'List'];
 
 			for (const primitive of primitives) {
 				const tokens = getTokenValues(primitive);

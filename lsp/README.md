@@ -121,7 +121,7 @@ code --install-extension noolang-0.1.0.vsix
 ```noolang
 # In any .noo file in VSCode:
 
-add = fn x y => x + y;    # Hover shows: Type: (Int) -> (Int) -> Int
+add = fn x y => x + y;    # Hover shows: Type: (Float) -> (Float) -> Float
 result = add 2 3;         # Ctrl+Space shows all completions
 user = { @name "Alice" }; # Error detection for type mismatches
 name = user | @n          # Trigger character "|" shows completions

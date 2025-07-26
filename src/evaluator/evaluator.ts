@@ -796,8 +796,8 @@ export class Evaluator {
 
 		// Primitive support functions for trait implementations
 		this.environment.set(
-			'primitive_int_eq',
-			createNativeFunction('primitive_int_eq', (a: Value) => (b: Value) => {
+			'primitive_float_eq',
+			createNativeFunction('primitive_float_eq', (a: Value) => (b: Value) => {
 				if (isNumber(a) && isNumber(b)) {
 					return createBool(a.value === b.value);
 				}
@@ -816,12 +816,33 @@ export class Evaluator {
 		);
 
 		this.environment.set(
-			'intToString',
-			createNativeFunction('intToString', (n: Value) => {
+			'floatToString',
+			createNativeFunction('floatToString', (n: Value) => {
 				if (isNumber(n)) {
 					return createString(n.value.toString());
 				}
-				throw new Error('intToString requires a number');
+				throw new Error('floatToString requires a number');
+			})
+		);
+
+		// Primitive Add trait implementations
+		this.environment.set(
+			'primitive_float_add',
+			createNativeFunction('primitive_float_add', (a: Value) => (b: Value) => {
+				if (isNumber(a) && isNumber(b)) {
+					return createNumber(a.value + b.value);
+				}
+				throw new Error('primitive_float_add requires two numbers');
+			})
+		);
+
+		this.environment.set(
+			'primitive_string_concat',
+			createNativeFunction('primitive_string_concat', (a: Value) => (b: Value) => {
+				if (isString(a) && isString(b)) {
+					return createString(a.value + b.value);
+				}
+				throw new Error('primitive_string_concat requires two strings');
 			})
 		);
 	}
@@ -1455,6 +1476,77 @@ export class Evaluator {
 			const leftVal = isCell(left) ? left.value : left;
 			const rightVal = isCell(right) ? right.value : right;
 
+			// Special handling for arithmetic operators - use primitive operations for basic types
+			if (expr.operator === '+') {
+				if (isNumber(leftVal) && isNumber(rightVal)) {
+					return createNumber(leftVal.value + rightVal.value);
+				}
+				if (isString(leftVal) && isString(rightVal)) {
+					return createString(leftVal.value + rightVal.value);
+				}
+				// For complex types, try trait resolution
+				if (this.traitRegistry && this.isTraitFunction('add')) {
+					try {
+						const result = this.resolveTraitFunctionWithArgs('add', [leftVal, rightVal], this.traitRegistry);
+						return result;
+					} catch (e) {
+						// Fall through to error
+					}
+				}
+				throw new Error(`Cannot add ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`);
+			}
+
+			if (expr.operator === '-') {
+				if (isNumber(leftVal) && isNumber(rightVal)) {
+					return createNumber(leftVal.value - rightVal.value);
+				}
+				// For complex types, try trait resolution
+				if (this.traitRegistry && this.isTraitFunction('subtract')) {
+					try {
+						const result = this.resolveTraitFunctionWithArgs('subtract', [leftVal, rightVal], this.traitRegistry);
+						return result;
+					} catch (e) {
+						// Fall through to error
+					}
+				}
+				throw new Error(`Cannot subtract ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`);
+			}
+
+			if (expr.operator === '*') {
+				if (isNumber(leftVal) && isNumber(rightVal)) {
+					return createNumber(leftVal.value * rightVal.value);
+				}
+				// For complex types, try trait resolution
+				if (this.traitRegistry && this.isTraitFunction('multiply')) {
+					try {
+						const result = this.resolveTraitFunctionWithArgs('multiply', [leftVal, rightVal], this.traitRegistry);
+						return result;
+					} catch (e) {
+						// Fall through to error
+					}
+				}
+				throw new Error(`Cannot multiply ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`);
+			}
+
+			if (expr.operator === '/') {
+				if (isNumber(leftVal) && isNumber(rightVal)) {
+					if (rightVal.value === 0) {
+						return createConstructor('None', []); // None for division by zero
+					}
+					return createConstructor('Some', [createNumber(leftVal.value / rightVal.value)]); // Some(result)
+				}
+				// For complex types, try trait resolution
+				if (this.traitRegistry && this.isTraitFunction('divide')) {
+					try {
+						const result = this.resolveTraitFunctionWithArgs('divide', [leftVal, rightVal], this.traitRegistry);
+						return result;
+					} catch (e) {
+						// Fall through to error
+					}
+				}
+				throw new Error(`Cannot divide ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`);
+			}
+
 			const operator = this.environment.get(expr.operator);
 			const operatorVal = isCell(operator) ? operator.value : operator;
 			if (operatorVal && isNativeFunction(operatorVal)) {
@@ -1888,7 +1980,10 @@ export class Evaluator {
 
 	private getValueTypeName(value: Value): string {
 		// Get a type name from a runtime value for constraint resolution
-		if (isNumber(value)) return 'Int';
+		if (isNumber(value)) {
+			// Distinguish between Float and Float based on whether it's an integer
+			return Number.isInteger(value.value) ? 'Float' : 'Float';
+		}
 		if (isString(value)) return 'String';
 		if (isBool(value)) return 'Bool';
 		if (isList(value)) return 'List';

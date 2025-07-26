@@ -18,7 +18,7 @@ describe('Polymorphic Function Type Pollution', () => {
 		const result1 = typeAndDecorate(program1, state);
 		state = result1.state;
 
-		// Print should work with Int - check if this succeeds
+		// Print should work with Float - check if this succeeds
 		expect(() => result1).not.toThrow();
 
 		// Now use print with string - this should also work
@@ -49,7 +49,7 @@ describe('Polymorphic Function Type Pollution', () => {
 		const tokens2 = lexer2.tokenize();
 		const program2 = parse(tokens2);
 
-		// This is where the bug manifests - print gets "stuck" on Int type
+		// This is where the bug manifests - print gets "stuck" on Float type
 		expect(() => {
 			const result2 = typeAndDecorate(program2, state);
 			state = result2.state;
