@@ -1,6 +1,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { type Type, type Expression, typeVariable } from '../ast';
+import {
+	type Type,
+	type Expression,
+	typeVariable,
+	type VariableType,
+} from '../ast';
 import { parse } from '../parser/parser';
 import { Lexer } from '../lexer/lexer';
 import {
@@ -15,7 +20,9 @@ import { typeExpression } from './expression-dispatcher';
 import { constraintsEqual } from './helpers';
 
 // Fresh type variable generation - optimized to avoid string concatenation
-export const freshTypeVariable = (state: TypeState): [Type, TypeState] => {
+export const freshTypeVariable = (
+	state: TypeState
+): [VariableType, TypeState] => {
 	const newCounter = state.counter + 1;
 	const newType = typeVariable(`α${newCounter}`);
 	// Avoid spreading the entire state object for better performance
