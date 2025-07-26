@@ -88,7 +88,9 @@ import * as assert from 'uvu/assert';
 		const evaluator = new Evaluator({ fs: mockFs as any });
 		const result = evaluator.evaluateProgram(program); // No file path
 		assert.equal(result.finalResult, { tag: 'number', value: 10 });
-
-
+	});
+	});
+	});
+	});
 
 test.run();

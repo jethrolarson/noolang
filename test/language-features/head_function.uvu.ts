@@ -91,6 +91,13 @@ function unwrapValue(val: Value): any {
 		assert.is(finalResult.name, 'Some');
 		expect(unwrapValue(finalResult.args[0])).toEqual([1, 2]);
 
-
+	});
+	});
+	});
+	});
+	});
+	});
+	});
+	});
 
 test.run();
