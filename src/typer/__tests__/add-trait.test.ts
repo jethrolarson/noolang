@@ -2,18 +2,18 @@ import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
 import { typeAndDecorate, createTypeState } from '../index';
 import { typeToString } from '../helpers';
-import { floatType, intType, stringType } from '../../ast';
+import { floatType, stringType } from '../../ast';
 import { Evaluator } from '../../evaluator/evaluator';
 
 describe('Add Trait System', () => {
 	describe('Type Checking', () => {
-		test('should type 1 + 2 as Int', () => {
+		test('should type 1 + 2 as Float', () => {
 			const code = '1 + 2';
 			const tokens = new Lexer(code).tokenize();
 			const program = parse(tokens);
 			const result = typeAndDecorate(program);
 			
-			expect(result.finalType).toEqual(intType());
+			expect(result.finalType).toEqual(floatType());
 		});
 
 		test('should type 3.14 + 2.86 as Float', () => {
@@ -50,12 +50,13 @@ describe('Add Trait System', () => {
 			expect(() => typeAndDecorate(program)).toThrow();
 		});
 
-		test('should reject mixed numeric types 1 + 3.14', () => {
+				test('should accept all numeric operations since everything is Float', () => {
 			const code = '1 + 3.14';
 			const tokens = new Lexer(code).tokenize();
 			const program = parse(tokens);
-			
-			expect(() => typeAndDecorate(program)).toThrow();
+			const result = typeAndDecorate(program);
+
+			expect(result.finalType).toEqual(floatType());
 		});
 
 		test('should work with variables of same type', () => {
@@ -68,7 +69,7 @@ describe('Add Trait System', () => {
 			const program = parse(tokens);
 			const result = typeAndDecorate(program);
 			
-			expect(result.finalType).toEqual(intType());
+			expect(result.finalType).toEqual(floatType());
 		});
 
 		test('should work with float variables', () => {

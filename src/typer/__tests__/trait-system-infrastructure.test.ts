@@ -4,7 +4,7 @@ import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
 import { typeToString } from '../helpers';
 import { createTraitRegistry, addTraitDefinition, addTraitImplementation, isTraitFunction, resolveTraitFunction } from '../trait-system';
-import { functionType, typeVariable, stringType, intType } from '../../ast';
+import { functionType, typeVariable, stringType, floatType } from '../../ast';
 
 describe('Trait System Phase 1 Infrastructure', () => {
 	const parseProgram = (source: string) => {
@@ -200,12 +200,12 @@ describe('Trait System Phase 1 Infrastructure', () => {
 			addTraitDefinition(registry, trait);
 
 			const impl = {
-				typeName: 'Int',
-				functions: new Map([['show', { kind: 'variable', name: 'intToString' } as any]]),
+				typeName: 'Float',
+				functions: new Map([['show', { kind: 'variable', name: 'floatToString' } as any]]),
 			};
 			addTraitImplementation(registry, 'Show', impl);
 
-			const result = resolveTraitFunction(registry, 'show', [intType()]);
+			const result = resolveTraitFunction(registry, 'show', [floatType()]);
 			
 			expect(result.found).toBe(true);
 			expect(result.traitName).toBe('Show');
@@ -222,7 +222,7 @@ describe('Trait System Phase 1 Infrastructure', () => {
 			};
 			addTraitDefinition(registry, trait);
 
-			const result = resolveTraitFunction(registry, 'show', [intType()]);
+			const result = resolveTraitFunction(registry, 'show', [floatType()]);
 			
 			expect(result.found).toBe(false);
 		});
@@ -230,7 +230,7 @@ describe('Trait System Phase 1 Infrastructure', () => {
 		it('should fail to resolve non-trait function', () => {
 			const registry = createTraitRegistry();
 			
-			const result = resolveTraitFunction(registry, 'nonExistent', [intType()]);
+			const result = resolveTraitFunction(registry, 'nonExistent', [floatType()]);
 			
 			expect(result.found).toBe(false);
 		});

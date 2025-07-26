@@ -53,11 +53,11 @@ export function tryResolveConstraints(
 					// Check if we have an implementation of this trait for this argument type
 					let hasImplementation = false;
 					
-					// Built-in implementations for traits to avoid circular dependency
-					if (traitName === 'Add' && (argTypeName === 'Int' || argTypeName === 'Float' || argTypeName === 'String')) {
-						hasImplementation = true;
-					} else if (traitName === 'Numeric' && (argTypeName === 'Int' || argTypeName === 'Float')) {
-						hasImplementation = true;
+							// Built-in implementations for traits to avoid circular dependency
+		if (traitName === 'Add' && (argTypeName === 'Float' || argTypeName === 'String')) {
+			hasImplementation = true;
+		} else if (traitName === 'Numeric' && (argTypeName === 'Float')) {
+			hasImplementation = true;
 					} else {
 						// Check trait registry for user-defined implementations
 						const traitRegistry = state.traitRegistry;

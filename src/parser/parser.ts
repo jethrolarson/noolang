@@ -13,7 +13,7 @@ import {
 	type AccessorExpression,
 	type Type,
 	type Effect,
-	intType,
+	floatType,
 	stringType,
 	unitType,
 	listTypeWithElement,
@@ -81,14 +81,14 @@ const parseTypeName: C.Parser<Token> = (tokens: Token[]) => {
 
 // Parse primitive types (Int, String, etc.)
 const parsePrimitiveType = (tokens: Token[]): C.ParseResult<Type> => {
-	const primitiveTypes = ['Int', 'Number', 'String', 'Unit'];
+	const primitiveTypes = ['Float', 'Number', 'String', 'Unit'];
 	for (const typeName of primitiveTypes) {
 		const result = C.keyword(typeName)(tokens);
 		if (result.success) {
 			switch (typeName) {
-				case 'Int':
+				case 'Float':
 				case 'Number':
-					return { success: true, value: intType(), remaining: result.remaining };
+					return { success: true, value: floatType(), remaining: result.remaining };
 				case 'String':
 					return { success: true, value: stringType(), remaining: result.remaining };
 				case 'Unit':

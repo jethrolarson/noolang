@@ -796,8 +796,8 @@ export class Evaluator {
 
 		// Primitive support functions for trait implementations
 		this.environment.set(
-			'primitive_int_eq',
-			createNativeFunction('primitive_int_eq', (a: Value) => (b: Value) => {
+			'primitive_float_eq',
+			createNativeFunction('primitive_float_eq', (a: Value) => (b: Value) => {
 				if (isNumber(a) && isNumber(b)) {
 					return createBool(a.value === b.value);
 				}
@@ -816,26 +816,16 @@ export class Evaluator {
 		);
 
 		this.environment.set(
-			'intToString',
-			createNativeFunction('intToString', (n: Value) => {
+			'floatToString',
+			createNativeFunction('floatToString', (n: Value) => {
 				if (isNumber(n)) {
 					return createString(n.value.toString());
 				}
-				throw new Error('intToString requires a number');
+				throw new Error('floatToString requires a number');
 			})
 		);
 
 		// Primitive Add trait implementations
-		this.environment.set(
-			'primitive_int_add',
-			createNativeFunction('primitive_int_add', (a: Value) => (b: Value) => {
-				if (isNumber(a) && isNumber(b)) {
-					return createNumber(a.value + b.value);
-				}
-				throw new Error('primitive_int_add requires two numbers');
-			})
-		);
-
 		this.environment.set(
 			'primitive_float_add',
 			createNativeFunction('primitive_float_add', (a: Value) => (b: Value) => {

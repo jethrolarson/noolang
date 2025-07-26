@@ -1,10 +1,9 @@
 import { TypeState } from './types';
 import {
 	functionType,
-	intType,
+	floatType,
 	boolType,
 	stringType,
-	floatType,
 	recordType,
 	tupleType,
 	listTypeWithElement,
@@ -87,19 +86,19 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a'],
 	});
 	newEnv.set('<', {
-		type: functionType([intType(), intType()], boolType()),
+		type: functionType([floatType(), floatType()], boolType()),
 		quantifiedVars: [],
 	});
 	newEnv.set('>', {
-		type: functionType([intType(), intType()], boolType()),
+		type: functionType([floatType(), floatType()], boolType()),
 		quantifiedVars: [],
 	});
 	newEnv.set('<=', {
-		type: functionType([intType(), intType()], boolType()),
+		type: functionType([floatType(), floatType()], boolType()),
 		quantifiedVars: [],
 	});
 	newEnv.set('>=', {
-		type: functionType([intType(), intType()], boolType()),
+		type: functionType([floatType(), floatType()], boolType()),
 		quantifiedVars: [],
 	});
 
@@ -204,13 +203,13 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 
 	// Random number generation - special zero-arg function syntax
 	newEnv.set('random', {
-		type: intType(), // For now, treat as a value with effects
+		type: floatType(), // For now, treat as a value with effects
 		quantifiedVars: [],
 		effects: new Set(['rand'] as Effect[]), // Store effects separately
 	});
 
 	newEnv.set('randomRange', {
-		type: functionType([intType(), intType()], intType(), new Set(['rand'])),
+		type: functionType([floatType(), floatType()], floatType(), new Set(['rand'])),
 		quantifiedVars: [],
 	});
 
@@ -270,7 +269,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	});
 	const lengthType = createUnaryFunctionType(
 		listTypeWithElement(typeVariable('a')),
-		intType()
+		floatType()
 	);
 	newEnv.set('length', {
 		type: lengthType,
@@ -294,15 +293,15 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 
 	// Math utilities (pure)
 	newEnv.set('abs', {
-		type: createUnaryFunctionType(intType(), intType()),
+		type: createUnaryFunctionType(floatType(), floatType()),
 		quantifiedVars: [],
 	});
 	newEnv.set('max', {
-		type: createBinaryFunctionType(intType(), intType(), intType()),
+		type: createBinaryFunctionType(floatType(), floatType(), floatType()),
 		quantifiedVars: [],
 	});
 	newEnv.set('min', {
-		type: createBinaryFunctionType(intType(), intType(), intType()),
+		type: createBinaryFunctionType(floatType(), floatType(), floatType()),
 		quantifiedVars: [],
 	});
 
@@ -317,8 +316,8 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	});
 	
 	// Primitive comparison functions (pure)
-	newEnv.set('primitive_int_eq', {
-		type: createBinaryFunctionType(intType(), intType(), boolType()),
+	newEnv.set('primitive_float_eq', {
+		type: createBinaryFunctionType(floatType(), floatType(), boolType()),
 		quantifiedVars: [],
 	});
 	newEnv.set('primitive_string_eq', {
@@ -327,11 +326,6 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	});
 
 	// Primitive Add trait implementations for type checking
-	newEnv.set('primitive_int_add', {
-		type: createBinaryFunctionType(intType(), intType(), intType()),
-		quantifiedVars: [],
-	});
-
 	newEnv.set('primitive_float_add', {
 		type: createBinaryFunctionType(floatType(), floatType(), floatType()),
 		quantifiedVars: [],
@@ -343,8 +337,8 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	});
 
 	// Primitive Subtract trait implementations for type checking
-	newEnv.set('primitive_int_subtract', {
-		type: createBinaryFunctionType(intType(), intType(), intType()),
+	newEnv.set('primitive_float_subtract', {
+		type: createBinaryFunctionType(floatType(), floatType(), floatType()),
 		quantifiedVars: [],
 	});
 
@@ -354,22 +348,12 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	});
 
 	// Primitive Multiply trait implementations for type checking
-	newEnv.set('primitive_int_multiply', {
-		type: createBinaryFunctionType(intType(), intType(), intType()),
-		quantifiedVars: [],
-	});
-
 	newEnv.set('primitive_float_multiply', {
 		type: createBinaryFunctionType(floatType(), floatType(), floatType()),
 		quantifiedVars: [],
 	});
 
 	// Primitive Divide trait implementations for type checking
-	newEnv.set('primitive_int_divide', {
-		type: createBinaryFunctionType(intType(), intType(), optionType(floatType())),
-		quantifiedVars: [],
-	});
-
 	newEnv.set('primitive_float_divide', {
 		type: createBinaryFunctionType(floatType(), floatType(), optionType(floatType())),
 		quantifiedVars: [],
@@ -403,7 +387,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	// Tuple operations - only keep sound ones
 	newEnv.set(
 		'tupleLength',
-		{ type: functionType([tupleType([])], intType()), quantifiedVars: [] } // Any tuple -> Int
+		{ type: functionType([tupleType([])], floatType()), quantifiedVars: [] } // Any tuple -> Float
 	);
 	newEnv.set(
 		'tupleIsEmpty',
@@ -415,7 +399,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	// Minimal built-in for self-hosted functions - now returns Option for safety
 	newEnv.set('list_get', {
 		type: functionType(
-			[intType(), listTypeWithElement(typeVariable('a'))],
+			[floatType(), listTypeWithElement(typeVariable('a'))],
 			optionType(typeVariable('a'))
 		),
 		quantifiedVars: ['a'],

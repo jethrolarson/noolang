@@ -47,7 +47,7 @@ export type StructureFieldType =
 // Extracted type definitions
 export type PrimitiveType = {
 	kind: 'primitive';
-	name: 'Int' | 'String' | 'Bool' | 'List' | 'Float';
+	name: 'String' | 'Bool' | 'List' | 'Float';
 };
 
 export type FunctionType = {
@@ -413,14 +413,6 @@ export const createPosition = (line: number, column: number): Position => ({
 });
 
 // Type constructors
-export const intType = (): PrimitiveType => ({
-	kind: 'primitive',
-	name: 'Int',
-});
-export const numberType = (): PrimitiveType => ({
-	kind: 'primitive',
-	name: 'Int',
-}); // Alias for backwards compatibility
 export const stringType = (): PrimitiveType => ({
 	kind: 'primitive',
 	name: 'String',
@@ -488,7 +480,7 @@ export const recordType = (fields: { [key: string]: Type }): RecordType => ({
 
 // Constructor functions for new types
 export const primitiveType = (
-	name: 'Int' | 'String' | 'Bool' | 'List'
+	name: 'Float' | 'String' | 'Bool' | 'List'
 ): PrimitiveType => ({
 	kind: 'primitive',
 	name,
@@ -541,7 +533,6 @@ export const resultType = (success: Type, error: Type): VariantType => ({
 });
 
 // Convenience functions for common types
-export const optionInt = (): VariantType => optionType(intType());
 export const resultString = (error: Type): VariantType =>
 	resultType(stringType(), error);
 
