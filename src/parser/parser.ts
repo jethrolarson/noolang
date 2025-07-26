@@ -913,8 +913,6 @@ const parsePrimary: C.Parser<Expression> = tokens => {
 				result = C.lazy(() => parseDefinitionWithType)(tokens);
 			} else if (firstToken.value === 'import') {
 				result = parseImportExpression(tokens);
-			} else if (firstToken.value === 'implement') {
-				result = parseImplementDefinition(tokens);
 			} else {
 				result = {
 					success: false,

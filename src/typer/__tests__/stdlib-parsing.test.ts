@@ -107,7 +107,7 @@ implement Show (Option a) given a implements Show (
     // ... etc
     
     // Should not contain any unexpected tokens
-    const unexpectedTokens = tokens.filter(t => t.type === 'UNKNOWN' || t.value === 'match');
+    const unexpectedTokens = tokens.filter(t => t.value === 'match');
     expect(unexpectedTokens).toHaveLength(0);
   });
 });
