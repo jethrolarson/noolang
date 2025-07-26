@@ -51,34 +51,43 @@ export function tryResolveConstraints(
 					const argTypeName = getTypeName(argType);
 					
 					// Check if we have an implementation of this trait for this argument type
-					const traitRegistry = state.traitRegistry;
-					if (traitRegistry) {
-						const traitImpls = traitRegistry.implementations.get(traitName);
-						
-						if (traitImpls && traitImpls.has(argTypeName)) {
-							// This argument type satisfies the constraint!
-							// Create a substitution and apply it to the return type
-							const substitution = new Map(state.substitution);
-							
-							if (argType.kind === 'list') {
-								// For List types, substitute the type constructor
-								substitution.set(varName, { kind: 'primitive', name: 'List' });
-							} else if (argType.kind === 'variant') {
-								// For variant types, substitute with the constructor
-								substitution.set(varName, {
-									kind: 'variant',
-									name: argType.name,
-									args: [] // Just the constructor
-								});
-							} else {
-								// For other types, substitute directly
-								substitution.set(varName, argType);
-							}
-							
-							// Apply substitution to return type
-							const resolvedType = substitute(returnType, substitution);
-							return resolvedType;
+					let hasImplementation = false;
+					
+					// Built-in implementations for Add trait to avoid circular dependency
+					if (traitName === 'Add' && (argTypeName === 'Int' || argTypeName === 'Float' || argTypeName === 'String')) {
+						hasImplementation = true;
+					} else {
+						// Check trait registry for user-defined implementations
+						const traitRegistry = state.traitRegistry;
+						if (traitRegistry) {
+							const traitImpls = traitRegistry.implementations.get(traitName);
+							hasImplementation = traitImpls && traitImpls.has(argTypeName);
 						}
+					}
+					
+					if (hasImplementation) {
+						// This argument type satisfies the constraint!
+						// Create a substitution and apply it to the return type
+						const substitution = new Map(state.substitution);
+						
+						if (argType.kind === 'list') {
+							// For List types, substitute the type constructor
+							substitution.set(varName, { kind: 'primitive', name: 'List' });
+						} else if (argType.kind === 'variant') {
+							// For variant types, substitute with the constructor
+							substitution.set(varName, {
+								kind: 'variant',
+								name: argType.name,
+								args: [] // Just the constructor
+							});
+						} else {
+							// For other types, substitute directly
+							substitution.set(varName, argType);
+						}
+						
+						// Apply substitution to return type
+						const resolvedType = substitute(returnType, substitution);
+						return resolvedType;
 					}
 				}
 			}
