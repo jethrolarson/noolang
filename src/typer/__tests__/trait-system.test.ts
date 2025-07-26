@@ -315,10 +315,12 @@ describe('Trait System - Consolidated Tests', () => {
 				const program = parseProgram(code);
 				const typeResult = typeProgram(program);
 				
-				// Should succeed and return a constrained type
-				assertConstrainedType(typeResult.type);
+				// CONSTRAINT COLLAPSE: Should succeed and return concrete List Int type
+				expect(typeResult.type.kind).toBe('list');
 				const typeString = typeToString(typeResult.type);
-				expect(typeString).toMatch(/implements Functor/);
+				expect(typeString).toBe('List Int');
+				// Should NOT have constraint annotations anymore
+				expect(typeString).not.toMatch(/implements|given|α\d+/);
 			});
 
 			test('should resolve Functor constraint for Option', () => {
@@ -327,10 +329,12 @@ describe('Trait System - Consolidated Tests', () => {
 				const program = parseProgram(code);
 				const typeResult = typeProgram(program);
 				
-				// Should succeed and return a constrained type
-				assertConstrainedType(typeResult.type);
+				// CONSTRAINT COLLAPSE: Should succeed and return concrete Option Int type
+				expect(typeResult.type.kind).toBe('variant');
 				const typeString = typeToString(typeResult.type);
-				expect(typeString).toMatch(/implements Functor/);
+				expect(typeString).toBe('Option Int');
+				// Should NOT have constraint annotations anymore
+				expect(typeString).not.toMatch(/implements|given|α\d+/);
 			});
 
 			test('should resolve Show constraint for Int', () => {

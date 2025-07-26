@@ -83,11 +83,36 @@ const substituteWithCache =
 					...type,
 					types: type.types.map(substituteWithCache(substitution, seen)),
 				};
-			case 'variant':
+			case 'variant': {
+				// Check if the variant name itself should be substituted
+				const substitutedName = substitution.get(type.name);
+				if (substitutedName) {
+					// The variant name is being substituted
+					if (substitutedName.kind === 'primitive' && substitutedName.name === 'List') {
+						// Special case: substituting with List constructor -> create list type
+						if (type.args.length === 1) {
+							return {
+								kind: 'list',
+								element: substituteWithCache(substitution, seen)(type.args[0])
+							};
+						}
+					} else if (substitutedName.kind === 'variant') {
+						// Substituting with another variant constructor
+						return {
+							...type,
+							name: substitutedName.name,
+							args: type.args.map(substituteWithCache(substitution, seen)),
+						};
+					}
+					// For other substitution types, fall through to normal arg substitution
+				}
+				
+				// Normal case: just substitute the arguments
 				return {
 					...type,
 					args: type.args.map(substituteWithCache(substitution, seen)),
 				};
+			}
 			case 'constrained':
 				return {
 					...type,

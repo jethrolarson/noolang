@@ -28,8 +28,66 @@ import {
 } from './types';
 import { substitute } from './substitute';
 import { unify } from './unify';
-import { freshTypeVariable, instantiate } from './type-operations';
 import { typeExpression } from './expression-dispatcher';
+import { freshTypeVariable } from './type-operations';
+
+// CONSTRAINT COLLAPSE FIX: Function to try resolving constraints using argument types
+function tryResolveConstraints(
+	returnType: Type,
+	functionConstraints: Map<string, TraitConstraint[]>,
+	argTypes: Type[],
+	state: TypeState
+): Type | null {
+	const { getTypeName } = require('./trait-system');
+	
+	// For each constraint, check if any of the argument types can satisfy it
+	for (const [varName, constraints] of functionConstraints.entries()) {
+		for (const constraint of constraints) {
+			if (constraint.kind === 'implements') {
+				const traitName = constraint.trait;
+				
+				// Check each argument type to see if it implements the required trait
+				for (const argType of argTypes) {
+					const argTypeName = getTypeName(argType);
+					
+					// Check if we have an implementation of this trait for this argument type
+					const traitRegistry = state.traitRegistry;
+					if (traitRegistry) {
+						const traitImpls = traitRegistry.implementations.get(traitName);
+						
+						if (traitImpls && traitImpls.has(argTypeName)) {
+							// This argument type satisfies the constraint!
+							// Create a substitution and apply it to the return type
+							const substitution = new Map(state.substitution);
+							
+							if (argType.kind === 'list') {
+								// For List types, substitute the type constructor
+								substitution.set(varName, { kind: 'primitive', name: 'List' });
+							} else if (argType.kind === 'variant') {
+								// For variant types, substitute with the constructor
+								substitution.set(varName, {
+									kind: 'variant',
+									name: argType.name,
+									args: [] // Just the constructor
+								});
+							} else {
+								// For other types, substitute directly
+								substitution.set(varName, argType);
+							}
+							
+							// Apply substitution to return type
+							const resolvedType = substitute(returnType, substitution);
+							return resolvedType;
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	// Could not resolve any constraints
+	return null;
+}
 
 // Helper function to continue function application with a specialized constraint function
 function continueWithSpecializedFunction(
@@ -261,15 +319,29 @@ export const typeApplication = (
 		if (argTypes.length === actualFuncType.params.length) {
 			// Full application - return the return type
 			
-			// If the original function had constraints, preserve them in the return type
+			// CONSTRAINT COLLAPSE FIX: Instead of blindly preserving constraints,
+			// try to resolve them using the actual argument types
 			let finalReturnType = returnType;
 			if (functionConstraints && functionConstraints.size > 0) {
-				// Create a ConstrainedType with the original constraints
-				finalReturnType = {
-					kind: 'constrained',
-					baseType: returnType,
-					constraints: functionConstraints
-				};
+				// Try to resolve constraints using argument types
+				const resolvedType = tryResolveConstraints(
+					returnType,
+					functionConstraints,
+					argTypes,
+					currentState
+				);
+				
+				if (resolvedType) {
+					// Constraints were successfully resolved to a concrete type
+					finalReturnType = resolvedType;
+				} else {
+					// Could not resolve constraints, preserve them
+					finalReturnType = {
+						kind: 'constrained',
+						baseType: returnType,
+						constraints: functionConstraints
+					};
+				}
 			}
 
 			// CRITICAL FIX: Handle function composition constraint propagation
