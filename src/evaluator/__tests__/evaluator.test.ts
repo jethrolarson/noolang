@@ -1146,6 +1146,11 @@ describe('Additional Coverage Tests', () => {
 			expect(unwrapValue(result.finalResult)).toBe('hello world');
 		});
 
+		test('should handle string concatenation with + operator', () => {
+			const result = runCode('"hello" + " world"');
+			expect(unwrapValue(result.finalResult)).toBe('hello world');
+		});
+
 		test('should handle math functions', () => {
 			expect(unwrapValue(runCode('abs (-5)').finalResult)).toBe(5);
 			expect(unwrapValue(runCode('max 10 5').finalResult)).toBe(10);

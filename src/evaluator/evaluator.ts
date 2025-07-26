@@ -214,6 +214,7 @@ export class Evaluator {
 			'+',
 			createNativeFunction('+', (a: Value) => (b: Value) => {
 				if (isNumber(a) && isNumber(b)) return createNumber(a.value + b.value);
+				if (isString(a) && isString(b)) return createString(a.value + b.value);
 				throw new Error(
 					`Cannot add ${a?.tag || 'unit'} and ${b?.tag || 'unit'}`
 				);
