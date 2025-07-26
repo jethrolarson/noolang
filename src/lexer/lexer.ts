@@ -160,6 +160,7 @@ export class Lexer {
 			'with',
 			'given',
 			'is',
+			'has',
 			'and',
 			'or',
 			'implements',

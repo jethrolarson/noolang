@@ -40,6 +40,9 @@ import {
 	type ConstraintFunction,
 	type ImplementationFunction,
 	type MutationExpression,
+	type RecordStructure,
+	type StructureFieldType,
+	recordStructure,
 } from '../ast';
 import * as C from './combinators';
 
@@ -74,9 +77,10 @@ const parseTypeName: C.Parser<Token> = (tokens: Token[]) => {
 	};
 };
 
-// --- Helper: parse a single type atom (primitive, variable, record, tuple, list) ---
-function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
-	// Try primitive types first, but handle List as a parameterizable type constructor
+// --- Smaller focused type parsers ---
+
+// Parse primitive types (Int, String, etc.)
+const parsePrimitiveType = (tokens: Token[]): C.ParseResult<Type> => {
 	const primitiveTypes = ['Int', 'Number', 'String', 'Unit'];
 	for (const typeName of primitiveTypes) {
 		const result = C.keyword(typeName)(tokens);
@@ -84,50 +88,36 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 			switch (typeName) {
 				case 'Int':
 				case 'Number':
-					return {
-						success: true as const,
-						value: intType(),
-						remaining: result.remaining,
-					};
+					return { success: true, value: intType(), remaining: result.remaining };
 				case 'String':
-					return {
-						success: true as const,
-						value: stringType(),
-						remaining: result.remaining,
-					};
+					return { success: true, value: stringType(), remaining: result.remaining };
 				case 'Unit':
-					return {
-						success: true as const,
-						value: unitType(),
-						remaining: result.remaining,
-					};
+					return { success: true, value: unitType(), remaining: result.remaining };
 			}
 		}
 	}
+	return { success: false, error: 'Expected primitive type', position: tokens[0]?.location.start.line || 0 };
+};
 
-	// Try List as a parameterizable type constructor
+// Parse List type with optional element type
+const parseListType = (tokens: Token[]): C.ParseResult<Type> => {
 	const listKeywordResult = C.keyword('List')(tokens);
 	if (listKeywordResult.success) {
 		// Try to parse a type argument for List
 		const argResult = C.lazy(() => parseTypeAtom)(listKeywordResult.remaining);
 		if (argResult.success) {
 			// List with specific element type: List Number, List String, etc.
-			return {
-				success: true as const,
-				value: listTypeWithElement(argResult.value),
-				remaining: argResult.remaining,
-			};
+			return { success: true, value: listTypeWithElement(argResult.value), remaining: argResult.remaining };
 		} else {
 			// Just List (generic)
-			return {
-				success: true as const,
-				value: listTypeWithElement(typeVariable('a')),
-				remaining: listKeywordResult.remaining,
-			};
+			return { success: true, value: listTypeWithElement(typeVariable('a')), remaining: listKeywordResult.remaining };
 		}
 	}
+	return { success: false, error: 'Expected List type', position: tokens[0]?.location.start.line || 0 };
+};
 
-	// Try record type
+// Parse record type {field: Type, ...}
+const parseRecordType = (tokens: Token[]): C.ParseResult<Type> => {
 	const recordResult = C.seq(
 		C.punctuation('{'),
 		C.optional(
@@ -151,14 +141,13 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 		for (const [name, type] of fields) {
 			fieldObj[name] = type;
 		}
-		return {
-			success: true as const,
-			value: recordType(fieldObj),
-			remaining: recordResult.remaining,
-		};
+		return { success: true, value: recordType(fieldObj), remaining: recordResult.remaining };
 	}
+	return { success: false, error: 'Expected record type', position: tokens[0]?.location.start.line || 0 };
+};
 
-	// Try tuple type
+// Parse tuple type {Type, Type, ...}
+const parseTupleType = (tokens: Token[]): C.ParseResult<Type> => {
 	const tupleResult = C.seq(
 		C.punctuation('{'),
 		C.optional(
@@ -171,82 +160,38 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 	)(tokens);
 	if (tupleResult.success) {
 		const elements = tupleResult.value[1] || [];
-		return {
-			success: true as const,
-			value: tupleType(elements),
-			remaining: tupleResult.remaining,
-		};
+		return { success: true, value: tupleType(elements), remaining: tupleResult.remaining };
 	}
+	return { success: false, error: 'Expected tuple type', position: tokens[0]?.location.start.line || 0 };
+};
 
-	// Try List type
-	const listResult = C.seq(
-		C.keyword('List'),
-		C.lazy(() => parseTypeExpression)
-	)(tokens);
-	if (listResult.success) {
-		return {
-			success: true as const,
-			value: listTypeWithElement(listResult.value[1]),
-			remaining: listResult.remaining,
-		};
-	}
-
-	// Try Tuple type constructor: Tuple T1 T2 T3
-	if (
-		tokens.length > 0 &&
-		tokens[0].type === 'IDENTIFIER' &&
-		tokens[0].value === 'Tuple'
-	) {
-		const tupleConstructorResult = C.seq(
-			C.identifier(),
-			C.many(C.lazy(() => parseTypeExpression))
-		)(tokens);
-		if (tupleConstructorResult.success) {
-			const elementTypes = tupleConstructorResult.value[1];
-			return {
-				success: true as const,
-				value: tupleTypeConstructor(elementTypes),
-				remaining: tupleConstructorResult.remaining,
-			};
-		}
-	}
-
-	// Try parenthesized type: (Type)
+// Parse parenthesized type (Type)
+const parseParenthesizedType = (tokens: Token[]): C.ParseResult<Type> => {
 	const parenResult = C.seq(
 		C.punctuation('('),
 		C.lazy(() => parseTypeExpression),
 		C.punctuation(')')
 	)(tokens);
 	if (parenResult.success) {
-		return {
-			success: true as const,
-			value: parenResult.value[1],
-			remaining: parenResult.remaining,
-		};
+		return { success: true, value: parenResult.value[1], remaining: parenResult.remaining };
 	}
+	return { success: false, error: 'Expected parenthesized type', position: tokens[0]?.location.start.line || 0 };
+};
 
-	// Try type constructor (uppercase or lowercase): TypeName arg1 arg2 ... 
-	if (
-		tokens.length > 0 &&
-		tokens[0].type === 'IDENTIFIER'
-	) {
+// Parse type constructor or variable (TypeName, a, Option a, etc.)
+const parseTypeConstructorOrVariable = (tokens: Token[]): C.ParseResult<Type> => {
+	if (tokens.length > 0 && tokens[0].type === 'IDENTIFIER') {
 		const typeNameResult = C.identifier()(tokens);
 		if (typeNameResult.success) {
 			const typeName = typeNameResult.value.value;
 			
 			// Try to parse type arguments
-			const argsResult = C.many(C.lazy(() => parseTypeAtom))(
-				typeNameResult.remaining
-			);
+			const argsResult = C.many(C.lazy(() => parseTypeAtom))(typeNameResult.remaining);
 			if (argsResult.success && argsResult.value.length > 0) {
 				// Type constructor with arguments (like Option a, f a, List String)
 				return {
-					success: true as const,
-					value: {
-						kind: 'variant',
-						name: typeName,
-						args: argsResult.value,
-					} as Type,
+					success: true,
+					value: { kind: 'variant', name: typeName, args: argsResult.value },
 					remaining: argsResult.remaining,
 				};
 			} else {
@@ -255,18 +200,14 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 				if (isUpperCase) {
 					// Type constructor without arguments (like Bool, Option, etc.)
 					return {
-						success: true as const,
-						value: {
-							kind: 'variant',
-							name: typeName,
-							args: [],
-						} as Type,
+						success: true,
+						value: { kind: 'variant', name: typeName, args: [] },
 						remaining: typeNameResult.remaining,
 					};
 				} else {
 					// Type variable (like a, b, etc.)
 					return {
-						success: true as const,
+						success: true,
 						value: typeVariable(typeName),
 						remaining: typeNameResult.remaining,
 					};
@@ -274,8 +215,43 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 			}
 		}
 	}
+	return { success: false, error: 'Expected type constructor or variable', position: tokens[0]?.location.start.line || 0 };
+};
 
+// Parse Tuple type constructor: Tuple T1 T2 T3
+const parseTupleConstructor = (tokens: Token[]): C.ParseResult<Type> => {
+	if (tokens.length > 0 && tokens[0].type === 'IDENTIFIER' && tokens[0].value === 'Tuple') {
+		const tupleConstructorResult = C.seq(
+			C.identifier(),
+			C.many(C.lazy(() => parseTypeExpression))
+		)(tokens);
+		if (tupleConstructorResult.success) {
+			const elementTypes = tupleConstructorResult.value[1];
+			return { success: true, value: tupleTypeConstructor(elementTypes), remaining: tupleConstructorResult.remaining };
+		}
+	}
+	return { success: false, error: 'Expected Tuple constructor', position: tokens[0]?.location.start.line || 0 };
+};
 
+// Main type atom parser - now clean and focused
+function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
+	// Try each type parser in order
+	const parsers = [
+		parsePrimitiveType,
+		parseListType,
+		parseRecordType,
+		parseTupleType,
+		parseTupleConstructor,
+		parseParenthesizedType,
+		parseTypeConstructorOrVariable,
+	];
+
+	for (const parser of parsers) {
+		const result = parser(tokens);
+		if (result.success) {
+			return result;
+		}
+	}
 
 	return {
 		success: false,
@@ -889,7 +865,7 @@ const parseIfExpression: C.Parser<Expression> = C.map(
 const parsePrimary: C.Parser<Expression> = tokens => {
 	// DEBUG: Log tokens at entry
 	if (process.env.NOO_DEBUG_PARSE) {
-		console.log('parsePrimary tokens:', tokens.map(t => t.value).join(' '));
+			console.log('parsePrimary tokens:', tokens.map(t => t.value).join(' '));
 	}
 
 	// Fast token-based dispatch instead of sequential choice attempts
@@ -1270,6 +1246,25 @@ const parseIfAfterDollar: C.Parser<Expression> = tokens => {
 };
 
 // Helper function to apply postfix operators to an expression
+// Parse type annotation with optional constraint: : Type [given Constraint]
+const parseTypeAnnotation = C.map(
+	C.seq(
+		C.punctuation(':'),
+		parseTypeExpression,
+		C.optional(
+			C.seq(
+				C.keyword('given'),
+				C.lazy(() => parseConstraintExpr)
+			)
+		)
+	),
+	([_colon, type, constraintClause]) => ({
+		type,
+		constraint: constraintClause ? constraintClause[1] : undefined
+	})
+);
+
+// Clean postfix parser using combinators
 const parsePostfixFromResult = (
 	expr: Expression,
 	tokens: Token[]
@@ -1277,59 +1272,33 @@ const parsePostfixFromResult = (
 	let result = expr;
 	let remaining = tokens;
 
-	// Try to parse postfix type annotations
+	// Try to parse type annotations repeatedly
 	while (remaining.length > 0) {
-		// Try to parse : type given constraint
-		if (
-			remaining.length >= 2 &&
-			remaining[0].type === 'PUNCTUATION' &&
-			remaining[0].value === ':'
-		) {
-			const typeResult = parseTypeExpression(remaining.slice(1));
-			if (!typeResult.success) break;
+		const annotationResult = parseTypeAnnotation(remaining);
+		if (!annotationResult.success) break;
 
-			// Check if there's a "given" constraint after the type
-			if (
-				typeResult.remaining.length > 0 &&
-				typeResult.remaining[0].type === 'KEYWORD' &&
-				typeResult.remaining[0].value === 'given'
-			) {
-				const constraintResult = parseConstraintExpr(
-					typeResult.remaining.slice(1)
-				);
-				if (!constraintResult.success) break;
-
-				result = {
-					kind: 'constrained',
-					expression: result,
-					type: typeResult.value,
-					constraint: constraintResult.value,
-					location: result.location,
-				};
-				remaining = constraintResult.remaining;
-				continue;
-			} else {
-				// Just a type annotation without constraints
-				result = {
-					kind: 'typed',
-					expression: result,
-					type: typeResult.value,
-					location: result.location,
-				};
-				remaining = typeResult.remaining;
-				continue;
-			}
+		// Create appropriate expression based on whether we have constraints
+		if (annotationResult.value.constraint) {
+			result = {
+				kind: 'constrained',
+				expression: result,
+				type: annotationResult.value.type,
+				constraint: annotationResult.value.constraint,
+				location: result.location,
+			};
+		} else {
+			result = {
+				kind: 'typed',
+				expression: result,
+				type: annotationResult.value.type,
+				location: result.location,
+			};
 		}
-
-		// No more postfix operators
-		break;
+		
+		remaining = annotationResult.remaining;
 	}
 
-	return {
-		success: true,
-		value: result,
-		remaining,
-	};
+	return { success: true, value: result, remaining };
 };
 
 // --- Definition ---
@@ -1787,6 +1756,34 @@ const parseSequenceTermWithIfExceptRecord: C.Parser<Expression> = C.choice(
 	parseIfExpression
 );
 
+// --- Parse record structure for constraints ---
+const parseRecordStructure: C.Parser<RecordStructure> = C.map(
+	C.seq(
+		C.punctuation('{'),
+		C.sepBy(
+			C.map(
+				C.seq(
+					C.accessor(),
+					C.lazy(() => parseTypeExpression)
+				),
+				([accessor, type]): [string, StructureFieldType] => [
+					accessor.value, // Accessor value already excludes the @ prefix
+					type
+				]
+			),
+			C.punctuation(',')
+		),
+		C.punctuation('}')
+	),
+	([_open, fields, _close]): RecordStructure => {
+		const fieldMap: { [key: string]: StructureFieldType } = {};
+		for (const [fieldName, fieldType] of fields) {
+			fieldMap[fieldName] = fieldType;
+		}
+		return recordStructure(fieldMap);
+	}
+);
+
 // --- Parse atomic constraint ---
 const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
 	// Parenthesized constraint
@@ -1812,6 +1809,19 @@ const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
 			kind: 'is',
 			typeVar: typeVar.value,
 			constraint: constraint.value,
+		})
+	),
+	// a has {@name String, @age Int} - Try this first since it has distinct syntax
+	C.map(
+		C.seq(
+			C.identifier(),
+			C.keyword('has'),
+			parseRecordStructure
+		),
+		([typeVar, _has, structure]): ConstraintExpr => ({
+			kind: 'has',
+			typeVar: typeVar.value,
+			structure,
 		})
 	),
 	// a has field "name" of type T
@@ -1961,50 +1971,47 @@ const parseSequence: C.Parser<Expression> = C.map(
 const parseExpr: C.Parser<Expression> = parseSequence;
 
 // --- Main Parse Function ---
-export const parse = (tokens: Token[]): Program => {
-	// Filter out EOF tokens for parsing
-	const nonEOFTokens = tokens.filter(t => t.type !== 'EOF');
-
-	// Parse multiple top-level expressions separated by semicolons
-	const statements: Expression[] = [];
-	let rest = nonEOFTokens;
-	while (rest.length > 0) {
-		// Skip leading semicolons
-		while (
-			rest.length > 0 &&
-			rest[0].type === 'PUNCTUATION' &&
-			rest[0].value === ';'
-		) {
-			rest = rest.slice(1);
-		}
-		if (rest.length === 0) break;
-		const result = parseExpr(rest);
-		if (!result.success) {
-			// Include line and column information in parse error
-			const errorLocation =
-				result.position > 0 ? ` at line ${result.position}` : '';
-			throw new Error(`Parse error: ${result.error}${errorLocation}`);
-		}
-		statements.push(result.value);
-		rest = result.remaining;
-		// Skip trailing semicolons after each statement
-		while (
-			rest.length > 0 &&
-			rest[0].type === 'PUNCTUATION' &&
-			rest[0].value === ';'
-		) {
-			rest = rest.slice(1);
-		}
+// Helper: skip semicolons
+const skipSemicolons = (tokens: Token[]): Token[] => {
+	while (tokens.length > 0 && tokens[0].type === 'PUNCTUATION' && tokens[0].value === ';') {
+		tokens = tokens.slice(1);
 	}
-	// If there are still leftover tokens that aren't semicolons or EOF, throw an error
-	if (rest.length > 0) {
-		const next = rest[0];
+	return tokens;
+};
+
+// Clean combinator-based program parser  
+const parseStatements = (tokens: Token[]): C.ParseResult<Expression[]> => {
+	const statements: Expression[] = [];
+	let rest = skipSemicolons(tokens.filter(t => t.type !== 'EOF'));
+	
+	while (rest.length > 0) {
+		const result = parseExpr(rest);
+		if (!result.success) return result;
+		
+		statements.push(result.value);
+		rest = skipSemicolons(result.remaining);
+	}
+	
+	return { success: true, value: statements, remaining: [] };
+};
+
+export const parse = (tokens: Token[]): Program => {
+	const result = parseStatements(tokens);
+	if (!result.success) {
+		const errorLocation = result.position > 0 ? ` at line ${result.position}` : '';
+		throw new Error(`Parse error: ${result.error}${errorLocation}`);
+	}
+	
+	// Check for leftover tokens (should be none after successful parse)
+	if (result.remaining.length > 0) {
+		const next = result.remaining[0];
 		throw new Error(
 			`Unexpected token after expression: ${next.type} '${next.value}' at line ${next.location.start.line}, column ${next.location.start.column}`
 		);
 	}
+	
 	return {
-		statements,
+		statements: result.value,
 		location: createLocation({ line: 1, column: 1 }, { line: 1, column: 1 }),
 	};
 };

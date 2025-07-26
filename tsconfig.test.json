@@ -13,7 +13,6 @@
   "exclude": [
     "node_modules",
     "dist",
-    "dist-test",
-    "test/integration/repl-integration.test.ts"
+    "dist-test"
   ]
 }
