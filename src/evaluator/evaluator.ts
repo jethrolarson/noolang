@@ -824,6 +824,37 @@ export class Evaluator {
 				throw new Error('intToString requires a number');
 			})
 		);
+
+		// Primitive Add trait implementations
+		this.environment.set(
+			'primitive_int_add',
+			createNativeFunction('primitive_int_add', (a: Value) => (b: Value) => {
+				if (isNumber(a) && isNumber(b)) {
+					return createNumber(a.value + b.value);
+				}
+				throw new Error('primitive_int_add requires two numbers');
+			})
+		);
+
+		this.environment.set(
+			'primitive_float_add',
+			createNativeFunction('primitive_float_add', (a: Value) => (b: Value) => {
+				if (isNumber(a) && isNumber(b)) {
+					return createNumber(a.value + b.value);
+				}
+				throw new Error('primitive_float_add requires two numbers');
+			})
+		);
+
+		this.environment.set(
+			'primitive_string_concat',
+			createNativeFunction('primitive_string_concat', (a: Value) => (b: Value) => {
+				if (isString(a) && isString(b)) {
+					return createString(a.value + b.value);
+				}
+				throw new Error('primitive_string_concat requires two strings');
+			})
+		);
 	}
 
 	addConstraintFunctions(typeState: TypeState): void {
@@ -1455,6 +1486,16 @@ export class Evaluator {
 			const leftVal = isCell(left) ? left.value : left;
 			const rightVal = isCell(right) ? right.value : right;
 
+			// Special handling for + operator using Add trait
+			if (expr.operator === '+' && this.traitRegistry && this.isTraitFunction('add')) {
+				try {
+					const result = this.resolveTraitFunctionWithArgs('add', [leftVal, rightVal], this.traitRegistry);
+					return result;
+				} catch (e) {
+					// Fall through to legacy lookup if trait resolution fails
+				}
+			}
+
 			const operator = this.environment.get(expr.operator);
 			const operatorVal = isCell(operator) ? operator.value : operator;
 			if (operatorVal && isNativeFunction(operatorVal)) {
@@ -1888,7 +1929,10 @@ export class Evaluator {
 
 	private getValueTypeName(value: Value): string {
 		// Get a type name from a runtime value for constraint resolution
-		if (isNumber(value)) return 'Int';
+		if (isNumber(value)) {
+			// Distinguish between Int and Float based on whether it's an integer
+			return Number.isInteger(value.value) ? 'Int' : 'Float';
+		}
 		if (isString(value)) return 'String';
 		if (isBool(value)) return 'Bool';
 		if (isList(value)) return 'List';

@@ -4,6 +4,7 @@ import {
 	intType,
 	boolType,
 	stringType,
+	floatType,
 	recordType,
 	tupleType,
 	listTypeWithElement,
@@ -12,6 +13,7 @@ import {
 	optionType,
 	Type,
 	Effect,
+	implementsConstraint,
 } from '../ast';
 
 // Helper: Create common function types
@@ -28,10 +30,16 @@ const createBinaryFunctionType = (
 export const initializeBuiltins = (state: TypeState): TypeState => {
 	const newEnv = new Map(state.environment);
 
-	// Arithmetic operators
+	// Arithmetic operators - + now uses Add trait
+	const addOpType = functionType(
+		[typeVariable('a'), typeVariable('a')], 
+		typeVariable('a'),
+		new Set()
+	);
+	addOpType.constraints = [implementsConstraint('a', 'Add')];
 	newEnv.set('+', {
-		type: functionType([intType(), intType()], intType()),
-		quantifiedVars: [],
+		type: addOpType,
+		quantifiedVars: ['a'],
 	});
 	newEnv.set('-', {
 		type: functionType([intType(), intType()], intType()),
@@ -292,6 +300,22 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	});
 	newEnv.set('primitive_string_eq', {
 		type: createBinaryFunctionType(stringType(), stringType(), boolType()),
+		quantifiedVars: [],
+	});
+
+	// Primitive Add trait implementations for type checking
+	newEnv.set('primitive_int_add', {
+		type: createBinaryFunctionType(intType(), intType(), intType()),
+		quantifiedVars: [],
+	});
+
+	newEnv.set('primitive_float_add', {
+		type: createBinaryFunctionType(floatType(), floatType(), floatType()),
+		quantifiedVars: [],
+	});
+
+	newEnv.set('primitive_string_concat', {
+		type: createBinaryFunctionType(stringType(), stringType(), stringType()),
 		quantifiedVars: [],
 	});
 

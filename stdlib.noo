@@ -10,6 +10,11 @@ constraint Show a (
   show : a -> String
 );
 
+# Constraint for addition operation
+constraint Add a (
+  add : a -> a -> a
+);
+
 # Basic Show implementations (must come before conditional implementations)
 implement Show Int (
   show = fn i => toString i
@@ -17,6 +22,19 @@ implement Show Int (
 
 implement Show String (
   show = fn s => s
+);
+
+# Add trait implementations for basic types
+implement Add Int (
+  add = primitive_int_add
+);
+
+implement Add Float (
+  add = primitive_float_add
+);
+
+implement Add String (
+  add = primitive_string_concat
 );
 
 # Constraint for monads
