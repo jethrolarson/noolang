@@ -88,22 +88,22 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 				case 'Int':
 				case 'Number':
 					return {
-						success: true as const,
+						success: true,
 						value: intType(),
 						remaining: result.remaining,
-					};
+					} as const;
 				case 'String':
 					return {
-						success: true as const,
+						success: true,
 						value: stringType(),
 						remaining: result.remaining,
-					};
+					} as const;
 				case 'Unit':
 					return {
-						success: true as const,
+						success: true,
 						value: unitType(),
 						remaining: result.remaining,
-					};
+					} as const;
 			}
 		}
 	}
@@ -116,17 +116,17 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 		if (argResult.success) {
 			// List with specific element type: List Number, List String, etc.
 			return {
-				success: true as const,
+				success: true,
 				value: listTypeWithElement(argResult.value),
 				remaining: argResult.remaining,
-			};
+			} as const;
 		} else {
 			// Just List (generic)
 			return {
-				success: true as const,
+				success: true,
 				value: listTypeWithElement(typeVariable('a')),
 				remaining: listKeywordResult.remaining,
-			};
+			} as const;
 		}
 	}
 
@@ -155,10 +155,10 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 			fieldObj[name] = type;
 		}
 		return {
-			success: true as const,
+			success: true,
 			value: recordType(fieldObj),
 			remaining: recordResult.remaining,
-		};
+		} as const;
 	}
 
 	// Try tuple type
@@ -175,10 +175,10 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 	if (tupleResult.success) {
 		const elements = tupleResult.value[1] || [];
 		return {
-			success: true as const,
+			success: true,
 			value: tupleType(elements),
 			remaining: tupleResult.remaining,
-		};
+		} as const;
 	}
 
 	// Try List type
@@ -188,10 +188,10 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 	)(tokens);
 	if (listResult.success) {
 		return {
-			success: true as const,
+			success: true,
 			value: listTypeWithElement(listResult.value[1]),
 			remaining: listResult.remaining,
-		};
+		} as const;
 	}
 
 	// Try Tuple type constructor: Tuple T1 T2 T3
@@ -207,10 +207,10 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 		if (tupleConstructorResult.success) {
 			const elementTypes = tupleConstructorResult.value[1];
 			return {
-				success: true as const,
+				success: true,
 				value: tupleTypeConstructor(elementTypes),
 				remaining: tupleConstructorResult.remaining,
-			};
+			} as const;
 		}
 	}
 
@@ -222,10 +222,10 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 	)(tokens);
 	if (parenResult.success) {
 		return {
-			success: true as const,
+			success: true,
 			value: parenResult.value[1],
 			remaining: parenResult.remaining,
-		};
+		} as const;
 	}
 
 	// Try type constructor (uppercase or lowercase): TypeName arg1 arg2 ... 
@@ -244,35 +244,35 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 			if (argsResult.success && argsResult.value.length > 0) {
 				// Type constructor with arguments (like Option a, f a, List String)
 				return {
-					success: true as const,
+					success: true,
 					value: {
 						kind: 'variant',
 						name: typeName,
 						args: argsResult.value,
-					} as Type,
+					},
 					remaining: argsResult.remaining,
-				};
+				} as const;
 			} else {
 				// Check if it's a type constructor (uppercase) or type variable (lowercase)
 				const isUpperCase = typeName[0] === typeName[0].toUpperCase();
 				if (isUpperCase) {
 					// Type constructor without arguments (like Bool, Option, etc.)
 					return {
-						success: true as const,
+						success: true,
 						value: {
 							kind: 'variant',
 							name: typeName,
 							args: [],
-						} as Type,
+						},
 						remaining: typeNameResult.remaining,
-					};
+					} as const;
 				} else {
 					// Type variable (like a, b, etc.)
 					return {
-						success: true as const,
+						success: true,
 						value: typeVariable(typeName),
 						remaining: typeNameResult.remaining,
-					};
+					} as const;
 				}
 			}
 		}
@@ -1802,7 +1802,7 @@ const parseRecordStructure: C.Parser<RecordStructure> = C.map(
 				),
 				([accessor, type]): [string, StructureFieldType] => [
 					accessor.value, // Accessor value already excludes the @ prefix
-					type as StructureFieldType
+					type
 				]
 			),
 			C.punctuation(',')
