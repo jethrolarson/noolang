@@ -18,10 +18,11 @@ import {
 	type ConstrainedExpression,
 	type ConstraintExpr,
 	type ConstraintDefinitionExpression,
+	type TraitConstraint,
 	type ImplementDefinitionExpression,
 	type Type,
 	type Constraint,
-	intType,
+	floatType,
 	stringType,
 	boolType,
 	functionType,
@@ -32,8 +33,9 @@ import {
 	tupleType,
 	recordType,
 	variantType,
-	hasFieldConstraint,
 	ApplicationExpression,
+	hasConstraint,
+	type VariableType,
 } from '../ast';
 import {
 	undefinedVariableError,
@@ -49,6 +51,7 @@ import {
 import { unify } from './unify';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
+import { tryResolveConstraints } from './function-application';
 import {
 	type TypeState,
 	type TypeResult,
@@ -56,8 +59,6 @@ import {
 	createTypeResult,
 	unionEffects,
 	emptyEffects,
-	// Legacy constraint imports removed
-	type TypeScheme,
 } from './types';
 // NOTE: validateConstraintName import removed - constraint validation disabled
 import {
@@ -84,7 +85,10 @@ export const typeLiteral = (
 	const value = expr.value;
 
 	if (typeof value === 'number') {
-		return createPureTypeResult(intType(), state);
+		// Check if it's an integer or float based on original token representation
+		// This allows 1.0 to be typed as Float even though Number.isInteger(1.0) is true
+		// All numeric literals are now Float type
+		return createPureTypeResult(floatType(), state);
 	} else if (typeof value === 'string') {
 		return createPureTypeResult(stringType(), state);
 	} else {
@@ -105,10 +109,13 @@ export const typeVariableExpr = (
 			const traitInfo = getTraitFunctionInfo(state.traitRegistry, expr.name);
 			if (traitInfo) {
 				// Create fresh type variables for the trait function type
-				const typeVarMapping = new Map<string, Type>();
-				
+				const typeVarMapping = new Map<string, VariableType>();
+
 				// Helper function to recursively freshen type variables
-				const freshenType = (type: Type, currentState: TypeState): [Type, TypeState] => {
+				const freshenType = (
+					type: Type,
+					currentState: TypeState
+				): [Type, TypeState] => {
 					switch (type.kind) {
 						case 'variable': {
 							if (!typeVarMapping.has(type.name)) {
@@ -122,86 +129,121 @@ export const typeVariableExpr = (
 							let currentState2 = currentState;
 							const freshenedParams: Type[] = [];
 							for (const param of type.params) {
-								const [freshenedParam, nextState] = freshenType(param, currentState2);
+								const [freshenedParam, nextState] = freshenType(
+									param,
+									currentState2
+								);
 								freshenedParams.push(freshenedParam);
 								currentState2 = nextState;
 							}
-							const [freshenedReturn, finalState] = freshenType(type.return, currentState2);
-							return [functionType(freshenedParams, freshenedReturn, type.effects), finalState];
+							const [freshenedReturn, finalState] = freshenType(
+								type.return,
+								currentState2
+							);
+							return [
+								functionType(freshenedParams, freshenedReturn, type.effects),
+								finalState,
+							];
 						}
 						case 'variant': {
 							// For variant types like "m a", freshen the name and args
 							if (!typeVarMapping.has(type.name)) {
 								const [freshVar, newState] = freshTypeVariable(currentState);
 								typeVarMapping.set(type.name, freshVar);
-								
+
 								// Also freshen the args
 								let currentState2 = newState;
 								const freshenedArgs: Type[] = [];
 								for (const arg of type.args) {
-									const [freshenedArg, nextState] = freshenType(arg, currentState2);
+									const [freshenedArg, nextState] = freshenType(
+										arg,
+										currentState2
+									);
 									freshenedArgs.push(freshenedArg);
 									currentState2 = nextState;
 								}
-								
+
 								// Return a variant type with the fresh variable name and freshened args
-								return [{
-									kind: 'variant',
-									name: (freshVar as any).name, // Use the fresh variable name
-									args: freshenedArgs
-								}, currentState2];
+								return [
+									{
+										kind: 'variant',
+										name: freshVar.name, // Use the fresh variable name
+										args: freshenedArgs,
+									},
+									currentState2,
+								];
 							} else {
 								// Use existing mapping
 								const existingVar = typeVarMapping.get(type.name)!;
 								let currentState2 = currentState;
 								const freshenedArgs: Type[] = [];
 								for (const arg of type.args) {
-									const [freshenedArg, nextState] = freshenType(arg, currentState2);
+									const [freshenedArg, nextState] = freshenType(
+										arg,
+										currentState2
+									);
 									freshenedArgs.push(freshenedArg);
 									currentState2 = nextState;
 								}
-								
-								return [{
-									kind: 'variant',
-									name: (existingVar as any).name,
-									args: freshenedArgs
-								}, currentState2];
+
+								return [
+									{
+										kind: 'variant',
+										name: existingVar.name,
+										args: freshenedArgs,
+									},
+									currentState2,
+								];
 							}
 						}
 						default:
 							return [type, currentState];
 					}
 				};
-				
-				const [freshenedType, state1] = freshenType(traitInfo.functionType, state);
-				
+
+				const [freshenedType, state1] = freshenType(
+					traitInfo.functionType,
+					state
+				);
+
 				// Create constraints for any type variables that correspond to the trait type parameter
 				// We need to find which freshened type variable corresponds to the original trait type parameter
-				const constraintsMap = new Map<string, Array<{ kind: 'implements'; trait: string }>>();
-				
+				const constraintsMap = new Map<
+					string,
+					Array<{ kind: 'implements'; trait: string }>
+				>();
+
 				// Find the freshened type variable that corresponds to the trait type parameter
 				const traitTypeParamVar = typeVarMapping.get(traitInfo.typeParam);
 				if (traitTypeParamVar && traitTypeParamVar.kind === 'variable') {
-					constraintsMap.set(traitTypeParamVar.name, [{ kind: 'implements', trait: traitInfo.traitName }]);
+					constraintsMap.set(traitTypeParamVar.name, [
+						{ kind: 'implements', trait: traitInfo.traitName },
+					]);
 				}
 
-				
 				// If we have constraints, create a ConstrainedType
 				if (constraintsMap.size > 0) {
-					const constrainedType = createConstrainedType(freshenedType, constraintsMap);
+					const constrainedType = createConstrainedType(
+						freshenedType,
+						constraintsMap
+					);
 					return createPureTypeResult(constrainedType, state1);
 				} else {
 					return createPureTypeResult(freshenedType, state1);
 				}
 			}
-			
+
 			// Fallback: return a generic function type if trait info not found
 			const [argType, state1] = freshTypeVariable(state);
 			const [returnType, state2] = freshTypeVariable(state1);
-			const traitFunctionType = functionType([argType], returnType, emptyEffects());
+			const traitFunctionType = functionType(
+				[argType],
+				returnType,
+				emptyEffects()
+			);
 			return createPureTypeResult(traitFunctionType, state2);
 		}
-		
+
 		throwTypeError(
 			location => undefinedVariableError(expr.name, location),
 			getExprLocation(expr)
@@ -230,6 +272,7 @@ const flattenConstraintExpr = (expr: ConstraintExpr): Constraint[] => {
 		case 'hasField':
 		case 'implements':
 		case 'custom':
+		case 'has':
 			return [expr];
 		case 'and':
 			return [
@@ -394,13 +437,59 @@ export const typeFunction = (
 
 	// Always include built-ins and stdlib essentials
 	const essentials = [
-		'+', '-', '*', '/', '==', '!=', '<', '>', '<=', '>=',
-		'|', '|>', '<|', ';', '$', 'if',
-		'length', 'head', 'tail', 'map', 'filter', 'reduce', 'isEmpty', 'append',
-		'concat', 'toString', 'abs', 'max', 'min',
-		'print', 'println', 'readFile', 'writeFile', 'log', 'random', 'randomRange',
-		'mutSet', 'mutGet', 'hasKey', 'hasValue', 'set', 'tupleLength', 'tupleIsEmpty', 'list_get',
-		'True', 'False', 'None', 'Some', 'Ok', 'Err', 'Bool', 'Option', 'Result',
+		'+',
+		'-',
+		'*',
+		'/',
+		'==',
+		'!=',
+		'<',
+		'>',
+		'<=',
+		'>=',
+		'|',
+		'|>',
+		'<|',
+		';',
+		'$',
+		'if',
+		'length',
+		'head',
+		'tail',
+		'map',
+		'filter',
+		'reduce',
+		'isEmpty',
+		'append',
+		'concat',
+		'toString',
+		'abs',
+		'max',
+		'min',
+		'print',
+		'println',
+		'readFile',
+		'writeFile',
+		'log',
+		'random',
+		'randomRange',
+		'mutSet',
+		'mutGet',
+		'hasKey',
+		'hasValue',
+		'set',
+		'tupleLength',
+		'tupleIsEmpty',
+		'list_get',
+		'True',
+		'False',
+		'None',
+		'Some',
+		'Ok',
+		'Err',
+		'Bool',
+		'Option',
+		'Result',
 		'not', // Add not to essentials for Bool operations
 	];
 	for (const essential of essentials) {
@@ -451,7 +540,7 @@ export const typeFunction = (
 			if (constraints.length > 0) {
 				funcType.constraints = constraints;
 				// Store the original constraint expression for display purposes
-				(funcType as any).originalConstraint = constrainedBody.constraint;
+				funcType.originalConstraint = constrainedBody.constraint;
 
 				// CRITICAL: Also propagate constraints to type variables in parameters
 				// This ensures constraint validation works during function application
@@ -811,11 +900,51 @@ export const typeBinary = (
 	);
 
 	// Apply substitution to get final result type
-	const [finalResultType, finalResultState] = freshenTypeVariables(
+	const [preliminaryResultType, finalResultState] = freshenTypeVariables(
 		resultType,
 		new Map(),
 		currentState
 	);
+
+	// CONSTRAINT RESOLUTION: Try to resolve constraints using argument types
+	// Only attempt resolution if we have concrete (non-variable) argument types
+	let finalResultType = preliminaryResultType;
+	if (operatorType.kind === 'function' && operatorType.constraints && operatorType.constraints.length > 0) {
+		// Only apply constraint resolution to specific operators that need it
+		if (expr.operator === '+' || expr.operator === '-' || expr.operator === '*' || expr.operator === '/') {
+			// Check if both arguments are concrete types (not variables)
+			const leftIsConcrete = leftResult.type.kind !== 'variable' && leftResult.type.kind !== 'constrained';
+			const rightIsConcrete = rightResult.type.kind !== 'variable' && rightResult.type.kind !== 'constrained';
+			
+			if (leftIsConcrete && rightIsConcrete) {
+				// Extract constraints from the operator type
+				const functionConstraints = new Map<string, TraitConstraint[]>();
+				for (const constraint of operatorType.constraints) {
+					if (constraint.kind === 'implements') {
+						const varName = constraint.typeVar;
+						const traitConstraint: TraitConstraint = { kind: 'implements', trait: constraint.interfaceName };
+						if (!functionConstraints.has(varName)) {
+							functionConstraints.set(varName, []);
+						}
+						functionConstraints.get(varName)!.push(traitConstraint);
+					}
+				}
+
+				// Try to resolve constraints using the actual argument types
+				const resolvedType = tryResolveConstraints(
+					preliminaryResultType,
+					functionConstraints,
+					[leftResult.type, rightResult.type],
+					finalResultState
+				);
+
+				if (resolvedType) {
+					// Constraints were successfully resolved to a concrete type
+					finalResultType = resolvedType;
+				}
+			}
+		}
+	}
 
 	return createTypeResult(
 		finalResultType,
@@ -912,12 +1041,14 @@ export const typeAccessor = (
 	const [fieldType, nextState] = freshTypeVariable(state);
 	// Create a simple type variable for the record (no constraints on the variable itself)
 	const [recordVar, finalState] = freshTypeVariable(nextState);
-	// Create a function type with constraints attached to the function type
+	// Create a function type with constraints attached to the parameter
 	const funcType = functionType([recordVar], fieldType);
-	// Add the constraint directly to the parameter variable
+	// Add the has constraint to the parameter type variable
 	if (recordVar.kind === 'variable') {
 		recordVar.constraints = [
-			hasFieldConstraint(recordVar.name, fieldName, fieldType),
+			hasConstraint(recordVar.name, {
+				fields: { [fieldName]: fieldType }
+			}),
 		];
 	}
 

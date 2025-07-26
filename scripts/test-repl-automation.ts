@@ -180,7 +180,7 @@ const scenarios: TestScenario[] = [
     name: 'Basic Arithmetic',
     inputs: ['1 + 2', '10 * 5', '100 / 4'],
     expectedOutputs: ['3', '50', '25'],
-    shouldContainInOutput: ['Int']
+    shouldContainInOutput: ['Float']
   },
   {
     name: 'String Operations',

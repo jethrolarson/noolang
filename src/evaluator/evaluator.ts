@@ -23,7 +23,9 @@ import type {
 	ConstraintDefinitionExpression,
 	ImplementDefinitionExpression,
 	Type,
+	Location,
 } from '../ast';
+import type { TraitRegistry } from '../typer/trait-system';
 import type { TypeState } from '../typer/types';
 
 import { createError } from '../errors';
@@ -41,7 +43,12 @@ export type Value =
 	| { tag: 'function'; fn: (...args: Value[]) => Value }
 	| { tag: 'native'; name: string; fn: unknown }
 	| { tag: 'constructor'; name: string; args: Value[] }
-	| { tag: 'trait-function'; name: string; traitRegistry: any; partialArgs?: Value[] }
+	| {
+			tag: 'trait-function';
+			name: string;
+			traitRegistry: TraitRegistry;
+			partialArgs?: Value[];
+	  }
 	| { tag: 'unit' };
 
 // --- Mutable Cell type ---
@@ -198,7 +205,11 @@ export class Evaluator {
 	private path: typeof defaultPath;
 	private traitRegistry?: any; // NEW: Trait registry for runtime trait resolution
 
-	constructor(opts?: { fs?: typeof defaultFs; path?: typeof defaultPath; traitRegistry?: any }) {
+	constructor(opts?: {
+		fs?: typeof defaultFs;
+		path?: typeof defaultPath;
+		traitRegistry?: any;
+	}) {
 		this.fs = opts?.fs ?? defaultFs;
 		this.path = opts?.path ?? defaultPath;
 		this.traitRegistry = opts?.traitRegistry;
@@ -375,18 +386,36 @@ export class Evaluator {
 		this.environment.set(
 			'$',
 			createNativeFunction('$', (func: Value) => (arg: Value) => {
-				// Handle trait function application (same as evaluateApplication)
+				// Handle trait function application
 				if (func.tag === 'trait-function') {
-					// Create a synthetic argument expression for the trait function
-					const argExpr = { kind: 'literal', value: arg, location: { line: 1, column: 1 } };
-					return this.evaluateTraitFunctionApplication(func as any, [argExpr as any]);
+					// Call trait function directly with values (no need to convert back to AST)
+					return this.applyTraitFunctionWithValues(func, [arg]);
 				}
-				
-				if (isFunction(func)) return func.fn(arg);
-				if (isNativeFunction(func)) return func.fn(arg);
-				throw new Error(
-					`Cannot apply non-function in dollar operator: ${func?.tag || 'unit'}`
-				);
+
+				if (isFunction(func)) {
+					// Handle tagged function - single argument application
+					if (typeof func.fn === 'function') {
+						return func.fn(arg);
+					} else {
+						throw new Error(`Cannot apply argument to non-function: ${typeof func.fn}`);
+					}
+				} else if (isNativeFunction(func)) {
+					// Handle native function - single argument application  
+					let result: any = func.fn;
+					if (typeof result === 'function') {
+						return result(arg);
+					} else if (isFunction(result)) {
+						return result.fn(arg);
+					} else if (isNativeFunction(result)) {
+						return result.fn(arg);
+					} else {
+						throw new Error(`Cannot apply argument to non-function: ${typeof result}`);
+					}
+				} else {
+					throw new Error(
+						`Cannot apply non-function: ${typeof func} (${func?.tag || 'unknown'})`
+					);
+				}
 			})
 		);
 
@@ -768,8 +797,8 @@ export class Evaluator {
 
 		// Primitive support functions for trait implementations
 		this.environment.set(
-			'primitive_int_eq',
-			createNativeFunction('primitive_int_eq', (a: Value) => (b: Value) => {
+			'primitive_float_eq',
+			createNativeFunction('primitive_float_eq', (a: Value) => (b: Value) => {
 				if (isNumber(a) && isNumber(b)) {
 					return createBool(a.value === b.value);
 				}
@@ -788,12 +817,33 @@ export class Evaluator {
 		);
 
 		this.environment.set(
-			'intToString',
-			createNativeFunction('intToString', (n: Value) => {
+			'floatToString',
+			createNativeFunction('floatToString', (n: Value) => {
 				if (isNumber(n)) {
 					return createString(n.value.toString());
 				}
-				throw new Error('intToString requires a number');
+				throw new Error('floatToString requires a number');
+			})
+		);
+
+		// Primitive Add trait implementations
+		this.environment.set(
+			'primitive_float_add',
+			createNativeFunction('primitive_float_add', (a: Value) => (b: Value) => {
+				if (isNumber(a) && isNumber(b)) {
+					return createNumber(a.value + b.value);
+				}
+				throw new Error('primitive_float_add requires two numbers');
+			})
+		);
+
+		this.environment.set(
+			'primitive_string_concat',
+			createNativeFunction('primitive_string_concat', (a: Value) => (b: Value) => {
+				if (isString(a) && isString(b)) {
+					return createString(a.value + b.value);
+				}
+				throw new Error('primitive_string_concat requires two strings');
 			})
 		);
 	}
@@ -1060,10 +1110,10 @@ export class Evaluator {
 				return {
 					tag: 'trait-function',
 					name: expr.name,
-					traitRegistry: this.traitRegistry
+					traitRegistry: this.traitRegistry,
 				};
 			}
-			
+
 			const error = createError(
 				'RuntimeError',
 				`Undefined variable: ${expr.name}`,
@@ -1153,7 +1203,7 @@ export class Evaluator {
 
 		// NEW: Handle trait function application
 		if (func.tag === 'trait-function') {
-			return this.evaluateTraitFunctionApplication(func as any, expr.args);
+			return this.evaluateTraitFunctionApplication(func, expr.args);
 		}
 
 		// Only apply the function to the arguments present in the AST
@@ -1326,7 +1376,11 @@ export class Evaluator {
 			if (this.traitRegistry && this.isTraitFunction('bind')) {
 				try {
 					// Use trait function resolution for bind
-					const result = this.resolveTraitFunctionWithArgs('bind', [left, right], this.traitRegistry);
+					const result = this.resolveTraitFunctionWithArgs(
+						'bind',
+						[left, right],
+						this.traitRegistry
+					);
 					if (result) {
 						return this.ensureMonadicResult(result, left);
 					}
@@ -1343,12 +1397,15 @@ export class Evaluator {
 					// Apply the function to the value inside Some
 					const value = left.args[0];
 					const result = isFunction(right) ? right.fn(value) : right.fn(value);
-					
+
 					// If the result is already an Option, return it as-is
-					if (isConstructor(result) && (result.name === 'Some' || result.name === 'None')) {
+					if (
+						isConstructor(result) &&
+						(result.name === 'Some' || result.name === 'None')
+					) {
 						return result;
 					}
-					
+
 					// Otherwise wrap it in Some
 					return createConstructor('Some', [result]);
 				}
@@ -1419,6 +1476,77 @@ export class Evaluator {
 			const right = this.evaluateExpression(expr.right);
 			const leftVal = isCell(left) ? left.value : left;
 			const rightVal = isCell(right) ? right.value : right;
+
+			// Special handling for arithmetic operators - use primitive operations for basic types
+			if (expr.operator === '+') {
+				if (isNumber(leftVal) && isNumber(rightVal)) {
+					return createNumber(leftVal.value + rightVal.value);
+				}
+				if (isString(leftVal) && isString(rightVal)) {
+					return createString(leftVal.value + rightVal.value);
+				}
+				// For complex types, try trait resolution
+				if (this.traitRegistry && this.isTraitFunction('add')) {
+					try {
+						const result = this.resolveTraitFunctionWithArgs('add', [leftVal, rightVal], this.traitRegistry);
+						return result;
+					} catch (e) {
+						// Fall through to error
+					}
+				}
+				throw new Error(`Cannot add ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`);
+			}
+
+			if (expr.operator === '-') {
+				if (isNumber(leftVal) && isNumber(rightVal)) {
+					return createNumber(leftVal.value - rightVal.value);
+				}
+				// For complex types, try trait resolution
+				if (this.traitRegistry && this.isTraitFunction('subtract')) {
+					try {
+						const result = this.resolveTraitFunctionWithArgs('subtract', [leftVal, rightVal], this.traitRegistry);
+						return result;
+					} catch (e) {
+						// Fall through to error
+					}
+				}
+				throw new Error(`Cannot subtract ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`);
+			}
+
+			if (expr.operator === '*') {
+				if (isNumber(leftVal) && isNumber(rightVal)) {
+					return createNumber(leftVal.value * rightVal.value);
+				}
+				// For complex types, try trait resolution
+				if (this.traitRegistry && this.isTraitFunction('multiply')) {
+					try {
+						const result = this.resolveTraitFunctionWithArgs('multiply', [leftVal, rightVal], this.traitRegistry);
+						return result;
+					} catch (e) {
+						// Fall through to error
+					}
+				}
+				throw new Error(`Cannot multiply ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`);
+			}
+
+			if (expr.operator === '/') {
+				if (isNumber(leftVal) && isNumber(rightVal)) {
+					if (rightVal.value === 0) {
+						return createConstructor('None', []); // None for division by zero
+					}
+					return createConstructor('Some', [createNumber(leftVal.value / rightVal.value)]); // Some(result)
+				}
+				// For complex types, try trait resolution
+				if (this.traitRegistry && this.isTraitFunction('divide')) {
+					try {
+						const result = this.resolveTraitFunctionWithArgs('divide', [leftVal, rightVal], this.traitRegistry);
+						return result;
+					} catch (e) {
+						// Fall through to error
+					}
+				}
+				throw new Error(`Cannot divide ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`);
+			}
 
 			const operator = this.environment.get(expr.operator);
 			const operatorVal = isCell(operator) ? operator.value : operator;
@@ -1738,7 +1866,7 @@ export class Evaluator {
 	// NEW: Check if a function name is a trait function
 	private isTraitFunction(functionName: string): boolean {
 		if (!this.traitRegistry) return false;
-		
+
 		// Check if any trait defines this function
 		for (const [traitName, traitDef] of this.traitRegistry.definitions) {
 			if (traitDef.functions.has(functionName)) {
@@ -1748,39 +1876,61 @@ export class Evaluator {
 		return false;
 	}
 
-	// NEW: Handle trait function application at runtime  
-	private evaluateTraitFunctionApplication(traitFunc: any, argExprs: Expression[]): Value {
+	// NEW: Handle trait function application at runtime
+	private evaluateTraitFunctionApplication(
+		traitFunc: {
+			name: string;
+			partialArgs?: Value[];
+			traitRegistry: TraitRegistry;
+		},
+		argExprs: Expression[]
+	): Value {
 		if (!this.traitRegistry) {
-			throw new Error(`No trait registry available for trait function ${traitFunc.name}`);
+			throw new Error(
+				`No trait registry available for trait function ${traitFunc.name}`
+			);
 		}
 
 		// Evaluate the arguments to get their runtime values
 		const argValues = argExprs.map(arg => this.evaluateExpression(arg));
-		
+
 		// For partial application, return a curried function that accumulates arguments
 		// until we have enough information to do trait dispatch
 		if (traitFunc.partialArgs) {
 			// This is already a partially applied trait function - add more arguments
 			const allArgs = [...traitFunc.partialArgs, ...argValues];
-			return this.resolveTraitFunctionWithArgs(traitFunc.name, allArgs, traitFunc.traitRegistry);
+			return this.resolveTraitFunctionWithArgs(
+				traitFunc.name,
+				allArgs,
+				traitFunc.traitRegistry
+			);
 		} else {
 			// This is the first application - start accumulating arguments
-			return this.resolveTraitFunctionWithArgs(traitFunc.name, argValues, this.traitRegistry);
+			return this.resolveTraitFunctionWithArgs(
+				traitFunc.name,
+				argValues,
+				this.traitRegistry
+			);
 		}
 	}
 
-	private resolveTraitFunctionWithArgs(functionName: string, argValues: Value[], traitRegistry: any): Value {
+	private resolveTraitFunctionWithArgs(
+		functionName: string,
+		argValues: Value[],
+		traitRegistry: TraitRegistry
+	): Value {
 		// Get the type names of the arguments for trait resolution
 		const argTypeNames = argValues.map(val => this.getValueTypeName(val));
-		
+
 		// Try to resolve the trait function based on different arguments
 		// For Functor map: try the last argument (container) first
-		const possibleDispatchIndices = argTypeNames.length > 1 ? [argTypeNames.length - 1, 0] : [0];
-		
+		const possibleDispatchIndices =
+			argTypeNames.length > 1 ? [argTypeNames.length - 1, 0] : [0];
+
 		for (const dispatchIndex of possibleDispatchIndices) {
 			const dispatchTypeName = argTypeNames[dispatchIndex];
 			if (dispatchTypeName === 'Unknown') continue;
-			
+
 			for (const [traitName, traitDef] of traitRegistry.definitions) {
 				if (traitDef.functions.has(functionName)) {
 					const traitImpls = traitRegistry.implementations.get(traitName);
@@ -1788,8 +1938,8 @@ export class Evaluator {
 						const impl = traitImpls.get(dispatchTypeName);
 						if (impl && impl.functions.has(functionName)) {
 							// Found the implementation! Create a curried function call
-							const implExpr = impl.functions.get(functionName);
-							
+							const implExpr = impl.functions.get(functionName)!;
+
 							// Apply the implementation to all accumulated arguments
 							let result: any = this.evaluateExpression(implExpr);
 							for (const argValue of argValues) {
@@ -1798,7 +1948,9 @@ export class Evaluator {
 								} else if (isNativeFunction(result)) {
 									result = result.fn(argValue);
 								} else {
-									throw new Error(`Cannot apply argument to non-function during trait resolution`);
+									throw new Error(
+										`Cannot apply argument to non-function during trait resolution`
+									);
 								}
 							}
 							return result;
@@ -1807,7 +1959,7 @@ export class Evaluator {
 				}
 			}
 		}
-		
+
 		// If we get here, we don't have enough type info yet - return a partial application
 		// that will try again when more arguments are provided
 		if (argTypeNames.every(t => t === 'Unknown') || argTypeNames.length < 2) {
@@ -1815,19 +1967,24 @@ export class Evaluator {
 				tag: 'trait-function',
 				name: functionName,
 				traitRegistry: traitRegistry,
-				partialArgs: argValues
+				partialArgs: argValues,
 			};
 		}
-		
+
 		// No implementation found even with type info
 		const knownTypes = argTypeNames.filter(t => t !== 'Unknown');
 		const typeStr = knownTypes.length > 0 ? knownTypes.join(', ') : 'Unknown';
-		throw new Error(`No implementation of trait function ${functionName} for ${typeStr}`);
+		throw new Error(
+			`No implementation of trait function ${functionName} for ${typeStr}`
+		);
 	}
 
 	private getValueTypeName(value: Value): string {
 		// Get a type name from a runtime value for constraint resolution
-		if (isNumber(value)) return 'Int';
+		if (isNumber(value)) {
+			// Distinguish between Float and Float based on whether it's an integer
+			return Number.isInteger(value.value) ? 'Float' : 'Float';
+		}
 		if (isString(value)) return 'String';
 		if (isBool(value)) return 'Bool';
 		if (isList(value)) return 'List';
@@ -2018,6 +2175,47 @@ export class Evaluator {
 
 		// For other types, just return the result unwrapped
 		return result;
+	}
+
+
+
+	// Apply trait function directly with runtime values (used by $ operator)
+	private applyTraitFunctionWithValues(
+		traitFunc: {
+			name: string;
+			partialArgs?: Value[];
+			traitRegistry: TraitRegistry;
+		},
+		argValues: Value[]
+	): Value {
+		if (!this.traitRegistry) {
+			throw new Error(
+				`No trait registry available for trait function ${traitFunc.name}`
+			);
+		}
+
+		// For partial application, return a curried function that accumulates arguments
+		// until we have enough information to do trait dispatch
+		if (traitFunc.partialArgs) {
+			// This is already a partially applied trait function - add more arguments
+			const allArgs = [...traitFunc.partialArgs, ...argValues];
+			return this.resolveTraitFunctionWithArgs(
+				traitFunc.name,
+				allArgs,
+				traitFunc.traitRegistry
+			);
+		} else {
+			// This is the first application - start accumulating arguments
+			return this.resolveTraitFunctionWithArgs(
+				traitFunc.name,
+				argValues,
+				traitFunc.traitRegistry
+			);
+		}
+	}
+
+	private ensureEnvironment(): Environment {
+		return this.environment;
 	}
 }
 

@@ -26,8 +26,7 @@ describe('Trait System Evaluation Test', () => {
 		
 		const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 		
-		console.log('Type result:', JSON.stringify(typeResult.type, null, 2));
-		console.log('Evaluation result:', evalResult.finalResult);
+		// Type result and evaluation result verified
 		
 		// If Phase 3 is complete, this should actually work
 		assertListValue(evalResult.finalResult);
@@ -47,8 +46,7 @@ describe('Trait System Evaluation Test', () => {
 		
 		const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 		
-		console.log('Custom trait type result:', JSON.stringify(typeResult.type, null, 2));
-		console.log('Custom trait evaluation result:', evalResult.finalResult);
+		// Custom trait type result and evaluation result verified
 		
 		// This should also work if constraint resolution is functional
 		assertListValue(evalResult.finalResult);
@@ -66,8 +64,7 @@ describe('Trait System Evaluation Test', () => {
 		const result1 = parseTypeAndEvaluate(code1);
 		const result2 = parseTypeAndEvaluate(code2);
 		
-		console.log('list_map evaluation:', result1.evalResult.finalResult);
-		console.log('trait map evaluation:', result2.evalResult.finalResult);
+		// Both evaluations verified
 		
 		// Both should produce the same result
 		expect(result1.evalResult.finalResult).toEqual(result2.evalResult.finalResult);

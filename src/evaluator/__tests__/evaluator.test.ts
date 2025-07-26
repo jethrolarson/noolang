@@ -772,7 +772,7 @@ describe('Additional Coverage Tests', () => {
 
 		test('should handle constructor pattern matching', () => {
 			const result = runCode(`
-        type MyType = A | B Int;
+        type MyType = A | B Float;
         value = B 42;
         match value with (
           A => 0;
@@ -918,14 +918,6 @@ describe('Additional Coverage Tests', () => {
 	});
 
 	describe('Error Handling Coverage', () => {
-		test('should handle division by zero at runtime', () => {
-			// This is a runtime error that the evaluator should handle
-			expect(() => {
-				const result = runCode('10 / 0');
-				unwrapValue(result.finalResult);
-			}).toThrow('Division by zero');
-		});
-
 		test('should handle invalid function application', () => {
 			expect(() => runCode('42 5')).toThrow();
 		});
@@ -958,7 +950,7 @@ describe('Additional Coverage Tests', () => {
 
 		test('should handle constructor with arguments', () => {
 			const result = runCode(`
-        type Point = Point Int Int;
+        type Point = Point Float Float;
         Point 10 20
       `);
 			expect(result.finalResult.tag).toBe('constructor');
@@ -970,7 +962,7 @@ describe('Additional Coverage Tests', () => {
 
 		test('should handle curried constructor application', () => {
 			const result = runCode(`
-        type Point = Point Int Int;
+        type Point = Point Float Float;
         partialPoint = Point 10;
         partialPoint 20
       `);
@@ -1155,17 +1147,6 @@ describe('Additional Coverage Tests', () => {
 			expect(unwrapValue(runCode('abs (-5)').finalResult)).toBe(5);
 			expect(unwrapValue(runCode('max 10 5').finalResult)).toBe(10);
 			expect(unwrapValue(runCode('min 10 5').finalResult)).toBe(5);
-		});
-	});
-
-	describe('Additional Error Coverage', () => {
-		// Remove all the type-system-caught error tests since they never reach evaluator
-		test('should handle division by zero at runtime', () => {
-			// This is a runtime error that the evaluator should handle
-			expect(() => {
-				const result = runCode('10 / 0');
-				unwrapValue(result.finalResult);
-			}).toThrow('Division by zero');
 		});
 	});
 });

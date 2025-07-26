@@ -18,7 +18,7 @@ describe('Functional Type Inference', () => {
 		it('should infer integer literal', () => {
 			const program = parseProgram('42');
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should infer string literal', () => {
@@ -48,6 +48,7 @@ describe('Functional Type Inference', () => {
 		it('should infer function with multiple parameters', () => {
 			const program = parseProgram('fn x y => x + y');
 			const result = typeProgram(program);
+			// With trait system, + operator is polymorphic: Add a => a -> a -> a
 			expect(typeToString(result.type, result.state.substitution)).toBe(
 				'(α) -> (α) -> α'
 			);
@@ -56,6 +57,7 @@ describe('Functional Type Inference', () => {
 		it('should infer nested function', () => {
 			const program = parseProgram('fn x => fn y => x + y');
 			const result = typeProgram(program);
+			// With trait system, + operator is polymorphic: Add a => a -> a -> a
 			expect(typeToString(result.type, result.state.substitution)).toBe(
 				'(α) -> (α) -> α'
 			);
@@ -66,7 +68,7 @@ describe('Functional Type Inference', () => {
 		it('should generalize identity function', () => {
 			const program = parseProgram('id = fn x => x; id 42');
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should allow polymorphic function to be used with different types', () => {
@@ -82,7 +84,7 @@ describe('Functional Type Inference', () => {
 				'fact = fn n => if n == 0 then 1 else n * (fact (n - 1)); fact 5'
 			);
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 	});
 
@@ -90,7 +92,7 @@ describe('Functional Type Inference', () => {
 		it('should apply function to argument', () => {
 			const program = parseProgram('(fn x => x + 1) 42');
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should handle partial application', () => {
@@ -98,13 +100,13 @@ describe('Functional Type Inference', () => {
 				'add = fn x y => x + y; add5 = add 5; add5 3'
 			);
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should handle curried application', () => {
 			const program = parseProgram('add = fn x y => x + y; add 2 3');
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 	});
 
@@ -112,7 +114,7 @@ describe('Functional Type Inference', () => {
 		it('should infer arithmetic operations', () => {
 			const program = parseProgram('2 + 3');
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should infer comparison operations', () => {
@@ -132,7 +134,7 @@ describe('Functional Type Inference', () => {
 		it('should infer if expression with same types', () => {
 			const program = parseProgram('if True then 1 else 2');
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should handle if expression with different types', () => {
@@ -145,13 +147,13 @@ describe('Functional Type Inference', () => {
 		it('should handle semicolon sequences', () => {
 			const program = parseProgram('1; 2; 3');
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should handle sequences with definitions', () => {
 			const program = parseProgram('x = 1; y = 2; x + y');
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 	});
 
@@ -159,7 +161,7 @@ describe('Functional Type Inference', () => {
 		it('should handle built-in arithmetic operators', () => {
 			const program = parseProgram('2 + 3');
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should handle built-in comparison operators', () => {
@@ -204,25 +206,25 @@ describe('Functional Type Inference', () => {
 		it('should type mutable definition with simple value', () => {
 			const program = parseProgram('mut x = 42; x');
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should type mutable definition with function', () => {
 			const program = parseProgram('mut f = fn x => x + 1; f 5');
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should type mutation with same type', () => {
 			const program = parseProgram('mut x = 10; mut! x = 20; x');
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should type mutation with compatible types', () => {
 			const program = parseProgram('mut x = 10; mut! x = 15; x + 5');
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should reject mutation of undefined variable', () => {
@@ -246,19 +248,19 @@ describe('Functional Type Inference', () => {
 		it('should handle mutation in sequences', () => {
 			const program = parseProgram('mut x = 1; mut! x = 2; x');
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should handle multiple mutations of same variable', () => {
 			const program = parseProgram('mut x = 0; mut! x = 1; mut! x = 2; x');
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should handle mutation with complex expressions', () => {
 			const program = parseProgram('mut x = 1; mut! x = x + 1; x');
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should handle mutation with function calls', () => {
@@ -266,7 +268,7 @@ describe('Functional Type Inference', () => {
 				'add = fn x y => x + y; mut x = 5; mut! x = add x 3; x'
 			);
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should handle mutation with conditional expressions', () => {
@@ -274,7 +276,7 @@ describe('Functional Type Inference', () => {
 				'mut x = 10; mut! x = if x > 5 then 20 else 0; x'
 			);
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should handle mutation with record values', () => {
@@ -283,7 +285,7 @@ describe('Functional Type Inference', () => {
 			);
 			const result = typeProgram(program);
 			expect(typeToString(result.type, result.state.substitution)).toBe(
-				'(Int Int)'
+				'(Float Float)'
 			);
 		});
 
@@ -293,7 +295,7 @@ describe('Functional Type Inference', () => {
 			);
 			const result = typeProgram(program);
 			expect(typeToString(result.type, result.state.substitution)).toBe(
-				'Option Int'
+				'Option Float'
 			);
 		});
 
@@ -305,7 +307,7 @@ describe('Functional Type Inference', () => {
 				inner
 			`);
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should handle mutation with polymorphic functions', () => {
@@ -313,7 +315,7 @@ describe('Functional Type Inference', () => {
 				'id = fn x => x; mut x = 42; mut! x = id x; x'
 			);
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should handle mutation with built-in functions', () => {
@@ -321,7 +323,7 @@ describe('Functional Type Inference', () => {
 				'mut list = [1, 2, 3]; mut! list = list_map (fn x => x * 2) list; length list'
 			);
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 	});
 });
@@ -348,7 +350,7 @@ describe('Constraint Propagation (Functional Typer)', () => {
     `);
 		const result = typeProgram(program);
 		const typeStr = typeToString(result.type, result.state.substitution);
-		// head now returns Option List Int instead of List Int
-		expect(typeStr).toBe('Option List Int');
+		// head now returns Option List Float instead of List Float
+		expect(typeStr).toBe('Option List Float');
 	});
 });

@@ -41,7 +41,7 @@ describe('Functional Typer - Let-Polymorphism', () => {
       `);
 			const result = typeProgram(program);
 			// The sequence returns the type of the rightmost expression
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 	});
 
@@ -67,7 +67,7 @@ describe('Functional Typer - Let-Polymorphism', () => {
         result = addFive 3
       `);
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should handle multiple polymorphic functions in sequence', () => {
@@ -93,7 +93,7 @@ describe('Functional Typer - Let-Polymorphism', () => {
         numResult
       `);
 			const result = typeProgram(program);
-			expect(typeToString(result.type, result.state.substitution)).toBe('Int');
+			expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 		});
 
 		it('should handle polymorphic function with multiple instantiations', () => {

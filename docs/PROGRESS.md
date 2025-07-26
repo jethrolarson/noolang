@@ -142,7 +142,7 @@ The FFI system revealed a dependency chain that requires foundational features:
 - **Evaluator**: Closure-based with recursion and mutation support
 - **Type System**: Hindley-Milner with constraints, ADTs, and trait system integration
 - **Type Annotations**: Both definition-level (`name = expr : type`) and expression-level (`(expr : type)`)
-- **Type Variable Unification**: Concrete type resolution working (shows `(Int) -> Int` not `t1 -> t2`)
+- **Type Variable Unification**: Concrete type resolution working (shows `(Float) -> Float` not `t1 -> t2`)
 - **ADTs**: Pattern matching, Option/Result types, custom constructors
 - **Trait System**: Complete constraint definitions, implementations, and type-directed dispatch
 - **REPL**: Interactive development with debugging commands
@@ -220,12 +220,9 @@ noolang/
 # Things the human is tracking
 
 - Type and parser errors should show the source code line and the line above and below
-- Need to add support for Float or make Int into float and not have int
-- `new Lexer("a = 1; b = 2; a + b;");`???
 - Imports aren't being inferred correctly
 - What if we have a way for the llm to ask what the type at a particular point in the program is? maybe with a `^` character? Similar to how users can hover over code with the mouse. or maybe just supporting LSP will do that?
 - Need module paths. Having to load everything via relative paths is troublesome
 - we're using both camelCase and snake. Everything should be snake.
-- Need to audit built-in effects
 - print should be : a -> a given a is Show (maybe log too, or can we just leave that with dumb encoding inferred in host language?)
 - **FFI Dependency Chain**: Discovered that implementing FFI properly requires traits → monadic bind → |? operator → optional accessors → Unknown type. Prioritizing traits as foundational feature.

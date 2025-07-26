@@ -132,8 +132,8 @@ test('should evaluate simple expressions interactively', async () => {
 ### Basic Arithmetic
 ```javascript
 inputs: ['1 + 2', '10 * 5', '100 / 4']
-expectedOutputs: ['3', '50', '25']
-shouldContainInOutput: ['Int']
+expectedOutputs: ['3', '50', 'Option 25']
+shouldContainInOutput: ['Float']
 ```
 
 ### Function Composition

@@ -1,4 +1,4 @@
-import { Type, TraitConstraint, VariantType } from '../ast';
+import { Type, TraitConstraint, VariantType, Constraint, RecordStructure, StructureFieldType } from '../ast';
 import { substitute } from './substitute';
 import { TypeState } from './types';
 import { isTypeKind, typesEqual, constraintsEqual } from './helpers';
@@ -8,10 +8,18 @@ import {
 	operatorTypeError,
 	unificationError,
 } from './type-errors';
-import { Constraint } from '../ast';
 import { mapSet, typeToString, occursIn } from './helpers';
 // Legacy constraint imports removed
 import { functionApplicationError } from './type-errors';
+
+// Valid primitive type names (must match PrimitiveType['name'] union)
+const VALID_PRIMITIVES = new Set(['Float', 'String', 'Bool', 'List'] as const);
+type ValidPrimitiveName = 'Float' | 'String' | 'Bool' | 'List';
+
+// Type guard for valid primitive names
+function isValidPrimitiveName(name: string): name is ValidPrimitiveName {
+	return VALID_PRIMITIVES.has(name as ValidPrimitiveName);
+}
 
 // Performance tracking
 let unifyCallCount = 0;
@@ -69,8 +77,17 @@ const unifyInternal = (
 
 	// PHASE 3: Handle constraint resolution EARLY to provide better error messages
 	// Check if one type is a variant with a constrained type variable name
-	if (context?.constraintContext && (isTypeKind(s1, 'variant') || isTypeKind(s2, 'variant'))) {
-		const constraintResult = tryUnifyConstrainedVariant(s1, s2, state, location, context);
+	if (
+		context?.constraintContext &&
+		(isTypeKind(s1, 'variant') || isTypeKind(s2, 'variant'))
+	) {
+		const constraintResult = tryUnifyConstrainedVariant(
+			s1,
+			s2,
+			state,
+			location,
+			context
+		);
 		if (constraintResult) {
 			return constraintResult;
 		}
@@ -129,13 +146,13 @@ const unifyInternal = (
 	// Add debug info for difficult cases
 	const debugContext = context || {};
 	if (
-		s1.kind === s2.kind &&
 		s1.kind === 'primitive' &&
-		(s1 as any).name === (s2 as any).name
+		s2.kind === 'primitive' &&
+		s1.name === s2.name
 	) {
 		debugContext.reason = 'concrete_vs_variable';
 		debugContext.hint = `Both types appear to be ${
-			(s1 as any).name
+			s1.name
 		} but they are not unifying. This suggests the type equality check is failing. Type 1: ${JSON.stringify(
 			s1
 		)}, Type 2: ${JSON.stringify(
@@ -331,6 +348,55 @@ function unifyVariable(
 					newState,
 					location
 				);
+			} else if (constraint.kind === 'has') {
+				if (isTypeKind(s2, 'record')) {
+					// Validate that s2 has all required fields with correct types
+					for (const [fieldName, expectedFieldType] of Object.entries(
+						constraint.structure.fields
+					)) {
+						if (!(fieldName in s2.fields)) {
+							throw new Error(
+								`Record missing required field @${fieldName} for constraint ${constraint.typeVar} has {${Object.keys(
+									constraint.structure.fields
+								)
+									.map(f => `@${f}`)
+									.join(', ')}}`
+							);
+						}
+
+						// Handle StructureFieldType (can be Type or nested structure)
+						if (
+							typeof expectedFieldType === 'object' &&
+							expectedFieldType !== null &&
+							'kind' in expectedFieldType
+						) {
+							if (expectedFieldType.kind === 'nested') {
+								// TODO: Handle nested record structures
+								throw new Error('Nested record structures not yet implemented');
+							} else {
+								// It's a regular Type
+								newState = unify(
+									s2.fields[fieldName],
+									expectedFieldType as Type,
+									newState,
+									location
+								);
+							}
+						} else {
+							throw new Error(
+								`Invalid field type in constraint: ${typeof expectedFieldType}`
+							);
+						}
+					}
+				} else {
+					// s2 is not a record type, but the constraint requires record structure
+					const fieldNames = Object.keys(constraint.structure.fields)
+						.map(f => `@${f}`)
+						.join(', ');
+					throw new Error(
+						`Type ${s2.kind === 'primitive' ? s2.name : s2.kind} cannot satisfy constraint ${constraint.typeVar} has {${fieldNames}} - expected a record type`
+					);
+				}
 			} else if (constraint.kind === 'is') {
 				// NOTE: Legacy constraint checking removed - handled by new trait system
 				// TODO: Implement proper constraint checking in Phase 2
@@ -529,7 +595,7 @@ function unifyConstrained(
 	if (isTypeKind(s1, 'constrained') && isTypeKind(s2, 'constrained')) {
 		// Both are constrained - unify base types and merge constraints
 		let currentState = unify(s1.baseType, s2.baseType, state, location);
-		
+
 		// For now, just merge constraints (simple conjunction)
 		// TODO: More sophisticated constraint merging
 		const mergedConstraints = new Map(s1.constraints);
@@ -537,7 +603,7 @@ function unifyConstrained(
 			const existing = mergedConstraints.get(varName) || [];
 			mergedConstraints.set(varName, [...existing, ...constraints]);
 		}
-		
+
 		return currentState;
 	} else if (isTypeKind(s1, 'constrained')) {
 		// PHASE 3: s1 is constrained, s2 is not - attempt constraint resolution
@@ -546,7 +612,7 @@ function unifyConstrained(
 		// PHASE 3: s2 is constrained, s1 is not - attempt constraint resolution
 		return unifyConstrainedWithConcrete(s2, s1, state, location);
 	}
-	
+
 	throw new Error('unifyConstrained called with non-constrained types');
 }
 
@@ -567,12 +633,12 @@ function tryUnifyConstrainedVariant(
 	if (!context?.constraintContext) {
 		return null;
 	}
-	
+
 	const { getTypeName } = require('./trait-system');
-	
+
 	let variantType: Type & { kind: 'variant' };
 	let concreteType: Type;
-	
+
 	if (isTypeKind(s1, 'variant') && !isTypeKind(s2, 'variant')) {
 		variantType = s1;
 		concreteType = s2;
@@ -581,9 +647,9 @@ function tryUnifyConstrainedVariant(
 		concreteType = s1;
 	} else if (isTypeKind(s1, 'variant') && isTypeKind(s2, 'variant')) {
 		// Both are variants - check if one is a constrained type variable
-		const s1Name = (s1 as any).name;
-		const s2Name = (s2 as any).name;
-		
+		const s1Name = s1.name;
+		const s2Name = s2.name;
+
 		// Check if s1 is a constrained type variable
 		if (context.constraintContext.has(s1Name)) {
 			variantType = s1;
@@ -597,8 +663,8 @@ function tryUnifyConstrainedVariant(
 	} else {
 		return null; // Neither is variant
 	}
-	
-		// Check if this variant type variable has constraints
+
+	// Check if this variant type variable has constraints
 	const constraints = context.constraintContext.get(variantType.name);
 	if (!constraints) {
 		return null; // No constraints on this type variable
@@ -611,90 +677,103 @@ function tryUnifyConstrainedVariant(
 	}
 
 	// Special case: if concreteType is also a type variable, check for constraint compatibility
-	if (concreteType.kind === 'variable' || 
+	if (
+		concreteType.kind === 'variable' ||
 		(concreteType.kind === 'variant' && concreteTypeName.startsWith('α')) ||
-		(concreteType.kind === 'constrained' && concreteTypeName.startsWith('α'))) {
-
+		(concreteType.kind === 'constrained' && concreteTypeName.startsWith('α'))
+	) {
 		// Both are type variables - we can unify them by propagating constraints
 		// For now, substitute the variant type with the concrete type
 		const newSubstitution = new Map(state.substitution);
 		newSubstitution.set(variantType.name, concreteType);
 		return { ...state, substitution: newSubstitution };
 	}
-	
 
-	
 	// Check if any constraint can be satisfied by the concrete type
 	for (const constraint of constraints) {
 		if (constraint.kind === 'implements') {
 			const traitName = constraint.trait;
 			const traitImpls = traitRegistry.implementations.get(traitName);
-			
+
 			if (traitImpls && traitImpls.has(concreteTypeName)) {
 				// Constraint is satisfied! Perform the substitution
 				const newSubstitution = new Map(state.substitution);
-				
+
 				if (concreteType.kind === 'list') {
 					// For List types, substitute the type constructor
-					newSubstitution.set(variantType.name, { kind: 'primitive', name: 'List' });
-					
-					// Transform α130 Int -> List Int
+					newSubstitution.set(variantType.name, {
+						kind: 'primitive',
+						name: 'List',
+					});
+
+					// Transform α130 Float -> List Float
 					const substitutedVariant = substitute(variantType, newSubstitution);
-					
-					if (substitutedVariant.kind === 'variant' && 
-						substitutedVariant.name === 'List' && 
-						substitutedVariant.args.length === 1) {
-						
+
+					if (
+						substitutedVariant.kind === 'variant' &&
+						substitutedVariant.name === 'List' &&
+						substitutedVariant.args.length === 1
+					) {
 						// Create the proper List type
 						const listType = {
 							kind: 'list' as const,
-							element: substitutedVariant.args[0]
+							element: substitutedVariant.args[0],
 						};
-						
+
 						// Check if types match
 						if (concreteType.kind === 'list') {
 							// Unify the element types
 							const elementUnificationState = unify(
-								listType.element, 
-								concreteType.element, 
-								{ ...state, substitution: newSubstitution }, 
+								listType.element,
+								concreteType.element,
+								{ ...state, substitution: newSubstitution },
 								location
 							);
 							return elementUnificationState;
 						}
 					}
 				}
-				
+
 				// PHASE 3 FIX: Handle variant types like Option, Result, etc.
-				// Use runtime check to work around TypeScript type issues
-				if ((concreteType as any).kind === 'variant') {
-					const concreteVariant = concreteType as any; // Type assertion for now
+				if (concreteType.kind === 'variant') {
+					const concreteVariant = concreteType; // Type-safe access
 					
-					// For variant types, substitute the type constructor variable with the variant name
-					newSubstitution.set(variantType.name, { kind: 'primitive', name: concreteVariant.name });
-					
-					// Transform α130 Int -> Option Int (variant)
+					// Validate that we're not trying to create an invalid primitive
+					if (isValidPrimitiveName(concreteVariant.name)) {
+						// Only valid primitives can be substituted as primitives
+						newSubstitution.set(variantType.name, {
+							kind: 'primitive',
+							name: concreteVariant.name, // TypeScript now knows this is ValidPrimitiveName
+						});
+					} else {
+						// For non-primitive variants (Option, Result, etc.), substitute with the variant type itself
+						newSubstitution.set(variantType.name, concreteVariant);
+					}
+
+					// Transform α130 Float -> Option Float (variant)
 					const substitutedVariant = substitute(variantType, newSubstitution);
-					
-					if (substitutedVariant.kind === 'variant' && 
-						substitutedVariant.name === concreteVariant.name && 
-						substitutedVariant.args && concreteVariant.args &&
-						substitutedVariant.args.length === concreteVariant.args.length) {
-						
+
+					if (
+						substitutedVariant.kind === 'variant' &&
+						substitutedVariant.name === concreteVariant.name &&
+						substitutedVariant.args &&
+						concreteVariant.args &&
+						substitutedVariant.args.length === concreteVariant.args.length
+					) {
 						// Unify the type arguments
 						let currentState = { ...state, substitution: newSubstitution };
 						for (let i = 0; i < substitutedVariant.args.length; i++) {
 							currentState = unify(
-								substitutedVariant.args[i], 
-								concreteVariant.args[i], 
-								currentState, 
+								substitutedVariant.args[i],
+								concreteVariant.args[i],
+								currentState,
 								location
 							);
 						}
 						return currentState;
 					}
 				}
-				
+
 				// For other types, try direct substitution
 				newSubstitution.set(variantType.name, concreteType);
 				return { ...state, substitution: newSubstitution };
@@ -705,8 +784,9 @@ function tryUnifyConstrainedVariant(
 						createTypeError(
 							`No implementation of ${traitName} for ${concreteTypeName}`,
 							{
-								suggestion: `The constraint '${variantType.name} implements ${traitName}' cannot be satisfied by ${concreteTypeName}. ` +
-									       `You need to add: implement ${traitName} ${concreteTypeName} (...)`
+								suggestion:
+									`The constraint '${variantType.name} implements ${traitName}' cannot be satisfied by ${concreteTypeName}. ` +
+									`You need to add: implement ${traitName} ${concreteTypeName} (...)`,
 							},
 							location || { line: 1, column: 1 }
 						)
@@ -715,7 +795,7 @@ function tryUnifyConstrainedVariant(
 			}
 		}
 	}
-	
+
 	return null; // No constraint resolution possible
 }
 
@@ -797,10 +877,10 @@ function unifyConstrainedWithConcrete(
 	// we should substitute the type variable with the concrete type constructor
 	
 	if (concreteType.kind === 'list') {
-		// For List Int, we substitute the type constructor variable with List
+		// For List Float, we substitute the type constructor variable with List
 		newSubstitution.set(resolvedVarName, { kind: 'primitive', name: 'List' });
 	} else if (concreteType.kind === 'variant') {
-		// For Option Int, Maybe String, etc., we need to substitute with a type constructor
+		// For Option Float, Maybe String, etc., we need to substitute with a type constructor
 		// We can't create a primitive with variant name, so we substitute with the variant type itself
 		// but extract just the constructor part
 		newSubstitution.set(resolvedVarName, {
