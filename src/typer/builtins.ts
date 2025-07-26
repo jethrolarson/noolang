@@ -41,18 +41,31 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		type: addOpType,
 		quantifiedVars: ['a'],
 	});
+	// Subtraction operator - uses Subtract trait
+	const subtractOpType = functionType(
+		[typeVariable('a'), typeVariable('a')], 
+		typeVariable('a'),
+		new Set()
+	);
+	subtractOpType.constraints = [implementsConstraint('a', 'Subtract')];
 	newEnv.set('-', {
-		type: functionType([intType(), intType()], intType()),
-		quantifiedVars: [],
+		type: subtractOpType,
+		quantifiedVars: ['a'],
 	});
+
+	// Multiplication operator - uses Multiply trait
+	const multiplyOpType = functionType(
+		[typeVariable('a'), typeVariable('a')], 
+		typeVariable('a'),
+		new Set()
+	);
+	multiplyOpType.constraints = [implementsConstraint('a', 'Multiply')];
 	newEnv.set('*', {
-		type: functionType([intType(), intType()], intType()),
-		quantifiedVars: [],
+		type: multiplyOpType,
+		quantifiedVars: ['a'],
 	});
-	newEnv.set('/', {
-		type: functionType([intType(), intType()], intType()),
-		quantifiedVars: [],
-	});
+
+	// Division operator removed - unsafe due to division by zero
 
 	// Comparison operators
 	newEnv.set('==', {
@@ -319,6 +332,28 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: [],
 	});
 
+	// Primitive Subtract trait implementations for type checking
+	newEnv.set('primitive_int_subtract', {
+		type: createBinaryFunctionType(intType(), intType(), intType()),
+		quantifiedVars: [],
+	});
+
+	newEnv.set('primitive_float_subtract', {
+		type: createBinaryFunctionType(floatType(), floatType(), floatType()),
+		quantifiedVars: [],
+	});
+
+	// Primitive Multiply trait implementations for type checking
+	newEnv.set('primitive_int_multiply', {
+		type: createBinaryFunctionType(intType(), intType(), intType()),
+		quantifiedVars: [],
+	});
+
+	newEnv.set('primitive_float_multiply', {
+		type: createBinaryFunctionType(floatType(), floatType(), floatType()),
+		quantifiedVars: [],
+	});
+
 	// Record utilities
 	newEnv.set('hasKey', {
 		type: createBinaryFunctionType(recordType({}), stringType(), boolType()),
@@ -376,6 +411,24 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 			name: 'Add',
 			typeParam: 'a',
 			functions: new Map([['add', functionType([typeVariable('a'), typeVariable('a')], typeVariable('a'))]])
+		});
+	}
+
+	// Add the Subtract trait definition if not already present
+	if (!newState.traitRegistry.definitions.has('Subtract')) {
+		addTraitDefinition(newState.traitRegistry, {
+			name: 'Subtract',
+			typeParam: 'a',
+			functions: new Map([['subtract', functionType([typeVariable('a'), typeVariable('a')], typeVariable('a'))]])
+		});
+	}
+
+	// Add the Multiply trait definition if not already present
+	if (!newState.traitRegistry.definitions.has('Multiply')) {
+		addTraitDefinition(newState.traitRegistry, {
+			name: 'Multiply',
+			typeParam: 'a',
+			functions: new Map([['multiply', functionType([typeVariable('a'), typeVariable('a')], typeVariable('a'))]])
 		});
 	}
 	

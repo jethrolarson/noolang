@@ -15,6 +15,16 @@ constraint Add a (
   add : a -> a -> a
 );
 
+# Constraint for subtraction operation
+constraint Subtract a (
+  subtract : a -> a -> a
+);
+
+# Constraint for multiplication operation
+constraint Multiply a (
+  multiply : a -> a -> a
+);
+
 # Basic Show implementations (must come before conditional implementations)
 implement Show Int (
   show = fn i => toString i
