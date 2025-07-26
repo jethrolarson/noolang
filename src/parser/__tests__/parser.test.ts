@@ -695,7 +695,7 @@ describe('Type Definitions (ADTs)', () => {
 	});
 
 	test('should parse type definition with multiple constructor arguments', () => {
-		const lexer = new Lexer('type Person = Person String Number');
+		const lexer = new Lexer('type Person = Person String Float');
 		const tokens = lexer.tokenize();
 		const program = parse(tokens);
 		expect(program.statements).toHaveLength(1);
@@ -1053,7 +1053,7 @@ describe('Constraint Definitions and Implementations', () => {
 // Add new test suite for Advanced Type Expressions
 describe('Advanced Type Expressions', () => {
 	test('should parse Tuple type constructor', () => {
-		const lexer = new Lexer('Tuple Int String Bool');
+		const lexer = new Lexer('Tuple Float String Bool');
 		const tokens = lexer.tokenize();
 		const result = parseTypeExpression(tokens);
 		assertParseSuccess(result);
@@ -1063,7 +1063,7 @@ describe('Advanced Type Expressions', () => {
 	});
 
 	test('should parse parenthesized type expression', () => {
-		const lexer = new Lexer('(Int -> String)');
+		const lexer = new Lexer('(Float -> String)');
 		const tokens = lexer.tokenize();
 		const result = parseTypeExpression(tokens);
 		assertParseSuccess(result);
@@ -1096,7 +1096,7 @@ describe('Advanced Type Expressions', () => {
 // Add new test suite for Constraint Expressions
 describe('Constraint Expressions', () => {
 	test('should parse simple constraint expression', () => {
-		const lexer = new Lexer('x : Int given a is Eq');
+		const lexer = new Lexer('x : Float given a is Eq');
 		const tokens = lexer.tokenize();
 		const program = parse(tokens);
 		expect(program.statements).toHaveLength(1);
@@ -1316,7 +1316,7 @@ describe('Type annotation parsing', () => {
 	}
 
 	test('parses record type annotation', () => {
-		const result = parseType('{ name: String, age: Number }');
+		const result = parseType('{ name: String, age: Float }');
 		assertParseSuccess(result);
 		assertRecordType(result.value);
 		expect(result.value.kind).toBe('record');
@@ -1327,7 +1327,7 @@ describe('Type annotation parsing', () => {
 	});
 
 	test('parses tuple type annotation', () => {
-		const result = parseType('{ Number, String }');
+		const result = parseType('{ Float, String }');
 		assertParseSuccess(result);
 		assertTupleType(result.value);
 		expect(result.value.elements[0].kind).toBe('primitive');
@@ -1335,14 +1335,14 @@ describe('Type annotation parsing', () => {
 	});
 
 	test('parses list type annotation', () => {
-		const result = parseType('List Number');
+		const result = parseType('List Float');
 		assertParseSuccess(result);
 		assertListType(result.value);
 		expect(result.value.element.kind).toBe('primitive');
 	});
 
 	test('parses function type annotation', () => {
-		const result = parseType('Number -> Number');
+		const result = parseType('Float -> Float');
 		assertParseSuccess(result);
 		assertFunctionType(result.value);
 		const funcType = result.value;
@@ -1360,14 +1360,14 @@ describe('Type annotation parsing', () => {
 
 	// Add comprehensive tests for type constructor application
 	test('parses simple type constructor application', () => {
-		const result = parseType('Option Int');
+		const result = parseType('Option Float');
 		assertParseSuccess(result);
 		expect(result.value.kind).toBe('variant');
 		const variantType = result.value as any;
 		expect(variantType.name).toBe('Option');
 		expect(variantType.args).toHaveLength(1);
 		expect(variantType.args[0].kind).toBe('primitive');
-		expect(variantType.args[0].name).toBe('Int');
+		expect(variantType.args[0].name).toBe('Float');
 	});
 
 	test('parses type constructor with type variable', () => {
@@ -1382,7 +1382,7 @@ describe('Type annotation parsing', () => {
 	});
 
 	test('parses type constructor with multiple arguments', () => {
-		const result = parseType('Either String Int');
+		const result = parseType('Either String Float');
 		assertParseSuccess(result);
 		expect(result.value.kind).toBe('variant');
 		const variantType = result.value as any;
@@ -1391,7 +1391,7 @@ describe('Type annotation parsing', () => {
 		expect(variantType.args[0].kind).toBe('primitive');
 		expect(variantType.args[0].name).toBe('String');
 		expect(variantType.args[1].kind).toBe('primitive');
-		expect(variantType.args[1].name).toBe('Int');
+		expect(variantType.args[1].name).toBe('Float');
 	});
 
 	test('parses type constructor with mixed type arguments', () => {
@@ -1408,7 +1408,7 @@ describe('Type annotation parsing', () => {
 	});
 
 	test('parses nested type constructor application', () => {
-		const result = parseType('Option (Either String Int)');
+		const result = parseType('Option (Either String Float)');
 		assertParseSuccess(result);
 		expect(result.value.kind).toBe('variant');
 		const variantType = result.value as any;
@@ -1466,7 +1466,7 @@ describe('Type annotation parsing', () => {
 
 	test('parses nested record type', () => {
 		const result = parseType(
-			'{ person: { name: String, age: Number }, active: Bool }'
+			'{ person: { name: String, age: Float }, active: Bool }'
 		);
 		assertParseSuccess(result);
 		assertRecordType(result.value);
@@ -1486,7 +1486,7 @@ describe('Top-level definitions with type annotations', () => {
 
 	test('parses definition with function type annotation', () => {
 		const result = parseDefinition(
-			'add = fn x y => x + y : Number -> Number -> Number;'
+			'add = fn x y => x + y : Float -> Float -> Float;'
 		);
 		expect(result.statements).toHaveLength(1);
 		expect(result.statements[0].kind).toBe('definition');
@@ -1498,7 +1498,7 @@ describe('Top-level definitions with type annotations', () => {
 	});
 
 	test('parses definition with primitive type annotation', () => {
-		const result = parseDefinition('answer = 42 : Number;');
+		const result = parseDefinition('answer = 42 : Float;');
 		expect(result.statements).toHaveLength(1);
 		expect(result.statements[0].kind).toBe('definition');
 		const def = assertDefinitionExpression(result.statements[0]);
@@ -1509,22 +1509,22 @@ describe('Top-level definitions with type annotations', () => {
 	});
 
 	test('parses definition with list type annotation', () => {
-		const result = parseDefinition('numbers = [1, 2, 3] : List Number;');
+		const result = parseDefinition('numbers = [1, 2, 3] : List Float;');
 		expect(result.statements).toHaveLength(1);
 		const def = assertDefinitionExpression(result.statements[0]);
 		expect(def.name).toBe('numbers');
 		const typed = assertTypedExpression(def.value);
 		expect(typed.expression.kind).toBe('list');
 		expect(typed.type.kind).toBe('list'); // List types have kind "list"
-		expect((typed.type as any).element.kind).toBe('primitive'); // Number is a primitive type
-		expect((typed.type as any).element.name).toBe('Int'); // Number maps to Int internally
+		expect((typed.type as any).element.kind).toBe('primitive'); // Float is a primitive type
+		expect((typed.type as any).element.name).toBe('Float');
 	});
 
 	test('parses multiple definitions with type annotations', () => {
 		const result = parseDefinition(`
-      add = fn x y => x + y : Number -> Number -> Number;
-      answer = 42 : Number;
-      numbers = [1, 2, 3] : List Number;
+      add = fn x y => x + y : Float -> Float -> Float;
+      answer = 42 : Float;
+      numbers = [1, 2, 3] : List Float;
     `);
 		expect(result.statements).toHaveLength(1);
 		const seq = assertBinaryExpression(result.statements[0]);
@@ -1535,7 +1535,7 @@ describe('Top-level definitions with type annotations', () => {
 	// Phase 1: Effect parsing tests
 	describe('Effect parsing', () => {
 		test('should parse function type with single effect', () => {
-			const lexer = new Lexer('Int -> Int !write');
+			const lexer = new Lexer('Float -> Float !write');
 			const tokens = lexer.tokenize();
 			const result = parseTypeExpression(tokens);
 
@@ -1549,7 +1549,7 @@ describe('Top-level definitions with type annotations', () => {
 		});
 
 		test('should parse function type with multiple effects', () => {
-			const lexer = new Lexer('Int -> String !write !log');
+			const lexer = new Lexer('Float -> String !write !log');
 			const tokens = lexer.tokenize();
 			const result = parseTypeExpression(tokens);
 
@@ -1561,7 +1561,7 @@ describe('Top-level definitions with type annotations', () => {
 
 		test('should parse function type with all valid effects', () => {
 			const lexer = new Lexer(
-				'Int -> Int !log !read !write !state !time !rand !ffi !async'
+				'Float -> Float !log !read !write !state !time !rand !ffi !async'
 			);
 			const tokens = lexer.tokenize();
 			const result = parseTypeExpression(tokens);
@@ -1582,7 +1582,7 @@ describe('Top-level definitions with type annotations', () => {
 		});
 
 		test('should parse function type with no effects', () => {
-			const lexer = new Lexer('Int -> Int');
+			const lexer = new Lexer('Float -> Float');
 			const tokens = lexer.tokenize();
 			const result = parseTypeExpression(tokens);
 
@@ -1593,7 +1593,7 @@ describe('Top-level definitions with type annotations', () => {
 		});
 
 		test('should parse multi-parameter function with effects', () => {
-			const lexer = new Lexer('Int -> String -> Bool !read');
+			const lexer = new Lexer('Float -> String -> Bool !read');
 			const tokens = lexer.tokenize();
 			const result = parseTypeExpression(tokens);
 
@@ -1606,7 +1606,7 @@ describe('Top-level definitions with type annotations', () => {
 		});
 
 		test('should reject invalid effect names', () => {
-			const lexer = new Lexer('Int -> Int !invalid');
+			const lexer = new Lexer('Float -> Float !invalid');
 			const tokens = lexer.tokenize();
 			const result = parseTypeExpression(tokens);
 
@@ -1615,7 +1615,7 @@ describe('Top-level definitions with type annotations', () => {
 		});
 
 		test('should require effect name after exclamation mark', () => {
-			const lexer = new Lexer('Int -> Int !');
+			const lexer = new Lexer('Float -> Float !');
 			const tokens = lexer.tokenize();
 			const result = parseTypeExpression(tokens);
 
@@ -1624,7 +1624,7 @@ describe('Top-level definitions with type annotations', () => {
 		});
 
 		test('should parse typed expression with effects', () => {
-			const result = parseDefinition('x : Int -> Int !state');
+			const result = parseDefinition('x : Float -> Float !state');
 			expect(result.statements).toHaveLength(1);
 			const typed = assertTypedExpression(result.statements[0]);
 			assertFunctionType(typed.type);
@@ -1633,7 +1633,7 @@ describe('Top-level definitions with type annotations', () => {
 		});
 
 		test('should parse function definition with effect annotation', () => {
-			const result = parseDefinition('fn x => x : Int -> Int !log');
+			const result = parseDefinition('fn x => x : Float -> Float !log');
 			expect(result.statements).toHaveLength(1);
 			const func = assertFunctionExpression(result.statements[0]);
 			const typed = assertTypedExpression(func.body);
@@ -1643,7 +1643,7 @@ describe('Top-level definitions with type annotations', () => {
 		});
 
 		test('should automatically deduplicate effects', () => {
-			const lexer = new Lexer('Int -> Int !write !log !write');
+			const lexer = new Lexer('Float -> Float !write !log !write');
 			const tokens = lexer.tokenize();
 			const result = parseTypeExpression(tokens);
 
@@ -1682,24 +1682,24 @@ describe('Edge Cases and Error Conditions', () => {
 		expect(result.value.kind).toBe('unit');
 	});
 
-	test('should parse Number type correctly', () => {
-		const lexer = new Lexer('Number');
+	test('should parse Float type correctly', () => {
+		const lexer = new Lexer('Float');
 		const tokens = lexer.tokenize();
 		const result = parseTypeExpression(tokens);
 		assertParseSuccess(result);
 		expect(result.value.kind).toBe('primitive');
-		expect((result.value as any).name).toBe('Int');
+		expect((result.value as any).name).toBe('Float');
 	});
 
 	test('should handle incomplete function type', () => {
-		const lexer = new Lexer('Int ->');
+		const lexer = new Lexer('Float ->');
 		const tokens = lexer.tokenize();
 		const result = parseTypeExpression(tokens);
 		assertParseError(result);
 	});
 
 	test('should handle invalid effect name', () => {
-		const lexer = new Lexer('Int -> Int !invalideffect');
+		const lexer = new Lexer('Float -> Float !invalideffect');
 		const tokens = lexer.tokenize();
 		const result = parseTypeExpression(tokens);
 		assertParseError(result);
@@ -1707,7 +1707,7 @@ describe('Edge Cases and Error Conditions', () => {
 	});
 
 	test('should handle missing effect name after exclamation', () => {
-		const lexer = new Lexer('Int -> Int !');
+		const lexer = new Lexer('Float -> Float !');
 		const tokens = lexer.tokenize();
 		const result = parseTypeExpression(tokens);
 		assertParseError(result);
@@ -1778,7 +1778,7 @@ describe('Edge Cases and Error Conditions', () => {
 	});
 
 	test('should handle function type without effects fallback', () => {
-		const lexer = new Lexer('String -> Int');
+		const lexer = new Lexer('String -> Float');
 		const tokens = lexer.tokenize();
 		const result = parseTypeExpression(tokens);
 		assertParseSuccess(result);
@@ -1805,7 +1805,7 @@ describe('Edge Cases and Error Conditions', () => {
 	});
 
 	test('should handle tuple type edge case', () => {
-		const lexer = new Lexer('{ String, Int }');
+		const lexer = new Lexer('{ String, Float }');
 		const tokens = lexer.tokenize();
 		const result = parseTypeExpression(tokens);
 		assertParseSuccess(result);
@@ -1843,7 +1843,7 @@ describe('Edge Cases and Error Conditions', () => {
 
 	test('should handle type atom parsing edge cases', () => {
 		// Test various edge cases that might not be covered
-		const testCases = ['(Int -> String)', 'Maybe Int', 'Either String Int'];
+		const testCases = ['(Float -> String)', 'Maybe Float', 'Either String Float'];
 
 		for (const testCase of testCases) {
 			const lexer = new Lexer(testCase);

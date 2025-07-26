@@ -5,9 +5,9 @@ constraint Show a ( show : a -> String );
 constraint Eq a ( equals : a -> a -> Bool );
 
 # 2. BASIC IMPLEMENTATIONS
-implement Show Int ( show = intToString );
+implement Show Float ( show = intToString );
 implement Show String ( show = fn s => "\"" + s + "\"" );
-implement Eq Int ( equals = fn a b => a == b );
+implement Eq Float ( equals = fn a b => a == b );
 implement Eq String ( equals = fn a b => a == b );
 
 # 3. CONDITIONAL IMPLEMENTATIONS
@@ -26,12 +26,12 @@ implement Eq (List a) given Eq a (
 
 # 4. MULTIPLE FUNCTION CONSTRAINTS
 constraint Ord a ( 
-  compare : a -> a -> Int;
+  compare : a -> a -> Float;
   lessThan : a -> a -> Bool;
   greaterThan : a -> a -> Bool
 );
 
-implement Ord Int (
+implement Ord Float (
   compare = fn a b => if a < b then -1 else if a > b then 1 else 0;
   lessThan = fn a b => a < b;
   greaterThan = fn a b => a > b
@@ -60,14 +60,14 @@ constraint Monad m (
 
 # Basic usage - automatically resolves implementations
 demo_basic = (
-  intValue = show 42;           # Uses Show Int
+  intValue = show 42;           # Uses Show Float
   stringValue = show "hello";   # Uses Show String
-  listValue = show [1, 2, 3];   # Uses Show (List a) with Show Int
+  listValue = show [1, 2, 3];   # Uses Show (List a) with Show Float
   
   # Comparison examples
-  intEquals = equals 1 1;       # Uses Eq Int
+  intEquals = equals 1 1;       # Uses Eq Float
   stringEquals = equals "a" "a"; # Uses Eq String
-  listEquals = equals [1, 2] [1, 2]; # Uses Eq (List a) with Eq Int
+  listEquals = equals [1, 2] [1, 2]; # Uses Eq (List a) with Eq Float
   
   { @intValue intValue, @stringValue stringValue, @listValue listValue }
 );

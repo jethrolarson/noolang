@@ -67,7 +67,7 @@ Noolang is a principled, expression-based language designed for LLM-assisted and
 
   ```noolang
   identity = fn x => x : a -> a  # Polymorphic type variables work correctly
-  add = fn x y => x + y         # Shows (Int) -> (Int) -> Int, not t1 -> t2 -> t3
+  add = fn x y => x + y         # Shows (Float) -> (Float) -> Float, not t1 -> t2 -> t3
   ```
 
 ---
@@ -124,7 +124,7 @@ constraint Monad m (
 
 ```noolang
 # Basic implementation
-implement Show Int ( show = intToString );
+implement Show Float ( show = intToString );
 
 # Implementation with multiple functions
 implement Eq String ( 
@@ -144,11 +144,11 @@ Constraint functions automatically resolve to the correct implementation based o
 
 ```noolang
 # These calls automatically resolve to the right implementation
-show 42              # Uses Show Int implementation
+show 42              # Uses Show Float implementation
 show "hello"         # Uses Show String implementation  
-show [1, 2, 3]       # Uses Show (List a) implementation with Show Int
+show [1, 2, 3]       # Uses Show (List a) implementation with Show Float
 
-equals 1 2           # Uses Eq Int implementation
+equals 1 2           # Uses Eq Float implementation
 equals "a" "b"       # Uses Eq String implementation
 ```
 
@@ -159,7 +159,7 @@ equals "a" "b"       # Uses Eq String implementation
 constraint Show a ( show : a -> String );
 
 # Implement the constraint for different types
-implement Show Int ( show = toString );
+implement Show Float ( show = toString );
 implement Show String ( show = fn s => s );
 
 # Define another constraint
@@ -168,8 +168,8 @@ constraint Eq a (
   notEquals : a -> a -> Bool 
 );
 
-# Implement for Int
-implement Eq Int ( 
+# Implement for Float
+implement Eq Float ( 
   equals = fn a b => a == b;
   notEquals = fn a b => a != b
 );
@@ -197,8 +197,8 @@ safeHead = compose head  # Constraint 'a is Collection' is preserved
 
 # User-defined constraints with trait system
 constraint Show a ( show : a -> String );
-implement Show Int ( show = intToString );
-showValue = show 42  # Automatically resolves to Int implementation
+implement Show Float ( show = intToString );
+showValue = show 42  # Automatically resolves to Float implementation
 ```
 
 #### **Integration with Existing Features**
@@ -308,7 +308,7 @@ type ExpressionResult = {
 
 ```noolang
 # Pure expressions - no effects
-add = fn x y => x + y : (Int) -> (Int) -> Int
+add = fn x y => x + y : (Float) -> (Float) -> Float
 
 # Effectful expressions - explicit effect annotations  
 readFile = fn path => ... : String !read
@@ -418,10 +418,10 @@ content = match result with (
 Explicit conversion from any type to `Unknown`:
 
 ```noolang
-myNumber = 42;                    # myNumber: Int
+myNumber = 42;                    # myNumber: Float
 dynamic = forget myNumber;        # dynamic: Unknown
 refined = match dynamic with (
-  Int n => n * 2;
+  Float n => n * 2;
   _ => 0
 );
 ```
@@ -542,7 +542,7 @@ custom = ffi "myplatform" "some.api";         # Returns Unknown
 * **✅ Functional Hindley-Milner**: Fully implemented with let-polymorphism
 * **✅ Constraint Propagation**: Robust constraint system with proper unification
 * **✅ Type Variable Management**: Fresh variable generation and substitution
-* **✅ Type Variable Unification**: Type variables properly resolve to concrete types (e.g., shows `(Int) -> Int` not `t1 -> t2`)
+* **✅ Type Variable Unification**: Type variables properly resolve to concrete types (e.g., shows `(Float) -> Float` not `t1 -> t2`)
 * Effects must always be declared manually and are not inferred (by design)
 * REPL and dev tools can show inferred types inline for LLM and human inspection
 
@@ -552,7 +552,7 @@ custom = ffi "myplatform" "some.api";         # Returns Unknown
 
 * **Parser**: ✅ Fully supports type annotations with `name = expr : type` syntax
 * **Expression-level type annotations**: ✅ `(expr : type)` syntax fully implemented and working
-* **Type Variables**: ✅ Proper unification to concrete types (shows `(Int) -> Int` not `t1 -> t2`)
+* **Type Variables**: ✅ Proper unification to concrete types (shows `(Float) -> Float` not `t1 -> t2`)
 * **Effect Annotations**: ✅ Parser fully supports `!effect` syntax (Phase 1 complete)
 * **Record Type Annotations**: ❌ Parser doesn't support `{ name: String, age: Number }` yet
 * **Type Constructors**: ❌ `List T`, `Tuple T1 T2` not implemented yet
@@ -758,7 +758,7 @@ Key architectural question: How do constraints become available in the type envi
 2. **Instance Definition**: How are constraint implementations provided?
    ```noolang
    # Possible syntax?
-   instance Numeric Int where
+   instance Numeric Float where
      add = intAdd
      multiply = intMultiply
    ```

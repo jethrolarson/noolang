@@ -18,11 +18,11 @@ describe('Trait System Conflicting Functions Safety', () => {
 		const code = `
 			constraint Processable a ( process: a -> String );
 			constraint Formatter a ( process: a -> String );
-			implement Processable Int ( process = toString );
+			implement Processable Float ( process = toString );
 			implement Formatter String ( process = fn s => s )
 		`;
 		
-		// This should succeed because Int implements Processable and String implements Formatter
+		// This should succeed because Float implements Processable and String implements Formatter
 		// No ambiguity because each type has only one implementation of 'process'
 		const result = parseAndType(code);
 		expect(result.type.kind).toBe('unit');
@@ -34,7 +34,7 @@ describe('Trait System Conflicting Functions Safety', () => {
 		// Both implementations should exist
 		const processableImpls = result.state.traitRegistry.implementations.get('Processable');
 		const formatterImpls = result.state.traitRegistry.implementations.get('Formatter');
-		expect(processableImpls?.has('Int')).toBe(true);
+		expect(processableImpls?.has('Float')).toBe(true);
 		expect(formatterImpls?.has('String')).toBe(true);
 	});
 
@@ -43,8 +43,8 @@ describe('Trait System Conflicting Functions Safety', () => {
 		const code = `
 			constraint Displayable a ( display: a -> String );
 			constraint Formattable a ( format: a -> String );
-			implement Displayable Int ( display = toString );
-			implement Formattable Int ( format = toString )
+			implement Displayable Float ( display = toString );
+			implement Formattable Float ( format = toString )
 		`;
 		
 		const result = parseAndType(code);
@@ -57,8 +57,8 @@ describe('Trait System Conflicting Functions Safety', () => {
 		// Both implementations should exist
 		const displayImpls = result.state.traitRegistry.implementations.get('Displayable');
 		const formatImpls = result.state.traitRegistry.implementations.get('Formattable');
-		expect(displayImpls?.has('Int')).toBe(true);
-		expect(formatImpls?.has('Int')).toBe(true);
+		expect(displayImpls?.has('Float')).toBe(true);
+		expect(formatImpls?.has('Float')).toBe(true);
 	});
 
 	test('should detect ambiguous function calls when multiple implementations exist', () => {
@@ -66,11 +66,11 @@ describe('Trait System Conflicting Functions Safety', () => {
 		const setupCode = `
 			constraint Stringify a ( convert: a -> String );
 			constraint Display a ( convert: a -> String );
-			implement Stringify Int ( convert = toString );
-			implement Display Int ( convert = toString )
+			implement Stringify Float ( convert = toString );
+			implement Display Float ( convert = toString )
 		`;
 		
-		// The setup should work (registering multiple implementations of 'convert' for Int)
+		// The setup should work (registering multiple implementations of 'convert' for Float)
 		const setupResult = parseAndType(setupCode);
 		expect(setupResult.type.kind).toBe('unit');
 		
@@ -83,13 +83,13 @@ describe('Trait System Conflicting Functions Safety', () => {
 		const code = `
 			constraint Printable a ( display: a -> String );
 			constraint Displayable a ( display: a -> String );
-			implement Printable Int ( display = toString );
-			implement Displayable Int ( display = toString );
+			implement Printable Float ( display = toString );
+			implement Displayable Float ( display = toString );
 			result = display 42
 		`;
 		
-		// This should fail because Int has two implementations of 'display'
-		expect(() => parseAndType(code)).toThrow(/ambiguous function call.*display.*Int/i);
+		// This should fail because Float has two implementations of 'display'
+		expect(() => parseAndType(code)).toThrow(/ambiguous function call.*display.*Float/i);
 	});
 
 	test('should work when same function name exists but for different types', () => {
@@ -97,7 +97,7 @@ describe('Trait System Conflicting Functions Safety', () => {
 		const code = `
 			constraint Printable a ( render: a -> String );
 			constraint Displayable a ( render: a -> String );
-			implement Printable Int ( render = toString );
+			implement Printable Float ( render = toString );
 			implement Displayable String ( render = fn s => s );
 			result1 = render 42;
 			result2 = render "hello"

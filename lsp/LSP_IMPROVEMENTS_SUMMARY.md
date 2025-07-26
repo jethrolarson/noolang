@@ -8,7 +8,7 @@
 
 **Example Before**:
 ```
-Type: { option_results: { some: Int none: Int } result_results: { ok: String err: String } color_value: Int }
+Type: { option_results: { some: Float none: Float } result_results: { ok: String err: String } color_value: Float }
 ```
 
 **Solution Implemented**:
@@ -19,9 +19,9 @@ Type: { option_results: { some: Int none: Int } result_results: { ok: String err
 
 **Example After**:
 ```
-Symbol 'factorial' has type: (Int) -> Int
-Symbol 'user' has type: { name: String age: Int }
-Symbol 'numbers' has type: List Int
+Symbol 'factorial' has type: (Float) -> Float
+Symbol 'user' has type: { name: String age: Float }
+Symbol 'numbers' has type: List Float
 ```
 
 ### 2. Error Information Not Bound to Correct Lines
@@ -47,7 +47,7 @@ another_line = 42;
 
 ```
 TypeError: Operator type mismatch
-  Expected: Int
+  Expected: Float
   Got:      String
   at line 3, column 16    # ✅ Correct line and column!
 ```
@@ -75,10 +75,10 @@ TypeError: Operator type mismatch
 ### Symbol Type Resolution
 ```bash
 $ node dist/cli.js --symbol-type examples/basic.noo factorial
-Symbol 'factorial' has type: (Int) -> Int
+Symbol 'factorial' has type: (Float) -> Float
 
 $ node dist/cli.js --symbol-type examples/demo.noo factorial  
-Symbol 'factorial' has type: (Int) -> Int
+Symbol 'factorial' has type: (Float) -> Float
 ```
 
 ### Error Line Binding
@@ -88,7 +88,7 @@ $ echo -e 'good = fn x => x\nbad = 5 + "hello"\nother = 42' > test.noo
 $ node dist/cli.js test.noo
 
 TypeError: Operator type mismatch
-  Expected: Int
+  Expected: Float
   Got:      String
   at line 2, column 7     # ✅ Correctly identifies line 2!
 ```

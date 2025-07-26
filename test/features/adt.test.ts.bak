@@ -247,14 +247,14 @@ describe('Algebraic Data Types (ADTs)', () => {
 
 		it('should handle literal patterns', () => {
 			const result = runNoolang(
-				`type Status = Success | Error | Code Int; getStatusMessage = fn status => match status with (Success => "ok"; Error => "fail"; Code 404 => "not found"; Code x => "unknown code"); result = getStatusMessage (Code 404); result`
+				`type Status = Success | Error | Code Float; getStatusMessage = fn status => match status with (Success => "ok"; Error => "fail"; Code 404 => "not found"; Code x => "unknown code"); result = getStatusMessage (Code 404); result`
 			);
 			expect(result.finalValue).toEqual({ tag: 'string', value: 'not found' });
 		});
 
 		it('should handle nested patterns', () => {
 			const result = runNoolang(
-				`type Wrapper a = Wrap a; type Inner = Value Int; nested = Wrap (Value 123); extract = fn w => match w with (Wrap (Value n) => n; _ => 0); result = extract nested; result`
+				`type Wrapper a = Wrap a; type Inner = Value Float; nested = Wrap (Value 123); extract = fn w => match w with (Wrap (Value n) => n; _ => 0); result = extract nested; result`
 			);
 			expect(result.finalValue).toEqual({ tag: 'number', value: 123 });
 		});
@@ -268,8 +268,8 @@ describe('Algebraic Data Types (ADTs)', () => {
         x
       `);
 
-			// Should infer that x has type Option Int
-			expect(result.finalType).toMatch(/Option.*Int|variant.*Option/);
+			// Should infer that x has type Option Float
+			expect(result.finalType).toMatch(/Option.*Float|variant.*Option/);
 		});
 
 		it('should enforce pattern exhaustiveness (implicit)', () => {
@@ -314,13 +314,13 @@ describe('Algebraic Data Types (ADTs)', () => {
 
 		it('should handle partial constructor application', () => {
 			const result = runNoolang(`
-        type Point = Point Int Int;
-        p = Point 1;  # Partial application - returns (Int) -> Point
+        type Point = Point Float Float;
+        p = Point 1;  # Partial application - returns (Float) -> Point
         p
       `);
 
 			// Should return a function type since it's a partial application
-			expect(result.finalType).toMatch(/Int.*Point|function/);
+			expect(result.finalType).toMatch(/Float.*Point|function/);
 		});
 
 		it('should error when no pattern matches', () => {

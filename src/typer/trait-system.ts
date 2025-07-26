@@ -13,7 +13,7 @@ export type TraitDefinition = {
 
 // Simple trait implementation - concrete functions for a specific type
 export type TraitImplementation = {
-	typeName: string; // e.g., "Option", "List", "Int"
+	typeName: string; // e.g., "Option", "List", "Float"
 	functions: Map<string, Expression>; // function name -> implementation expression
 	givenConstraints?: ConstraintExpr; // Optional given constraints for conditional implementations
 };

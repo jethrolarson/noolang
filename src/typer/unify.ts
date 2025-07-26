@@ -706,7 +706,7 @@ function tryUnifyConstrainedVariant(
 						name: 'List',
 					});
 
-					// Transform α130 Int -> List Int
+					// Transform α130 Float -> List Float
 					const substitutedVariant = substitute(variantType, newSubstitution);
 
 					if (
@@ -750,7 +750,7 @@ function tryUnifyConstrainedVariant(
 						newSubstitution.set(variantType.name, concreteVariant);
 					}
 
-					// Transform α130 Int -> Option Int (variant)
+					// Transform α130 Float -> Option Float (variant)
 					const substitutedVariant = substitute(variantType, newSubstitution);
 
 					if (
@@ -877,10 +877,10 @@ function unifyConstrainedWithConcrete(
 	// we should substitute the type variable with the concrete type constructor
 	
 	if (concreteType.kind === 'list') {
-		// For List Int, we substitute the type constructor variable with List
+		// For List Float, we substitute the type constructor variable with List
 		newSubstitution.set(resolvedVarName, { kind: 'primitive', name: 'List' });
 	} else if (concreteType.kind === 'variant') {
-		// For Option Int, Maybe String, etc., we need to substitute with a type constructor
+		// For Option Float, Maybe String, etc., we need to substitute with a type constructor
 		// We can't create a primitive with variant name, so we substitute with the variant type itself
 		// but extract just the constructor part
 		newSubstitution.set(resolvedVarName, {

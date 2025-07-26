@@ -167,7 +167,7 @@ export class Lexer {
 			'constraint',
 			'implement',
 			// Primitive type names
-			'Int',
+			'Float',
 			'Number',
 			'String',
 			'Unit',

@@ -24,10 +24,10 @@ export type Effect =
 // Type constraints for constrained polymorphism
 export type Constraint =
 	| { kind: 'is'; typeVar: string; constraint: string } // a is Collection
-	| { kind: 'hasField'; typeVar: string; field: string; fieldType: Type } // a has field "length" of type Int
+	| { kind: 'hasField'; typeVar: string; field: string; fieldType: Type } // a has field "length" of type Float
 	| { kind: 'implements'; typeVar: string; interfaceName: string } // a implements Show
 	| { kind: 'custom'; typeVar: string; constraint: string; args: Type[] } // a satisfies MyConstraint T1 T2
-	| { kind: 'has'; typeVar: string; structure: RecordStructure }; // a has {@name String, @age Int}
+	| { kind: 'has'; typeVar: string; structure: RecordStructure }; // a has {@name String, @age Float}
 
 export type ConstraintExpr =
 	| Constraint

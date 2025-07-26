@@ -50,7 +50,8 @@ add 2 3
 
 # all functions are curried so if you pass less than their full number of arguments you get back a partially applied function
 increment = add 1;
-increment 2 #=> 3 : Int
+increment 2 
+# 3 : Float
 
 # to nest calls you may need parenthesis
 add 2 (add 3 2)
@@ -100,7 +101,7 @@ type Option a = Some a | None;
 result = match (Some 42) with (Some x => x; None => 0)
 
 # Pattern matching
-type Point = Point Int Int;
+type Point = Point Float Float;
 point = Point 10 20;
 x = match point with (Point x y => x)
 ```
@@ -313,18 +314,18 @@ Noolang uses commas as separators for all data structures:
 Noolang provides a comprehensive set of built-in functions organized by category:
 
 #### Arithmetic Operations (Pure)
-- **`+`** - Addition: `Int -> Int -> Int`
-- **`-`** - Subtraction: `Int -> Int -> Int` 
-- **`*`** - Multiplication: `Int -> Int -> Int`
-- **`/`** - Division: `Int -> Int -> Int` (throws error on division by zero)
+- **`+`** - Addition: `Float -> Float -> Float`
+- **`-`** - Subtraction: `Float -> Float -> Float` 
+- **`*`** - Multiplication: `Float -> Float -> Float`
+- **`/`** - Division: `Float -> Float -> Option Float`
 
 #### Comparison Operations (Pure)
 - **`==`** - Equality: `a -> a -> Bool` (polymorphic)
 - **`!=`** - Inequality: `a -> a -> Bool` (polymorphic)
-- **`<`** - Less than: `Int -> Int -> Bool`
-- **`>`** - Greater than: `Int -> Int -> Bool`
-- **`<=`** - Less than or equal: `Int -> Int -> Bool`
-- **`>=`** - Greater than or equal: `Int -> Int -> Bool`
+- **`<`** - Less than: `Float -> Float -> Bool`
+- **`>`** - Greater than: `Float -> Float -> Bool`
+- **`<=`** - Less than or equal: `Float -> Float -> Bool`
+- **`>=`** - Greater than or equal: `Float -> Float -> Bool`
 
 #### Function Application and Composition (Pure)
 - **`|`** - Thrush operator (function application): `a -> (a -> b) -> b`
@@ -340,14 +341,14 @@ Noolang provides a comprehensive set of built-in functions organized by category
 - **`map`** - Map function over list: `(a -> b) -> List a -> List b`
 - **`filter`** - Filter list with predicate: `(a -> Bool) -> List a -> List a`
 - **`reduce`** - Reduce list with accumulator: `(b -> a -> b) -> b -> List a -> b`
-- **`length`** - Get list length: `List a -> Int`
+- **`length`** - Get list length: `List a -> Float`
 - **`isEmpty`** - Check if list is empty: `List a -> Bool`
 - **`append`** - Concatenate two lists: `List a -> List a -> List a`
 
 #### Math Utilities (Pure)
-- **`abs`** - Absolute value: `Int -> Int`
-- **`max`** - Maximum of two numbers: `Int -> Int -> Int`
-- **`min`** - Minimum of two numbers: `Int -> Int -> Int`
+- **`abs`** - Absolute value: `Float -> Float`
+- **`max`** - Maximum of two numbers: `Float -> Float -> Float`
+- **`min`** - Minimum of two numbers: `Float -> Float -> Float`
 
 #### String Operations (Pure)
 - **`concat`** - Concatenate strings: `String -> String -> String`
@@ -360,7 +361,7 @@ Noolang provides a comprehensive set of built-in functions organized by category
 - **Accessors** - `@field` for getting record fields: `Record -> a`
 
 #### Tuple Operations (Pure)
-- **`tupleLength`** - Get tuple length: `Tuple -> Int`
+- **`tupleLength`** - Get tuple length: `Tuple -> Float`
 - **`tupleIsEmpty`** - Check if tuple is empty: `Tuple -> Bool`
 
 #### I/O Operations (Effectful)
@@ -371,8 +372,8 @@ Noolang provides a comprehensive set of built-in functions organized by category
 - **`log`** - Log message: `String -> Unit` (effect: `!log`)
 
 #### Random Number Generation (Effectful)
-- **`random`** - Random integer: `Int` (effect: `!rand`)
-- **`randomRange`** - Random in range: `Int -> Int -> Int` (effect: `!rand`)
+- **`random`** - Random integer: `Float` (effect: `!rand`)
+- **`randomRange`** - Random in range: `Float -> Float -> Float` (effect: `!rand`)
 
 #### Mutable State Operations (Effectful)
 - **`mutSet`** - Set mutable reference: `ref -> a -> Unit` (effect: `!state`)
@@ -438,7 +439,7 @@ Noolang has a comprehensive effect system that tracks side effects in function t
 #### Effect Syntax:
 ```noolang
 # Pure function (no effects)
-add = fn x y => x + y : Int -> Int -> Int
+add = fn x y => x + y : Float -> Float -> Float
 
 # Effectful function
 readAndPrint = fn filename => (
@@ -467,7 +468,7 @@ type Result a b = Ok a | Err b;
 
 # Types with multiple parameters
 type Point a = Point a a;
-type Shape = Circle Int | Rectangle Int Int;
+type Shape = Circle Float | Rectangle Float Float;
 ```
 
 ### Built-in ADTs
@@ -652,8 +653,8 @@ constraint Monad m (
 Provide implementations of constraints for specific types:
 
 ```noolang
-# Implement Show for Int
-implement Show Int ( show = intToString );
+# Implement Show for Float
+implement Show Float ( show = intToString );
 
 # Implement Eq for String
 implement Eq String ( 
@@ -673,11 +674,11 @@ Constraint functions automatically resolve to the correct implementation based o
 
 ```noolang
 # These calls automatically resolve to the right implementation
-show 42              # Uses Show Int implementation
+show 42              # Uses Show Float implementation
 show "hello"         # Uses Show String implementation  
-show [1, 2, 3]       # Uses Show (List a) implementation with Show Int
+show [1, 2, 3]       # Uses Show (List a) implementation with Show Float
 
-equals 1 2           # Uses Eq Int implementation
+equals 1 2           # Uses Eq Float implementation
 equals "a" "b"       # Uses Eq String implementation
 ```
 
@@ -720,9 +721,9 @@ constraint Eq a (
 );
 
 # Implement constraints for different types
-implement Show Int ( show = toString );
+implement Show Float ( show = toString );
 implement Show String ( show = fn s => s );
-implement Eq Int ( 
+implement Eq Float ( 
   equals = fn a b => a == b;
   notEquals = fn a b => a != b
 );
@@ -778,8 +779,8 @@ Noolang features a comprehensive **type constraint system** that enables safe an
 
 Noolang provides several built-in constraints:
 
-- **`Collection`** - Lists and records (not primitive types like String, Int, Bool)
-- **`Number`** - Numeric types (Int)
+- **`Collection`** - Lists and records (not primitive types like String, Float, Bool)
+- **`Number`** - Numeric types (Float)
 - **`String`** - String types
 - **`Boolean`** - Boolean types
 - **`Show`** - Types that can be converted to strings
@@ -790,22 +791,7 @@ Noolang provides several built-in constraints:
 
 ### Constraint Syntax
 
-#### Automatic Constraints (Current Implementation)
-
-Many built-in functions automatically carry constraints that are enforced during type checking:
-
-```noolang
-# head function has constraint: (List a) -> a given a is Collection
-first = head [1, 2, 3];  # ✅ Works - Int satisfies Collection
-first_bad = head 42;     # ❌ Error - Int does not satisfy Collection
-
-# tail function has same constraint
-rest = tail [1, 2, 3];   # ✅ Works
-rest_bad = tail "hello"; # ❌ Error - String does not satisfy Collection
-
-# length function works on any Collection
-count = length [1, 2, 3]; # ✅ Works
-```
+TODO add examples
 
 #### Explicit Constraint Annotations (Planned)
 
@@ -826,84 +812,26 @@ flexible = fn x => x : a -> a given a is Collection or a is String
 
 Constraints automatically propagate through function composition:
 
-```noolang
-# Compose functions while preserving constraints
-compose = fn f g x => f (g x)
-
-# head has constraint: a is Collection
-# compose preserves this constraint
-safeHead = compose head
-
-# This works because list satisfies Collection constraint
-result = safeHead [1, 2, 3];  # ✅ Type: Int
-
-# This fails because Int doesn't satisfy Collection constraint
-bad_result = safeHead 42;     # ❌ Type error
-```
+TODO add examples
 
 ### Constraint Validation
 
 The type system validates constraints during unification:
 
-```noolang
-# Function that requires Collection constraint
-processList = fn x => head x : a -> b given a is Collection
-
-# Valid usage
-result1 = processList [1, 2, 3];  # ✅ Works
-
-# Invalid usage - constraint violation
-result2 = processList 42;         # ❌ Error: Int does not satisfy Collection constraint
-```
+TODO add examples
 
 ### Constraint Examples
 
 #### List Operations with Constraints
 
-```noolang
-# All list operations require Collection constraint
-numbers = [1, 2, 3, 4, 5];
-
-first = head numbers;     # Type: Int
-rest = tail numbers;      # Type: List Int
-count = length numbers;   # Type: Int
-
-# Constraint propagation through composition
-getFirst = compose head;
-result = getFirst numbers;  # Type: Int
-```
+TODO add examples
 
 #### Record Operations with Constraints
 
-```noolang
-# Records also satisfy Collection constraint
-person = { @name "Alice", @age 30 };
-
-# Accessors work with any record having the required field
-name = @name person;      # Type: String
-age = @age person;        # Type: Int
-
-# Constraint validation ensures type safety
-bad_access = @nonexistent person;  # ❌ Error if field doesn't exist
-```
+TODO add examples
 
 #### Function Composition with Constraints
-
-```noolang
-# Compose functions while maintaining constraint safety
-compose = fn f g x => f (g x)
-
-# Create safe list operations
-safeHead = compose head;
-safeTail = compose tail;
-
-# These work because constraints are preserved
-first = safeHead [1, 2, 3];  # ✅ Type: Int
-rest = safeTail [1, 2, 3];   # ✅ Type: List Int
-
-# These fail because constraints are enforced
-bad_first = safeHead 42;     # ❌ Error: Int does not satisfy Collection
-```
+TODO add examples
 
 
 ### CLI Debugging Tools
@@ -1077,8 +1005,8 @@ Noolang uses commas as separators for all data structures for consistency and fa
 The type system provides:
 
 - **Type inference** for all expressions using a functional Hindley-Milner engine
-- **Primitive types**: Int, String, Bool, List, Record, Unit
-- **Function types**: `(Int Int) -> Int`
+- **Primitive types**: Float, String, Bool, List, Record, Unit
+- **Function types**: `(Float Float) -> Float`
 - **Type constraints**: Complete constraint system with automatic propagation and validation
 - **Type annotations** (planned for future versions)
 

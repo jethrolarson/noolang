@@ -125,7 +125,7 @@ head_with_constraint = head [1, 2, 3, 4, 5];
 # tail function: (List a) -> List a given a is Collection
 tail_with_constraint = tail [1, 2, 3, 4, 5];
 
-# length function: (List a) -> Int given a is Collection
+# length function: (List a) -> Float given a is Collection
 length_with_constraint = length [1, 2, 3, 4, 5];
 
 # ========================================
@@ -162,7 +162,7 @@ record_age = record_person | @age;
 # All list operations require Collection constraint
 numbers_for_constraints = [10, 20, 30, 40, 50];
 
-# These work because List Int satisfies Collection constraint
+# These work because List Float satisfies Collection constraint
 first_number = head numbers_for_constraints;
 rest_numbers = tail numbers_for_constraints;
 count_numbers = length numbers_for_constraints;

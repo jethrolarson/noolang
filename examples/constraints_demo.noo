@@ -12,122 +12,39 @@
 # Built-in functions automatically carry constraints that are enforced during
 # type checking. The type system validates these constraints during unification.
 
-# ========================================
-# 2. BUILT-IN CONSTRAINTS
-# ========================================
-
-# Noolang provides 9 built-in constraints:
-# - Collection: Lists and records
-# - Number: Numeric types (Int)
-# - String: String types  
-# - Boolean: Boolean types
-# - Show: Types that can be converted to strings
-# - List: List types specifically
-# - Record: Record types specifically
-# - Function: Function types
-# - Eq: Types that support equality comparison
 
 # ========================================
 # 3. AUTOMATIC CONSTRAINT ENFORCEMENT
 # ========================================
 
-# The head function has constraint: (List a) -> a given a is Collection
-head_result = head [1, 2, 3, 4, 5];
-
-# The tail function has same constraint: (List a) -> List a given a is Collection  
-tail_result = tail [1, 2, 3, 4, 5];
-
-# Length function works on any Collection: (List a) -> Int given a is Collection
-length_result = length [1, 2, 3, 4, 5];
+# todo need examples
 
 # ========================================
 # 4. CONSTRAINT SOLVING AND VALIDATION
 # ========================================
 
-# When we use head on a list of numbers, the constraint is solved
-# and we get Int as the result type
-numbers = [1, 2, 3, 4, 5];
-first_number = head numbers;  # Type: Int
-
-# Records also satisfy Collection constraint
-person = { @name "Alice", @age 30, @city "Wonderland" };
-
-# Accessors work with any record having the required field
-person_name = @name person;    # Type: String
-person_age = person | @age;    # Type: Int
+# todo need examples
 
 # ========================================
 # 5. CONSTRAINT PROPAGATION THROUGH COMPOSITION
 # ========================================
 
-# Function composition preserves constraints automatically
-compose = fn f g => fn x => f (g x);
-
-# head has constraint: a is Collection
-# compose preserves this constraint
-safeHead = compose head;
-
-# This works because list satisfies Collection constraint
-safe_head_result = safeHead [1, 2, 3, 4, 5];  # Type: Int
-
-# Create other safe list operations
-safeTail = compose tail;
-safeLength = compose length;
-
-# These work because constraints are preserved through composition
-composed_first = safeHead numbers;    # Type: Int
-composed_rest = safeTail numbers;     # Type: List Int
-composed_count = safeLength numbers;  # Type: Int
+# todo need examples
 
 # ========================================
 # 6. CONSTRAINT EXAMPLES WITH DIFFERENT TYPES
 # ========================================
-
-# String lists work (List String satisfies Collection constraint)
-string_list = ["hello", "world", "noolang"];
-first_string = head string_list;      # Type: String
-string_count = length string_list;    # Type: Int
-
-# Record lists work too (Record satisfies Collection)
-record_list = [
-  { @name "Alice", @age 30 },
-  { @name "Bob", @age 25 },
-  { @name "Charlie", @age 35 }
-];
-first_record = head record_list;      # Type: Record
-record_count = length record_list;    # Type: Int
+# todo need examples
 
 # ========================================
 # 7. ADVANCED CONSTRAINT PATTERNS
 # ========================================
-
-# Create a function that works with any Collection
-processCollection = fn x => head x;
-
-# This works with lists
-list_result = processCollection [1, 2, 3];  # Type: Int
-
-# This works with records (if we had a head-like function for records)
-# record_result = processCollection person;  # Would work if head worked on records
+# todo need examples
 
 # ========================================
 # 8. CONSTRAINT VALIDATION EXAMPLES
 # ========================================
-
-# The following would cause constraint violations if uncommented:
-# bad_head = head 42;                    # ❌ Int does not satisfy Collection
-# bad_tail = tail "hello";               # ❌ String does not satisfy Collection
-# bad_length = length true;              # ❌ Boolean does not satisfy Collection
-
-# ========================================
-# 9. FUNCTION COMPOSITION WITH CONSTRAINTS
-# ========================================
-
-# Create a pipeline that preserves constraints
-pipeline = fn list => list | safeHead | add 10;
-
-# This works because each step preserves the Collection constraint
-pipeline_result = pipeline [1, 2, 3, 4, 5];  # Type: Int
+#TODO add new examples
 
 # ========================================
 # 10. CONSTRAINT SYSTEM BENEFITS DEMONSTRATION

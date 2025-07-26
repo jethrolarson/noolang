@@ -78,7 +78,7 @@ describe('Trait System - Consolidated Tests', () => {
 				addTraitDefinition(registry, trait);
 
 				const impl = {
-					typeName: 'Int',
+					typeName: 'Float',
 					functions: new Map([['testShow', { kind: 'variable', name: 'intToString' } as any]]),
 				};
 				
@@ -86,13 +86,13 @@ describe('Trait System - Consolidated Tests', () => {
 				expect(success).toBe(true);
 				
 				const showImpls = registry.implementations.get('TestShow');
-				expect(showImpls?.has('Int')).toBe(true);
+				expect(showImpls?.has('Float')).toBe(true);
 			});
 
 			test('should fail to add implementation for non-existent trait', () => {
 				const registry = createTraitRegistry();
 				const impl = {
-					typeName: 'Int',
+					typeName: 'Float',
 					functions: new Map([['testShow', { kind: 'variable', name: 'intToString' } as any]]),
 				};
 				
@@ -110,7 +110,7 @@ describe('Trait System - Consolidated Tests', () => {
 				addTraitDefinition(registry, trait);
 
 				const badImpl = {
-					typeName: 'Int',
+					typeName: 'Float',
 					functions: new Map([['testShow', {
 						kind: 'function',
 						params: ['a', 'b'], // Wrong arity - expects 1 param, provides 2
@@ -132,7 +132,7 @@ describe('Trait System - Consolidated Tests', () => {
 				addTraitDefinition(registry, trait);
 
 				const variableImpl = {
-					typeName: 'Int',
+					typeName: 'Float',
 					functions: new Map([['testShow', { kind: 'variable', name: 'someFunction' } as any]]),
 				};
 				
@@ -150,7 +150,7 @@ describe('Trait System - Consolidated Tests', () => {
 				addTraitDefinition(registry, trait);
 
 				const badImpl = {
-					typeName: 'Int',
+					typeName: 'Float',
 					functions: new Map([['wrongFunction', { kind: 'variable', name: 'something' } as any]]),
 				};
 
@@ -240,7 +240,7 @@ describe('Trait System - Consolidated Tests', () => {
 				const typeResult = typeProgram(program);
 				
 				assertPrimitiveType(typeResult.type);
-				expect(typeResult.type.name).toBe('Int');
+				expect(typeResult.type.name).toBe('Float');
 			});
 
 			test('should work with ConstrainedType infrastructure', () => {
@@ -315,10 +315,10 @@ describe('Trait System - Consolidated Tests', () => {
 				const program = parseProgram(code);
 				const typeResult = typeProgram(program);
 				
-				// CONSTRAINT COLLAPSE: Should succeed and return concrete List Int type
+				// CONSTRAINT COLLAPSE: Should succeed and return concrete List Float type
 				expect(typeResult.type.kind).toBe('list');
 				const typeString = typeToString(typeResult.type);
-				expect(typeString).toBe('List Int');
+				expect(typeString).toBe('List Float');
 				// Should NOT have constraint annotations anymore
 				expect(typeString).not.toMatch(/implements|given|α\d+/);
 			});
@@ -329,15 +329,15 @@ describe('Trait System - Consolidated Tests', () => {
 				const program = parseProgram(code);
 				const typeResult = typeProgram(program);
 				
-				// CONSTRAINT COLLAPSE: Should succeed and return concrete Option Int type
+				// CONSTRAINT COLLAPSE: Should succeed and return concrete Option Float type
 				expect(typeResult.type.kind).toBe('variant');
 				const typeString = typeToString(typeResult.type);
-				expect(typeString).toBe('Option Int');
+				expect(typeString).toBe('Option Float');
 				// Should NOT have constraint annotations anymore
 				expect(typeString).not.toMatch(/implements|given|α\d+/);
 			});
 
-			test('should resolve Show constraint for Int', () => {
+			test('should resolve Show constraint for Float', () => {
 				const code = 'result = show 42';
 				
 				const program = parseProgram(code);
@@ -392,7 +392,7 @@ describe('Trait System - Consolidated Tests', () => {
 				
 				const typeString = typeToString(typeResult.type);
 				expect(typeString).toMatch(/implements Functor/);
-				expect(typeString).toMatch(/-> .* Int/); // Should be a function returning constrained Int
+				expect(typeString).toMatch(/-> .* Float/); // Should be a function returning constrained Float
 			});
 
 			test('should handle nested function applications', () => {
@@ -406,10 +406,10 @@ describe('Trait System - Consolidated Tests', () => {
 				const program = parseProgram(code);
 				const typeResult = typeProgram(program);
 				
-				// CONSTRAINT COLLAPSE: Should succeed and resolve to concrete List Int
+				// CONSTRAINT COLLAPSE: Should succeed and resolve to concrete List Float
 				expect(typeResult.type.kind).toBe('list');
 				const typeString = typeToString(typeResult.type);
-				expect(typeString).toBe('List Int');
+				expect(typeString).toBe('List Float');
 				expect(typeString).not.toMatch(/implements|given|α\d+/);
 			});
 
@@ -443,7 +443,7 @@ describe('Trait System - Consolidated Tests', () => {
 				
 				// Should work normally without constraints
 				assertPrimitiveType(typeResult.type);
-				expect(typeResult.type.name).toBe('Int');
+				expect(typeResult.type.name).toBe('Float');
 			});
 
 			test('should work with let polymorphism', () => {
@@ -458,7 +458,7 @@ describe('Trait System - Consolidated Tests', () => {
 				
 				// Should succeed - polymorphic function used with different types
 				assertPrimitiveType(typeResult.type);
-				expect(typeResult.type.name).toBe('Int'); // Last definition wins
+				expect(typeResult.type.name).toBe('Float'); // Last definition wins
 			});
 
 			test('should integrate with ADT pattern matching', () => {
@@ -482,7 +482,7 @@ describe('Trait System - Consolidated Tests', () => {
 
 		describe('Error Message Quality', () => {
 			test('should provide helpful error for missing trait implementation', () => {
-				const code = 'result = map (fn x => x + 1) 42'; // Int doesn't implement Functor
+				const code = 'result = map (fn x => x + 1) 42'; // Float doesn't implement Functor
 				
 				const program = parseProgram(code);
 				
@@ -492,7 +492,7 @@ describe('Trait System - Consolidated Tests', () => {
 				} catch (error) {
 					const message = (error as Error).message;
 					expect(message).toMatch(/Functor/);
-					expect(message).toMatch(/Int/);
+					expect(message).toMatch(/Float/);
 					// Should suggest how to fix it
 					expect(message).toMatch(/implement/);
 				}
@@ -541,8 +541,8 @@ describe('Trait System - Consolidated Tests', () => {
 			const code = `
 				constraint Printable a ( print: a -> String );
 				constraint Renderable a ( render: a -> String );
-				implement Printable Int ( print = toString );
-				implement Renderable Int ( render = toString )
+				implement Printable Float ( print = toString );
+				implement Renderable Float ( render = toString )
 			`;
 			
 			const program = parseProgram(code);
@@ -556,8 +556,8 @@ describe('Trait System - Consolidated Tests', () => {
 			const code = `
 				constraint Printable a ( display: a -> String );
 				constraint Renderable a ( display: a -> String );
-				implement Printable Int ( display = toString );
-				implement Renderable Int ( display = toString );
+				implement Printable Float ( display = toString );
+				implement Renderable Float ( display = toString );
 				result = display 42
 			`;
 			
@@ -588,11 +588,11 @@ describe('Trait System - Consolidated Tests', () => {
 
 			// Both implement for same type
 			const printImpl = {
-				typeName: 'Int',
+				typeName: 'Float',
 				functions: new Map([['display', { kind: 'variable', name: 'printInt' } as any]]),
 			};
 			const renderImpl = {
-				typeName: 'Int',
+				typeName: 'Float',
 				functions: new Map([['display', { kind: 'variable', name: 'renderInt' } as any]]),
 			};
 
@@ -608,7 +608,7 @@ describe('Trait System - Consolidated Tests', () => {
 			const code = `
 				constraint Printable a ( display: a -> String );
 				constraint Renderable a ( display: a -> String );
-				implement Printable Int ( display = toString );
+				implement Printable Float ( display = toString );
 				implement Renderable String ( display = fn s => s );
 				intResult = display 42;
 				stringResult = display "hello"
@@ -632,12 +632,12 @@ describe('Trait System - Consolidated Tests', () => {
 			
 			const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 			
-			// CONSTRAINT COLLAPSE: Should be concrete List Int, not constrained
+			// CONSTRAINT COLLAPSE: Should be concrete List Float, not constrained
 			expect(typeResult.type.kind).toBe('list');
 			if (typeResult.type.kind === 'list') {
 				expect(typeResult.type.element.kind).toBe('primitive');
 				if (typeResult.type.element.kind === 'primitive') {
-					expect(typeResult.type.element.name).toBe('Int');
+					expect(typeResult.type.element.name).toBe('Float');
 				}
 			}
 			
@@ -652,7 +652,7 @@ describe('Trait System - Consolidated Tests', () => {
 		test('should work with custom trait function', () => {
 			const code = `
 				constraint CustomDouble a ( customDouble: a -> a );
-				implement CustomDouble Int ( customDouble = fn x => x * 2 );
+				implement CustomDouble Float ( customDouble = fn x => x * 2 );
 				customDouble 21
 			`;
 			

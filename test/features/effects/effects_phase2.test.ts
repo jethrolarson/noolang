@@ -110,7 +110,7 @@ describe('Effects Phase 2: Separated Effects Architecture', () => {
 			`);
 			expect(result.type.kind).toBe('primitive');
 			if (result.type.kind === 'primitive') {
-				expect(result.type.name).toBe('Int');
+				expect(result.type.name).toBe('Float');
 			}
 			expect(result.effects.size).toBe(0);
 		});

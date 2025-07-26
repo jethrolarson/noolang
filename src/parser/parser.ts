@@ -57,7 +57,7 @@ const parseTypeName: C.Parser<Token> = (tokens: Token[]) => {
 	}
 
 	const [first, ...rest] = tokens;
-	const typeKeywords = ['Int', 'Number', 'String', 'Unit', 'List'];
+	const typeKeywords = ['Float', 'String', 'Unit', 'List'];
 
 	if (
 		first.type === 'IDENTIFIER' ||
@@ -79,15 +79,14 @@ const parseTypeName: C.Parser<Token> = (tokens: Token[]) => {
 
 // --- Smaller focused type parsers ---
 
-// Parse primitive types (Int, String, etc.)
+// Parse primitive types (Float, String, etc.)
 const parsePrimitiveType = (tokens: Token[]): C.ParseResult<Type> => {
-	const primitiveTypes = ['Float', 'Number', 'String', 'Unit'];
+	const primitiveTypes = ['Float', 'String', 'Unit'];
 	for (const typeName of primitiveTypes) {
 		const result = C.keyword(typeName)(tokens);
 		if (result.success) {
 			switch (typeName) {
 				case 'Float':
-				case 'Number':
 					return { success: true, value: floatType(), remaining: result.remaining };
 				case 'String':
 					return { success: true, value: stringType(), remaining: result.remaining };
@@ -106,7 +105,7 @@ const parseListType = (tokens: Token[]): C.ParseResult<Type> => {
 		// Try to parse a type argument for List
 		const argResult = C.lazy(() => parseTypeAtom)(listKeywordResult.remaining);
 		if (argResult.success) {
-			// List with specific element type: List Number, List String, etc.
+			// List with specific element type: List Float, List String, etc.
 			return { success: true, value: listTypeWithElement(argResult.value), remaining: argResult.remaining };
 		} else {
 			// Just List (generic)
@@ -412,7 +411,7 @@ export const parseTypeExpression: C.Parser<Type> = tokens => {
 		}
 	}
 
-	// Try record type: { name: String, age: Number }
+	// Try record type: { name: String, age: Float }
 	const recordResult = C.seq(
 		C.punctuation('{'),
 		C.optional(
@@ -443,7 +442,7 @@ export const parseTypeExpression: C.Parser<Type> = tokens => {
 		};
 	}
 
-	// Try tuple type: { Number, String }
+	// Try tuple type: { Float, String }
 	const tupleResult = C.seq(
 		C.punctuation('{'),
 		C.optional(
@@ -1813,7 +1812,7 @@ const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
 			constraint: constraint.value,
 		})
 	),
-	// a has {@name String, @age Int} - Try this first since it has distinct syntax
+	// a has {@name String, @age Float} - Try this first since it has distinct syntax
 	C.map(
 		C.seq(
 			C.identifier(),

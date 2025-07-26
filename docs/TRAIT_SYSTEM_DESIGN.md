@@ -29,7 +29,7 @@ The trait system is **functionally complete**:
 - ✅ **Multi-Type Support**: Works with stdlib ADTs `Option`, `List`, `Result`
 
 #### Safety & Robustness  
-- ✅ **Duplicate Implementation Detection**: `implement Show Int` twice → error
+- ✅ **Duplicate Implementation Detection**: `implement Show Float` twice → error
 - ✅ **Signature Validation**: Function implementations must match trait signatures
 - ✅ **Ambiguous Function Prevention**: Same type implementing conflicting traits → error
 - ✅ **Clear Error Messages**: Helpful feedback for constraint violations
@@ -74,7 +74,7 @@ Extend the constraint system with structural constraints using the `has` keyword
 #### Syntax Design
 ```noo
 # Basic record constraints
-given a has {@name String, @age Int}
+given a has {@name String, @age Float}
 
 # Nested record constraints  
 given a has {@person {@name String}, @address {@street String, @city String}}
@@ -136,8 +136,8 @@ Once tuple pattern matching is implemented, extend `has` constraints to tuples:
 
 ```noo
 # Tuple constraints with pattern matching safety
-given a has {Int, String}           # At least Int, String (extra elements OK)
-given a has {_, Int}                # Second element must be Int
+given a has {Float, String}           # At least Float, String (extra elements OK)
+given a has {_, Float}                # Second element must be Float
 
 # Safe tuple accessors using pattern matching
 first = fn t => match t with ({x, ...} => x)

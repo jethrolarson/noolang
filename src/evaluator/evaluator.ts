@@ -1981,8 +1981,8 @@ export class Evaluator {
 	private getValueTypeName(value: Value): string {
 		// Get a type name from a runtime value for constraint resolution
 		if (isNumber(value)) {
-			// Distinguish between Int and Float based on whether it's an integer
-			return Number.isInteger(value.value) ? 'Int' : 'Float';
+			// Distinguish between Float and Float based on whether it's an integer
+			return Number.isInteger(value.value) ? 'Float' : 'Float';
 		}
 		if (isString(value)) return 'String';
 		if (isBool(value)) return 'Bool';

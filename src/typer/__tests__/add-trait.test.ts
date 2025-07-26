@@ -161,7 +161,7 @@ describe('Add Trait System', () => {
 			const tokens = new Lexer(code).tokenize();
 			const program = parse(tokens);
 			
-			expect(() => typeAndDecorate(program)).toThrow(/Operator type mismatch|Expected.*Int.*Got.*String/i);
+			expect(() => typeAndDecorate(program)).toThrow(/Operator type mismatch|Expected.*Float.*Got.*String/i);
 		});
 	});
 });
