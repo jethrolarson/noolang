@@ -1,7 +1,7 @@
 // NEW MINIMAL TRAIT SYSTEM
 // Designed to make `map increment (Some 1)` work with simple dispatch
 
-import { Type, Expression } from '../ast';
+import { Type, Expression, FunctionExpression, ConstraintExpr } from '../ast';
 import { TypeState } from './types';
 
 // Simple trait definition - just a name and function signatures
@@ -15,6 +15,7 @@ export type TraitDefinition = {
 export type TraitImplementation = {
 	typeName: string; // e.g., "Option", "List", "Int"
 	functions: Map<string, Expression>; // function name -> implementation expression
+	givenConstraints?: ConstraintExpr; // Optional given constraints for conditional implementations
 };
 
 // Registry holding all traits and their implementations
@@ -24,6 +25,23 @@ export type TraitRegistry = {
 	// Track which traits define each function name for conflict detection
 	functionTraits: Map<string, string[]>; // function name -> trait names that define it
 };
+
+// Helper function to count parameters in a function expression
+function countExpressionParams(expr: Expression): number {
+	if (expr.kind === 'function') {
+		return (expr as FunctionExpression).params.length;
+	}
+	// For non-function expressions (like variables), we can't determine arity
+	// Return -1 to indicate unknown arity (this will be handled in validation)
+	return -1;
+}
+
+// Helper function to count parameters in a function type (handles curried types)
+function countTypeParams(type: Type): number {
+	if (type.kind !== 'function') return 0;
+	// Count current parameters plus any parameters in the return type (for curried functions)
+	return type.params.length + countTypeParams(type.return);
+}
 
 // Create empty trait registry
 export function createTraitRegistry(): TraitRegistry {
@@ -55,7 +73,7 @@ export function addTraitDefinition(
 	}
 }
 
-// Add a trait implementation
+// Add a trait implementation with signature validation
 export function addTraitImplementation(
 	registry: TraitRegistry,
 	traitName: string,
@@ -71,6 +89,35 @@ export function addTraitImplementation(
 		throw new Error(`Duplicate implementation of ${traitName} for ${impl.typeName}`);
 	}
 	
+	// Get the trait definition for signature validation
+	const traitDef = registry.definitions.get(traitName);
+	if (!traitDef) {
+		throw new Error(`Trait definition not found for ${traitName}`);
+	}
+	
+	// Validate each function signature matches the constraint definition
+	for (const [functionName, implExpr] of impl.functions.entries()) {
+		const expectedType = traitDef.functions.get(functionName);
+		if (!expectedType) {
+			throw new Error(`Function '${functionName}' not defined in trait ${traitName}`);
+		}
+		
+		// Count parameters in expected type vs implementation
+		const expectedParamCount = countTypeParams(expectedType);
+		const actualParamCount = countExpressionParams(implExpr);
+		
+		// Only validate arity for function expressions (actualParamCount >= 0)
+		// For variable references and other expressions, we can't determine arity at this stage
+		if (actualParamCount >= 0 && actualParamCount !== expectedParamCount) {
+			throw new Error(
+				`Function signature mismatch for '${functionName}' in ${traitName} implementation for ${impl.typeName}: ` +
+				`expected ${expectedParamCount} parameters, got ${actualParamCount}`
+			);
+		}
+	}
+	
+	// TODO: Validate given constraints are satisfied
+	// For now, just store the implementation with its given constraints
 	traitImpls.set(impl.typeName, impl);
 	return true;
 }

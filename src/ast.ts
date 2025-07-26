@@ -371,6 +371,7 @@ export interface ImplementDefinitionExpression {
 	kind: 'implement-definition';
 	constraintName: string;
 	typeExpr: Type; // Changed from typeName to support type applications like (Result e)
+	givenConstraints?: ConstraintExpr; // Optional given constraints for conditional implementations
 	implementations: ImplementationFunction[];
 	type?: Type;
 	location: Location;

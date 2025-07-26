@@ -10,6 +10,15 @@ constraint Show a (
   show : a -> String
 );
 
+# Basic Show implementations (must come before conditional implementations)
+implement Show Int (
+  show = fn i => toString i
+);
+
+implement Show String (
+  show = fn s => s
+);
+
 # Constraint for monads
 constraint Monad m ( 
   bind : m a -> (a -> m b) -> m b; 
@@ -46,6 +55,9 @@ id = fn x => x;
 
 type Bool = True | False;
 
+# Boolean negation
+not = fn b => match b with (True => False; False => True);
+
 implement Show Bool (
   show = fn b => match b with (
     True => "True";
@@ -53,8 +65,12 @@ implement Show Bool (
   )
 );
 
-# Boolean negation
-not = fn b => match b with (True => False; False => True);
+implement Eq Bool (
+  equals = fn a b => match a with (
+    True => b;
+    False => not b
+  )
+)
 
 # ========================================
 # OPTION TYPE
@@ -62,9 +78,9 @@ not = fn b => match b with (True => False; False => True);
 
 type Option a = Some a | None;
 
-implement Show Option (
-  show = fn showElement opt => match opt with (
-    Some x => concat "Some(" (concat (showElement x) ")");
+implement Show (Option a) given a implements Show (
+  show = fn opt => match opt with (
+    Some x => concat "Some(" (concat (show x) ")");
     None => "None"
   )
 );
@@ -118,9 +134,9 @@ implement Applicative Option (
 type Result a b = Ok a | Err b;
 
 implement Show Result (
-  show = fn showOk showErr res => match res with (
-    Ok x => concat "Ok(" (concat (showOk x) ")");
-    Err e => concat "Err(" (concat (showErr e) ")")
+  show = fn res => match res with (
+    Ok x => concat "Ok(" (concat (show x) ")");
+    Err e => concat "Err(" (concat (show e) ")")
   )
 );
 
@@ -200,14 +216,6 @@ implement Monad List (
 # ========================================
 # Constraint implementations for basic types
 # ========================================
-
-implement Show Int (
-  show = fn i => toString i
-);
-
-implement Show String (
-  show = id
-);
 
 # Eq-like functions for basic types
 implement Eq Int (

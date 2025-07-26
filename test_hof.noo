@@ -1,5 +1,0 @@
-# Test higher-order functions
-apply = fn f x => f x;
-increment = fn x => x + 1;
-
-apply increment 5

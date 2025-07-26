@@ -1,3 +1,0 @@
-# Test simple generic function
-id = fn x => x;
-id 42

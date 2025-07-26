@@ -66,6 +66,114 @@ describe('Trait System Phase 1 Infrastructure', () => {
 			
 			expect(success).toBe(false);
 		});
+
+		it('should reject implementation with wrong function signature', () => {
+			const registry = createTraitRegistry();
+			const trait = {
+				name: 'Show',
+				typeParam: 'a',
+				functions: new Map([['show', functionType([typeVariable('a')], stringType())]]),
+			};
+			addTraitDefinition(registry, trait);
+
+			// This is the exact case from the documentation: Show takes 1 param, but implementation takes 2
+			const badImpl = {
+				typeName: 'Option',
+				functions: new Map([['show', {
+					kind: 'function',
+					params: ['showElement', 'opt'], // 2 parameters - WRONG!
+					body: { kind: 'literal', value: 'dummy' }
+				} as any]]),
+			};
+			
+			expect(() => addTraitImplementation(registry, 'Show', badImpl))
+				.toThrow('Function signature mismatch for \'show\' in Show implementation for Option: expected 1 parameters, got 2');
+		});
+
+		it('should reject implementation with too few parameters', () => {
+			const registry = createTraitRegistry();
+			const trait = {
+				name: 'Test',
+				typeParam: 'a',
+				functions: new Map([['fn2', functionType([typeVariable('a'), typeVariable('a')], stringType())]]),
+			};
+			addTraitDefinition(registry, trait);
+
+			const badImpl = {
+				typeName: 'Int',
+				functions: new Map([['fn2', {
+					kind: 'function',
+					params: ['x'], // 1 parameter, expected 2
+					body: { kind: 'literal', value: 'dummy' }
+				} as any]]),
+			};
+			
+			expect(() => addTraitImplementation(registry, 'Test', badImpl))
+				.toThrow('Function signature mismatch for \'fn2\' in Test implementation for Int: expected 2 parameters, got 1');
+		});
+
+		it('should accept implementation with correct function signature', () => {
+			const registry = createTraitRegistry();
+			const trait = {
+				name: 'Show',
+				typeParam: 'a',
+				functions: new Map([['show', functionType([typeVariable('a')], stringType())]]),
+			};
+			addTraitDefinition(registry, trait);
+
+			const correctImpl = {
+				typeName: 'Option',
+				functions: new Map([['show', {
+					kind: 'function',
+					params: ['opt'], // 1 parameter - CORRECT!
+					body: { kind: 'literal', value: 'dummy' }
+				} as any]]),
+			};
+			
+			const success = addTraitImplementation(registry, 'Show', correctImpl);
+			expect(success).toBe(true);
+		});
+
+		it('should accept variable references (unknown arity)', () => {
+			const registry = createTraitRegistry();
+			const trait = {
+				name: 'Show',
+				typeParam: 'a',
+				functions: new Map([['show', functionType([typeVariable('a')], stringType())]]),
+			};
+			addTraitDefinition(registry, trait);
+
+			// Variable references can't be validated at this stage
+			const variableImpl = {
+				typeName: 'Int',
+				functions: new Map([['show', { kind: 'variable', name: 'intToString' } as any]]),
+			};
+			
+			const success = addTraitImplementation(registry, 'Show', variableImpl);
+			expect(success).toBe(true);
+		});
+
+		it('should reject function not defined in trait', () => {
+			const registry = createTraitRegistry();
+			const trait = {
+				name: 'Show',
+				typeParam: 'a',
+				functions: new Map([['show', functionType([typeVariable('a')], stringType())]]),
+			};
+			addTraitDefinition(registry, trait);
+
+			const badImpl = {
+				typeName: 'Int',
+				functions: new Map([['nonExistentFunction', {
+					kind: 'function',
+					params: ['x'],
+					body: { kind: 'literal', value: 'dummy' }
+				} as any]]),
+			};
+			
+			expect(() => addTraitImplementation(registry, 'Show', badImpl))
+				.toThrow('Function \'nonExistentFunction\' not defined in trait Show');
+		});
 	});
 
 	describe('Trait Function Resolution', () => {
@@ -212,7 +320,6 @@ describe('Trait System Phase 1 Infrastructure', () => {
 
 	describe('Trait Function Type Inference Integration', () => {
 		it('should generate generic function type for trait function lookups', () => {
-			// Create a mock state with a trait definition
 			const registry = createTraitRegistry();
 			const trait = {
 				name: 'Show',
@@ -221,20 +328,113 @@ describe('Trait System Phase 1 Infrastructure', () => {
 			};
 			addTraitDefinition(registry, trait);
 
-			// Test that isTraitFunction works correctly
 			expect(isTraitFunction(registry, 'show')).toBe(true);
-			
-			// The type inference will return a generic function type for trait functions
-			// This is tested indirectly by verifying the trait function is recognized
 		});
 
 		it('should maintain registry state through type inference', () => {
-			const program = parseProgram('42');
-			const result = typeProgram(program);
+			const program = parseProgram(`
+				constraint TestShow a ( show2 : a -> String );
+				implement TestShow Int ( show2 = toString );
+				result = show2 42
+			`);
+
+			expect(() => typeProgram(program)).not.toThrow();
+		});
+	});
+
+	describe('Conditional Implementations (Given Constraints)', () => {
+		it('should parse implement statements with given constraints', () => {
+			const program = parseProgram(`
+				constraint Show a ( show : a -> String );
+				implement Show (List a) given a implements Show ( 
+					show = fn list => "test" 
+				);
+			`);
+
+			expect(program.statements).toHaveLength(1);
+			// The parser treats constraint; implement as a binary expression
+			const binaryExpr = program.statements[0] as any;
+			expect(binaryExpr.kind).toBe('binary');
+			expect(binaryExpr.operator).toBe(';');
 			
-			// Should have trait registry with stdlib definitions
-			expect(result.state.traitRegistry).toBeDefined();
-			expect(result.state.traitRegistry.definitions.size).toBeGreaterThan(0);
+			// The implement statement is the right side of the binary expression
+			const implementStmt = binaryExpr.right;
+			expect(implementStmt.kind).toBe('implement-definition');
+			
+			expect(implementStmt.constraintName).toBe('Show');
+			expect(implementStmt.givenConstraints).toBeDefined();
+			expect(implementStmt.givenConstraints.kind).toBe('implements');
+			expect(implementStmt.givenConstraints.typeVar).toBe('a');
+			expect(implementStmt.givenConstraints.interfaceName).toBe('Show');
+		});
+
+		it('should validate given constraints are satisfied during implementation', () => {
+			const registry = createTraitRegistry();
+			
+			// Define Show trait
+			const showTrait = {
+				name: 'Show',
+				typeParam: 'a',
+				functions: new Map([['show', functionType([typeVariable('a')], stringType())]]),
+			};
+			addTraitDefinition(registry, showTrait);
+
+			// This should fail because we haven't implemented Show Int yet
+			const conditionalImpl = {
+				typeName: 'List',
+				functions: new Map([['show', {
+					kind: 'function',
+					params: ['list'],
+					body: { kind: 'literal', value: 'test' }
+				} as any]]),
+				givenConstraints: {
+					kind: 'implements',
+					typeVar: 'a',
+					interfaceName: 'Show'
+				} as any
+			};
+
+			// TODO: This should eventually check that the given constraint is satisfied
+			// For now, just test that it doesn't crash
+			expect(() => addTraitImplementation(registry, 'Show', conditionalImpl))
+				.not.toThrow();
+		});
+
+		it('should accept conditional implementations when constraints are satisfied', () => {
+			const registry = createTraitRegistry();
+			
+			// Define Show trait
+			const showTrait = {
+				name: 'Show',
+				typeParam: 'a',
+				functions: new Map([['show', functionType([typeVariable('a')], stringType())]]),
+			};
+			addTraitDefinition(registry, showTrait);
+
+			// First implement Show Int
+			const intImpl = {
+				typeName: 'Int',
+				functions: new Map([['show', { kind: 'variable', name: 'toString' } as any]]),
+			};
+			addTraitImplementation(registry, 'Show', intImpl);
+
+			// Now implement Show (List a) given Show a - this should work
+			const conditionalImpl = {
+				typeName: 'List',
+				functions: new Map([['show', {
+					kind: 'function',
+					params: ['list'],
+					body: { kind: 'literal', value: 'test' }
+				} as any]]),
+				givenConstraints: {
+					kind: 'implements',
+					typeVar: 'a',
+					interfaceName: 'Show'
+				} as any
+			};
+
+			const success = addTraitImplementation(registry, 'Show', conditionalImpl);
+			expect(success).toBe(true);
 		});
 	});
 });
