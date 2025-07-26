@@ -134,7 +134,15 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 			C.sepBy(
 				C.map(
 					C.seq(
-						C.identifier(),
+						C.choice(
+							// Support @field syntax for consistency with values
+							C.map(
+								C.seq(C.punctuation('@'), C.identifier()),
+								([_, name]) => name
+							),
+							// Also support plain identifier for backward compatibility
+							C.identifier()
+						),
 						C.punctuation(':'),
 						C.lazy(() => parseTypeExpression)
 					),
@@ -1899,7 +1907,7 @@ const parseExprWithType: C.Parser<Expression> = C.choice(
 	// Expression with type and constraints: expr : type given constraintExpr
 	C.map(
 		C.seq(
-			parseThrush, // Use parseThrush to support full expression hierarchy
+			C.lazy(() => parseSequenceTermWithIf), // Use parseSequenceTermWithIf to avoid circular dependency
 			C.punctuation(':'),
 			C.lazy(() => parseTypeExpression),
 			C.keyword('given'),
@@ -1916,7 +1924,7 @@ const parseExprWithType: C.Parser<Expression> = C.choice(
 	// Expression with just type: expr : type
 	C.map(
 		C.seq(
-			parseThrush, // Use parseThrush to support full expression hierarchy
+			C.lazy(() => parseSequenceTermWithIf), // Use parseSequenceTermWithIf to avoid circular dependency
 			C.punctuation(':'),
 			C.lazy(() => parseTypeExpression)
 		),
@@ -1927,18 +1935,18 @@ const parseExprWithType: C.Parser<Expression> = C.choice(
 			location: expr.location,
 		})
 	),
-	parseThrush // Fallback to regular expressions
+	C.lazy(() => parseSequenceTermWithIf) // Fallback to regular expressions
 );
 
 // --- Sequence (semicolon) ---
 // Accepts a sequence of definitions and/or expressions, separated by semicolons
 const parseSequence: C.Parser<Expression> = C.map(
 	C.seq(
-		C.lazy(() => parseSequenceTermWithIf),
+		C.lazy(() => parseExprWithType),
 		C.many(
 			C.seq(
 				C.punctuation(';'),
-				C.lazy(() => parseSequenceTermWithIf)
+				C.lazy(() => parseExprWithType)
 			)
 		)
 	),
