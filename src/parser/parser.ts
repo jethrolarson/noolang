@@ -1246,6 +1246,25 @@ const parseIfAfterDollar: C.Parser<Expression> = tokens => {
 };
 
 // Helper function to apply postfix operators to an expression
+// Parse type annotation with optional constraint: : Type [given Constraint]
+const parseTypeAnnotation = C.map(
+	C.seq(
+		C.punctuation(':'),
+		parseTypeExpression,
+		C.optional(
+			C.seq(
+				C.keyword('given'),
+				C.lazy(() => parseConstraintExpr)
+			)
+		)
+	),
+	([_colon, type, constraintClause]) => ({
+		type,
+		constraint: constraintClause ? constraintClause[1] : undefined
+	})
+);
+
+// Clean postfix parser using combinators
 const parsePostfixFromResult = (
 	expr: Expression,
 	tokens: Token[]
@@ -1253,59 +1272,33 @@ const parsePostfixFromResult = (
 	let result = expr;
 	let remaining = tokens;
 
-	// Try to parse postfix type annotations
+	// Try to parse type annotations repeatedly
 	while (remaining.length > 0) {
-		// Try to parse : type given constraint
-		if (
-			remaining.length >= 2 &&
-			remaining[0].type === 'PUNCTUATION' &&
-			remaining[0].value === ':'
-		) {
-			const typeResult = parseTypeExpression(remaining.slice(1));
-			if (!typeResult.success) break;
+		const annotationResult = parseTypeAnnotation(remaining);
+		if (!annotationResult.success) break;
 
-			// Check if there's a "given" constraint after the type
-			if (
-				typeResult.remaining.length > 0 &&
-				typeResult.remaining[0].type === 'KEYWORD' &&
-				typeResult.remaining[0].value === 'given'
-			) {
-				const constraintResult = parseConstraintExpr(
-					typeResult.remaining.slice(1)
-				);
-				if (!constraintResult.success) break;
-
-				result = {
-					kind: 'constrained',
-					expression: result,
-					type: typeResult.value,
-					constraint: constraintResult.value,
-					location: result.location,
-				};
-				remaining = constraintResult.remaining;
-				continue;
-			} else {
-				// Just a type annotation without constraints
-				result = {
-					kind: 'typed',
-					expression: result,
-					type: typeResult.value,
-					location: result.location,
-				};
-				remaining = typeResult.remaining;
-				continue;
-			}
+		// Create appropriate expression based on whether we have constraints
+		if (annotationResult.value.constraint) {
+			result = {
+				kind: 'constrained',
+				expression: result,
+				type: annotationResult.value.type,
+				constraint: annotationResult.value.constraint,
+				location: result.location,
+			};
+		} else {
+			result = {
+				kind: 'typed',
+				expression: result,
+				type: annotationResult.value.type,
+				location: result.location,
+			};
 		}
-
-		// No more postfix operators
-		break;
+		
+		remaining = annotationResult.remaining;
 	}
 
-	return {
-		success: true,
-		value: result,
-		remaining,
-	};
+	return { success: true, value: result, remaining };
 };
 
 // --- Definition ---
