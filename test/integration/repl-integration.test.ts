@@ -114,16 +114,16 @@ describe('REPL Integration Tests', () => {
 
 	describe('Function Definitions and Calls', () => {
 		test('should define and call functions', async () => {
-			await sendInput('double = (x) => x * 2');
-			const result = await sendInput('double(5)');
+			await sendInput('double = fn x => x * 2');
+			const result = await sendInput('double 5');
 			expect(result).toContain('10');
 		});
 
 		test('should handle recursive functions', async () => {
 			await sendInput(
-				'factorial = (n) => if n <= 1 then 1 else n * factorial(n - 1)'
+				'factorial = fn n => if n <= 1 then 1 else n * factorial(n - 1)'
 			);
-			const result = await sendInput('factorial(4)');
+			const result = await sendInput('factorial 4');
 			expect(result).toContain('24');
 		});
 	});
@@ -135,7 +135,7 @@ describe('REPL Integration Tests', () => {
 		});
 
 		test('should handle records', async () => {
-			const result = await sendInput('{ name: "John", age: 30 }');
+			const result = await sendInput('{ @name "John", @age 30 }');
 			expect(result).toContain('name');
 			expect(result).toContain('John');
 		});
@@ -150,7 +150,7 @@ describe('REPL Integration Tests', () => {
 	describe('REPL Commands', () => {
 		test('should respond to .help command', async () => {
 			const result = await sendInput('.help');
-			expect(result).toContain('Commands') || expect(result).toContain('help');
+			expect(result.includes('Commands') || result.includes('help')).toBe(true);
 		});
 
 		test('should respond to .env command', async () => {
@@ -168,18 +168,17 @@ describe('REPL Integration Tests', () => {
 
 	describe('Error Handling', () => {
 		test('should handle syntax errors gracefully', async () => {
-			const result = await sendInput('2 + + 3');
-			expect(result).toContain('error') || expect(result).toContain('Error');
+			const result = await sendInput('2 + +');
+			expect(result.includes('error') || result.includes('Error')).toBe(true);
 		});
 
 		test('should handle undefined variable errors', async () => {
 			const result = await sendInput('undefinedVar');
-			expect(result).toContain('error') ||
-				expect(result).toContain('undefined');
+			expect(result.includes('error') || result.includes('undefined')).toBe(true);
 		});
 
 		test('should continue after errors', async () => {
-			await sendInput('invalid syntax here');
+			await sendInput('2 + +');
 			const result = await sendInput('2 + 2');
 			expect(result).toContain('4');
 		});
@@ -195,16 +194,16 @@ describe('REPL Integration Tests', () => {
 
 	describe('Multi-line Input', () => {
 		test('should handle complex expressions', async () => {
-			const complexExpr = `
-        let result = if true then
-          let x = 10
-          let y = 20
-          x + y
-        else
-          0
-      `;
+			const complexExpr = `if true then (
+				x = 10;
+				y = 20;
+				x + y
+			) else 0`;
 			const result = await sendInput(complexExpr);
 			expect(result).toContain('30');
 		});
 	});
-}, 30000); // Extended timeout for integration tests
+}); // Extended timeout for integration tests
+
+// Set timeout for the entire describe block
+jest.setTimeout(30000);
