@@ -235,14 +235,11 @@ implement Add List (
 # Constraint implementations for basic types
 # ========================================
 
-<<<<<<< HEAD
 # Eq-like functions for basic types
 implement Eq Float (
   equals = primitive_float_eq
 );
 
-=======
->>>>>>> c5f6aca (Replace Int type with Float in type system and standard library)
 implement Eq String (
   equals = primitive_string_eq
 );

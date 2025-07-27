@@ -826,10 +826,7 @@ export class Evaluator {
 			})
 		);
 
-<<<<<<< HEAD
 		// Primitive Add trait implementations
-=======
->>>>>>> c5f6aca (Replace Int type with Float in type system and standard library)
 		this.environment.set(
 			'primitive_float_add',
 			createNativeFunction('primitive_float_add', (a: Value) => (b: Value) => {
