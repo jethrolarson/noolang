@@ -1,73 +1,58 @@
-/**
- * @jest-environment node
- * @jest-environment-options {"silent": true}
- */
+import { test } from 'uvu';
+import * as assert from 'uvu/assert';
 
-// Mock console before importing REPL to prevent output pollution
+// Mock console to prevent output pollution
 const originalConsole = { ...console };
 global.console = {
 	...originalConsole,
-	log: jest.fn(),
-	warn: jest.fn(),
-	error: jest.fn(),
+	log: () => {},
+	warn: () => {},
+	error: () => {},
 };
 
 import { REPL } from '../../repl';
 
-// Mock readline to prevent hanging in tests
-jest.mock('node:readline', () => ({
-	createInterface: jest.fn().mockReturnValue({
-		prompt: jest.fn(),
-		on: jest.fn(),
-		close: jest.fn(),
-	}),
-}));
-
-describe('REPL Unit Tests', () => {
-	afterAll(() => {
-		// Restore original console
-		global.console = originalConsole;
-	});
-
-	describe('REPL Instance', () => {
-		test('should create REPL instance', () => {
-			const repl = new REPL();
-			expect(repl).toBeInstanceOf(REPL);
-		});
-
-		test('should have evaluator property', () => {
-			const repl = new REPL();
-			expect(repl.evaluator).toBeDefined();
-		});
-
-		test('should have typeState property', () => {
-			const repl = new REPL();
-			expect(repl.typeState).toBeDefined();
-		});
-
-		test('should have readline interface', () => {
-			const repl = new REPL();
-			expect(repl.rl).toBeDefined();
-		});
-	});
-
-	describe('Basic Functionality', () => {
-		test('should handle empty input', () => {
-			const repl = new REPL();
-			const processInput = repl.processInput.bind(repl);
-			expect(() => processInput('')).not.toThrow();
-		});
-
-		test('should handle command input', () => {
-			const repl = new REPL();
-			const processInput = repl.processInput.bind(repl);
-			expect(() => processInput('.help')).not.toThrow();
-		});
-
-		test('should handle unknown command', () => {
-			const repl = new REPL();
-			const processInput = repl.processInput.bind(repl);
-			expect(() => processInput('.unknown')).not.toThrow();
-		});
-	});
+test('REPL Unit Tests - REPL Instance - should create REPL instance', () => {
+	const repl = new REPL();
+	assert.instance(repl, REPL);
 });
+
+test('REPL Unit Tests - REPL Instance - should have evaluator property', () => {
+	const repl = new REPL();
+	assert.ok(repl.evaluator);
+});
+
+test('REPL Unit Tests - REPL Instance - should have typeState property', () => {
+	const repl = new REPL();
+	assert.ok(repl.typeState);
+});
+
+test('REPL Unit Tests - REPL Instance - should have readline interface', () => {
+	const repl = new REPL();
+	assert.ok(repl.rl);
+});
+
+test('REPL Unit Tests - Basic Functionality - should handle empty input', () => {
+	const repl = new REPL();
+	const processInput = repl.processInput.bind(repl);
+	assert.not.throws(() => processInput(''));
+});
+
+test('REPL Unit Tests - Basic Functionality - should handle command input', () => {
+	const repl = new REPL();
+	const processInput = repl.processInput.bind(repl);
+	assert.not.throws(() => processInput('.help'));
+});
+
+test('REPL Unit Tests - Basic Functionality - should handle unknown command', () => {
+	const repl = new REPL();
+	const processInput = repl.processInput.bind(repl);
+	assert.not.throws(() => processInput('.unknown'));
+});
+
+// Restore original console after tests
+process.on('exit', () => {
+	global.console = originalConsole;
+});
+
+test.run();

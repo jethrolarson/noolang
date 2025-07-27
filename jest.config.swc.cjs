@@ -1,3 +1,18 @@
+const fs = require('fs');
+const path = require('path');
+
+// Read migrated tests from JSON file
+const getMigratedTests = () => {
+	try {
+		const migratedTestsPath = path.join(__dirname, 'uvu-migrated-tests.json');
+		const migratedTestsData = JSON.parse(fs.readFileSync(migratedTestsPath, 'utf8'));
+		return migratedTestsData.migratedFiles || [];
+	} catch (error) {
+		console.warn('Warning: Could not read uvu-migrated-tests.json, using empty list');
+		return [];
+	}
+};
+
 module.exports = {
 	testEnvironment: 'node',
 
@@ -38,25 +53,5 @@ module.exports = {
 	],
 
 	// Exclude files that have been migrated to uvu
-	testPathIgnorePatterns: [
-		// Migrated to uvu - exclude from Jest
-		'test/language-features/record_tuple_unit.test.ts', // Migrated to uvu
-		'test/language-features/tuple.test.ts', // Migrated to uvu
-		'test/language-features/closure.test.ts', // Migrated to uvu
-		'test/type-system/option_unification.test.ts', // Migrated to uvu
-		'test/integration/import_relative.test.ts', // Migrated to uvu
-		'test/language-features/head_function.test.ts', // Migrated to uvu
-		'test/features/pattern-matching/pattern_matching_failures.test.ts', // Migrated to uvu
-		'test/type-system/print_type_pollution.test.ts', // Migrated to uvu
-		'test/features/operators/safe_thrush_operator.test.ts', // Migrated to uvu
-		'test/type-system/adt_limitations.test.ts', // Migrated to uvu
-		'test/features/effects/effects_phase2.test.ts', // Migrated to uvu
-		'test/features/operators/dollar-operator.test.ts', // Migrated to uvu
-		'test/features/effects/effects_phase3.test.ts', // Migrated to uvu
-		'test/features/adt.test.ts', // Migrated to uvu
-		'test/language-features/combinators.test.ts', // Migrated to uvu
-	
-		'src/typer/__tests__/type-display.test.ts', // Migrated to uvu
-		'src/typer/__tests__/trait-system-conflicting-functions.test.ts', // Migrated to uvu
-		'src/typer/__tests__/stdlib-parsing.test.ts', // Migrated to uvu],
+	testPathIgnorePatterns: getMigratedTests(),
 };
