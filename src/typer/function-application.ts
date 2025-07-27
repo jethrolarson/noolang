@@ -31,6 +31,7 @@ import { substitute } from './substitute';
 import { unify } from './unify';
 import { typeExpression } from './expression-dispatcher';
 import { freshTypeVariable } from './type-operations';
+import { getTypeName, resolveTraitFunction } from './trait-system';
 
 // CONSTRAINT COLLAPSE FIX: Function to try resolving constraints using argument types
 export function tryResolveConstraints(
@@ -39,7 +40,6 @@ export function tryResolveConstraints(
 	argTypes: Type[],
 	state: TypeState
 ): Type | null {
-	const { getTypeName } = require('./trait-system');
 	
 	// For each constraint, check if any of the argument types can satisfy it
 	for (const [varName, constraints] of functionConstraints.entries()) {
@@ -213,7 +213,6 @@ export const typeApplication = (
 	if (argTypes.length > 0) {
 		// Check if this could be a trait function call
 		if (expr.func.kind === 'variable') {
-			const { resolveTraitFunction } = require('./trait-system');
 			const resolution = resolveTraitFunction(
 				currentState.traitRegistry,
 				expr.func.name,

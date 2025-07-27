@@ -11,6 +11,7 @@ import {
 import { mapSet, typeToString, occursIn } from './helpers';
 // Legacy constraint imports removed
 import { functionApplicationError } from './type-errors';
+import { getTypeName } from './trait-system';
 
 // Valid primitive type names (must match PrimitiveType['name'] union)
 const VALID_PRIMITIVES = new Set(['Float', 'String', 'Bool', 'List'] as const);
@@ -634,8 +635,6 @@ function tryUnifyConstrainedVariant(
 		return null;
 	}
 
-	const { getTypeName } = require('./trait-system');
-
 	let variantType: Type & { kind: 'variant' };
 	let concreteType: Type;
 
@@ -806,8 +805,6 @@ function unifyConstrainedWithConcrete(
 	state: TypeState,
 	location?: { line: number; column: number }
 ): TypeState {
-	const { getTypeName } = require('./trait-system');
-	
 	// Get the concrete type name for trait lookup
 	const concreteTypeName = getTypeName(concreteType);
 	

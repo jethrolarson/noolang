@@ -56,5 +56,9 @@ module.exports = {
 		'test/features/operators/safe_thrush_operator.test.ts', // Migrated to uvu
 		'test/type-system/adt_limitations.test.ts', // Migrated to uvu
 		'test/features/effects/effects_phase2.test.ts', // Migrated to uvu
+		'test/features/operators/dollar-operator.test.ts', // Migrated to uvu
+		'test/features/effects/effects_phase3.test.ts', // Migrated to uvu
+		'test/features/adt.test.ts', // Migrated to uvu
+		'test/language-features/combinators.test.ts', // Migrated to uvu
 	],
 };
