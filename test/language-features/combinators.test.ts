@@ -301,10 +301,13 @@ test('Parser Combinators - lazy - should handle recursive parsers', () => {
 	
 	const expr: () => C.Parser<any> = () => C.choice(
 		C.token('NUMBER'),
-		C.seq(
-			C.token('PUNCTUATION', '('),
-			C.lazy(expr),
-			C.token('PUNCTUATION', ')')
+		C.map(
+			C.seq(
+				C.token('PUNCTUATION', '('),
+				C.lazy(expr),
+				C.token('PUNCTUATION', ')')
+			),
+			([_, inner, __]) => inner
 		)
 	);
 	
