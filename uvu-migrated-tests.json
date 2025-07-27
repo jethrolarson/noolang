@@ -13,7 +13,8 @@
     "test/features/effects/effects_phase2.test.ts",
     "test/features/operators/dollar-operator.test.ts",
     "test/features/effects/effects_phase3.test.ts",
-    "test/features/adt.test.ts"
+    "test/features/adt.test.ts",
+    "test/language-features/combinators.test.ts"
   ],
   "lastUpdated": "2025-01-27T18:45:00.000Z"
 }
