@@ -181,6 +181,7 @@ test.run();
 ```
 
 #### Skip Pattern for Unimplemented Features
+ONLY SKIP IF THE ORIGINAL TEST WAS SKIPPED IN JEST.
 ```typescript
 test.skip('Feature - unimplemented feature test - TODO: reason', () => {
   // Original test code as comment/reference
