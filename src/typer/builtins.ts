@@ -432,48 +432,9 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		});
 	}
 	
-	// Add basic trait implementations for built-in types
-	// These are needed for runtime trait function resolution in the evaluator
-	
-	// Create a minimal location for built-in implementations
-	const builtinLocation = {
-		start: { line: 0, column: 0 },
-		end: { line: 0, column: 0 }
-	};
-	
-	// Implement Add for Float
-	try {
-		addTraitImplementation(newState.traitRegistry, 'Add', {
-			typeName: 'Float',
-			functions: new Map([['add', { kind: 'variable', name: 'primitive_float_add', location: builtinLocation }]])
-		});
-	} catch (e) {
-		// Implementation may already exist from stdlib - that's ok
-	}
-	
-	// Implement Add for String
-	try {
-		addTraitImplementation(newState.traitRegistry, 'Add', {
-			typeName: 'String',
-			functions: new Map([['add', { kind: 'variable', name: 'primitive_string_concat', location: builtinLocation }]])
-		});
-	} catch (e) {
-		// Implementation may already exist from stdlib - that's ok
-	}
-	
-	// Implement Numeric for Float
-	try {
-		addTraitImplementation(newState.traitRegistry, 'Numeric', {
-			typeName: 'Float',
-			functions: new Map([
-				['subtract', { kind: 'variable', name: 'primitive_float_subtract', location: builtinLocation }],
-				['multiply', { kind: 'variable', name: 'primitive_float_multiply', location: builtinLocation }],
-				['divide', { kind: 'variable', name: 'primitive_float_divide', location: builtinLocation }]
-			])
-		});
-	} catch (e) {
-		// Implementation may already exist from stdlib - that's ok
-	}
+	// Built-in trait implementations are handled directly in the evaluator's
+	// getBuiltinTraitImplementation method to avoid circular dependencies
+	// and duplication with constraint checking in function-application.ts
 	
 	return newState;
 };

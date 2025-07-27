@@ -326,45 +326,46 @@ test('Built-in Trait Implementations - Function Definitions - should work with f
 // TRAIT IMPLEMENTATION VERIFICATION
 // ========================================
 
-test('Built-in Trait Implementations - Trait Registry - should have Add trait implemented for Float', () => {
-	const code = '1.0';
-	const { typeResult } = parseTypeAndEvaluate(code);
+test('Built-in Trait Implementations - Built-in Resolution - should resolve Add trait for Float via built-in mechanism', () => {
+	const code = '1.0 + 2.0';
+	const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 	
-	const addImpls = typeResult.state.traitRegistry.implementations.get('Add');
-	assert.ok(addImpls);
-	assert.ok(addImpls.has('Float'));
+	// Type checking should pass (constraint checking works)
+	assert.equal(typeResult.finalType, floatType());
 	
-	const floatAddImpl = addImpls.get('Float');
-	assert.ok(floatAddImpl);
-	assert.ok(floatAddImpl.functions.has('add'));
+	// Runtime should work (built-in resolution works)
+	assert.is(evalResult.finalResult.tag, 'number');
+	if (evalResult.finalResult.tag === 'number') {
+		assert.is(evalResult.finalResult.value, 3);
+	}
 });
 
-test('Built-in Trait Implementations - Trait Registry - should have Add trait implemented for String', () => {
-	const code = '"test"';
-	const { typeResult } = parseTypeAndEvaluate(code);
+test('Built-in Trait Implementations - Built-in Resolution - should resolve Add trait for String via built-in mechanism', () => {
+	const code = '"hello" + " world"';
+	const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 	
-	const addImpls = typeResult.state.traitRegistry.implementations.get('Add');
-	assert.ok(addImpls);
-	assert.ok(addImpls.has('String'));
+	// Type checking should pass (constraint checking works)
+	assert.equal(typeResult.finalType, stringType());
 	
-	const stringAddImpl = addImpls.get('String');
-	assert.ok(stringAddImpl);
-	assert.ok(stringAddImpl.functions.has('add'));
+	// Runtime should work (built-in resolution works)
+	assert.is(evalResult.finalResult.tag, 'string');
+	if (evalResult.finalResult.tag === 'string') {
+		assert.is(evalResult.finalResult.value, 'hello world');
+	}
 });
 
-test('Built-in Trait Implementations - Trait Registry - should have Numeric trait implemented for Float', () => {
-	const code = '1.0';
-	const { typeResult } = parseTypeAndEvaluate(code);
+test('Built-in Trait Implementations - Built-in Resolution - should resolve Numeric trait for Float via built-in mechanism', () => {
+	const code = '10.0 - 5.0';
+	const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 	
-	const numericImpls = typeResult.state.traitRegistry.implementations.get('Numeric');
-	assert.ok(numericImpls);
-	assert.ok(numericImpls.has('Float'));
+	// Type checking should pass (constraint checking works)
+	assert.equal(typeResult.finalType, floatType());
 	
-	const floatNumericImpl = numericImpls.get('Float');
-	assert.ok(floatNumericImpl);
-	assert.ok(floatNumericImpl.functions.has('subtract'));
-	assert.ok(floatNumericImpl.functions.has('multiply'));
-	assert.ok(floatNumericImpl.functions.has('divide'));
+	// Runtime should work (built-in resolution works)
+	assert.is(evalResult.finalResult.tag, 'number');
+	if (evalResult.finalResult.tag === 'number') {
+		assert.is(evalResult.finalResult.value, 5);
+	}
 });
 
 // ========================================

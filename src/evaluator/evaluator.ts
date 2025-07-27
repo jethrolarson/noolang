@@ -1914,6 +1914,34 @@ export class Evaluator {
 		}
 	}
 
+	private getBuiltinTraitImplementation(
+		traitName: string,
+		functionName: string,
+		typeName: string
+	): any {
+		// Handle built-in Add trait implementations
+		if (traitName === 'Add' && functionName === 'add') {
+			if (typeName === 'Float') {
+				return this.environment.get('primitive_float_add');
+			} else if (typeName === 'String') {
+				return this.environment.get('primitive_string_concat');
+			}
+		}
+		
+		// Handle built-in Numeric trait implementations
+		if (traitName === 'Numeric' && typeName === 'Float') {
+			if (functionName === 'subtract') {
+				return this.environment.get('primitive_float_subtract');
+			} else if (functionName === 'multiply') {
+				return this.environment.get('primitive_float_multiply');
+			} else if (functionName === 'divide') {
+				return this.environment.get('primitive_float_divide');
+			}
+		}
+		
+		return null;
+	}
+
 	private resolveTraitFunctionWithArgs(
 		functionName: string,
 		argValues: Value[],
@@ -1933,6 +1961,7 @@ export class Evaluator {
 
 			for (const [traitName, traitDef] of traitRegistry.definitions) {
 				if (traitDef.functions.has(functionName)) {
+					// First try user-defined implementations in the registry
 					const traitImpls = traitRegistry.implementations.get(traitName);
 					if (traitImpls) {
 						const impl = traitImpls.get(dispatchTypeName);
@@ -1955,6 +1984,25 @@ export class Evaluator {
 							}
 							return result;
 						}
+					}
+					
+					// If no user implementation found, try built-in implementations
+					const builtinImpl = this.getBuiltinTraitImplementation(traitName, functionName, dispatchTypeName);
+					if (builtinImpl) {
+						// Apply the built-in implementation to all accumulated arguments
+						let result: any = builtinImpl;
+						for (const argValue of argValues) {
+							if (isFunction(result)) {
+								result = result.fn(argValue);
+							} else if (isNativeFunction(result)) {
+								result = result.fn(argValue);
+							} else {
+								throw new Error(
+									`Cannot apply argument to non-function during built-in trait resolution`
+								);
+							}
+						}
+						return result;
 					}
 				}
 			}
