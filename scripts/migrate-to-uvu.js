@@ -20,32 +20,37 @@ const saveMigratedTests = (config) => {
 };
 
 const updateJestConfig = (filePath) => {
-  if (!fs.existsSync(JEST_CONFIG_FILE)) return;
+  const configFiles = ['jest.config.cjs', 'jest.config.swc.cjs'];
   
-  let jestConfig = fs.readFileSync(JEST_CONFIG_FILE, 'utf8');
-  
-  // Find the testPathIgnorePatterns array
-  if (jestConfig.includes('testPathIgnorePatterns:')) {
-    // Add the file to the ignore patterns
-    const newPattern = `\t\t'${filePath}', // Migrated to uvu`;
-    if (!jestConfig.includes(filePath)) {
-      jestConfig = jestConfig.replace(
-        /testPathIgnorePatterns:\s*\[([^\]]*)\]/,
-        (match, content) => {
-          if (content.includes('//')) {
-            // Insert before the comment line
-            return match.replace(/(\t\t.*\/\/ [^,]*)(,?\s*\])/,
-              `$1\n${newPattern}$2`);
-          } else {
-            // Add at the end
-            return `testPathIgnorePatterns: [${content.trim()}\n${newPattern}\n\t]`;
+  configFiles.forEach(configFile => {
+    if (!fs.existsSync(configFile)) return;
+    
+    let jestConfig = fs.readFileSync(configFile, 'utf8');
+    
+    // Find the testPathIgnorePatterns array
+    if (jestConfig.includes('testPathIgnorePatterns:')) {
+      // Add the file to the ignore patterns
+      const newPattern = `\t\t'${filePath}', // Migrated to uvu`;
+      if (!jestConfig.includes(filePath)) {
+        jestConfig = jestConfig.replace(
+          /testPathIgnorePatterns:\s*\[([^\]]*)\]/,
+          (match, content) => {
+            if (content.includes('//')) {
+              // Insert before the comment line
+              return match.replace(/(\t\t.*\/\/ [^,]*)(,?\s*\])/,
+                `$1\n${newPattern}$2`);
+            } else {
+              // Add at the end
+              return `testPathIgnorePatterns: [${content.trim()}\n${newPattern}\n\t]`;
+            }
           }
-        }
-      );
-      fs.writeFileSync(JEST_CONFIG_FILE, jestConfig);
-      console.log(`   ✓ Updated Jest config to exclude: ${filePath}`);
+        );
+        fs.writeFileSync(configFile, jestConfig);
+      }
     }
-  }
+  });
+  
+  console.log(`   ✓ Updated Jest configs to exclude: ${filePath}`);
 };
 
 const migrateFile = (filePath) => {
