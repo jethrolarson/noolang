@@ -2,9 +2,8 @@ import { test } from 'uvu';
 import * as assert from 'uvu/assert';
 
 // Mock console to prevent output pollution
-const originalConsole = { ...console };
 global.console = {
-	...originalConsole,
+	...console,
 	log: () => {},
 	warn: () => {},
 	error: () => {},
@@ -48,11 +47,6 @@ test('REPL Unit Tests - Basic Functionality - should handle unknown command', ()
 	const repl = new REPL();
 	const processInput = repl.processInput.bind(repl);
 	assert.not.throws(() => processInput('.unknown'));
-});
-
-// Restore original console after tests
-process.on('exit', () => {
-	global.console = originalConsole;
 });
 
 test.run();

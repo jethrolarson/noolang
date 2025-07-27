@@ -80,43 +80,9 @@ Migrate tests in order of complexity and dependencies:
 ```
 
 #### uvu Configuration (`uvu.config.js`)
-```javascript
-export default {
-  require: ['tsx/cjs'],
-  timeout: 30000,
-  concurrency: true,
-  bail: false
-};
-```
 
 #### Test Utilities (`test/utils.uvu.ts`)
-```typescript
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 
-// Shared test utilities for uvu
-export { test, assert };
-
-// Custom assertion helpers
-export const assertDeepEqual = (actual: any, expected: any) => {
-  assert.equal(JSON.stringify(actual), JSON.stringify(expected));
-};
-
-// beforeEach/afterEach equivalents
-export const createSuite = (name: string) => {
-  const suite = test.suite(name);
-  
-  suite.before = (fn: () => void) => {
-    // Global setup if needed
-  };
-  
-  suite.after = (fn: () => void) => {
-    // Global cleanup if needed
-  };
-  
-  return suite;
-};
-```
 
 ### 2. Migration Patterns
 
@@ -160,50 +126,6 @@ test('Suite - test', () => {
   // test code
 });
 test.run();
-```
-
-#### Mock Handling
-```typescript
-// BEFORE (Jest) - Simple mocks
-const mockFs = { readFileSync: jest.fn() };
-
-// AFTER (uvu) - Manual mocks (no change needed)
-const mockFs = { 
-  readFileSync: (path: string) => 'mocked content'
-};
-```
-
-### 3. Automated Migration Script
-
-Create `scripts/migrate-to-uvu.js`:
-```javascript
-#!/usr/bin/env node
-
-const fs = require('fs');
-const path = require('path');
-
-const migrateFile = (filePath) => {
-  let content = fs.readFileSync(filePath, 'utf8');
-  
-  // Basic transformations
-  content = content.replace(/import.*from '@jest\/globals'.*;?\n/g, "import { test } from 'uvu';\nimport * as assert from 'uvu/assert';\n");
-  content = content.replace(/describe\(['"`]([^'"`]+)['"`],\s*\(\)\s*=>\s*\{/g, '// Test suite: $1');
-  content = content.replace(/\s*it\(['"`]([^'"`]+)['"`],/g, "test('$1',");
-  content = content.replace(/expect\(([^)]+)\)\.toEqual\(([^)]+)\)/g, 'assert.equal($1, $2)');
-  content = content.replace(/expect\(([^)]+)\)\.toBe\(([^)]+)\)/g, 'assert.is($1, $2)');
-  
-  // Add test.run() at the end
-  if (!content.includes('test.run()')) {
-    content += '\ntest.run();\n';
-  }
-  
-  // Write to .uvu.ts file
-  const newPath = filePath.replace('.test.ts', '.uvu.ts');
-  fs.writeFileSync(newPath, content);
-  console.log(`Migrated: ${filePath} -> ${newPath}`);
-};
-
-// Migration logic here...
 ```
 
 ### 4. CI/CD Updates
@@ -262,40 +184,6 @@ test('my test', () => withSetup((data) => {
 }));
 ```
 
-### 3. Complex Mocking
-**Challenge**: No built-in mocking like Jest
-**Solution**: Manual mocks or simple mock libraries
-```typescript
-// Simple manual mocks work fine for most cases
-const createMockFs = () => ({
-  readFileSync: (path: string) => mockFileContents[path] || '',
-  existsSync: (path: string) => path in mockFileContents
-});
-```
-
-### 4. Snapshot Testing
-**Challenge**: uvu doesn't have built-in snapshots
-**Solution**: 
-- Use a simple snapshot library like `@paka/snapshot`
-- Or convert to explicit assertions
-
-## Risk Assessment
-
-### Low Risk Items
-- Simple unit tests with basic assertions
-- Tests without complex mocking
-- Tests with straightforward setup/teardown
-
-### Medium Risk Items  
-- Tests with beforeEach/afterEach patterns
-- Tests with simple mocking
-- Integration tests with file system mocking
-
-### High Risk Items
-- Tests with complex Jest-specific features
-- Tests with extensive mocking/spying
-- Tests that rely on Jest's specific assertion behavior
-
 ## Success Metrics
 
 ### Performance Goals
@@ -309,43 +197,3 @@ const createMockFs = () => ({
 - [ ] Maintain or improve code coverage
 - [ ] Zero breaking changes to test behavior
 - [ ] Improved developer experience
-
-## Timeline
-
-### Week 1
-- **Days 1-2**: Infrastructure setup and tooling
-- **Days 3-4**: Migrate simple tests (Batches 1-2)
-- **Day 5**: Validate and fix issues
-
-### Week 2  
-- **Days 1-2**: Migrate complex tests (Batches 3-4)
-- **Days 3-4**: Integration testing and performance validation
-- **Day 5**: Documentation and cleanup
-
-## Rollback Plan
-
-1. Keep Jest dependencies until migration is complete
-2. Maintain parallel test scripts during transition
-3. Git branching strategy for safe rollback
-4. Performance benchmarks at each phase
-
-## Getting Started
-
-### Immediate Next Steps
-1. Run `npm install --save-dev uvu c8 tsx`
-2. Create basic uvu configuration
-3. Start with the simplest test file migration
-4. Set up parallel CI pipeline for validation
-5. Create migration tooling/scripts
-
-### Command to Start Migration
-```bash
-# Install dependencies
-npm install --save-dev uvu c8 tsx
-
-# Migrate first simple test
-node scripts/migrate-to-uvu.js test/language-features/record_tuple_unit.test.ts
-
-# Test the migration
-npm run test:uvu -- test/language-features/record_tuple_unit.uvu.ts
-```
