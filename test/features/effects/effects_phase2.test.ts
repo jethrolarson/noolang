@@ -94,7 +94,7 @@ test('pure pattern matching has no effects', () => {
 // Test suite: Type System Returns TypeResult with Effects
 test('typeProgram returns TypeResult with type and effects', () => {
 	const result = runNoolang('42');
-	assert.ok(result.type);
+	assert.is(result.type.kind, 'primitive');
 	assert.is(result.effects.size, 0);
 });
 
@@ -105,7 +105,10 @@ test('complex expressions return proper TypeResult structure', () => {
 				compute = fn x => add (multiply x 2) 3;
 				compute 5
 			`);
-	assert.ok(result.type);
+	assert.is(result.type.kind, 'primitive');
+	if (result.type.kind === 'primitive') {
+		assert.is(result.type.name, 'Float');
+	}
 	assert.is(result.effects.size, 0);
 });
 
@@ -258,22 +261,21 @@ test('function with pure function calls in body has no effects', () => {
 // Test suite: Type System Architecture Validation
 test('TypeResult structure is consistent across all expression types', () => {
 	const expressions = [
-		'42',
-		'"hello"',
-		'True',
-		'fn x => x',
-		'[1, 2, 3]',
-		'{ @a 1, @b 2 }',
-		'{1, 2}',
-		'if True then 1 else 2',
-		'1 + 2',
-		'head [1, 2, 3]',
+		{ code: '42', expectedKind: 'primitive' },
+		{ code: '"hello"', expectedKind: 'primitive' },
+		{ code: 'True', expectedKind: 'variant' }, // Boolean is a variant type
+		{ code: 'fn x => x', expectedKind: 'function' },
+		{ code: '[1, 2, 3]', expectedKind: 'list' },
+		{ code: '{ @a 1, @b 2 }', expectedKind: 'record' },
+		{ code: '{1, 2}', expectedKind: 'tuple' },
+		{ code: 'if True then 1 else 2', expectedKind: 'primitive' },
+		{ code: '1 + 2', expectedKind: 'primitive' },
+		{ code: 'head [1, 2, 3]', expectedKind: 'variant' }, // Option type is variant
 	];
 
-	for (const expr of expressions) {
-		const result = runNoolang(expr);
-		// Just verify the structure exists and effects are empty for all pure expressions
-		assert.ok(result.type);
+	for (const { code, expectedKind } of expressions) {
+		const result = runNoolang(code);
+		assert.is(result.type.kind, expectedKind);
 		assert.ok(result.effects instanceof Set);
 		assert.is(result.effects.size, 0);
 	}
