@@ -3,6 +3,21 @@
 const fs = require('fs');
 const path = require('path');
 
+// Configuration file to track migrated tests
+const MIGRATED_TESTS_CONFIG = 'uvu-migrated-tests.json';
+
+const loadMigratedTests = () => {
+  if (fs.existsSync(MIGRATED_TESTS_CONFIG)) {
+    return JSON.parse(fs.readFileSync(MIGRATED_TESTS_CONFIG, 'utf8'));
+  }
+  return { migratedFiles: [], lastUpdated: new Date().toISOString() };
+};
+
+const saveMigratedTests = (config) => {
+  config.lastUpdated = new Date().toISOString();
+  fs.writeFileSync(MIGRATED_TESTS_CONFIG, JSON.stringify(config, null, 2));
+};
+
 const migrateFile = (filePath) => {
   console.log(`\n🔄 Migrating: ${filePath}`);
   
@@ -12,134 +27,96 @@ const migrateFile = (filePath) => {
   // Track changes for summary
   const changes = [];
   
-  // 1. Add uvu imports at the top (CRITICAL - was missing before)
+  // 1. Add uvu imports at the top, but keep Jest imports for backward compatibility
   if (!content.includes("import { test } from 'uvu'")) {
     // Find the first import or add at the beginning
     const importMatch = content.match(/^(import.*\n)+/m);
     if (importMatch) {
       const firstImportEnd = content.indexOf(importMatch[0]) + importMatch[0].length;
       content = content.slice(0, firstImportEnd) + 
-                "import { test } from 'uvu';\nimport * as assert from 'uvu/assert';\n" +
+                "// uvu test imports\nimport { test as uvuTest } from 'uvu';\nimport * as assert from 'uvu/assert';\n\n" +
                 content.slice(firstImportEnd);
     } else {
-      content = "import { test } from 'uvu';\nimport * as assert from 'uvu/assert';\n" + content;
+      content = "// uvu test imports\nimport { test as uvuTest } from 'uvu';\nimport * as assert from 'uvu/assert';\n\n" + content;
     }
     changes.push('✓ Added uvu imports');
   }
   
-  // 2. Replace Jest imports (if any exist)
-  if (content.includes("from '@jest/globals'")) {
-    content = content.replace(/import.*from '@jest\/globals'.*;?\n/g, "");
-    changes.push('✓ Removed Jest imports');
-  }
-  
-  // 3. Convert describe blocks to comments and flatten structure
-  content = content.replace(/describe\(['"`]([^'"`]+)['"`],\s*\(\)\s*=>\s*\{/g, '// Test suite: $1');
-  if (content !== originalContent) {
-    changes.push('✓ Flattened describe blocks');
-  }
-  
-  // 4. Convert nested describes (more complex pattern)
-  content = content.replace(/^\s*describe\(['"`]([^'"`]+)['"`],\s*\(\)\s*=>\s*\{/gm, '// Test group: $1');
-  
-  // 5. Convert it/test calls to uvu test calls
-  const itRegex = /(\s*)it\(['"`]([^'"`]+)['"`],\s*\(\)\s*=>\s*\{/g;
-  content = content.replace(itRegex, "$1test('$2', () => {");
-  
-  // Also handle 'test(' calls from Jest
-  const testRegex = /(\s*)test\(['"`]([^'"`]+)['"`],\s*\(\)\s*=>\s*\{/g;
-  content = content.replace(testRegex, "$1test('$2', () => {");
-  changes.push('✓ Converted it() to test()');
-  
-  // 6. Convert expect assertions to assert
-  const expectReplacements = [
-    // expect().toBe() patterns
-    { from: /expect\(([^)]+)\)\.toBe\(([^)]+)\)/g, to: 'assert.is($1, $2)', desc: 'toBe → assert.is' },
-    
-    // expect().toEqual() patterns  
-    { from: /expect\(([^)]+)\)\.toEqual\(([^)]+)\)/g, to: 'assert.equal($1, $2)', desc: 'toEqual → assert.equal' },
-    
-    // expect.anything() - remove these as they're Jest-specific
-    { from: /expect\.anything\(\)/g, to: 'undefined', desc: 'expect.anything() → undefined' },
-    
-    // expect().toThrow() patterns
-    { from: /expect\(\(\)\s*=>\s*([^)]+)\)\.toThrow\(\)/g, to: 'assert.throws(() => $1)', desc: 'toThrow → assert.throws' },
-    { from: /expect\(\(\)\s*=>\s*([^)]+)\)\.toThrow\(['"`]([^'"`]+)['"`]\)/g, to: 'assert.throws(() => $1, $2)', desc: 'toThrow with message → assert.throws' },
-    
-    // Basic expect().toThrow() without arrow function wrapper
-    { from: /expect\(([^)]+)\)\.toThrow\(\)/g, to: 'assert.throws($1)', desc: 'toThrow → assert.throws' },
-    { from: /expect\(([^)]+)\)\.toThrow\(['"`]([^'"`]+)['"`]\)/g, to: 'assert.throws($1, $2)', desc: 'toThrow with message → assert.throws' },
-    
-    // Other common patterns
-    { from: /expect\(([^)]+)\)\.toBeNull\(\)/g, to: 'assert.is($1, null)', desc: 'toBeNull → assert.is(x, null)' },
-    { from: /expect\(([^)]+)\)\.toBeUndefined\(\)/g, to: 'assert.is($1, undefined)', desc: 'toBeUndefined → assert.is(x, undefined)' },
-    { from: /expect\(([^)]+)\)\.toBeTruthy\(\)/g, to: 'assert.ok($1)', desc: 'toBeTruthy → assert.ok' },
-    { from: /expect\(([^)]+)\)\.toBeFalsy\(\)/g, to: 'assert.not.ok($1)', desc: 'toBeFalsy → assert.not.ok' },
-    { from: /expect\(([^)]+)\)\.toContain\(([^)]+)\)/g, to: 'assert.ok($1.includes($2))', desc: 'toContain → assert.ok(x.includes(y))' },
-    { from: /expect\(([^)]+)\)\.toHaveLength\(([^)]+)\)/g, to: 'assert.is($1.length, $2)', desc: 'toHaveLength → assert.is(x.length, y)' },
-    { from: /expect\(([^)]+)\)\.toMatch\(([^)]+)\)/g, to: 'assert.match($1, $2)', desc: 'toMatch → assert.match' },
-    { from: /expect\(([^)]+)\)\.not\.toThrow\(\)/g, to: 'assert.not.throws(() => $1)', desc: 'not.toThrow → assert.not.throws' },
-    { from: /expect\(\(\)\s*=>\s*([^)]+)\)\.not\.toThrow\(\)/g, to: 'assert.not.throws(() => $1)', desc: 'not.toThrow function → assert.not.throws' }
-  ];
-  
-  expectReplacements.forEach(({ from, to, desc }) => {
-    if (from.test(content)) {
-      content = content.replace(from, to);
-      changes.push(`✓ ${desc}`);
+  // 2. Add environment detection and dual compatibility
+  const compatibilityCode = `
+// Dual Jest/uvu compatibility
+const isJest = typeof jest !== 'undefined';
+const testFn = isJest ? test : uvuTest;
+const describeFn = isJest ? describe : (name, fn) => fn(); // uvu doesn't use describe, just run the function
+const expectFn = isJest ? expect : (actual) => ({
+  toBe: (expected) => assert.is(actual, expected),
+  toEqual: (expected) => {
+    if (Array.isArray(expected) && expected.some(item => item && typeof item === 'object' && item.asymmetricMatch)) {
+      // Handle expect.anything() in arrays
+      assert.is(Array.isArray(actual), true);
+      assert.is(actual.length, expected.length);
+      for (let i = 0; i < expected.length; i++) {
+        if (expected[i] && expected[i].asymmetricMatch) {
+          assert.ok(actual[i] !== undefined);
+        } else {
+          assert.equal(actual[i], expected[i]);
+        }
+      }
+    } else {
+      assert.equal(actual, expected);
     }
-  });
+  },
+  toThrow: () => assert.throws(actual),
+});
+const expectAnything = () => ({ asymmetricMatch: () => true });
+
+`;
+
+  if (!content.includes('// Dual Jest/uvu compatibility')) {
+    // Insert after imports
+    const lastImportMatch = content.match(/^import.*$/gm);
+    if (lastImportMatch) {
+      const lastImport = lastImportMatch[lastImportMatch.length - 1];
+      const insertPos = content.indexOf(lastImport) + lastImport.length + 1;
+      content = content.slice(0, insertPos) + compatibilityCode + content.slice(insertPos);
+      changes.push('✓ Added Jest/uvu compatibility layer');
+    }
+  }
   
-  // 7. Handle skip patterns
-  content = content.replace(/it\.skip\(/g, 'test.skip(');
-  content = content.replace(/test\.skip\(/g, 'test.skip(');
-  content = content.replace(/describe\.skip\(/g, '// test.skip(');
-  
-  // 8. Remove extra closing braces from describe blocks
-  // This is a heuristic - look for standalone closing braces that are likely from describe blocks
-  content = content.replace(/^\s*\}\);\s*$/gm, '');
-  content = content.replace(/^\s*\}\);\s*$/gm, ''); // Run twice to catch nested ones
+  // 3. Replace test and describe calls to use compatibility functions
+  content = content.replace(/\btest\(/g, 'testFn(');
+  content = content.replace(/\bdescribe\(/g, 'describeFn(');
   if (content !== originalContent) {
-    changes.push('✓ Removed describe block closing braces');
+    changes.push('✓ Updated test and describe calls');
   }
   
-  // 9. Handle beforeEach/afterEach (convert to helper functions)
-  const beforeEachRegex = /beforeEach\(\(\)\s*=>\s*\{([^}]*)\}\);?/g;
-  let beforeEachMatch;
-  while ((beforeEachMatch = beforeEachRegex.exec(content)) !== null) {
-    const setupCode = beforeEachMatch[1].trim();
-    content = content.replace(beforeEachMatch[0], `// Setup function (was beforeEach)\nconst setup = () => {\n${setupCode}\n};`);
-    changes.push('⚠️  Converted beforeEach to setup function (manual review needed)');
+  // 4. Replace expect calls to use compatibility function
+  content = content.replace(/\bexpect\(/g, 'expectFn(');
+  content = content.replace(/expect\.anything\(\)/g, 'expectAnything()');
+  if (content !== originalContent) {
+    changes.push('✓ Updated expect calls');
   }
   
-  // 10. Add test.run() at the end if not present
-  if (!content.includes('test.run()')) {
-    content += '\n\ntest.run();\n';
-    changes.push('✓ Added test.run()');
+  // 5. Add uvu test runner at the end
+  if (!content.includes('if (!isJest)')) {
+    content += `
+// Run tests with uvu if not in Jest environment
+if (!isJest && typeof uvuTest.run === 'function') {
+  uvuTest.run();
+}
+`;
+    changes.push('✓ Added uvu test runner');
   }
   
-  // 11. Handle common patterns that need manual review
-  if (content.includes('beforeAll') || content.includes('afterAll') || content.includes('afterEach')) {
-    changes.push('⚠️  Lifecycle hooks detected - manual review needed');
-  }
-  
-  if (content.includes('jest.')) {
-    changes.push('⚠️  Jest-specific features detected - manual review needed');
-  }
-  
-  if (content.includes('spy') || content.includes('mock')) {
-    changes.push('⚠️  Mocking detected - may need manual adjustment');
-  }
-  
-  // Write the migrated file
-  const newPath = filePath.replace('.test.ts', '.uvu.ts');
-  fs.writeFileSync(newPath, content);
+  // Write the migrated file (same filename)
+  fs.writeFileSync(filePath, content);
   
   // Show summary
   console.log(`📝 Changes made:`);
   changes.forEach(change => console.log(`   ${change}`));
-  console.log(`✅ Created: ${newPath}`);
+  console.log(`✅ Migrated: ${filePath}`);
   
-  return { originalPath: filePath, newPath, changes: changes.length };
+  return { filePath, changes: changes.length };
 };
 
 const main = () => {
@@ -147,65 +124,44 @@ const main = () => {
   
   if (args.length === 0) {
     console.log(`
-🚀 Jest to uvu Migration Script
+🚀 Jest to uvu Migration Script (Config-Based)
 
 Usage:
   node scripts/migrate-to-uvu.js <test-file>           # Migrate single file
-  node scripts/migrate-to-uvu.js --all                # Migrate all test files
-  node scripts/migrate-to-uvu.js --batch=1            # Migrate batch (1-4)
+  node scripts/migrate-to-uvu.js --list               # List current migration status
+  node scripts/migrate-to-uvu.js --simple <file>      # Migrate one simple file
 
 Examples:
   node scripts/migrate-to-uvu.js test/language-features/tuple.test.ts
-  node scripts/migrate-to-uvu.js --batch=1
-  node scripts/migrate-to-uvu.js --all
+  node scripts/migrate-to-uvu.js --simple test/language-features/record_tuple_unit.test.ts
+  node scripts/migrate-to-uvu.js --list
     `);
     return;
   }
   
-  const batches = {
-    1: [
-      'test/language-features/record_tuple_unit.test.ts',
-      'test/language-features/tuple.test.ts',
-      'test/type-system/print_type_pollution.test.ts',
-      'test/type-system/option_unification.test.ts'
-    ],
-    2: [
-      'test/language-features/closure.test.ts',
-      'test/language-features/head_function.test.ts',
-      'test/integration/import_relative.test.ts'
-    ],
-    3: [
-      'test/features/operators/dollar-operator.test.ts',
-      'test/features/operators/safe_thrush_operator.test.ts',
-      'test/features/pattern-matching/pattern_matching_failures.test.ts',
-      'test/features/effects/effects_phase2.test.ts',
-      'test/features/effects/effects_phase3.test.ts'
-    ],
-    4: [
-      'test/features/adt.test.ts',
-      'test/language-features/combinators.test.ts',
-      'test/integration/repl-integration.test.ts'
-    ]
-  };
+  const config = loadMigratedTests();
+  
+  if (args[0] === '--list') {
+    console.log('📋 Migration Status:');
+    console.log(`   Migrated files: ${config.migratedFiles.length}`);
+    config.migratedFiles.forEach(file => console.log(`   ✅ ${file}`));
+    return;
+  }
   
   let filesToMigrate = [];
   
-  if (args[0] === '--all') {
-    // Find all test files
-    const { execSync } = require('child_process');
-    const testFiles = execSync('find test -name "*.test.ts" -type f', { encoding: 'utf8' })
-      .trim()
-      .split('\n')
-      .filter(f => f && !f.includes('adt_limitations')); // Skip already migrated
-    filesToMigrate = testFiles;
-  } else if (args[0].startsWith('--batch=')) {
-    const batchNum = parseInt(args[0].split('=')[1]);
-    if (batches[batchNum]) {
-      filesToMigrate = batches[batchNum].filter(f => fs.existsSync(f));
-    } else {
-      console.error(`❌ Invalid batch number. Use 1-4.`);
+  if (args[0] === '--simple') {
+    // Migrate a single simple file
+    const filePath = args[1];
+    if (!filePath) {
+      console.error('❌ Please specify a file to migrate');
       return;
     }
+    if (!fs.existsSync(filePath)) {
+      console.error(`❌ File not found: ${filePath}`);
+      return;
+    }
+    filesToMigrate = [filePath];
   } else {
     // Single file
     const filePath = args[0];
@@ -223,20 +179,28 @@ Examples:
     try {
       const result = migrateFile(file);
       results.push(result);
+      
+      // Add to migrated files config
+      if (!config.migratedFiles.includes(file)) {
+        config.migratedFiles.push(file);
+      }
     } catch (error) {
       console.error(`❌ Error migrating ${file}:`, error.message);
     }
   }
   
+  // Save updated config
+  saveMigratedTests(config);
+  
   console.log(`\n📊 Migration Summary:`);
   console.log(`   Files processed: ${results.length}`);
   console.log(`   Total changes: ${results.reduce((sum, r) => sum + r.changes, 0)}`);
+  console.log(`   Total migrated files: ${config.migratedFiles.length}`);
   
   console.log(`\n🔍 Next steps:`);
-  console.log(`   1. Review migrated files for manual adjustments`);
-  console.log(`   2. Test with: npm run test:uvu`);
-  console.log(`   3. Fix any remaining issues`);
-  console.log(`   4. Remove original .test.ts files when satisfied`);
+  console.log(`   1. Test with Jest: npm test -- --testPathPattern="${path.basename(filesToMigrate[0], '.test.ts')}"`);
+  console.log(`   2. Test with uvu: npx uvu ${filesToMigrate[0]} --require tsx/cjs`);
+  console.log(`   3. Update Jest config to exclude: ${filesToMigrate[0]}`);
 };
 
 main();
