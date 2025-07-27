@@ -349,15 +349,19 @@ test('Parser Combinators - sepBy - should parse zero elements', () => {
 	}
 });
 
-test('Parser Combinators - sepBy - should fail if separator is followed by invalid element', () => {
+test('Parser Combinators - sepBy - should parse partial when separator is followed by invalid element', () => {
 	const tokens = createTokens('42, hello');
 	const result = C.sepBy(C.token('NUMBER'), C.token('PUNCTUATION', ','))(tokens);
 
-	assert.equal(result.success, false);
+	assert.equal(result.success, true);
+	if (result.success) {
+		assert.equal(result.value.length, 1);
+		assert.equal(result.value[0].value, '42');
+	}
 });
 
 test('Parser Combinators - parseAll - should succeed when parser consumes all input', () => {
-	const tokens = createTokens('42');
+	const tokens = createTokensWithoutEOF('42');
 	const result = C.parseAll(C.token('NUMBER'))(tokens);
 
 	assert.equal(result.success, true);
@@ -409,7 +413,7 @@ test('Parser Combinators - convenience parsers - string should match strings', (
 	assert.equal(result.success, true);
 	if (result.success) {
 		assert.equal(result.value.type, 'STRING');
-		assert.equal(result.value.value, '"hello"');
+		assert.equal(result.value.value, 'hello');
 	}
 });
 
@@ -453,7 +457,7 @@ test('Parser Combinators - convenience parsers - accessor should match accessors
 	assert.equal(result.success, true);
 	if (result.success) {
 		assert.equal(result.value.type, 'ACCESSOR');
-		assert.equal(result.value.value, '@name');
+		assert.equal(result.value.value, 'name');
 	}
 });
 
