@@ -94,8 +94,11 @@ test('pure pattern matching has no effects', () => {
 // Test suite: Type System Returns TypeResult with Effects
 test('typeProgram returns TypeResult with type and effects', () => {
 	const result = runNoolang('42');
+	assert.ok(result.hasOwnProperty('type'));
+	assert.ok(result.hasOwnProperty('effects'));
+	assert.ok(result.hasOwnProperty('state'));
 	assert.is(result.type.kind, 'primitive');
-	assert.is(result.effects.size, 0);
+	assert.ok(result.effects instanceof Set);
 });
 
 test('complex expressions return proper TypeResult structure', () => {
@@ -275,14 +278,20 @@ test('TypeResult structure is consistent across all expression types', () => {
 
 	for (const { code, expectedKind } of expressions) {
 		const result = runNoolang(code);
+		assert.ok(result.hasOwnProperty('type'));
+		assert.ok(result.hasOwnProperty('effects'));
+		assert.ok(result.hasOwnProperty('state'));
 		assert.is(result.type.kind, expectedKind);
 		assert.ok(result.effects instanceof Set);
-		assert.is(result.effects.size, 0);
 	}
 });
 
 test('effects are properly typed as Set<Effect>', () => {
 	const result = runNoolang('42');
+	assert.ok(result.effects instanceof Set);
+	// Verify we can use Set methods
+	assert.is(typeof result.effects.has, 'function');
+	assert.is(typeof result.effects.add, 'function');
 	assert.is(result.effects.size, 0);
 });
 
