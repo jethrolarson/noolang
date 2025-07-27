@@ -55,7 +55,7 @@ jobs:
       run: echo "✅ TypeScript checking passed for source and test files"
 
   # Run core Jest tests once with fast SWC compilation
-  core-tests:
+  jest-tests:
     runs-on: ubuntu-latest
     needs: typescript-check  # Only run tests if TypeScript checking passes
     
@@ -83,10 +83,33 @@ jobs:
           jest-cache-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
           jest-cache-${{ runner.os }}-
 
+  # Run uvu tests for migrated test files
+  uvu-tests:
+    runs-on: ubuntu-latest
+    needs: typescript-check  # Only run tests if TypeScript checking passes
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run uvu tests
+      run: npm run test:uvu
+      
+    - name: Report uvu test results
+      run: echo "✅ uvu tests completed successfully"
+
   # Run REPL-specific tests separately  
   repl-tests:
     runs-on: ubuntu-latest
-    needs: [typescript-check, core-tests]  # Only run if TypeScript check and core tests pass
+    needs: [typescript-check, jest-tests, uvu-tests]  # Only run if TypeScript check and all core tests pass
     
     steps:
     - uses: actions/checkout@v4
@@ -120,7 +143,7 @@ jobs:
   # Run LSP tests separately
   lsp-tests:
     runs-on: ubuntu-latest
-    needs: [typescript-check, core-tests]  # Only run if TypeScript check and core tests pass
+    needs: [typescript-check, jest-tests, uvu-tests]  # Only run if TypeScript check and all core tests pass
     
     steps:
     - uses: actions/checkout@v4
