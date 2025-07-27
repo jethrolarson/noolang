@@ -7,12 +7,13 @@ import {
 	functionType,
 	isConstraint,
 	type Effect,
+	type ConstrainedType,
+	type FunctionType,
 } from '../ast';
 import {
 	functionApplicationError,
 	nonFunctionApplicationError,
 	formatTypeError,
-	createTypeError,
 } from './type-errors';
 import {
 	getExprLocation,
@@ -474,7 +475,7 @@ export const typeApplication = (
 			);
 			
 			// If the original function had constraints, preserve them in the partial function
-			let finalPartialType: Type = partialFunctionType;
+			let finalPartialType: ConstrainedType | FunctionType = partialFunctionType;
 			if (functionConstraints && functionConstraints.size > 0) {
 				finalPartialType = {
 					kind: 'constrained',

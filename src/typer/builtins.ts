@@ -49,8 +49,13 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	);
 	subtractOpType.constraints = [implementsConstraint('a', 'Numeric')];
 	newEnv.set('-', {
+<<<<<<< HEAD
 		type: subtractOpType,
 		quantifiedVars: ['a'],
+=======
+		type: functionType([floatType(), floatType()], floatType()),
+		quantifiedVars: [],
+>>>>>>> c5f6aca (Replace Int type with Float in type system and standard library)
 	});
 
 	const multiplyOpType = functionType(
@@ -60,8 +65,13 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	);
 	multiplyOpType.constraints = [implementsConstraint('a', 'Numeric')];
 	newEnv.set('*', {
+<<<<<<< HEAD
 		type: multiplyOpType,
 		quantifiedVars: ['a'],
+=======
+		type: functionType([floatType(), floatType()], floatType()),
+		quantifiedVars: [],
+>>>>>>> c5f6aca (Replace Int type with Float in type system and standard library)
 	});
 
 	// Division operator - returns Option Float for safety
@@ -72,8 +82,13 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	);
 	divideOpType.constraints = [implementsConstraint('a', 'Numeric')];
 	newEnv.set('/', {
+<<<<<<< HEAD
 		type: divideOpType,
 		quantifiedVars: ['a'],
+=======
+		type: functionType([floatType(), floatType()], floatType()),
+		quantifiedVars: [],
+>>>>>>> c5f6aca (Replace Int type with Float in type system and standard library)
 	});
 
 	// Comparison operators
@@ -316,7 +331,11 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	});
 	
 	// Primitive comparison functions (pure)
+<<<<<<< HEAD
 	newEnv.set('primitive_float_eq', {
+=======
+	newEnv.set('primitive_int_eq', {
+>>>>>>> c5f6aca (Replace Int type with Float in type system and standard library)
 		type: createBinaryFunctionType(floatType(), floatType(), boolType()),
 		quantifiedVars: [],
 	});
