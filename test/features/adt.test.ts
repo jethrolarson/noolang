@@ -486,16 +486,15 @@ test('Algebraic Data Types (ADTs) - Error Cases - should handle type mismatches 
 	});
 });
 
-test('Algebraic Data Types (ADTs) - Error Cases - should handle incomplete pattern matches by matching available cases', () => {
-	const result = runNoolang(`
+test('Algebraic Data Types (ADTs) - Error Cases - should handle incomplete pattern matches', () => {
+	assert.throws(() => {
+		runNoolang(`
           opt = Some 42;
           match opt with (
             Some x => x
           )
         `);
-	
-	// The language allows incomplete patterns and matches available cases
-	assert.equal(result.finalValue, { tag: 'number', value: 42 });
+	});
 });
 
 test('Algebraic Data Types (ADTs) - Integration with Built-ins - should work with built-in list functions', () => {
