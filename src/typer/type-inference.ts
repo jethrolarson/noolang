@@ -85,13 +85,7 @@ export const typeLiteral = (
 	const value = expr.value;
 
 	if (typeof value === 'number') {
-<<<<<<< HEAD
-		// Check if it's an integer or float based on original token representation
-		// This allows 1.0 to be typed as Float even though Number.isInteger(1.0) is true
-		// All numeric literals are now Float type
-=======
 		// All numeric literals are Float (Int type has been removed)
->>>>>>> c5f6aca (Replace Int type with Float in type system and standard library)
 		return createPureTypeResult(floatType(), state);
 	} else if (typeof value === 'string') {
 		return createPureTypeResult(stringType(), state);
