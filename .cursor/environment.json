@@ -1,0 +1,6 @@
+{
+  "agentCanUpdateSnapshot": true,
+  "snapshot": "snapshot-20250724-6b669f33-892b-49c5-b763-f7928e750611",
+  "install": "npm install",
+  "start": "npm start"
+}

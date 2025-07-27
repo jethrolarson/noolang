@@ -1,6 +1,27 @@
 import { test } from 'uvu';
 import * as assert from 'uvu/assert';
 
+// Mock readline BEFORE importing REPL
+const mockInterface = {
+	prompt: () => {},
+	on: () => {},
+	close: () => {},
+	question: () => {},
+	write: () => {},
+};
+
+// Override require for readline
+const Module = require('module');
+const originalRequire = Module.prototype.require;
+Module.prototype.require = function(id: string) {
+	if (id === 'node:readline' || id === 'readline') {
+		return {
+			createInterface: () => mockInterface
+		};
+	}
+	return originalRequire.apply(this, arguments);
+};
+
 // Mock console to prevent output pollution
 global.console = {
 	...console,
@@ -11,33 +32,42 @@ global.console = {
 
 import { REPL } from '../../repl';
 
-// Skip REPL tests as they require complex readline mocking that hangs in test environment
-test.skip('REPL Unit Tests - REPL Instance - should create REPL instance', () => {
-	// Skipped: REPL tests hang due to readline interface
+test('REPL Unit Tests - REPL Instance - should create REPL instance', () => {
+	const repl = new REPL();
+	assert.instance(repl, REPL);
 });
 
-test.skip('REPL Unit Tests - REPL Instance - should have evaluator property', () => {
-	// Skipped: REPL tests hang due to readline interface  
+test('REPL Unit Tests - REPL Instance - should have evaluator property', () => {
+	const repl = new REPL();
+	assert.ok(repl.evaluator);
 });
 
-test.skip('REPL Unit Tests - REPL Instance - should have typeState property', () => {
-	// Skipped: REPL tests hang due to readline interface
+test('REPL Unit Tests - REPL Instance - should have typeState property', () => {
+	const repl = new REPL();
+	assert.ok(repl.typeState);
 });
 
-test.skip('REPL Unit Tests - REPL Instance - should have readline interface', () => {
-	// Skipped: REPL tests hang due to readline interface
+test('REPL Unit Tests - REPL Instance - should have readline interface', () => {
+	const repl = new REPL();
+	assert.ok(repl.rl);
 });
 
-test.skip('REPL Unit Tests - Basic Functionality - should handle empty input', () => {
-	// Skipped: REPL tests hang due to readline interface
+test('REPL Unit Tests - Basic Functionality - should handle empty input', () => {
+	const repl = new REPL();
+	const processInput = repl.processInput.bind(repl);
+	assert.not.throws(() => processInput(''));
 });
 
-test.skip('REPL Unit Tests - Basic Functionality - should handle command input', () => {
-	// Skipped: REPL tests hang due to readline interface
+test('REPL Unit Tests - Basic Functionality - should handle command input', () => {
+	const repl = new REPL();
+	const processInput = repl.processInput.bind(repl);
+	assert.not.throws(() => processInput('.help'));
 });
 
-test.skip('REPL Unit Tests - Basic Functionality - should handle unknown command', () => {
-	// Skipped: REPL tests hang due to readline interface
+test('REPL Unit Tests - Basic Functionality - should handle unknown command', () => {
+	const repl = new REPL();
+	const processInput = repl.processInput.bind(repl);
+	assert.not.throws(() => processInput('.unknown'));
 });
 
 test.run();
