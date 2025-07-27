@@ -1087,8 +1087,8 @@ describe('Additional Coverage Tests', () => {
 	describe('Reduce Function Coverage', () => {
 		test('should handle basic reduce operation', () => {
 			const result = runCode(`
-        add = fn acc => fn item => acc + item;
-        reduce add 0 [1, 2, 3]
+        sum = fn acc => fn item => acc + item;
+        reduce sum 0 [1, 2, 3]
       `);
 			expect(unwrapValue(result.finalResult)).toBe(6);
 		});
