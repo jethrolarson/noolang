@@ -57,5 +57,6 @@ module.exports = {
 		'test/language-features/combinators.test.ts', // Migrated to uvu
 	
 		'src/typer/__tests__/type-display.test.ts', // Migrated to uvu
-		'src/typer/__tests__/trait-system-conflicting-functions.test.ts', // Migrated to uvu],
+		'src/typer/__tests__/trait-system-conflicting-functions.test.ts', // Migrated to uvu
+		'src/typer/__tests__/stdlib-parsing.test.ts', // Migrated to uvu],
 };
