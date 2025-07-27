@@ -2,7 +2,10 @@
   "migratedFiles": [
     "test/language-features/record_tuple_unit.test.ts",
     "test/language-features/tuple.test.ts",
-    "test/language-features/closure.test.ts"
+    "test/language-features/closure.test.ts",
+    "test/type-system/option_unification.test.ts",
+    "test/integration/import_relative.test.ts",
+    "test/language-features/head_function.test.ts"
   ],
-  "lastUpdated": "2025-07-27T01:50:00.000Z"
+  "lastUpdated": "2025-07-27T02:10:00.000Z"
 }

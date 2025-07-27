@@ -48,5 +48,8 @@ module.exports = {
 		'test/language-features/record_tuple_unit.test.ts', // Migrated to uvu
 		'test/language-features/tuple.test.ts', // Migrated to uvu
 		'test/language-features/closure.test.ts', // Migrated to uvu
+		'test/type-system/option_unification.test.ts', // Migrated to uvu
+		'test/integration/import_relative.test.ts', // Migrated to uvu
+		'test/language-features/head_function.test.ts', // Migrated to uvu
 	],
 };
