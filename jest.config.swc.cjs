@@ -46,5 +46,9 @@ module.exports = {
 		'test/type-system/option_unification.test.ts', // Migrated to uvu
 		'test/integration/import_relative.test.ts', // Migrated to uvu
 		'test/language-features/head_function.test.ts', // Migrated to uvu
-	],
+	
+		'test/features/pattern-matching/pattern_matching_failures.test.ts', // Migrated to uvu
+		'test/type-system/print_type_pollution.test.ts', // Migrated to uvu
+		'test/features/operators/safe_thrush_operator.test.ts', // Migrated to uvu
+],
 };
