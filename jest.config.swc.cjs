@@ -55,5 +55,7 @@ module.exports = {
 		'test/features/effects/effects_phase3.test.ts', // Migrated to uvu
 		'test/features/adt.test.ts', // Migrated to uvu
 		'test/language-features/combinators.test.ts', // Migrated to uvu
-	],
+	
+		'src/typer/__tests__/type-display.test.ts', // Migrated to uvu
+		'src/typer/__tests__/trait-system-conflicting-functions.test.ts', // Migrated to uvu],
 };
