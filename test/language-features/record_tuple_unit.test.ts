@@ -1,44 +1,48 @@
+import { test } from 'uvu';
+import * as assert from 'uvu/assert';
 import { Lexer } from '../../src/lexer/lexer';
 import { parse } from '../../src/parser/parser';
 
-describe('Records, Tuples, and Unit', () => {
-	function parseNoo(src: string) {
-		const lexer = new Lexer(src);
-		const tokens = lexer.tokenize();
-		return parse(tokens);
+function parseNoo(src: string) {
+	const lexer = new Lexer(src);
+	const tokens = lexer.tokenize();
+	return parse(tokens);
+}
+
+test('parses named record', () => {
+	const program = parseNoo('{ @a 1, @b 2 }');
+	const record = program.statements[0];
+	assert.is(record.kind, 'record');
+	if (record.kind === 'record') {
+		assert.is(record.fields.length, 2);
+		assert.is(record.fields[0].name, 'a');
+		assert.is(record.fields[1].name, 'b');
+		// Skip checking exact value structure - just verify they exist
+		assert.ok(record.fields[0].value);
+		assert.ok(record.fields[1].value);
 	}
-
-	test('parses named record', () => {
-		const program = parseNoo('{ @a 1, @b 2 }');
-		const record = program.statements[0];
-		expect(record.kind).toBe('record');
-		if (record.kind === 'record') {
-			expect(record.fields).toEqual([
-				{ name: 'a', value: expect.anything() },
-				{ name: 'b', value: expect.anything() },
-			]);
-		}
-	});
-
-	test('parses tuple (nameless record)', () => {
-		const program = parseNoo('{ 1, 2 }');
-		const tuple = program.statements[0];
-		expect(tuple.kind).toBe('tuple');
-		if (tuple.kind === 'tuple') {
-			expect(tuple.elements.length).toBe(2);
-			expect(tuple.elements[0]).toEqual(expect.anything());
-			expect(tuple.elements[1]).toEqual(expect.anything());
-		}
-	});
-
-	test('parses unit (empty braces)', () => {
-		const program = parseNoo('{ }');
-		const unit = program.statements[0];
-		expect(unit.kind).toBe('unit');
-	});
-
-	test('throws on mixed named and positional fields', () => {
-		expect(() => parseNoo('{ 1, @a 2 }')).toThrow();
-		expect(() => parseNoo('{ @a 2, 1 }')).toThrow();
-	});
 });
+
+test('parses tuple (nameless record)', () => {
+	const program = parseNoo('{ 1, 2 }');
+	const tuple = program.statements[0];
+	assert.is(tuple.kind, 'tuple');
+	if (tuple.kind === 'tuple') {
+		assert.is(tuple.elements.length, 2);
+		assert.ok(tuple.elements[0]);
+		assert.ok(tuple.elements[1]);
+	}
+});
+
+test('parses unit (empty braces)', () => {
+	const program = parseNoo('{ }');
+	const unit = program.statements[0];
+	assert.is(unit.kind, 'unit');
+});
+
+test('throws on mixed named and positional fields', () => {
+	assert.throws(() => parseNoo('{ 1, @a 2 }'));
+	assert.throws(() => parseNoo('{ @a 2, 1 }'));
+});
+
+test.run();

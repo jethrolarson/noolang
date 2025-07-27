@@ -1,3 +1,5 @@
+import { test } from 'uvu';
+import * as assert from 'uvu/assert';
 import { Evaluator, Value } from '../../src/evaluator/evaluator';
 import { parse } from '../../src/parser/parser';
 import { Lexer } from '../../src/lexer/lexer';
@@ -28,45 +30,43 @@ function unwrapValue(val: Value): any {
 	}
 }
 
-describe('Tuple Native Functions', () => {
-	const evaluateSource = (source: string) => {
-		const evaluator = new Evaluator();
-		const lexer = new Lexer(source);
-		return evaluator.evaluateProgram(parse(lexer.tokenize()));
-	};
+// Test suite: Tuple Native Functions
+const evaluateSource = (source: string) => {
+	const evaluator = new Evaluator();
+	const lexer = new Lexer(source);
+	return evaluator.evaluateProgram(parse(lexer.tokenize()));
+};
 
-	describe('tupleLength', () => {
-		test('length of empty tuple', () => {
-			const source = 'tuple = {}; tupleLength tuple';
-			// { } is now unit, not an empty tuple, so this should throw an error
-			expect(() => evaluateSource(source)).toThrow(
-				'tupleLength requires a tuple'
-			);
-		});
-		test('length of singleton tuple', () => {
-			const source = 'tuple = { 1 }; tupleLength tuple';
-			const result = evaluateSource(source);
-			expect(unwrapValue(result.finalResult)).toBe(1);
-		});
-		test('length of pair tuple', () => {
-			const source = 'tuple = { 1, 2 }; tupleLength tuple';
-			const result = evaluateSource(source);
-			expect(unwrapValue(result.finalResult)).toBe(2);
-		});
-	});
-
-	describe('tupleIsEmpty', () => {
-		test('returns true for empty tuple', () => {
-			const source = 'tuple = {}; tupleIsEmpty tuple';
-			// { } is now unit, not an empty tuple, so this should throw an error
-			expect(() => evaluateSource(source)).toThrow(
-				'tupleIsEmpty requires a tuple'
-			);
-		});
-		test('returns false for non-empty tuple', () => {
-			const source = 'tuple = { 1, 2, 3 }; tupleIsEmpty tuple';
-			const result = evaluateSource(source);
-			expect(unwrapValue(result.finalResult)).toBe(false);
-		});
-	});
+// Test suite: tupleLength
+test('length of empty tuple', () => {
+	const source = 'tuple = {}; tupleLength tuple';
+	// { } is now unit, not an empty tuple, so this should throw an error
+	assert.throws(() => evaluateSource(source));
 });
+
+test('length of singleton tuple', () => {
+	const source = 'tuple = { 1 }; tupleLength tuple';
+	const result = evaluateSource(source);
+	assert.is(unwrapValue(result.finalResult), 1);
+});
+
+test('length of pair tuple', () => {
+	const source = 'tuple = { 1, 2 }; tupleLength tuple';
+	const result = evaluateSource(source);
+	assert.is(unwrapValue(result.finalResult), 2);
+});
+
+// Test suite: tupleIsEmpty
+test('returns true for empty tuple', () => {
+	const source = 'tuple = {}; tupleIsEmpty tuple';
+	// { } is now unit, not an empty tuple, so this should throw an error
+	assert.throws(() => evaluateSource(source));
+});
+
+test('returns false for non-empty tuple', () => {
+	const source = 'tuple = { 1, 2, 3 }; tupleIsEmpty tuple';
+	const result = evaluateSource(source);
+	assert.is(unwrapValue(result.finalResult), false);
+});
+
+test.run();

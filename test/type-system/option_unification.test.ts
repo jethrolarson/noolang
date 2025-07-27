@@ -1,3 +1,5 @@
+import { test } from 'uvu';
+import * as assert from 'uvu/assert';
 import { Lexer } from '../../src/lexer/lexer';
 import { parse } from '../../src/parser/parser';
 import { typeAndDecorate } from '../../src/typer';
@@ -29,57 +31,63 @@ function unwrapValue(val: Value): any {
 	}
 }
 
-describe('Option Type Unification Tests', () => {
-	let evaluator: Evaluator;
+// Test suite: Option Type Unification Tests
+let evaluator: Evaluator;
 
-	beforeEach(() => {
-		evaluator = new Evaluator();
-	});
+// Setup function (was beforeEach)
+const setup = () => {
+	evaluator = new Evaluator();
+};
 
-	const runCode = (code: string) => {
-		const lexer = new Lexer(code);
-		const tokens = lexer.tokenize();
-		const ast = parse(tokens);
-		const decoratedResult = typeAndDecorate(ast);
-		return evaluator.evaluateProgram(decoratedResult.program);
-	};
+const runCode = (code: string) => {
+	const lexer = new Lexer(code);
+	const tokens = lexer.tokenize();
+	const ast = parse(tokens);
+	const decoratedResult = typeAndDecorate(ast);
+	return evaluator.evaluateProgram(decoratedResult.program);
+};
 
-	test('should handle simple Option construction', () => {
-		const code = `Some 42`;
-		const result = runCode(code);
-		const unwrapped = unwrapValue(result.finalResult);
-		expect(unwrapped.name).toBe('Some');
-		expect(unwrapped.args).toEqual([42]);
-	});
+test('should handle simple Option construction', () => {
+	setup();
+	const code = `Some 42`;
+	const result = runCode(code);
+	const unwrapped = unwrapValue(result.finalResult);
+	assert.is(unwrapped.name, 'Some');
+	assert.equal(unwrapped.args, [42]);
+});
 
-	test('should handle None construction', () => {
-		const code = `None`;
-		const result = runCode(code);
-		const unwrapped = unwrapValue(result.finalResult);
-		expect(unwrapped.name).toBe('None');
-		expect(unwrapped.args).toEqual([]);
-	});
+test('should handle None construction', () => {
+	setup();
+	const code = `None`;
+	const result = runCode(code);
+	const unwrapped = unwrapValue(result.finalResult);
+	assert.is(unwrapped.name, 'None');
+	assert.equal(unwrapped.args, []);
+});
 
-	test('should handle Option in conditional expressions', () => {
-		// FIXME: Currently fails with "Cannot unify Option a with Option a"
-		const code = `
+test('should handle Option in conditional expressions', () => {
+	setup();
+	// FIXME: Currently fails with "Cannot unify Option a with Option a"
+	const code = `
       result = if True then Some 42 else None;
       result
     `;
-		const result = runCode(code);
-		const unwrapped = unwrapValue(result.finalResult);
-		expect(unwrapped.name).toBe('Some');
-		expect(unwrapped.args).toEqual([42]);
-	});
+	const result = runCode(code);
+	const unwrapped = unwrapValue(result.finalResult);
+	assert.is(unwrapped.name, 'Some');
+	assert.equal(unwrapped.args, [42]);
+});
 
-	test('should handle Option function return types', () => {
-		const code = `
+test('should handle Option function return types', () => {
+	setup();
+	const code = `
       makeOption = fn x => if x > 0 then Some x else None;
       makeOption 5
     `;
-		const result = runCode(code);
-		const unwrapped = unwrapValue(result.finalResult);
-		expect(unwrapped.name).toBe('Some');
-		expect(unwrapped.args).toEqual([5]);
-	});
+	const result = runCode(code);
+	const unwrapped = unwrapValue(result.finalResult);
+	assert.is(unwrapped.name, 'Some');
+	assert.equal(unwrapped.args, [5]);
 });
+
+test.run();
