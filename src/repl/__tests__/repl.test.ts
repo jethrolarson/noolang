@@ -1,18 +1,15 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
+const { test } = require('uvu');
+const assert = require('uvu/assert');
 
-// Mock readline module completely before any other imports
-const path = require('path');
+// Mock readline completely before any imports
 const readlinePath = require.resolve('node:readline');
-
-// Override the module cache
 require.cache[readlinePath] = {
 	exports: {
 		createInterface: () => ({
 			prompt: () => {},
 			on: () => {},
 			close: () => {},
-			question: (q: string, cb: Function) => cb(''),
+			question: (q, cb) => cb(''),
 			write: () => {},
 			setPrompt: () => {},
 		})
@@ -25,7 +22,14 @@ require.cache[readlinePath] = {
 	paths: []
 };
 
-// Now safely import REPL
+// Mock console to prevent output
+global.console = {
+	...console,
+	log: () => {},
+	warn: () => {},
+	error: () => {},
+};
+
 const { REPL } = require('../../repl');
 
 test('REPL Unit Tests - should create REPL instance', () => {
@@ -41,7 +45,6 @@ test('REPL Unit Tests - should have required properties', () => {
 
 test('REPL Unit Tests - should handle basic commands', () => {
 	const repl = new REPL();
-	// Test that processInput method exists and doesn't throw
 	assert.ok(typeof repl.processInput === 'function');
 });
 
