@@ -35,6 +35,7 @@ import {
 	variantType,
 	ApplicationExpression,
 	hasConstraint,
+	implementsConstraint,
 	type VariableType,
 } from '../ast';
 import {
@@ -85,9 +86,7 @@ export const typeLiteral = (
 	const value = expr.value;
 
 	if (typeof value === 'number') {
-		// Check if it's an integer or float based on original token representation
-		// This allows 1.0 to be typed as Float even though Number.isInteger(1.0) is true
-		// All numeric literals are now Float type
+		// All numeric literals are Float (Int type has been removed)
 		return createPureTypeResult(floatType(), state);
 	} else if (typeof value === 'string') {
 		return createPureTypeResult(stringType(), state);
@@ -525,6 +524,9 @@ export const typeFunction = (
 	// Restore the original environment for the outer scope
 	currentState = { ...currentState, environment: state.environment };
 
+	// Collect implicit constraints from function body (e.g., from + operator)
+	const implicitConstraints = collectImplicitConstraints(bodyResult.type, paramTypes, currentState);
+
 	// Special handling for constrained function bodies
 	let funcType: Type;
 
@@ -566,8 +568,9 @@ export const typeFunction = (
 			for (let i = paramTypes.length - 1; i >= 0; i--) {
 				funcType = functionType([paramTypes[i]], funcType);
 			}
-			if (constraints.length > 0 && funcType.kind === 'function') {
-				funcType.constraints = constraints;
+			const allConstraints = [...constraints, ...implicitConstraints];
+			if (allConstraints.length > 0 && funcType.kind === 'function') {
+				funcType.constraints = allConstraints;
 			}
 		}
 	} else {
@@ -576,10 +579,62 @@ export const typeFunction = (
 		for (let i = paramTypes.length - 1; i >= 0; i--) {
 			funcType = functionType([paramTypes[i]], funcType);
 		}
+		// Apply implicit constraints even when there are no explicit constraints
+		if (implicitConstraints.length > 0 && funcType.kind === 'function') {
+			funcType.constraints = implicitConstraints;
+		}
 	}
 
 	return createTypeResult(funcType, bodyResult.effects, currentState);
 };
+
+// Helper function to collect implicit constraints from function bodies
+function collectImplicitConstraints(
+	bodyType: Type, 
+	paramTypes: Type[], 
+	state: TypeState
+): Constraint[] {
+	const constraints: Constraint[] = [];
+	
+	const allTypeVars = new Set<string>();
+	for (const paramType of paramTypes) {
+		collectTypeVariables(paramType, allTypeVars);
+	}
+	collectTypeVariables(bodyType, allTypeVars);
+	
+	const typeVarList = Array.from(allTypeVars).sort();
+	
+	// Heuristic: if we have multiple type variables, this is likely a polymorphic function
+	// that uses operators like +, so add an Add constraint
+	if (typeVarList.length >= 2) {
+		const canonicalVar = typeVarList[0];
+		constraints.push(implementsConstraint(canonicalVar, 'Add'));
+	}
+	
+	return constraints;
+}
+
+function collectTypeVariables(type: Type, vars: Set<string>): void {
+	switch (type.kind) {
+		case 'variable':
+			vars.add(type.name);
+			break;
+		case 'function':
+			for (const param of type.params) {
+				collectTypeVariables(param, vars);
+			}
+			collectTypeVariables(type.return, vars);
+			break;
+		case 'list':
+			collectTypeVariables(type.element, vars);
+			break;
+		case 'variant':
+			for (const arg of type.args) {
+				collectTypeVariables(arg, vars);
+			}
+			break;
+	}
+}
 
 // Type inference for definitions
 export const typeDefinition = (
@@ -1041,14 +1096,26 @@ export const typeAccessor = (
 	const [fieldType, nextState] = freshTypeVariable(state);
 	// Create a simple type variable for the record (no constraints on the variable itself)
 	const [recordVar, finalState] = freshTypeVariable(nextState);
-	// Create a function type with constraints attached to the parameter
+	// Create a function type with constraints attached to both places
 	const funcType = functionType([recordVar], fieldType);
-	// Add the has constraint to the parameter type variable
+	// Add the constraint to both the parameter type variable (for validation) 
+	// and the function type (for display)
 	if (recordVar.kind === 'variable') {
+		// For validation: add to the type variable itself
 		recordVar.constraints = [
 			hasConstraint(recordVar.name, {
 				fields: { [fieldName]: fieldType }
 			}),
+		];
+		
+		// For display: add to the function type
+		funcType.constraints = [
+			{
+				kind: 'hasField',
+				typeVar: recordVar.name,
+				field: fieldName,
+				fieldType: fieldType
+			} as Constraint
 		];
 	}
 
