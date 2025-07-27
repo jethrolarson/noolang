@@ -18,14 +18,16 @@ const main = () => {
   if (config.migratedFiles.length === 0) {
     console.log('📝 No migrated test files found. Run migration first:');
     console.log('   node scripts/migrate-to-uvu.js --simple <test-file>');
-    return;
+    process.exit(0);
   }
   
   console.log(`🧪 Running ${config.migratedFiles.length} migrated uvu test file(s)...`);
   
   let totalTests = 0;
   let totalPassed = 0;
+  let totalFailed = 0;
   let totalTime = 0;
+  let hasFailures = false;
   
   for (const testFile of config.migratedFiles) {
     console.log(`\n📁 Running: ${testFile}`);
@@ -39,7 +41,7 @@ const main = () => {
       const endTime = Date.now();
       const duration = endTime - startTime;
       
-      // Parse uvu output for test counts (basic parsing)
+      // Parse uvu output for test counts
       const lines = result.split('\n');
       const summaryLine = lines.find(line => line.includes('Total:'));
       if (summaryLine) {
@@ -55,16 +57,32 @@ const main = () => {
       console.log(`   ✅ Completed in ${duration}ms`);
       
     } catch (error) {
+      hasFailures = true;
+      totalFailed++;
+      
+      // Output the actual test failure details
+      if (error.stdout) {
+        console.log(error.stdout);
+      }
+      if (error.stderr) {
+        console.log(error.stderr);
+      }
+      
       console.log(`   ❌ Failed: ${error.message}`);
-      // Still continue with other tests
     }
   }
   
   console.log(`\n📊 Summary:`);
   console.log(`   Total tests: ${totalTests}`);
   console.log(`   Passed: ${totalPassed}`);
+  console.log(`   Failed: ${totalFailed}`);
   console.log(`   Total time: ${totalTime}ms`);
   console.log(`   Average: ${Math.round(totalTime / config.migratedFiles.length)}ms per file`);
+  
+  // Exit with non-zero code if any tests failed
+  if (hasFailures) {
+    process.exit(1);
+  }
 };
 
 main();

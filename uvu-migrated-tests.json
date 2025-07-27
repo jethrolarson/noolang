@@ -20,9 +20,16 @@
     "src/typer/__tests__/typer_functional_generalization.test.ts",
     "src/typer/__tests__/stdlib-parsing.test.ts",
     "src/typer/__tests__/lsp-regression.test.ts",
-    "src/typer/__tests__/trait-system-resolution.test.ts"
+    "src/typer/__tests__/trait-system-resolution.test.ts",
+    "src/typer/__tests__/type-display.test.ts",
+    "src/typer/__tests__/add-trait.test.ts",
+    "src/typer/__tests__/math-traits.test.ts",
+    "src/typer/__tests__/structural-constraints.test.ts",
+    "src/typer/__tests__/trait-system-infrastructure.test.ts",
+    "src/typer/__tests__/typer.test.ts",
+    "src/typer/__tests__/trait-system.test.ts"
   ],
-  "totalMigrated": 21,
-  "remaining": 11,
-  "notes": "All test/ directory files completed (15/15). Source directory in progress (6/17)."
+  "totalMigrated": 28,
+  "remaining": 4,
+  "notes": "All test/ directory files completed (15/15). Source directory: 13/17 completed (4 large files remaining: lexer 652 lines, evaluator 1153 lines, parser 1957 lines, repl 74 lines)."
 }
