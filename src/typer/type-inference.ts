@@ -35,6 +35,7 @@ import {
 	variantType,
 	ApplicationExpression,
 	hasConstraint,
+	implementsConstraint,
 	type VariableType,
 } from '../ast';
 import {
@@ -523,6 +524,9 @@ export const typeFunction = (
 	// Restore the original environment for the outer scope
 	currentState = { ...currentState, environment: state.environment };
 
+	// Collect implicit constraints from function body (e.g., from + operator)
+	const implicitConstraints = collectImplicitConstraints(bodyResult.type, paramTypes, currentState);
+
 	// Special handling for constrained function bodies
 	let funcType: Type;
 
@@ -564,8 +568,9 @@ export const typeFunction = (
 			for (let i = paramTypes.length - 1; i >= 0; i--) {
 				funcType = functionType([paramTypes[i]], funcType);
 			}
-			if (constraints.length > 0 && funcType.kind === 'function') {
-				funcType.constraints = constraints;
+			const allConstraints = [...constraints, ...implicitConstraints];
+			if (allConstraints.length > 0 && funcType.kind === 'function') {
+				funcType.constraints = allConstraints;
 			}
 		}
 	} else {
@@ -574,10 +579,62 @@ export const typeFunction = (
 		for (let i = paramTypes.length - 1; i >= 0; i--) {
 			funcType = functionType([paramTypes[i]], funcType);
 		}
+		// Apply implicit constraints even when there are no explicit constraints
+		if (implicitConstraints.length > 0 && funcType.kind === 'function') {
+			funcType.constraints = implicitConstraints;
+		}
 	}
 
 	return createTypeResult(funcType, bodyResult.effects, currentState);
 };
+
+// Helper function to collect implicit constraints from function bodies
+function collectImplicitConstraints(
+	bodyType: Type, 
+	paramTypes: Type[], 
+	state: TypeState
+): Constraint[] {
+	const constraints: Constraint[] = [];
+	
+	const allTypeVars = new Set<string>();
+	for (const paramType of paramTypes) {
+		collectTypeVariables(paramType, allTypeVars);
+	}
+	collectTypeVariables(bodyType, allTypeVars);
+	
+	const typeVarList = Array.from(allTypeVars).sort();
+	
+	// Heuristic: if we have multiple type variables, this is likely a polymorphic function
+	// that uses operators like +, so add an Add constraint
+	if (typeVarList.length >= 2) {
+		const canonicalVar = typeVarList[0];
+		constraints.push(implementsConstraint(canonicalVar, 'Add'));
+	}
+	
+	return constraints;
+}
+
+function collectTypeVariables(type: Type, vars: Set<string>): void {
+	switch (type.kind) {
+		case 'variable':
+			vars.add(type.name);
+			break;
+		case 'function':
+			for (const param of type.params) {
+				collectTypeVariables(param, vars);
+			}
+			collectTypeVariables(type.return, vars);
+			break;
+		case 'list':
+			collectTypeVariables(type.element, vars);
+			break;
+		case 'variant':
+			for (const arg of type.args) {
+				collectTypeVariables(arg, vars);
+			}
+			break;
+	}
+}
 
 // Type inference for definitions
 export const typeDefinition = (
