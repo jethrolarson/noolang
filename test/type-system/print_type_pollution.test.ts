@@ -3,8 +3,10 @@ import { parse } from '../../src/parser/parser';
 import { typeAndDecorate } from '../../src/typer';
 import { createTypeState } from '../../src/typer/type-operations';
 import { initializeBuiltins } from '../../src/typer/builtins';
+import { test } from 'uvu';
+import * as assert from 'uvu/assert';
 
-describe('Polymorphic Function Type Pollution', () => {
+// Test suite: Polymorphic Function Type Pollution
 	test('print should remain polymorphic between uses', () => {
 		// Initialize fresh type state for each test
 		let state = createTypeState();
@@ -19,7 +21,7 @@ describe('Polymorphic Function Type Pollution', () => {
 		state = result1.state;
 
 		// Print should work with Float - check if this succeeds
-		expect(() => result1).not.toThrow();
+		assert.not.throws(() => result1);
 
 		// Now use print with string - this should also work
 		const lexer2 = new Lexer('print "hello"');
@@ -27,12 +29,12 @@ describe('Polymorphic Function Type Pollution', () => {
 		const program2 = parse(tokens2);
 
 		// This should not throw - print should be polymorphic
-		expect(() => {
+		assert.not.throws(() => {
 			const result2 = typeAndDecorate(program2, state);
-		}).not.toThrow();
+		});
 	});
 
-	test('simulate REPL behavior - alternating print types', () => {
+test('simulate REPL behavior - alternating print types', () => {
 		// Simulate REPL state persistence
 		let state = createTypeState();
 		state = initializeBuiltins(state);
@@ -50,22 +52,22 @@ describe('Polymorphic Function Type Pollution', () => {
 		const program2 = parse(tokens2);
 
 		// This is where the bug manifests - print gets "stuck" on Float type
-		expect(() => {
+		assert.not.throws(() => {
 			const result2 = typeAndDecorate(program2, state);
 			state = result2.state;
-		}).not.toThrow();
+		});
 
 		// Third REPL input: print 42 - should work again
 		const lexer3 = new Lexer('print 42');
 		const tokens3 = lexer3.tokenize();
 		const program3 = parse(tokens3);
 
-		expect(() => {
+		assert.not.throws(() => {
 			const result3 = typeAndDecorate(program3, state);
-		}).not.toThrow();
+		});
 	});
 
-	test('other polymorphic functions should not have type pollution', () => {
+test('other polymorphic functions should not have type pollution', () => {
 		let state = createTypeState();
 		state = initializeBuiltins(state);
 
@@ -73,32 +75,32 @@ describe('Polymorphic Function Type Pollution', () => {
 		const eq1 = typeAndDecorate(parse(new Lexer('1 == 1').tokenize()), state);
 		state = eq1.state;
 
-		expect(() => {
+		assert.not.throws(() => {
 			const eq2 = typeAndDecorate(
 				parse(new Lexer('"a" == "b"').tokenize()),
 				state
 			);
 			state = eq2.state;
-		}).not.toThrow();
+		});
 
 		// Test toString with different types
-		expect(() => {
+		assert.not.throws(() => {
 			const toString1 = typeAndDecorate(
 				parse(new Lexer('toString 42').tokenize()),
 				state
 			);
 			state = toString1.state;
-		}).not.toThrow();
+		});
 
-		expect(() => {
+		assert.not.throws(() => {
 			const toString2 = typeAndDecorate(
 				parse(new Lexer('toString "hello"').tokenize()),
 				state
 			);
-		}).not.toThrow();
+		});
 	});
 
-	test('list functions should remain polymorphic', () => {
+test('list functions should remain polymorphic', () => {
 		let state = createTypeState();
 		state = initializeBuiltins(state);
 
@@ -110,11 +112,14 @@ describe('Polymorphic Function Type Pollution', () => {
 		state = list1.state;
 
 		// Test toString with different input again - should work
-		expect(() => {
+		assert.not.throws(() => {
 			const toString3 = typeAndDecorate(
 				parse(new Lexer('toString 100').tokenize()),
 				state
 			);
-		}).not.toThrow();
+		});
 	});
-});
+
+
+
+test.run();
