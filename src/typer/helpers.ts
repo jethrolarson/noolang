@@ -494,34 +494,50 @@ export const typeToString = (
 		}
 	}
 
+	// Helper function to normalize constraint variable names
+	function normalizeConstraintVariable(typeVar: string): string {
+		// First try the mapping
+		const mapped = mapping.get(typeVar);
+		if (mapped) {
+			return mapped;
+		}
+		
+		// If not in mapping, check if this looks like an internal variable name
+		for (const greekLetter of greek) {
+			if (typeVar.startsWith(greekLetter) && /^\d+$/.test(typeVar.slice(greekLetter.length))) {
+				return greekLetter;
+			}
+		}
+		
+		// Fallback to original name
+		return typeVar;
+	}
+
 	function formatConstraint(c: Constraint): string {
 		switch (c.kind) {
 			case 'is': {
-				// Use the normalized variable name for consistency
-				const normalizedVarName = mapping.get(c.typeVar) || c.typeVar;
+				const normalizedVarName = normalizeConstraintVariable(c.typeVar);
 				return `${normalizedVarName} is ${c.constraint}`;
 			}
 			case 'hasField': {
-				// For hasField constraints, we need to use the normalized variable name
-				// that matches the parameter it's constraining
-				const normalizedVarName2 = mapping.get(c.typeVar) || c.typeVar;
+				const normalizedVarName2 = normalizeConstraintVariable(c.typeVar);
 				return `${normalizedVarName2} has field "${c.field}" of type ${norm(
 					c.fieldType
 				)}`;
 			}
 			case 'implements': {
-				const normalizedVarName3 = mapping.get(c.typeVar) || c.typeVar;
+				const normalizedVarName3 = normalizeConstraintVariable(c.typeVar);
 				return `${normalizedVarName3} implements ${c.interfaceName}`;
 			}
 			case 'has': {
-				const normalizedVarName = mapping.get(c.typeVar) || c.typeVar;
+				const normalizedVarName = normalizeConstraintVariable(c.typeVar);
 				const fieldDescs = Object.entries(c.structure.fields)
 					.map(([fieldName, fieldType]) => `@${fieldName} ${norm(fieldType as Type)}`)
 					.join(', ');
 				return `${normalizedVarName} has {${fieldDescs}}`;
 			}
 			case 'custom': {
-				const normalizedVarName4 = mapping.get(c.typeVar) || c.typeVar;
+				const normalizedVarName4 = normalizeConstraintVariable(c.typeVar);
 				return `${normalizedVarName4} satisfies ${c.constraint} ${c.args
 					.map(norm)
 					.join(' ')}`;

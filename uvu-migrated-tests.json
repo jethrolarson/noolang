@@ -8,7 +8,13 @@
     "test/language-features/head_function.test.ts",
     "test/features/pattern-matching/pattern_matching_failures.test.ts",
     "test/type-system/print_type_pollution.test.ts",
-    "test/features/operators/safe_thrush_operator.test.ts"
+    "test/features/operators/safe_thrush_operator.test.ts",
+    "test/type-system/adt_limitations.test.ts",
+    "test/features/effects/effects_phase2.test.ts",
+    "test/features/operators/dollar-operator.test.ts",
+    "test/features/effects/effects_phase3.test.ts",
+    "test/features/adt.test.ts",
+    "test/language-features/combinators.test.ts"
   ],
-  "lastUpdated": "2025-07-27T05:04:08.376Z"
+  "lastUpdated": "2025-01-27T18:45:00.000Z"
 }
