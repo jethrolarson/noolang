@@ -50,5 +50,5 @@ module.exports = {
 		'test/features/pattern-matching/pattern_matching_failures.test.ts', // Migrated to uvu
 		'test/type-system/print_type_pollution.test.ts', // Migrated to uvu
 		'test/features/operators/safe_thrush_operator.test.ts', // Migrated to uvu
-],
+	],
 };
