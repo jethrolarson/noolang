@@ -41,6 +41,7 @@ import {
 import {
 	undefinedVariableError,
 	nonFunctionApplicationError,
+	traitFunctionShadowingError,
 } from './type-errors';
 import {
 	getExprLocation,

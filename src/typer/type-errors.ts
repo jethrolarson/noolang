@@ -113,6 +113,23 @@ export function functionApplicationError(
 	);
 }
 
+export function traitFunctionShadowingError(
+	variableName: string,
+	traitNames: string[],
+	location?: ErrorLocation
+): NoolangError {
+	const traitsList = traitNames.join(', ');
+	const message = `Cannot define variable '${variableName}' as it shadows the trait function '${variableName}'`;
+	return createTypeError(
+		message,
+		{
+			variableName,
+			suggestion: `Choose a different variable name. '${variableName}' is a trait function from: ${traitsList}`,
+		},
+		location
+	);
+}
+
 export function undefinedVariableError(
 	variableName: string,
 	location?: ErrorLocation

@@ -65,7 +65,7 @@ test('Dollar Operator ($) - Basic Function Application - simple function applica
 
 test('Dollar Operator ($) - Basic Function Application - curried function application', () => {
 	evaluator = new Evaluator();
-	const result = runCode('add = fn x y => x + y; (add $ 3) $ 5');
+	const result = runCode('sum = fn x y => x + y; (sum $ 3) $ 5');
 	assert.equal(unwrapValue(result.finalResult), 8);
 });
 
