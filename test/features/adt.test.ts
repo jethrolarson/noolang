@@ -357,7 +357,7 @@ test.skip('Algebraic Data Types (ADTs) - Advanced Patterns - should handle recur
 	});
 });
 
-test.skip('Algebraic Data Types (ADTs) - Advanced Patterns - should handle mutual recursion - TODO: Constructor arity validation needs improvement', () => {
+test('Algebraic Data Types (ADTs) - Advanced Patterns - should handle mutual recursion', () => {
 	const result = runNoolang(`
         type Expr = Num Float | Add Expr Expr | Mul Expr Expr;
         
