@@ -1,4 +1,5 @@
 import { TypeState } from './types';
+import { addTraitDefinition, addTraitImplementation } from './trait-system';
 import {
 	functionType,
 	floatType,
@@ -408,7 +409,6 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	const newState = { ...state, environment: newEnv };
 	
 	// Register basic trait implementations to avoid loading order issues
-	const { addTraitDefinition, addTraitImplementation } = require('./trait-system');
 	
 	// Add the Add trait definition if not already present
 	if (!newState.traitRegistry.definitions.has('Add')) {

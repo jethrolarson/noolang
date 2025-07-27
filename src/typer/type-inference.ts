@@ -73,7 +73,7 @@ import {
 } from './type-operations';
 // NOTE: Constraint resolution imports removed - trait system will replace
 import { typeApplication } from './function-application';
-import { isTraitFunction, getTraitFunctionInfo } from './trait-system';
+import { isTraitFunction, getTraitFunctionInfo, addTraitDefinition, getTypeName, addTraitImplementation } from './trait-system';
 
 // Note: Main typeExpression is now in expression-dispatcher.ts
 // This file only contains the individual type inference functions
@@ -1311,9 +1311,8 @@ export const typeConstraintDefinition = (
 		functions: functionMap,
 	};
 
-	// Add to trait registry using the new trait system
-	const { addTraitDefinition } = require('./trait-system');
-	addTraitDefinition(state.traitRegistry, traitDef);
+	   // Add to trait registry using the new trait system
+   addTraitDefinition(state.traitRegistry, traitDef);
 
 	// Constraint definitions have unit type
 	return createPureTypeResult(unitType(), state);
@@ -1327,7 +1326,6 @@ export const typeImplementDefinition = (
 	const { constraintName, typeExpr, implementations, givenConstraints } = expr;
 
 	// Extract type name from type expression - support all type kinds
-	const { getTypeName } = require('./trait-system');
 	const typeName = getTypeName(typeExpr);
 
 	// Check if trait exists in trait registry
@@ -1379,7 +1377,6 @@ export const typeImplementDefinition = (
 	};
 
 	// Add to trait registry using the new trait system
-	const { addTraitImplementation } = require('./trait-system');
 	addTraitImplementation(currentState.traitRegistry, constraintName, traitImpl);
 
 	// Implement definitions have unit type
