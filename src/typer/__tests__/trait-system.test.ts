@@ -230,8 +230,7 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Type Sy
 	
 	const program = parseProgram(code);
 	const typeResult = typeProgram(program);
-	
-	assert.is(typeResult.type.kind, 'primitive');
+	assertPrimitiveType(typeResult.type);
 	assert.is(typeResult.type.name, 'Float');
 });
 
@@ -330,7 +329,7 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Basic
 	const typeResult = typeProgram(program);
 	
 	// Should succeed and return String
-	assert.is(typeResult.type.kind, 'primitive');
+	assertPrimitiveType(typeResult.type);
 	assert.is(typeResult.type.name, 'String');
 });
 
@@ -422,7 +421,7 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Integ
 	const typeResult = typeProgram(program);
 	
 	// Should work normally without constraints
-	assert.is(typeResult.type.kind, 'primitive');
+	assertPrimitiveType(typeResult.type);
 	assert.is(typeResult.type.name, 'Float');
 });
 
@@ -437,7 +436,7 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Integ
 	const typeResult = typeProgram(program);
 	
 	// Should succeed - polymorphic function used with different types
-	assert.is(typeResult.type.kind, 'primitive');
+	assertPrimitiveType(typeResult.type);
 	assert.is(typeResult.type.name, 'Float'); // Last expression evaluated wins
 });
 
@@ -466,7 +465,7 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Error
 	
 	try {
 		typeProgram(program);
-		assert.fail('Expected error for missing trait implementation');
+		assert.unreachable('Expected error for missing trait implementation');
 	} catch (error) {
 		const message = (error as Error).message;
 		assert.match(message, /Functor/);
@@ -483,7 +482,7 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Error
 	
 	try {
 		typeProgram(program);
-		assert.fail('Expected error for missing trait implementation');
+		assert.unreachable('Expected error for missing trait implementation');
 	} catch (error) {
 		const message = (error as Error).message;
 		// Should include location information
@@ -591,7 +590,7 @@ test('Trait System - Consolidated Tests - Safety: Conflicting Functions & Valida
 	const typeResult = typeProgram(program);
 	
 	// Should succeed - same function name but different types
-	assert.is(typeResult.type.kind, 'primitive');
+	assertPrimitiveType(typeResult.type);
 	assert.is(typeResult.type.name, 'String');
 });
 
@@ -612,7 +611,7 @@ test('Trait System - Consolidated Tests - Evaluation Integration - should evalua
 		}
 	}
 	
-	assert.is(evalResult.finalResult.tag, 'list');
+	assertListValue(evalResult.finalResult);
 	assert.equal(evalResult.finalResult.values, [
 		{ tag: 'number', value: 2 },
 		{ tag: 'number', value: 3 },
@@ -629,7 +628,7 @@ test('Trait System - Consolidated Tests - Evaluation Integration - should work w
 	
 	const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'number');
+	assertNumberValue(evalResult.finalResult);
 	assert.is(evalResult.finalResult.value, 42);
 });
 
@@ -638,7 +637,7 @@ test('Trait System - Consolidated Tests - Evaluation Integration - should compar
 	
 	const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'list');
+	assertListValue(evalResult.finalResult);
 	assert.equal(evalResult.finalResult.values, [
 		{ tag: 'number', value: 11 },
 		{ tag: 'number', value: 12 },
