@@ -44,16 +44,17 @@ module.exports = {
 
 	// Exclude files that have been migrated to uvu
 	testPathIgnorePatterns: [
-		'/node_modules/',
+		// Migrated to uvu - exclude from Jest
 		'test/language-features/record_tuple_unit.test.ts', // Migrated to uvu
 		'test/language-features/tuple.test.ts', // Migrated to uvu
 		'test/language-features/closure.test.ts', // Migrated to uvu
 		'test/type-system/option_unification.test.ts', // Migrated to uvu
 		'test/integration/import_relative.test.ts', // Migrated to uvu
 		'test/language-features/head_function.test.ts', // Migrated to uvu
-	
 		'test/features/pattern-matching/pattern_matching_failures.test.ts', // Migrated to uvu
 		'test/type-system/print_type_pollution.test.ts', // Migrated to uvu
 		'test/features/operators/safe_thrush_operator.test.ts', // Migrated to uvu
+		'test/type-system/adt_limitations.test.ts', // Migrated to uvu
+		'test/features/effects/effects_phase2.test.ts', // Migrated to uvu
 	],
 };
