@@ -516,12 +516,7 @@ export const typeToString = (
 	function formatConstraint(c: Constraint): string {
 		switch (c.kind) {
 			case 'is': {
-<<<<<<< HEAD
-				// Use the normalized variable name for consistency
-				const normalizedVarName = mapping.get(c.typeVar) || c.typeVar;
-=======
 				const normalizedVarName = normalizeConstraintVariable(c.typeVar);
->>>>>>> c840d5f (Refactor constraint variable normalization with helper function)
 				return `${normalizedVarName} is ${c.constraint}`;
 			}
 			case 'hasField': {
@@ -531,20 +526,15 @@ export const typeToString = (
 				)}`;
 			}
 			case 'implements': {
-<<<<<<< HEAD
-				const normalizedVarName3 = mapping.get(c.typeVar) || c.typeVar;
+				const normalizedVarName3 = normalizeConstraintVariable(c.typeVar);
 				return `${normalizedVarName3} implements ${c.interfaceName}`;
 			}
 			case 'has': {
-				const normalizedVarName = mapping.get(c.typeVar) || c.typeVar;
+				const normalizedVarName = normalizeConstraintVariable(c.typeVar);
 				const fieldDescs = Object.entries(c.structure.fields)
 					.map(([fieldName, fieldType]) => `@${fieldName} ${norm(fieldType as Type)}`)
 					.join(', ');
 				return `${normalizedVarName} has {${fieldDescs}}`;
-=======
-				const normalizedVarName3 = normalizeConstraintVariable(c.typeVar);
-				return `${normalizedVarName3} implements ${c.interfaceName}`;
->>>>>>> c840d5f (Refactor constraint variable normalization with helper function)
 			}
 			case 'custom': {
 				const normalizedVarName4 = normalizeConstraintVariable(c.typeVar);
