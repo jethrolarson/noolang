@@ -47,5 +47,6 @@ module.exports = {
 		'/node_modules/',
 		'test/language-features/record_tuple_unit.test.ts', // Migrated to uvu
 		'test/language-features/tuple.test.ts', // Migrated to uvu
+		'test/language-features/closure.test.ts', // Migrated to uvu
 	],
 };

@@ -1,7 +1,8 @@
 {
   "migratedFiles": [
     "test/language-features/record_tuple_unit.test.ts",
-    "test/language-features/tuple.test.ts"
+    "test/language-features/tuple.test.ts",
+    "test/language-features/closure.test.ts"
   ],
-  "lastUpdated": "2025-07-27T01:05:00.000Z"
+  "lastUpdated": "2025-07-27T01:50:00.000Z"
 }

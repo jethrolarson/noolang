@@ -1,3 +1,5 @@
+import { test } from 'uvu';
+import * as assert from 'uvu/assert';
 import { Evaluator, Value } from '../../src/evaluator/evaluator';
 import { parse } from '../../src/parser/parser';
 import { Lexer } from '../../src/lexer/lexer';
@@ -28,43 +30,43 @@ function unwrapValue(val: Value): any {
 	}
 }
 
-describe('Closure behavior', () => {
-	function evalNoo(src: string) {
-		const lexer = new Lexer(src);
-		const tokens = lexer.tokenize();
-		const program = parse(tokens);
-		const evaluator = new Evaluator();
-		return evaluator.evaluateProgram(program).finalResult;
-	}
+// Test suite: Closure behavior
+function evalNoo(src: string) {
+	const lexer = new Lexer(src);
+	const tokens = lexer.tokenize();
+	const program = parse(tokens);
+	const evaluator = new Evaluator();
+	return evaluator.evaluateProgram(program).finalResult;
+}
 
-	test('simple closure: makeAdder', () => {
-		const src = `
+test('simple closure: makeAdder', () => {
+	const src = `
       makeAdder = fn x => fn y => x + y;
       add5 = makeAdder 5;
       result = add5 10;
       result
     `;
-		expect(unwrapValue(evalNoo(src))).toBe(15);
-	});
+	assert.is(unwrapValue(evalNoo(src)), 15);
+});
 
-	test('closure in a record', () => {
-		const code = `
+test('closure in a record', () => {
+	const code = `
       makeCounter = fn start => { @value start };
       counter = makeCounter 10;
       result = (@value counter);
       result
     `;
-		const lexer = new Lexer(code);
-		const tokens = lexer.tokenize();
-		const program = parse(tokens);
-		const evaluator = new Evaluator();
-		const result = evaluator.evaluateProgram(program);
+	const lexer = new Lexer(code);
+	const tokens = lexer.tokenize();
+	const program = parse(tokens);
+	const evaluator = new Evaluator();
+	const result = evaluator.evaluateProgram(program);
 
-		expect(unwrapValue(result.finalResult)).toBe(10);
-	});
+	assert.is(unwrapValue(result.finalResult), 10);
+});
 
-	test('closure with function in record', () => {
-		const code = `
+test('closure with function in record', () => {
+	const code = `
       makeCounter = fn start => { @value start };
       counter1 = makeCounter 10;
       counter2 = makeCounter 20;
@@ -72,12 +74,13 @@ describe('Closure behavior', () => {
       result2 = (@value counter2);
       result1 + result2
     `;
-		const lexer = new Lexer(code);
-		const tokens = lexer.tokenize();
-		const program = parse(tokens);
-		const evaluator = new Evaluator();
-		const result = evaluator.evaluateProgram(program);
+	const lexer = new Lexer(code);
+	const tokens = lexer.tokenize();
+	const program = parse(tokens);
+	const evaluator = new Evaluator();
+	const result = evaluator.evaluateProgram(program);
 
-		expect(unwrapValue(result.finalResult)).toBe(30);
-	});
+	assert.is(unwrapValue(result.finalResult), 30);
 });
+
+test.run();
