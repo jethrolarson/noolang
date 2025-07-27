@@ -45,6 +45,6 @@ module.exports = {
 	// Exclude files that have been migrated to uvu
 	testPathIgnorePatterns: [
 		'/node_modules/',
-		// Add patterns here to exclude uvu-migrated files
+		'test/language-features/record_tuple_unit.test.ts', // Migrated to uvu
 	],
 };
