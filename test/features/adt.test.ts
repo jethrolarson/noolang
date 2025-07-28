@@ -132,7 +132,7 @@ test('Algebraic Data Types (ADTs) - Custom ADT Definition - should pattern match
 	});
 });
 
-test.skip('Algebraic Data Types (ADTs) - Custom ADT Definition - should define ADT with parameters - TODO: Fix parameterized ADT type unification', () => {
+test('Algebraic Data Types (ADTs) - Custom ADT Definition - should define ADT with parameters', () => {
 	const result = runNoolang(`
 		type Box a = Empty | Full a;
 		x = Full 42;
@@ -160,7 +160,7 @@ test('Algebraic Data Types (ADTs) - Custom ADT Definition - should handle ADT wi
 	});
 });
 
-test.skip('Algebraic Data Types (ADTs) - Pattern Matching - should handle recursive ADTs', () => {
+test.skip('Algebraic Data Types (ADTs) - Pattern Matching - should handle recursive ADTs - TODO: Fix recursive type unification', () => {
 	const result = runNoolang(`
 		type List a = Cons a (List a) | Nil;
 		list = Cons 1 (Cons 2 Nil);
@@ -181,7 +181,7 @@ test.skip('Algebraic Data Types (ADTs) - Pattern Matching - should handle recurs
 	});
 });
 
-test.skip('Algebraic Data Types (ADTs) - Pattern Matching - should handle complex pattern matching with variables', () => {
+test('Algebraic Data Types (ADTs) - Pattern Matching - should handle complex pattern matching with variables', () => {
 	const result = runNoolang(`
 		type Result a b = Ok a | Error b;
 		
@@ -251,7 +251,7 @@ test('Algebraic Data Types (ADTs) - Type Inference - should infer ADT types corr
 	});
 });
 
-test.skip('Algebraic Data Types (ADTs) - Type Inference - should handle polymorphic ADTs - TODO: Fix polymorphic ADT type unification', () => {
+test('Algebraic Data Types (ADTs) - Type Inference - should handle polymorphic ADTs', () => {
 	const result = runNoolang(`
 		type Container a = Container a;
 		
@@ -434,6 +434,55 @@ test.skip('Algebraic Data Types (ADTs) - Complex Scenarios - should work when sh
 		values: [
 			{ tag: 'number', value: 27 },
 			{ tag: 'number', value: 20 },
+		],
+	});
+});
+
+test('Algebraic Data Types (ADTs) - Generic Constructors - should handle Point with generic parameters (issue fix)', () => {
+	const result = runNoolang(`
+		type Point a = Point a a;
+		origin = Point 0.0 0.0;
+		origin
+	`);
+
+	assert.equal(result.finalValue, {
+		tag: 'constructor',
+		name: 'Point',
+		args: [
+			{ tag: 'number', value: 0.0 },
+			{ tag: 'number', value: 0.0 }
+		],
+	});
+});
+
+test('Algebraic Data Types (ADTs) - Generic Constructors - should handle Shape with multiple constructors (issue fix)', () => {
+	const result = runNoolang(`
+		type Shape a = Circle a | Rectangle a a;
+		circle = Circle 5.0;
+		circle
+	`);
+
+	assert.equal(result.finalValue, {
+		tag: 'constructor',
+		name: 'Circle',
+		args: [{ tag: 'number', value: 5.0 }],
+	});
+});
+
+test('Algebraic Data Types (ADTs) - Generic Constructors - should handle partial application of generic constructors', () => {
+	const result = runNoolang(`
+		type Point a = Point a a;
+		makeOrigin = Point 0.0;
+		point = makeOrigin 0.0;
+		point
+	`);
+
+	assert.equal(result.finalValue, {
+		tag: 'constructor',
+		name: 'Point',
+		args: [
+			{ tag: 'number', value: 0.0 },
+			{ tag: 'number', value: 0.0 }
 		],
 	});
 });
