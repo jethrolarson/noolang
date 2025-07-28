@@ -2,7 +2,7 @@ name: Comprehensive Test Suite
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, 'cursor/**' ]  # Temporarily re-added for testing the generic ADT fix
     paths:
       - 'src/**'
       - 'test/**'
