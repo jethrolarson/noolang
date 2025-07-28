@@ -1285,9 +1285,9 @@ describe('Top-level sequence parsing', () => {
 
 	test('multiple definitions and final record', () => {
 		const code = `
-      add = fn x y => x + y;
+      sum = fn x y => x + y;
       sub = fn x y => x - y;
-      math = { @add add, @sub sub };
+      math = { @add sum, @sub sub };
       math
     `;
 		const lexer = new Lexer(code);
@@ -1534,7 +1534,7 @@ describe('Top-level definitions with type annotations', () => {
 
 	test('parses definition with function type annotation', () => {
 		const result = parseDefinition(
-			'add = fn x y => x + y : Float -> Float -> Float;'
+			'sum = fn x y => x + y : Float -> Float -> Float;'
 		);
 		expect(result.statements).toHaveLength(1);
 		expect(result.statements[0].kind).toBe('definition');
@@ -1596,7 +1596,7 @@ describe('Top-level definitions with type annotations', () => {
 
 	test('parses multiple definitions with type annotations', () => {
 		const result = parseDefinition(`
-      add = fn x y => x + y : Float -> Float -> Float;
+      sum = fn x y => x + y : Float -> Float -> Float;
       answer = 42 : Float;
       numbers = [1, 2, 3] : List Float;
     `);
