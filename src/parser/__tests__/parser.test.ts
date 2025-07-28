@@ -1539,7 +1539,7 @@ describe('Top-level definitions with type annotations', () => {
 		expect(result.statements).toHaveLength(1);
 		expect(result.statements[0].kind).toBe('definition');
 		const def = assertDefinitionExpression(result.statements[0]);
-		expect(def.name).toBe('add');
+		expect(def.name).toBe('sum');
 		expect(def.value.kind).toBe('function');
 		// Function expressions with type annotations may not wrap in "typed" nodes
 		// The type information might be stored directly on the function
