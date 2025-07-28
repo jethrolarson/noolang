@@ -209,6 +209,7 @@ export class Evaluator {
 		fs?: typeof defaultFs;
 		path?: typeof defaultPath;
 		traitRegistry?: any;
+		skipStdlib?: boolean;
 	}) {
 		this.fs = opts?.fs ?? defaultFs;
 		this.path = opts?.path ?? defaultPath;
@@ -216,7 +217,10 @@ export class Evaluator {
 		this.environment = new Map();
 		this.environmentStack = [];
 		this.initializeBuiltins();
-		this.loadStdlib();
+		
+		if (!opts?.skipStdlib) {
+			this.loadStdlib();
+		}
 	}
 
 	private initializeBuiltins(): void {

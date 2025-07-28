@@ -63,7 +63,7 @@ test('REPL Core - should evaluate simple expressions', () => {
 
 test('REPL Core - should evaluate string expressions', () => {
 	const mockOutput = new MockOutput();
-	const repl = new REPLCore(mockOutput, { skipStdlib: true });
+	const repl = new REPLCore(mockOutput);
 	
 	const result = repl.processInput('"hello world"');
 	
@@ -76,7 +76,7 @@ test('REPL Core - should evaluate string expressions', () => {
 
 test('REPL Core - should handle arithmetic expressions', () => {
 	const mockOutput = new MockOutput();
-	const repl = new REPLCore(mockOutput, { skipStdlib: true });
+	const repl = new REPLCore(mockOutput);
 	
 	const result = repl.processInput('2 + 3');
 	
@@ -89,7 +89,7 @@ test('REPL Core - should handle arithmetic expressions', () => {
 
 test('REPL Core - should handle variable definitions', () => {
 	const mockOutput = new MockOutput();
-	const repl = new REPLCore(mockOutput, { skipStdlib: true });
+	const repl = new REPLCore(mockOutput);
 	
 	const result = repl.processInput('x = 42');
 	
@@ -107,15 +107,15 @@ test('REPL Core - should handle variable definitions', () => {
 
 test('REPL Core - should handle function definitions', () => {
 	const mockOutput = new MockOutput();
-	const repl = new REPLCore(mockOutput, { skipStdlib: true });
+	const repl = new REPLCore(mockOutput);
 	
-	const result = repl.processInput('myAdd = fn x y => x + y');
+	const result = repl.processInput('add = fn x y => x + y');
 	
 	assert.is(result.success, true, 'should succeed');
 	
 	// Test using the function
 	mockOutput.clear();
-	const result2 = repl.processInput('myAdd 2 3');
+	const result2 = repl.processInput('add 2 3');
 	
 	assert.is(result2.success, true, 'should succeed');
 	const output = mockOutput.logs.join(' ');
@@ -124,7 +124,7 @@ test('REPL Core - should handle function definitions', () => {
 
 test('REPL Core - should handle help command', () => {
 	const mockOutput = new MockOutput();
-	const repl = new REPLCore(mockOutput, { skipStdlib: true });
+	const repl = new REPLCore(mockOutput);
 	
 	const result = repl.processInput('.help');
 	
@@ -139,7 +139,7 @@ test('REPL Core - should handle help command', () => {
 
 test('REPL Core - should handle env command', () => {
 	const mockOutput = new MockOutput();
-	const repl = new REPLCore(mockOutput, { skipStdlib: true });
+	const repl = new REPLCore(mockOutput);
 	
 	// Define a variable first
 	repl.processInput('testVar = 123');
@@ -157,7 +157,7 @@ test('REPL Core - should handle env command', () => {
 
 test('REPL Core - should handle clear-env command', () => {
 	const mockOutput = new MockOutput();
-	const repl = new REPLCore(mockOutput, { skipStdlib: true });
+	const repl = new REPLCore(mockOutput);
 	
 	// Define a variable
 	repl.processInput('testVar = 123');
@@ -179,7 +179,7 @@ test('REPL Core - should handle clear-env command', () => {
 
 test('REPL Core - should handle quit command', () => {
 	const mockOutput = new MockOutput();
-	const repl = new REPLCore(mockOutput, { skipStdlib: true });
+	const repl = new REPLCore(mockOutput);
 	
 	const result = repl.processInput('.quit');
 	
@@ -189,7 +189,7 @@ test('REPL Core - should handle quit command', () => {
 
 test('REPL Core - should handle unknown commands', () => {
 	const mockOutput = new MockOutput();
-	const repl = new REPLCore(mockOutput, { skipStdlib: true });
+	const repl = new REPLCore(mockOutput);
 	
 	const result = repl.processInput('.unknown');
 	
@@ -202,7 +202,7 @@ test('REPL Core - should handle unknown commands', () => {
 
 test('REPL Core - should handle syntax errors gracefully', () => {
 	const mockOutput = new MockOutput();
-	const repl = new REPLCore(mockOutput, { skipStdlib: true });
+	const repl = new REPLCore(mockOutput);
 	
 	const result = repl.processInput('invalid syntax @#$');
 	
@@ -213,7 +213,7 @@ test('REPL Core - should handle syntax errors gracefully', () => {
 
 test('REPL Core - should handle tokens command', () => {
 	const mockOutput = new MockOutput();
-	const repl = new REPLCore(mockOutput, { skipStdlib: true });
+	const repl = new REPLCore(mockOutput);
 	
 	const result = repl.processInput('.tokens (42 + 3)');
 	
@@ -227,7 +227,7 @@ test('REPL Core - should handle tokens command', () => {
 
 test('REPL Core - should handle ast command', () => {
 	const mockOutput = new MockOutput();
-	const repl = new REPLCore(mockOutput, { skipStdlib: true });
+	const repl = new REPLCore(mockOutput);
 	
 	const result = repl.processInput('.ast (42)');
 	
@@ -240,7 +240,7 @@ test('REPL Core - should handle ast command', () => {
 
 test('REPL Core - should maintain state between inputs', () => {
 	const mockOutput = new MockOutput();
-	const repl = new REPLCore(mockOutput, { skipStdlib: true });
+	const repl = new REPLCore(mockOutput);
 	
 	// Define multiple variables
 	repl.processInput('a = 10');
