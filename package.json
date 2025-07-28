@@ -8,7 +8,7 @@
     "start": "npx ts-node src/cli.ts",
     "dev": "ts-node src/repl.ts",
     "cli": "node dist/cli.js",
-    "test": "node scripts/run-uvu-tests.js",
+    "test": "uvu test --require tsx/cjs && uvu src --require tsx/cjs",
     "typecheck": "tsc --noEmit",
     "typecheck:all": "npm run typecheck",
     "lint": "npx eslint src/**/*.ts",
