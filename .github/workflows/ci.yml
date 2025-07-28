@@ -55,11 +55,8 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: TypeScript check - source files
+    - name: TypeScript check - source and test files
       run: npm run typecheck
-      
-    - name: TypeScript check - test files (including assert helpers)
-      run: npm run typecheck:test
       
     - name: Report TypeScript status
       run: echo "✅ TypeScript checking passed for source and test files"
@@ -81,20 +78,8 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: Run Jest tests (SWC)
-      run: npm run test:fast
-    
-    - name: Run uvu tests
+    - name: Run uvu tests (all tests migrated)
       run: npm run test:uvu
-      
-    - name: Cache Jest transform cache
-      uses: actions/cache@v4
-      with:
-        path: .jest-cache
-        key: jest-cache-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('src/**/*.ts', 'test/**/*.ts') }}
-        restore-keys: |
-          jest-cache-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
-          jest-cache-${{ runner.os }}-
 
   # Run REPL-specific tests separately  
   repl-tests:

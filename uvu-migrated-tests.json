@@ -39,9 +39,10 @@
     "src/parser/__tests__/parser-advanced-types.test.ts",
     "src/parser/__tests__/parser-error-handling.test.ts",
     "src/parser/__tests__/parser-annotations.test.ts",
-    "src/parser/__tests__/parser-edge-cases.test.ts"
+    "src/parser/__tests__/parser-edge-cases.test.ts",
+    "src/repl/__tests__/repl.test.ts"
   ],
-  "totalMigrated": 40,
-  "remaining": 1,
-  "notes": "MIGRATION 97.6% COMPLETE! All test/ directory files completed (15/15). Source directory: 24/25 completed. Major achievement: Parser's 1957-line monster split into 9 focused, maintainable files (128 tests total). Lexer (45 tests) and Evaluator (91 tests) successfully migrated. Only REPL tests remain (74 lines, problematic due to readline hanging)."
+  "totalMigrated": 41,
+  "remaining": 0,
+  "notes": "MIGRATION 100% COMPLETE! All test/ directory files completed (15/15). Source directory: 25/25 completed. Major achievement: Parser's 1957-line monster split into 9 focused, maintainable files (128 tests total). Lexer (45 tests) and Evaluator (91 tests) successfully migrated. REPL tests migrated using component-based testing approach to avoid readline hanging issues. Migration fully complete - Jest can now be removed from project."
 }
