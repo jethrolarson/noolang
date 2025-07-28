@@ -307,8 +307,8 @@ test('Effects Phase 3 - Effect System Architecture Validation - pure functions h
 
 test('Effects Phase 3 - Effect System Architecture Validation - pure function application has no effects', () => {
 	expectPure(`
-				add = fn x => fn y => x + y;
-				add 2 3
+				sum = fn x => fn y => x + y;
+				sum 2 3
 			`);
 });
 
