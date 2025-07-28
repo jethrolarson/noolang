@@ -434,13 +434,6 @@ export const typeToString = (
 			case 'variable': {
 				let varStr = '';
 				
-				// DEBUG: Log when processing 'a' or any α variable
-				if (t.name === 'a' || t.name.startsWith('α')) {
-					console.log('DEBUG: Processing variable:', JSON.stringify(t.name));
-					console.log('DEBUG: Current mapping for this name:', JSON.stringify(mapping.get(t.name)));
-					console.log('DEBUG: Mapping keys:', Array.from(mapping.keys()));
-				}
-				
 				if (!mapping.has(t.name)) {
 					// If the type variable name is a single letter, keep it as-is
 					// This preserves explicit type annotations like 'a -> a'
@@ -453,11 +446,6 @@ export const typeToString = (
 				}
 				// biome-ignore lint/style/noNonNullAssertion: it's set if not defined above
 				varStr = mapping.get(t.name)!;
-				
-				// DEBUG: Show the final mapped string
-				if (t.name === 'a' || t.name.startsWith('α')) {
-					console.log('DEBUG: Final mapped string for', JSON.stringify(t.name), ':', JSON.stringify(varStr));
-				}
 
 				return varStr;
 			}
