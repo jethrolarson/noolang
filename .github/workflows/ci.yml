@@ -279,7 +279,7 @@ jobs:
         
         echo "✅ Broken examples validation completed"
     
-        - name: Generate validation summary
+    - name: Generate validation summary
       if: always()
       run: |
         echo "## Example Validation Results" >> $GITHUB_STEP_SUMMARY
