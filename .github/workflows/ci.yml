@@ -2,7 +2,7 @@ name: Comprehensive Test Suite
 
 on:
   push:
-    branches: [ main, develop, 'cursor/**' ]  # Added cursor/** pattern to include our branch
+    branches: [ main, develop ]
     paths:
       - 'src/**'
       - 'test/**'
