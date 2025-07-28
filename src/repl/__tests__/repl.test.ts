@@ -1,12 +1,17 @@
 import { test } from 'uvu';
 import * as assert from 'uvu/assert';
 
-// Minimal REPL component tests - no process spawning to avoid CI timeouts
+// Import all dependencies once at the top for better performance
+import { Lexer } from '../../lexer/lexer';
+import { parse } from '../../parser/parser';
+import { Evaluator } from '../../evaluator/evaluator';
+import { createTypeState, initializeBuiltins, loadStdlib } from '../../typer/type-operations';
+
+// Minimal REPL component tests - no process spawning to avoid CI timeouts  
 // Tests the core parsing and type system components that REPL uses
+// All dependencies imported once for performance
 
 test('REPL Components - Lexer should tokenize simple expressions', () => {
-	const { Lexer } = require('../../lexer/lexer');
-	
 	const lexer = new Lexer('42');
 	const tokens = lexer.tokenize();
 	assert.ok(tokens.length > 0, 'should produce tokens');
@@ -14,8 +19,6 @@ test('REPL Components - Lexer should tokenize simple expressions', () => {
 });
 
 test('REPL Components - Lexer should tokenize strings', () => {
-	const { Lexer } = require('../../lexer/lexer');
-	
 	const lexer = new Lexer('"hello"');
 	const tokens = lexer.tokenize();
 	assert.ok(tokens.length > 0, 'should produce tokens');
@@ -23,9 +26,6 @@ test('REPL Components - Lexer should tokenize strings', () => {
 });
 
 test('REPL Components - Parser should parse number literals', () => {
-	const { Lexer } = require('../../lexer/lexer');
-	const { parse } = require('../../parser/parser');
-	
 	const lexer = new Lexer('42');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
@@ -37,8 +37,8 @@ test('REPL Components - Parser should parse number literals', () => {
 });
 
 test('REPL Components - Parser should parse string literals', () => {
-	const { Lexer } = require('../../lexer/lexer');
-	const { parse } = require('../../parser/parser');
+	
+	
 	
 	const lexer = new Lexer('"hello"');
 	const tokens = lexer.tokenize();
@@ -50,8 +50,8 @@ test('REPL Components - Parser should parse string literals', () => {
 });
 
 test('REPL Components - Parser should parse variable references', () => {
-	const { Lexer } = require('../../lexer/lexer');
-	const { parse } = require('../../parser/parser');
+	
+	
 	
 	const lexer = new Lexer('someVar');
 	const tokens = lexer.tokenize();
@@ -63,8 +63,8 @@ test('REPL Components - Parser should parse variable references', () => {
 });
 
 test('REPL Components - Parser should parse assignments', () => {
-	const { Lexer } = require('../../lexer/lexer');
-	const { parse } = require('../../parser/parser');
+	
+	
 	
 	const lexer = new Lexer('x = 42');
 	const tokens = lexer.tokenize();
@@ -76,8 +76,8 @@ test('REPL Components - Parser should parse assignments', () => {
 });
 
 test('REPL Components - Parser should handle invalid syntax gracefully', () => {
-	const { Lexer } = require('../../lexer/lexer');
-	const { parse } = require('../../parser/parser');
+	
+	
 	
 	// Test that the parser can handle some input without crashing
 	// Even if the syntax is unusual, the parser should not crash
@@ -94,8 +94,8 @@ test('REPL Components - Parser should handle invalid syntax gracefully', () => {
 });
 
 test('REPL Components - TypeState should initialize', () => {
-	const { createTypeState } = require('../../typer/type-operations');
-	const { initializeBuiltins } = require('../../typer/builtins');
+	
+	
 	
 	let typeState = createTypeState();
 	assert.ok(typeState, 'should create type state');
@@ -106,9 +106,9 @@ test('REPL Components - TypeState should initialize', () => {
 });
 
 test('REPL Components - Evaluator should initialize', () => {
-	const { Evaluator } = require('../../evaluator/evaluator');
-	const { createTypeState } = require('../../typer/type-operations');
-	const { initializeBuiltins } = require('../../typer/builtins');
+	
+	
+	
 	
 	const typeState = initializeBuiltins(createTypeState());
 	const evaluator = new Evaluator({ traitRegistry: typeState.traitRegistry });
