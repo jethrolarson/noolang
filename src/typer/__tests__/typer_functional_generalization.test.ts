@@ -32,9 +32,9 @@ test('Functional Typer - Let-Polymorphism - Core Let-Polymorphism - should allow
 
 test('Functional Typer - Let-Polymorphism - Core Let-Polymorphism - should handle higher-order functions with generalization', () => {
 	const program = parseProgram(`
-        apply = fn f x => f x;
+        applyFn = fn f x => f x;
         double = fn x => x * 2;
-        result = apply double 5
+        result = applyFn double 5
       `);
 	const result = typeProgram(program);
 	// The sequence returns the type of the rightmost expression
@@ -55,9 +55,9 @@ test('Functional Typer - Let-Polymorphism - Let-Polymorphism Edge Cases - should
 
 test('Functional Typer - Let-Polymorphism - Let-Polymorphism Edge Cases - should handle curried polymorphic functions', () => {
 	const program = parseProgram(`
-        add = fn x y => x + y;
-        addFive = add 5;
-        result = addFive 3
+        sum = fn x y => x + y;
+        sumFive = sum 5;
+        result = sumFive 3
       `);
 	const result = typeProgram(program);
 	assert.is(typeToString(result.type, result.state.substitution), 'Float');
