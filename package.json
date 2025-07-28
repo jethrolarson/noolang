@@ -25,7 +25,7 @@
     "test:uvu:single": "uvu test/type-system adt_limitations.uvu.ts --require tsx/cjs",
     "test:uvu:coverage": "c8 --reporter=text --reporter=html --reporter=lcov uvu test --require tsx/cjs",
     "test:uvu:watch": "uvu test --require tsx/cjs --watch",
-    "migrate:jest-to-uvu": "node scripts/migrate-to-uvu.js",
+
     "benchmark": "npm run build && node benchmark.js",
     "benchmark:repl": "npm run build && node benchmark.js --repl",
     "benchmark:all": "npm run build && node benchmark.js && npm run benchmark:repl",
