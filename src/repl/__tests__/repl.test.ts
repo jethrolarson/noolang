@@ -1,155 +1,122 @@
 import { test } from 'uvu';
 import * as assert from 'uvu/assert';
-import { Lexer } from '../../lexer/lexer';
-import { parse } from '../../parser/parser';
-import { Evaluator } from '../../evaluator/evaluator';
-import { createTypeState, initializeBuiltins, loadStdlib } from '../../typer/type-operations';
-import type { TypeState } from '../../typer/types';
+import { spawn } from 'child_process';
+import { promisify } from 'util';
+import * as path from 'path';
 
-// Test REPL core functionality without readline interface
-class REPLCore {
-	evaluator: Evaluator;
-	typeState: TypeState;
+// Helper function to run REPL commands via shell
+async function runReplCommand(input: string, timeout = 5000): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
+	return new Promise((resolve) => {
+		const replPath = path.join(process.cwd(), 'src', 'repl.ts');
+		const child = spawn('npx', ['tsx', replPath], {
+			stdio: ['pipe', 'pipe', 'pipe'],
+			shell: true
+		});
 
-	constructor() {
-		this.typeState = createTypeState();
-		this.typeState = initializeBuiltins(this.typeState);
-		this.typeState = loadStdlib(this.typeState);
-		this.evaluator = new Evaluator({ traitRegistry: this.typeState.traitRegistry });
-	}
+		let stdout = '';
+		let stderr = '';
 
-	// Extract the core input processing logic without console output
-	processInputSilent(input: string): { success: boolean; error?: string } {
-		if (input === '') {
-			return { success: true };
-		}
+		child.stdout?.on('data', (data) => {
+			stdout += data.toString();
+		});
 
-		// Handle REPL commands
-		if (input.startsWith('.')) {
-			return this.handleCommandSilent(input);
-		}
+		child.stderr?.on('data', (data) => {
+			stderr += data.toString();
+		});
 
-		try {
-			// Parse the input
-			const lexer = new Lexer(input);
-			const tokens = lexer.tokenize();
-			const program = parse(tokens);
+		// Send input and then quit
+		const commands = input.split('\n').filter(cmd => cmd.trim() !== '');
+		commands.push('.quit');
+		
+		setTimeout(() => {
+			const inputText = commands.join('\n') + '\n';
+			child.stdin?.write(inputText);
+			child.stdin?.end();
+		}, 100);
 
-			// This tests that the core REPL pipeline works
-			return { success: true };
-		} catch (error) {
-			return { success: false, error: (error as Error).message };
-		}
-	}
+		const timer = setTimeout(() => {
+			child.kill('SIGTERM');
+			resolve({ stdout, stderr, exitCode: null });
+		}, timeout);
 
-	private handleCommandSilent(input: string): { success: boolean; error?: string } {
-		const [command] = input.split(' ');
+		child.on('close', (code) => {
+			clearTimeout(timer);
+			resolve({ stdout, stderr, exitCode: code });
+		});
+	});
+}
 
-		switch (command) {
-			case '.quit':
-			case '.exit':
-			case '.help':
-			case '.env':
-			case '.env-json':
-			case '.clear-env':
-			case '.types':
-				return { success: true };
-			default:
-				return { success: false, error: `Unknown command: ${command}` };
-		}
-	}
+// Helper function to test simple expressions that don't require interactive REPL
+async function testSimpleExpression(expression: string): Promise<boolean> {
+	try {
+		// Test by creating a temporary noo file and running it
+		const { spawn } = require('child_process');
+		return new Promise((resolve) => {
+			const child = spawn('npx', ['tsx', '-e', `
+				import { Lexer } from './src/lexer/lexer';
+				import { parse } from './src/parser/parser';
+				try {
+					const lexer = new Lexer('${expression}');
+					const tokens = lexer.tokenize();
+					const program = parse(tokens);
+					console.log('SUCCESS');
+				} catch (error) {
+					console.log('ERROR:', error.message);
+				}
+			`], { cwd: process.cwd() });
 
-	getEnvironmentSize(): number {
-		return this.evaluator.getEnvironment().size;
-	}
+			let output = '';
+			child.stdout?.on('data', (data) => {
+				output += data.toString();
+			});
 
-	getTypeEnvironmentSize(): number {
-		return this.typeState.environment.size;
+			child.on('close', () => {
+				resolve(output.includes('SUCCESS'));
+			});
+		});
+	} catch {
+		return false;
 	}
 }
 
-test('REPL Core - should create instance', () => {
-	const repl = new REPLCore();
-	assert.instance(repl, REPLCore);
+test('REPL Shell - should start and show welcome message', async () => {
+	const result = await runReplCommand('');
+	assert.ok(result.stdout.includes('Welcome to Noolang'), 'should show welcome message');
 });
 
-test('REPL Core - should have evaluator property', () => {
-	const repl = new REPLCore();
-	assert.ok(repl.evaluator, 'evaluator should be defined');
+test('REPL Shell - should handle help command', async () => {
+	const result = await runReplCommand('.help');
+	assert.ok(result.stdout.includes('REPL Commands'), 'should show help text');
 });
 
-test('REPL Core - should have typeState property', () => {
-	const repl = new REPLCore();
-	assert.ok(repl.typeState, 'typeState should be defined');
+test('REPL Shell - should handle quit command', async () => {
+	const result = await runReplCommand('.quit');
+	assert.is(result.exitCode, 0, 'should exit cleanly with quit command');
 });
 
-test('REPL Core - should have initialized type environment', () => {
-	const repl = new REPLCore();
-	const typeEnvSize = repl.getTypeEnvironmentSize();
-	assert.ok(typeEnvSize > 0, 'type environment should be initialized with builtins');
+test('REPL Shell - should handle unknown command', async () => {
+	const result = await runReplCommand('.unknown');
+	assert.ok(result.stdout.includes('Unknown command'), 'should show unknown command error');
 });
 
-test('Basic Functionality - should handle empty input', () => {
-	const repl = new REPLCore();
-	const result = repl.processInputSilent('');
-	assert.is(result.success, true, 'empty input should succeed');
+test('REPL Core - should parse simple expression', async () => {
+	const success = await testSimpleExpression('42');
+	assert.is(success, true, 'should parse simple number');
 });
 
-test('Basic Functionality - should handle help command', () => {
-	const repl = new REPLCore();
-	const result = repl.processInputSilent('.help');
-	assert.is(result.success, true, 'help command should succeed');
+test('REPL Core - should parse string expression', async () => {
+	const success = await testSimpleExpression('"hello"');
+	assert.is(success, true, 'should parse simple string');
 });
 
-test('Basic Functionality - should handle quit command', () => {
-	const repl = new REPLCore();
-	const result = repl.processInputSilent('.quit');
-	assert.is(result.success, true, 'quit command should succeed');
+test('REPL Core - should parse boolean expression', async () => {
+	const success = await testSimpleExpression('True');
+	assert.is(success, true, 'should parse boolean');
 });
 
-test('Basic Functionality - should handle exit command', () => {
-	const repl = new REPLCore();
-	const result = repl.processInputSilent('.exit');
-	assert.is(result.success, true, 'exit command should succeed');
-});
-
-test('Basic Functionality - should handle unknown command', () => {
-	const repl = new REPLCore();
-	const result = repl.processInputSilent('.unknown');
-	assert.is(result.success, false, 'unknown command should fail');
-	assert.ok(result.error?.includes('Unknown command'), 'should have error message about unknown command');
-});
-
-test('Basic Functionality - should handle env commands', () => {
-	const repl = new REPLCore();
-	
-	const envResult = repl.processInputSilent('.env');
-	assert.is(envResult.success, true, 'env command should succeed');
-	
-	const envJsonResult = repl.processInputSilent('.env-json');
-	assert.is(envJsonResult.success, true, 'env-json command should succeed');
-	
-	const typesResult = repl.processInputSilent('.types');
-	assert.is(typesResult.success, true, 'types command should succeed');
-});
-
-test('Basic Functionality - should handle simple expression', () => {
-	const repl = new REPLCore();
-	const result = repl.processInputSilent('42');
-	assert.is(result.success, true, 'simple expression should succeed');
-});
-
-test('Basic Functionality - should handle simple string', () => {
-	const repl = new REPLCore();
-	const result = repl.processInputSilent('"hello"');
-	assert.is(result.success, true, 'simple string should succeed');
-});
-
-test('Basic Functionality - should handle invalid syntax', () => {
-	const repl = new REPLCore();
-	const result = repl.processInputSilent('invalid syntax here @#$');
-	assert.is(result.success, false, 'invalid syntax should fail');
-	assert.ok(result.error, 'should have error message');
+test('REPL Core - should reject invalid syntax', async () => {
+	const success = await testSimpleExpression('invalid @#$ syntax');
+	assert.is(success, false, 'should reject invalid syntax');
 });
 
 test.run();
