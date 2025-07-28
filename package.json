@@ -8,9 +8,9 @@
     "start": "npx ts-node src/cli.ts",
     "dev": "ts-node src/repl.ts",
     "cli": "node dist/cli.js",
-    "test": "npx uvu -r tsx/cjs",
-    "test:watch": "uvu -r tsx/cjs --watch",
-    "test:bail": "uvu -r tsx/cjs --bail",
+    "test": "npx uvu -r tsm",
+    "test:watch": "uvu -r tsm --watch",
+    "test:bail": "uvu -r tsm --bail",
     "typecheck": "tsc --noEmit",
     "typecheck:all": "npm run typecheck",
     "lint": "npx eslint src/**/*.ts",
@@ -92,5 +92,8 @@
     "tsx": "^4.20.3",
     "typescript": "^5.8.3",
     "uvu": "^0.5.6"
+  },
+  "dependencies": {
+    "tsm": "^2.3.0"
   }
 }
