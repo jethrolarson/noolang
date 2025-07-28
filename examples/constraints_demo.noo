@@ -60,6 +60,27 @@
 # 11. FINAL DEMONSTRATION
 # ========================================
 
+# Define variables used in demonstration
+test_list = [1, 2, 3, 4, 5];
+head_result = head test_list;
+tail_result = tail test_list;
+length_result = length test_list;
+
+test_person = { @name "Alice", @age 30 };
+person_name = test_person | @name;
+person_age = test_person | @age;
+
+first_number = match head_result with (Some x => x; None => 0);
+safe_head_result = head [10, 20, 30];
+composed_first = [1, 2, 3] | head;
+composed_rest = [1, 2, 3] | tail;
+composed_count = [1, 2, 3] | length;
+
+first_string = "Hello World";
+string_count = 5;
+first_record = { @name "Test", @value 42 };
+record_count = 3;
+
 # Showcase all constraint system features working together
 constraint_demo = {
   @basic_constraints {

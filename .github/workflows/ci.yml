@@ -9,6 +9,9 @@ on:
       - 'scripts/**'
       - 'benchmarks/**'
       - 'lsp/**'
+      - 'examples/**'
+      - 'docs/**'
+      - 'README.md'
       - 'jest.config*.js'
       - 'package.json'
       - 'tsconfig*.json'
@@ -21,10 +24,14 @@ on:
       - 'scripts/**'
       - 'benchmarks/**'
       - 'lsp/**'
+      - 'examples/**'
+      - 'docs/**'
+      - 'README.md'
       - 'jest.config*.js'
       - 'package.json'
       - 'tsconfig*.json'
       - '.github/workflows/ci.yml'
+  workflow_dispatch:  # Allow manual triggering
 
 jobs:
   # TypeScript type checking for both source and test files
@@ -186,6 +193,120 @@ jobs:
         path: |
           lsp/target/release/noolang-lsp
           lsp/test-*.log
+        retention-days: 14
+
+  # Validate example files (currently optional due to known type system issues)
+  example-validation:
+    runs-on: ubuntu-latest
+    needs: [typescript-check, core-tests]  # Only run if TypeScript check and core tests pass
+    continue-on-error: true  # Don't fail the entire pipeline if examples fail
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build project
+      run: npm run build
+    
+    - name: Test working examples
+      run: |
+        echo "Testing known working examples..."
+        
+        # List of examples that should work
+        WORKING_EXAMPLES=(
+          "basic.noo"
+          "adt_demo.noo" 
+          "safe_thrush_demo.noo"
+          "simple_adt.noo"
+          "minimal_trait_test.noo"
+          "math_functions.noo"
+        )
+        
+        FAILED_EXAMPLES=()
+        
+        for example in "${WORKING_EXAMPLES[@]}"; do
+          echo "Testing examples/$example..."
+          if npm start "examples/$example"; then
+            echo "✅ $example passed"
+          else
+            echo "❌ $example failed"
+            FAILED_EXAMPLES+=("$example")
+          fi
+        done
+        
+                 if [ ${#FAILED_EXAMPLES[@]} -eq 0 ]; then
+           echo "✅ All working examples passed validation"
+         else
+           echo "⚠️ Failed examples: ${FAILED_EXAMPLES[*]}"
+           echo "::warning::Some examples that should work are failing - this indicates type system regressions"
+           # Don't exit 1 here since continue-on-error is set
+         fi
+    
+    - name: Test known broken examples (should fail gracefully)
+      run: |
+        echo "Testing known broken examples (these should fail with clear errors)..."
+        
+        # List of examples with known issues
+        BROKEN_EXAMPLES=(
+          "demo.noo"
+          "type_system_demo.noo"
+          "constraints_demo.noo"
+          "trait_system_demo.noo"
+          "generic_safe_thrush_demo.noo"
+          "trait_truly_multiline_demo.noo"
+        )
+        
+        for example in "${BROKEN_EXAMPLES[@]}"; do
+          echo "Testing examples/$example (expecting failure)..."
+          if npm start "examples/$example" 2>/dev/null; then
+            echo "⚠️ $example unexpectedly passed (this might be good news!)"
+          else
+            echo "✅ $example failed as expected"
+          fi
+        done
+        
+                 echo "✅ Broken examples validation completed"
+    
+    - name: Generate validation summary
+      if: always()
+      run: |
+                 echo "## Example Validation Results" >> $GITHUB_STEP_SUMMARY
+         echo "" >> $GITHUB_STEP_SUMMARY
+         echo "⚠️ **Note**: Example validation is currently informational only due to known type system issues." >> $GITHUB_STEP_SUMMARY
+         echo "See [Language Weaknesses](docs/LANGUAGE_WEAKNESSES.md) for details and fix priorities." >> $GITHUB_STEP_SUMMARY
+         echo "" >> $GITHUB_STEP_SUMMARY
+         echo "### Working Examples (should pass)" >> $GITHUB_STEP_SUMMARY
+        echo "- basic.noo" >> $GITHUB_STEP_SUMMARY
+        echo "- adt_demo.noo" >> $GITHUB_STEP_SUMMARY
+        echo "- safe_thrush_demo.noo" >> $GITHUB_STEP_SUMMARY
+        echo "- simple_adt.noo" >> $GITHUB_STEP_SUMMARY
+        echo "- minimal_trait_test.noo" >> $GITHUB_STEP_SUMMARY
+        echo "- math_functions.noo" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Known Issues (expected to fail)" >> $GITHUB_STEP_SUMMARY
+        echo "See [Language Weaknesses](docs/LANGUAGE_WEAKNESSES.md) for details:" >> $GITHUB_STEP_SUMMARY
+        echo "- demo.noo - Generic ADT constructor issues" >> $GITHUB_STEP_SUMMARY
+        echo "- type_system_demo.noo - Type annotation issues" >> $GITHUB_STEP_SUMMARY
+        echo "- constraints_demo.noo - Variable definition issues" >> $GITHUB_STEP_SUMMARY
+        echo "- trait_system_demo.noo - Trait function constraint issues" >> $GITHUB_STEP_SUMMARY
+        echo "- generic_safe_thrush_demo.noo - Safe thrush operator with Result monad" >> $GITHUB_STEP_SUMMARY
+        echo "- trait_truly_multiline_demo.noo - Type mismatch errors" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Upload example test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: example-validation-results
+        path: |
+          examples/
         retention-days: 14
 
   # Run benchmarks (can run in parallel with other tests)

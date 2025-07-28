@@ -63,7 +63,7 @@ showAndPrint = fn x => (
 );
 
 # Function that works with any comparable type  
-findEquals = fn target list => filter (fn x => equals x target) list;
+findEquals = fn target list => filter (fn x => x == target) list;
 
 # Function that works with ordered types
 sortList = fn list => list; # Would use Ord constraint for actual sorting
@@ -74,16 +74,16 @@ pipeline_demo = (
   numbers = [1, 2, 3, 4, 5];
   
   # Show all numbers in a list
-  numberStrings = numbers |> map show;
+  numberStrings = map show numbers;
   
   # Find equal numbers
-  equalToThree = numbers |> findEquals 3;
+  equalToThree = numbers | findEquals 3;
   
   # Chain operations
   result = numbers 
-    |> map (fn x => x * 2)
-    |> map show 
-    |> show;  # Show the list of strings
+    | map (fn x => x * 2)
+    | map show 
+    | show;  # Show the list of strings
     
   result
 );
