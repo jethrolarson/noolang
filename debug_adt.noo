@@ -1,0 +1,2 @@
+type Point a = Point a a;
+Point

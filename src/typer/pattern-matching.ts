@@ -38,11 +38,14 @@ export const typeTypeDefinition = (
 		constructors: constructorMap, // Will be filled
 	});
 
+	// Create consistent type variables for the ADT type parameters
+	const adtTypeVars = expr.typeParams.map(param => typeVariable(param));
+	
 	// Also add the ADT type constructor to the environment
 	const adtType = {
 		kind: 'variant' as const,
 		name: expr.name,
-		args: expr.typeParams.map(param => typeVariable(param)),
+		args: adtTypeVars,
 	};
 	const envWithType = new Map(state.environment);
 	envWithType.set(expr.name, {
@@ -61,7 +64,7 @@ export const typeTypeDefinition = (
 		const adtType: Type = {
 			kind: 'variant',
 			name: expr.name,
-			args: expr.typeParams.map(param => typeVariable(param)),
+			args: adtTypeVars, // Use the same type variable instances
 		};
 
 		let constructorType: Type;
