@@ -81,14 +81,14 @@ test('Functional Type Inference - Function Application - should apply function t
 
 test('Functional Type Inference - Function Application - should handle partial application', () => {
 	const program = parseProgram(
-		'add = fn x y => x + y; add5 = add 5; add5 3'
+		'sum = fn x y => x + y; sum5 = sum 5; sum5 3'
 	);
 	const result = typeProgram(program);
 	assert.is(typeToString(result.type, result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Function Application - should handle curried application', () => {
-	const program = parseProgram('add = fn x y => x + y; add 2 3');
+	const program = parseProgram('sum = fn x y => x + y; sum 2 3');
 	const result = typeProgram(program);
 	assert.is(typeToString(result.type, result.state.substitution), 'Float');
 });
@@ -235,7 +235,7 @@ test('Functional Type Inference - Mutation Types - should handle mutation with c
 
 test('Functional Type Inference - Mutation Types - should handle mutation with function calls', () => {
 	const program = parseProgram(
-		'add = fn x y => x + y; mut x = 5; mut! x = add x 3; x'
+		'sum = fn x y => x + y; mut x = 5; mut! x = sum x 3; x'
 	);
 	const result = typeProgram(program);
 	assert.is(typeToString(result.type, result.state.substitution), 'Float');

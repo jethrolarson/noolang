@@ -41,6 +41,7 @@ import {
 import {
 	undefinedVariableError,
 	nonFunctionApplicationError,
+	traitFunctionShadowingError,
 } from './type-errors';
 import {
 	getExprLocation,
@@ -678,6 +679,15 @@ export const typeDefinition = (
 		envForGen,
 		currentState.substitution
 	);
+
+	// Check if this variable would shadow a trait function
+	const traitFunctions = currentState.traitRegistry.functionTraits.get(expr.name);
+	if (traitFunctions && traitFunctions.length > 0) {
+		throwTypeError(
+			location => traitFunctionShadowingError(expr.name, traitFunctions, location),
+			getExprLocation(expr)
+		);
+	}
 
 	// Add to environment with generalized type
 	const finalEnv = mapSet(currentState.environment, expr.name, scheme);

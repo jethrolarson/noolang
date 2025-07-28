@@ -31,7 +31,20 @@ implement Show String (
   show = fn s => s
 );
 
-# Add trait implementations moved to builtins to avoid loading order issues
+# Add trait implementations for built-in types
+implement Add Float (
+  add = primitive_float_add
+);
+
+implement Add String (
+  add = primitive_string_concat
+);
+
+implement Numeric Float (
+  subtract = primitive_float_subtract;
+  multiply = primitive_float_multiply;
+  divide = primitive_float_divide
+);
 
 # Constraint for monads
 constraint Monad m ( 

@@ -27,9 +27,10 @@
     "src/typer/__tests__/structural-constraints.test.ts",
     "src/typer/__tests__/trait-system-infrastructure.test.ts",
     "src/typer/__tests__/typer.test.ts",
-    "src/typer/__tests__/trait-system.test.ts"
+    "src/typer/__tests__/trait-system.test.ts",
+    "src/typer/__tests__/builtin-trait-implementations.test.ts"
   ],
-  "totalMigrated": 28,
+  "totalMigrated": 29,
   "remaining": 4,
   "notes": "All test/ directory files completed (15/15). Source directory: 13/17 completed (4 large files remaining: lexer 652 lines, evaluator 1153 lines, parser 1957 lines, repl 74 lines)."
 }

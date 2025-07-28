@@ -1914,6 +1914,8 @@ export class Evaluator {
 		}
 	}
 
+
+
 	private resolveTraitFunctionWithArgs(
 		functionName: string,
 		argValues: Value[],
@@ -1933,6 +1935,7 @@ export class Evaluator {
 
 			for (const [traitName, traitDef] of traitRegistry.definitions) {
 				if (traitDef.functions.has(functionName)) {
+					// First try user-defined implementations in the registry
 					const traitImpls = traitRegistry.implementations.get(traitName);
 					if (traitImpls) {
 						const impl = traitImpls.get(dispatchTypeName);
@@ -1956,6 +1959,8 @@ export class Evaluator {
 							return result;
 						}
 					}
+					
+
 				}
 			}
 		}

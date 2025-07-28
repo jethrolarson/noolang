@@ -202,9 +202,9 @@ test('Trait System Phase 1 Infrastructure - Constraint Type Infrastructure - sho
 
 test('Trait System Phase 1 Infrastructure - Constraint Type Infrastructure - should handle partial application correctly', () => {
 	const program = parseProgram(`
-		add = fn x y => x + y;
-		add5 = add 5;
-		add5
+		sum = fn x y => x + y;
+		sum5 = sum 5;
+		sum5
 	`);
 	const result = typeProgram(program);
 	

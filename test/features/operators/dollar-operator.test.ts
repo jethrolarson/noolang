@@ -65,7 +65,7 @@ test('Dollar Operator ($) - Basic Function Application - simple function applica
 
 test('Dollar Operator ($) - Basic Function Application - curried function application', () => {
 	evaluator = new Evaluator();
-	const result = runCode('add = fn x y => x + y; (add $ 3) $ 5');
+	const result = runCode('sum = fn x y => x + y; (sum $ 3) $ 5');
 	assert.equal(unwrapValue(result.finalResult), 8);
 });
 
@@ -94,12 +94,12 @@ test('Dollar Operator ($) - Right Associativity - right associativity with arith
 	// But function-to-function application isn't what we want to test here
 	// Let's test a simpler case: const $ (add $ 1) $ 2
 	const result = runCode(
-		'const = fn x y => x; add = fn x y => x + y; (const $ (add $ 1)) $ 99'
+		'const = fn x y => x; sum = fn x y => x + y; (const $ (sum $ 1)) $ 99'
 	);
 	// const gets (add 1) which is a function, so const returns that function
 	// The result should be a function, not a number. Let's test that it returns a function by applying it
 	const result3 = runCode(
-		'const = fn x y => x; add = fn x y => x + y; ((const $ (add $ 1)) $ 99) 7'
+		'const = fn x y => x; sum = fn x y => x + y; ((const $ (sum $ 1)) $ 99) 7'
 	);
 	assert.equal(unwrapValue(result3.finalResult), 8); // (add $ 1) 7 = 1 + 7 = 8
 
@@ -112,13 +112,13 @@ test('Dollar Operator ($) - Right Associativity - right associativity with arith
 
 test('Dollar Operator ($) - Precedence with Other Operators - $ has lower precedence than |', () => {
 	evaluator = new Evaluator();
-	const result = runCode('add = fn x y => x + y; [1, 2] | list_map $ add 1');
+	const result = runCode('sum = fn x y => x + y; [1, 2] | list_map $ sum 1');
 	assert.equal(unwrapValue(result.finalResult), [2, 3]);
 });
 
 test('Dollar Operator ($) - Precedence with Other Operators - $ has lower precedence than function application', () => {
 	evaluator = new Evaluator();
-	const result = runCode('add = fn x y => x + y; list_map (add 1) $ [1, 2, 3]');
+	const result = runCode('sum = fn x y => x + y; list_map (sum 1) $ [1, 2, 3]');
 	assert.equal(unwrapValue(result.finalResult), [2, 3, 4]);
 });
 
@@ -135,7 +135,7 @@ test('Dollar Operator ($) - Type Checking - $ with built-in functions type check
 	// Just verify it doesn't throw type errors
 	assert.not.throws(() => {
 		runCode(
-			'add = fn x y => x + y; result = list_map $ add 1; result [1, 2, 3]'
+			'sum = fn x y => x + y; result = list_map $ sum 1; result [1, 2, 3]'
 		);
 	});
 });
@@ -144,7 +144,7 @@ test('Dollar Operator ($) - Type Checking - $ with user-defined functions type c
 	evaluator = new Evaluator();
 	assert.not.throws(() => {
 		runCode(
-			'add = fn x y => x + y; mylist_map = fn f list => list_map f list; result = mylist_map $ add 1; result [1, 2, 3]'
+			'sum = fn x y => x + y; mylist_map = fn f list => list_map f list; result = mylist_map $ sum 1; result [1, 2, 3]'
 		);
 	});
 });
@@ -152,14 +152,14 @@ test('Dollar Operator ($) - Type Checking - $ with user-defined functions type c
 test('Dollar Operator ($) - Type Checking - $ creates partial application correctly', () => {
 	evaluator = new Evaluator();
 	const result = runCode(
-		'add = fn x y z => x + y + z; partialAdd = add $ 1; partialAdd 2 3'
+		'addThree = fn x y z => x + y + z; partialAdd = addThree $ 1; partialAdd 2 3'
 	);
 	assert.equal(unwrapValue(result.finalResult), 6);
 });
 
 test('Dollar Operator ($) - Integration with Other Features - $ with pipeline operators', () => {
 	evaluator = new Evaluator();
-	const result = runCode('add = fn x y => x + y; [1, 2, 3] | list_map $ add 10');
+	const result = runCode('sum = fn x y => x + y; [1, 2, 3] | list_map $ sum 10');
 	assert.equal(unwrapValue(result.finalResult), [11, 12, 13]);
 });
 
@@ -196,7 +196,7 @@ test('Dollar Operator ($) - Complex Chaining - deep $ chaining', () => {
 test('Dollar Operator ($) - Complex Chaining - $ with mixed operators', () => {
 	evaluator = new Evaluator();
 	const result = runCode(
-		'add = fn x y => x + y; opt = [10] | head; match opt with (Some x => (add $ x) $ 5; None => 0)'
+		'sum = fn x y => x + y; opt = [10] | head; match opt with (Some x => (sum $ x) $ 5; None => 0)'
 	);
 	assert.equal(unwrapValue(result.finalResult), 15);
 });
@@ -223,7 +223,7 @@ test('Dollar Operator ($) - Error Handling - $ with wrong arity should error app
 	evaluator = new Evaluator();
 	// This should work - partial application
 	assert.not.throws(() => {
-		const result = runCode('add = fn x y => x + y; add $ 1');
+		const result = runCode('sum = fn x y => x + y; sum $ 1');
 		// This should return a function, not throw
 	});
 });
@@ -266,9 +266,9 @@ test('Dollar Operator ($) - Trait Function Application - should handle partial a
 	// This tests the specific case where a partially applied function 
 	// (which may have trait-function tag) is used with $
 	const result = runCode(`
-				add = fn x => fn y => x + y;
-				add5 = add 5;
-				result = add5 $ 3
+				sum = fn x => fn y => x + y;
+				sum5 = sum 5;
+				result = sum5 $ 3
 			`);
 	
 	assert.equal(unwrapValue(result.finalResult), 8);

@@ -432,8 +432,9 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		});
 	}
 	
-	// Basic trait implementations are handled directly in constraint resolution
-	// to avoid circular dependency issues with primitive function loading
+	// Built-in trait implementations are handled directly in the evaluator's
+	// getBuiltinTraitImplementation method to avoid circular dependencies
+	// and duplication with constraint checking in function-application.ts
 	
 	return newState;
 };

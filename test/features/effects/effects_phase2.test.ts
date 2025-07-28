@@ -58,7 +58,7 @@ test('pure functions have no effects', () => {
 });
 
 test('pure function application has no effects', () => {
-	const result = runNoolang('add = fn x y => x + y; add 2 3');
+	const result = runNoolang('sum = fn x y => x + y; sum 2 3');
 	assert.is(result.effects.size, 0);
 });
 
@@ -103,9 +103,9 @@ test('typeProgram returns TypeResult with type and effects', () => {
 
 test('complex expressions return proper TypeResult structure', () => {
 	const result = runNoolang(`
-				add = fn x y => x + y;
-				multiply = fn a b => a * b;
-				compute = fn x => add (multiply x 2) 3;
+				sum = fn x y => x + y;
+				mult = fn a b => a * b;
+				compute = fn x => sum (mult x 2) 3;
 				compute 5
 			`);
 	assert.is(result.type.kind, 'primitive');
@@ -135,8 +135,8 @@ test('sequences with pure operations have no effects', () => {
 // Test suite: Effect Propagation in Function Applications
 test('function application with pure function and pure arguments has no effects', () => {
 	const result = runNoolang(`
-				add = fn x y => x + y;
-				add (1 + 2) (3 * 4)
+				sum = fn x y => x + y;
+				sum (1 + 2) (3 * 4)
 			`);
 	assert.is(result.effects.size, 0);
 });
@@ -144,9 +144,9 @@ test('function application with pure function and pure arguments has no effects'
 test('curried function application propagates effects correctly', () => {
 	const result = runNoolang(`
 				curry = fn f => fn x => fn y => f x y;
-				add = fn x y => x + y;
-				curriedAdd = curry add;
-				curriedAdd 1 2
+				sum = fn x y => x + y;
+				curriedSum = curry sum;
+				curriedSum 1 2
 			`);
 	assert.is(result.effects.size, 0);
 });
@@ -171,8 +171,8 @@ test('nested conditionals with pure expressions have no effects', () => {
 // Test suite: Effect Propagation in Data Structures
 test('lists with pure elements have no effects', () => {
 	const result = runNoolang(`
-				add = fn x => x + 1;
-				[add 1, add 2, add 3]
+				increment = fn x => x + 1;
+				[increment 1, increment 2, increment 3]
 			`);
 	assert.is(result.effects.size, 0);
 });
