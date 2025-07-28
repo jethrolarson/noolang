@@ -41,6 +41,8 @@ npm start
 
 ### Examples
 
+**Note**: Some examples in the `examples/` directory have known issues due to current type system limitations. See `docs/LANGUAGE_WEAKNESSES.md` for details. Working examples include `basic.noo`, `adt_demo.noo`, `safe_thrush_demo.noo`, `simple_adt.noo`, and `math_functions.noo`.
+
 ```noolang
 # Function definition
 add = fn x y => x + y
@@ -941,7 +943,9 @@ syntaxes/
 npm test
 ```
 
-All 316 tests pass, including parser, evaluator, typer, ADTs, constraints, recursion, and effects tests. The functional typer is used exclusively.
+All 373 tests pass, including parser, evaluator, typer, ADTs, constraints, recursion, effects, and trait system tests. The functional typer is used exclusively.
+
+**Known Issues**: While all unit tests pass, some example files reveal type system limitations with generic ADT constructors and trait function constraint resolution. See `docs/LANGUAGE_WEAKNESSES.md` for details and remediation priorities.
 
 ### Building
 
