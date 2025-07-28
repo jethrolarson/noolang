@@ -2,7 +2,10 @@ name: Comprehensive Test Suite
 
 on:
   push:
-    branches: [ main, develop, 'cursor/**' ]  # Temporarily re-added for testing the generic ADT fix
+    branches: 
+      - main
+      - develop
+      - 'cursor/**'  # Temporarily re-added for testing the generic ADT fix
     paths:
       - 'src/**'
       - 'test/**'
@@ -17,7 +20,8 @@ on:
       - 'tsconfig*.json'
       - '.github/workflows/ci.yml'
   pull_request:
-    branches: [ main ]
+    branches: 
+      - main
     paths:
       - 'src/**'
       - 'test/**'
@@ -273,17 +277,17 @@ jobs:
           fi
         done
         
-                 echo "✅ Broken examples validation completed"
+        echo "✅ Broken examples validation completed"
     
-    - name: Generate validation summary
+        - name: Generate validation summary
       if: always()
       run: |
-                 echo "## Example Validation Results" >> $GITHUB_STEP_SUMMARY
-         echo "" >> $GITHUB_STEP_SUMMARY
-         echo "⚠️ **Note**: Example validation is currently informational only due to known type system issues." >> $GITHUB_STEP_SUMMARY
-         echo "See [Language Weaknesses](docs/LANGUAGE_WEAKNESSES.md) for details and fix priorities." >> $GITHUB_STEP_SUMMARY
-         echo "" >> $GITHUB_STEP_SUMMARY
-         echo "### Working Examples (should pass)" >> $GITHUB_STEP_SUMMARY
+        echo "## Example Validation Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "⚠️ **Note**: Example validation is currently informational only due to known type system issues." >> $GITHUB_STEP_SUMMARY
+        echo "See [Language Weaknesses](docs/LANGUAGE_WEAKNESSES.md) for details and fix priorities." >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Working Examples (should pass)" >> $GITHUB_STEP_SUMMARY
         echo "- basic.noo" >> $GITHUB_STEP_SUMMARY
         echo "- adt_demo.noo" >> $GITHUB_STEP_SUMMARY
         echo "- safe_thrush_demo.noo" >> $GITHUB_STEP_SUMMARY
