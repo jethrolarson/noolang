@@ -5,7 +5,6 @@ on:
     branches: 
       - main
       - develop
-      - 'cursor/**'  # Temporarily re-added for testing the generic ADT fix
     paths:
       - 'src/**'
       - 'test/**'
