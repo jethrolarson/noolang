@@ -1,8 +1,8 @@
 # Type System Demo - Noolang Enhanced Type System
 
 # Pure functions (no effects)
-add = fn x y => x + y : Number -> Number -> Number;
-multiply = fn x y => x * y : Number -> Number -> Number;
+add_func = fn x y => x + y : Float -> Float -> Float;
+multiply_func = fn x y => x * y : Float -> Float -> Float;
 identity = fn x => x : a -> a;
 
 # Effectful functions (with explicit effects)
@@ -10,33 +10,33 @@ identity = fn x => x : a -> a;
 #readInput = fn {} => "user input" : Unit -> String !io;  # Simulated IO
 
 # Parameterized types
-numbers = [1, 2, 3, 4, 5] : List Number;
+numbers = [1, 2, 3, 4, 5] : List Float;
 strings = ["hello", "world"] : List String;
-doubled = map (fn x => x * 2) numbers : List Number;
+doubled = map (fn x => x * 2) numbers : List Float;
 
 # Tuples
-pair = { 42, "answer" } : { Number, String };
-triple = { 1, 2, 3 } : { Number, Number, Number };
+pair = { 42, "answer" } : { Float, String };
+triple = { 1, 2, 3 } : { Float, Float, Float };
 
 # Records with typed fields
-person = { @name "Alice", @age 30, @active true } : { name: String, age: Number, active: Bool };
-math = { @add add, @multiply multiply } : { add: Number -> Number -> Number, multiply: Number -> Number -> Number };
+person = { @name "Alice", @age 30, @active True } : { @name String, @age Float, @active Bool };
+math = { @add add_func, @multiply multiply_func };
 
 # Function composition with pipelines (pure)
-addOne = fn x => x + 1 : Number -> Number;
-square = fn x => x * x : Number -> Number;
+addOne = fn x => x + 1 : Float -> Float;
+square = fn x => x * x : Float -> Float;
 
 # Pipeline: apply addOne then square to a number
-pipeline_result = 3 |> addOne |> square : Number;
+pipeline_result = 3 |> addOne |> square;
 
 # Pipeline with lists: map addOne over numbers, then map square
-mapped_pipeline = numbers |> map addOne |> map square : List Number;
+mapped_pipeline = numbers |> map addOne |> map square : List Float;
 
 # Thrush operator: pass numbers through map addOne, then map square
-thrush_result = numbers | map addOne | map square : List Number;
+thrush_result = numbers | map addOne | map square : List Float;
 
 # Thrush with a single function (should be same as direct application)
-thrush_single = 10 | addOne : Number;
+thrush_single = 10 | addOne : Float;
 
 # Final value for demo (can be any of the above)
 pipeline_result 

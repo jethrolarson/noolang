@@ -15,11 +15,11 @@ unit_literal = {};
 identity = fn x => x;
 
 # all functions are curried just like Haskell and F#
-add = fn a b => a + b;
-add_ten = add 10;
+add_func = fn a b => a + b;
+add_ten = add_func 10;
 result = add_ten 5;
-multiply = fn a b => a * b;
-product = multiply 6 7;
+multiply_func = fn a b => a * b;
+product = multiply_func 6 7;
 
 # ========================================
 # 3. RECURSION
@@ -53,7 +53,7 @@ point = {10, 20};
 # 5. CONTROL FLOW
 # ========================================
 # If expressions
-is_even = fn n => if (n / 2) * 2 == n then True else False;
+is_even = fn n => if n == 0 then True else if n == 1 then False else is_even (n - 2);
 even_check = is_even 10;
 
 # ========================================
@@ -69,7 +69,7 @@ comparison_result = 5 < 10;
 # 7. PIPELINE, THRUSH, AND DOLLAR OPERATORS
 # ========================================
 # Thrush/pipe operator (|) - function application
-thrush_result = [1, 2, 3, 4, 5] | map (fn x => x * 2);
+thrush_result = [1, 2, 3, 4, 5] | length;
 
 # Pipeline operator (|>) - left-to-right function composition
 add_one = fn x => x + 1;
@@ -255,14 +255,14 @@ color_to_number = fn color => match color with (
 
 color_value = color_to_number favorite_color;
 
-# ADT with parameters
-type Point a = Point a a;
-origin = Point 0 0;
-float_point = Point 1.5 2.7;
+# ADT with parameters (using concrete types for now)
+type IntPoint = IntPoint Float Float;
+origin = IntPoint 0.0 0.0;
+float_point = IntPoint 1.5 2.7;
 
 # Pattern matching with parameter extraction
-get_x = fn point => match point with (Point x y => x);
-get_y = fn point => match point with (Point x y => y);
+get_x = fn point => match point with (IntPoint x y => x);
+get_y = fn point => match point with (IntPoint x y => y);
 
 origin_x = get_x origin;
 float_y = get_y float_point;
