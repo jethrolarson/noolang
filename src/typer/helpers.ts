@@ -433,6 +433,7 @@ export const typeToString = (
 			}
 			case 'variable': {
 				let varStr = '';
+				
 				if (!mapping.has(t.name)) {
 					// If the type variable name is a single letter, keep it as-is
 					// This preserves explicit type annotations like 'a -> a'

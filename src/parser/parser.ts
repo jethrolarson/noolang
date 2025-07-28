@@ -1418,9 +1418,65 @@ const parseWhereDefinition: C.Parser<
 	};
 };
 
+// Parse a simple type atom for ADT constructor arguments (no type constructor applications)
+const parseSimpleTypeAtom = (tokens: Token[]): C.ParseResult<Type> => {
+	// Try each simple type parser in order (no type constructor applications)
+	const parsers = [
+		parsePrimitiveType,
+		parseListType,
+		parseRecordType,
+		parseTupleType,
+		parseTupleConstructor,
+		parseParenthesizedType,
+		parseSimpleTypeVariable, // Use a simpler parser for variables
+	];
+
+	for (const parser of parsers) {
+		const result = parser(tokens);
+		if (result.success) {
+			return result;
+		}
+	}
+
+	return {
+		success: false,
+		error: 'Expected simple type atom',
+		position: tokens[0]?.location.start.line || 0,
+	};
+};
+
+// Parse type variable or nullary type constructor (no arguments allowed)
+const parseSimpleTypeVariable = (tokens: Token[]): C.ParseResult<Type> => {
+	if (tokens.length > 0 && tokens[0].type === 'IDENTIFIER') {
+		const typeNameResult = C.identifier()(tokens);
+		if (typeNameResult.success) {
+			const typeName = typeNameResult.value.value;
+			
+			// Check if it's a type constructor (uppercase) or type variable (lowercase)
+			const isUpperCase = typeName[0] === typeName[0].toUpperCase();
+			if (isUpperCase) {
+				// Type constructor without arguments (like Bool, Option, etc.)
+				return {
+					success: true,
+					value: { kind: 'variant', name: typeName, args: [] },
+					remaining: typeNameResult.remaining,
+				};
+			} else {
+				// Type variable (like a, b, etc.)
+				return {
+					success: true,
+					value: typeVariable(typeName),
+					remaining: typeNameResult.remaining,
+				};
+			}
+		}
+	}
+	return { success: false, error: 'Expected type variable or nullary type constructor', position: tokens[0]?.location.start.line || 0 };
+};
+
 // --- ADT Constructor ---
 const parseConstructor: C.Parser<ConstructorDefinition> = C.map(
-	C.seq(parseTypeName, C.many(C.lazy(() => parseTypeExpression))),
+	C.seq(parseTypeName, C.many(parseSimpleTypeAtom)), // Use parseSimpleTypeAtom to avoid type constructor applications
 	([name, args]): ConstructorDefinition => ({
 		name: name.value,
 		args,
