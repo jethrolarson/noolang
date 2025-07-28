@@ -28,9 +28,20 @@
     "src/typer/__tests__/trait-system-infrastructure.test.ts",
     "src/typer/__tests__/typer.test.ts",
     "src/typer/__tests__/trait-system.test.ts",
-    "src/typer/__tests__/builtin-trait-implementations.test.ts"
+    "src/typer/__tests__/builtin-trait-implementations.test.ts",
+    "src/lexer/__tests__/lexer.test.ts",
+    "src/evaluator/__tests__/evaluator.test.ts",
+    "src/parser/__tests__/parser-core.test.ts",
+    "src/parser/__tests__/parser-types.test.ts",
+    "src/parser/__tests__/parser-pattern-matching.test.ts",
+    "src/parser/__tests__/parser-where-mutations.test.ts",
+    "src/parser/__tests__/parser-constraints.test.ts",
+    "src/parser/__tests__/parser-advanced-types.test.ts",
+    "src/parser/__tests__/parser-error-handling.test.ts",
+    "src/parser/__tests__/parser-annotations.test.ts",
+    "src/parser/__tests__/parser-edge-cases.test.ts"
   ],
-  "totalMigrated": 29,
-  "remaining": 4,
-  "notes": "All test/ directory files completed (15/15). Source directory: 13/17 completed (4 large files remaining: lexer 652 lines, evaluator 1153 lines, parser 1957 lines, repl 74 lines)."
+  "totalMigrated": 40,
+  "remaining": 1,
+  "notes": "MIGRATION 97.6% COMPLETE! All test/ directory files completed (15/15). Source directory: 24/25 completed. Major achievement: Parser's 1957-line monster split into 9 focused, maintainable files (128 tests total). Lexer (45 tests) and Evaluator (91 tests) successfully migrated. Only REPL tests remain (74 lines, problematic due to readline hanging)."
 }
