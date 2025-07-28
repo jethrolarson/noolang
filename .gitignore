@@ -98,5 +98,4 @@ Thumbs.db
 test-results/
 playwright-report/
 
-# Jest cache (build artifacts)
-.jest-cache/ 
+ 
