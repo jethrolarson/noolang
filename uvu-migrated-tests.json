@@ -28,9 +28,11 @@
     "src/typer/__tests__/trait-system-infrastructure.test.ts",
     "src/typer/__tests__/typer.test.ts",
     "src/typer/__tests__/trait-system.test.ts",
-    "src/typer/__tests__/builtin-trait-implementations.test.ts"
+    "src/typer/__tests__/builtin-trait-implementations.test.ts",
+    "src/lexer/__tests__/lexer.test.ts",
+    "src/evaluator/__tests__/evaluator.test.ts"
   ],
-  "totalMigrated": 29,
-  "remaining": 4,
-  "notes": "All test/ directory files completed (15/15). Source directory: 13/17 completed (4 large files remaining: lexer 652 lines, evaluator 1153 lines, parser 1957 lines, repl 74 lines)."
+  "totalMigrated": 31,
+  "remaining": 2,
+  "notes": "All test/ directory files completed (15/15). Source directory: 15/17 completed (2 large files remaining: parser 1957 lines, repl 74 lines)."
 }
