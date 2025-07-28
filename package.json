@@ -8,14 +8,13 @@
     "start": "npx ts-node src/cli.ts",
     "dev": "ts-node src/repl.ts",
     "cli": "node dist/cli.js",
-    "test": "npx uvu -r tsx/cjs",
-    "test:watch": "uvu -r tsx/cjs --watch",
-    "test:bail": "uvu -r tsx/cjs --bail",
+    "test": "npx uvu -r tsm",
+    "test:watch": "uvu -r tsm --watch",
+    "test:bail": "uvu -r tsm --bail",
     "typecheck": "tsc --noEmit",
     "typecheck:all": "npm run typecheck",
     "lint": "npx eslint src/**/*.ts",
     "lint:fix": "npx eslint src/**/*.ts --fix",
-
     "test:repl-automation": "ts-node scripts/test-repl-automation.ts",
     "test:repl-simple": "node scripts/simple-repl-test.js",
     "test:lsp": "cd lsp && cargo test",
@@ -23,11 +22,9 @@
     "test:all": "npm test && npm run test:repl-simple && npm run test:lsp",
     "test:all-repl": "npm run test:repl-simple && npm run test:repl-automation",
     "test:fast": "npm test",
-
     "test:uvu:single": "uvu test/type-system adt_limitations.uvu.ts --require tsx/cjs",
     "test:uvu:coverage": "c8 --reporter=text --reporter=html --reporter=lcov uvu test --require tsx/cjs",
     "test:uvu:watch": "uvu test --require tsx/cjs --watch",
-
     "benchmark": "npm run build && node benchmark.js",
     "benchmark:repl": "npm run build && node benchmark.js --repl",
     "benchmark:all": "npm run build && node benchmark.js && npm run benchmark:repl",
@@ -83,7 +80,6 @@
     "@biomejs/biome": "2.1.1",
     "@eslint/js": "^9.31.0",
     "@swc/core": "^1.13.1",
-
     "@types/node": "^20.19.9",
     "@types/vscode": "^1.74.0",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
@@ -93,6 +89,7 @@
     "eslint": "^9.31.0",
     "prettier": "^3.6.2",
     "ts-node": "^10.9.0",
+    "tsm": "^2.3.0",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3",
     "uvu": "^0.5.6"
