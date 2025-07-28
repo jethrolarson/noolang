@@ -32,12 +32,17 @@
   ],
   "totalMigrated": 29,
   "remaining": 4,
-  "notes": "All test/ directory files completed (15/15). Source directory: 13/17 completed (4 files remaining: lexer 652 lines, evaluator 1153 lines, parser 1957 lines, repl 74 lines - REPL reverted to Jest due to hanging issues).",
+  "notes": "All test/ directory files completed (15/15). Source directory: 13/17 completed. Remaining 4 files still in Jest format: lexer (651 lines), evaluator (1152 lines), parser (1956 lines), repl (74 lines).",
   "reverted": [
     {
       "file": "src/repl/__tests__/repl.test.ts",
       "reason": "hangs during execution due to readline interface initialization",
       "status": "reverted to Jest format to prevent test suite failures"
     }
+  ],
+  "notMigrated": [
+    "src/lexer/__tests__/lexer.test.ts",
+    "src/evaluator/__tests__/evaluator.test.ts", 
+    "src/parser/__tests__/parser.test.ts"
   ]
 }
