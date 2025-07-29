@@ -146,18 +146,10 @@ export const typeVariableExpr = (
 							];
 						}
 						case 'variant': {
-							// For variant types, we need to distinguish between:
-							// 1. Concrete types like "Bool", "Option", "List" - should NOT be freshened
-							// 2. Type variables like "a", "m" - should be freshened
-							// 
-							// We check if this variant name matches the trait's type parameter
-							// or is a single lowercase letter (common type variable pattern)
-							const isTypeVariable = 
-								type.name === traitInfo.typeParam || 
-								(type.name.length === 1 && type.name >= 'a' && type.name <= 'z');
-							
-							if (isTypeVariable) {
-								// This is a type variable - freshen it
+							// Check if this variant name is actually a type parameter from the trait constraint
+							// For example, in "Functor f", the type parameter "f" appears as variant type in "f a"
+							if (type.name === traitInfo.typeParam) {
+								// This is a type parameter, treat it as a type variable that needs freshening
 								if (!typeVarMapping.has(type.name)) {
 									const [freshVar, newState] = freshTypeVariable(currentState);
 									typeVarMapping.set(type.name, freshVar);
@@ -174,7 +166,6 @@ export const typeVariableExpr = (
 										currentState2 = nextState;
 									}
 
-									// Return a variant type with the fresh variable name and freshened args
 									return [
 										{
 											kind: 'variant',
@@ -207,8 +198,8 @@ export const typeVariableExpr = (
 									];
 								}
 							} else {
-								// This is a concrete type like "Bool", "Option" - don't freshen the name,
-								// but still freshen any type arguments
+								// This is a concrete variant type (Bool, Option, etc.)
+								// Freshen the type arguments but keep the variant name
 								let currentState2 = currentState;
 								const freshenedArgs: Type[] = [];
 								for (const arg of type.args) {
@@ -219,11 +210,10 @@ export const typeVariableExpr = (
 									freshenedArgs.push(freshenedArg);
 									currentState2 = nextState;
 								}
-
 								return [
 									{
 										kind: 'variant',
-										name: type.name, // Keep the original concrete type name
+										name: type.name, // Keep the original variant name
 										args: freshenedArgs,
 									},
 									currentState2,
