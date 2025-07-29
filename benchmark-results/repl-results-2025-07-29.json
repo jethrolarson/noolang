@@ -1,0 +1,125 @@
+{
+  "timestamp": "2025-07-29T01:21:50.128Z",
+  "type": "repl-benchmarks",
+  "git_commit": "f3ff0e661c204f4b4cf507d60030c5d983e06db7",
+  "results": [
+    {
+      "scenario": "interactive-basic",
+      "totalTime": "2.3",
+      "commandCount": 5,
+      "min": "0.1",
+      "max": "1.5",
+      "avg": "0.5",
+      "median": "0.2",
+      "measurements": [
+        {
+          "input": "1 + 2",
+          "duration": 0.220179,
+          "output": "Type expressions or definitions. Use Ctrl+C to exit."
+        },
+        {
+          "input": "let x = 10",
+          "duration": 1.528216,
+          "output": "➡ 3 \t : Float"
+        },
+        {
+          "input": "x * 2",
+          "duration": 0.071232,
+          "output": ""
+        },
+        {
+          "input": "\"hello\" ++ \" world\"",
+          "duration": 0.25823,
+          "output": ""
+        },
+        {
+          "input": "[1, 2, 3] |> map(\\n -> n * 2)",
+          "duration": 0.234478,
+          "output": ""
+        }
+      ]
+    },
+    {
+      "scenario": "interactive-complex",
+      "totalTime": "3.6",
+      "commandCount": 6,
+      "min": "0.1",
+      "max": "1.0",
+      "avg": "0.6",
+      "median": "0.8",
+      "measurements": [
+        {
+          "input": "let factorial = \\n -> if n <= 1 then 1 else n * factorial(n - 1)",
+          "duration": 0.11635,
+          "output": "Type expressions or definitions. Use Ctrl+C to exit."
+        },
+        {
+          "input": "factorial(5)",
+          "duration": 0.950121,
+          "output": ""
+        },
+        {
+          "input": "let compose = \\f g x -> f(g(x))",
+          "duration": 0.338589,
+          "output": ""
+        },
+        {
+          "input": "let double = \\x -> x * 2",
+          "duration": 0.54134,
+          "output": ""
+        },
+        {
+          "input": "let increment = \\x -> x + 1",
+          "duration": 0.791066,
+          "output": ""
+        },
+        {
+          "input": "compose(double, increment)(5)",
+          "duration": 0.884335,
+          "output": ""
+        }
+      ]
+    },
+    {
+      "scenario": "interactive-state",
+      "totalTime": "3.5",
+      "commandCount": 6,
+      "min": "0.0",
+      "max": "1.1",
+      "avg": "0.6",
+      "median": "0.6",
+      "measurements": [
+        {
+          "input": "let users = [{name: \"Alice\", age: 30}, {name: \"Bob\", age: 25}]",
+          "duration": 0.049061,
+          "output": ""
+        },
+        {
+          "input": "let getNames = \\users -> users |> map(\\u -> u.name)",
+          "duration": 1.101262,
+          "output": ""
+        },
+        {
+          "input": "getNames(users)",
+          "duration": 0.67095,
+          "output": ""
+        },
+        {
+          "input": "let addUser = \\user users -> users ++ [user]",
+          "duration": 0.595557,
+          "output": ""
+        },
+        {
+          "input": "let newUsers = addUser({name: \"Charlie\", age: 35}, users)",
+          "duration": 0.482274,
+          "output": ""
+        },
+        {
+          "input": "getNames(newUsers)",
+          "duration": 0.602338,
+          "output": ""
+        }
+      ]
+    }
+  ]
+}

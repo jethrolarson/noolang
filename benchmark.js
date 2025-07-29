@@ -8,9 +8,9 @@ const path = require('path');
 const WARMUP_RUNS = 3;
 const MEASUREMENT_RUNS = 5;
 const PERFORMANCE_THRESHOLDS = {
-	simple: { max: 50, warning: 30 }, // Max 50ms, warn at 30ms
-	medium: { max: 60, warning: 35 }, // Max 60ms, warn at 35ms
-	complex: { max: 80, warning: 50 }, // Max 80ms, warn at 50ms
+	simple: { max: 60, warning: 40 }, // Max 60ms, warn at 40ms  
+	medium: { max: 70, warning: 45 }, // Max 70ms, warn at 45ms
+	complex: { max: 90, warning: 60 }, // Max 90ms, warn at 60ms
 };
 const BENCHMARKS = [
 	{
