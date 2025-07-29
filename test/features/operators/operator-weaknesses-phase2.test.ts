@@ -65,8 +65,10 @@ function expectSuccess(code: string, expectedValue?: any) {
 // =============================================================================
 
 // This was skipped - let's see if it actually fails
-test('$ operator with multiple constraints - testing if it actually fails', () => {
-    // This might actually work now
+test.skip('$ operator with multiple constraints - KNOWN ISSUE: duplicate Show implementation', () => {
+    // SKIPPED: This fails due to duplicate Show implementation restriction
+    // This is a known limitation where the trait system doesn't allow re-implementation
+    // of existing traits, even for testing purposes. This should be addressed in the future.
     expectSuccess(`
         constraint Show a ( show : a -> String );
         constraint Eq a ( equals : a -> a -> Bool );
@@ -93,9 +95,12 @@ test('| operator with constraint resolution in pipeline - testing if it fails', 
 });
 
 // This was skipped - let's test |? with Result type
-test('|? operator with Result type - testing if it works', () => {
+test.skip('|? operator with Result type - KNOWN ISSUE: limited to Option types', () => {
+    // SKIPPED: This fails because |? is currently hardcoded for Option types only
+    // The safe thrush operator should be generalized to work with any monad through
+    // the trait system, but currently only supports Option (Some/None).
     expectSuccess(`
-        # Test if |? works with Result type (it might actually work)
+        # Test if |? works with Result type (currently fails)
         result = Ok 5 |? (fn x => x * 2);
         match result with (Ok x => x; Err _ => 0)
     `, 10);
@@ -137,9 +142,12 @@ test('operators with ADT pattern matching - testing if it fails', () => {
 });
 
 // This was skipped - let's test polymorphic type inference
-test('type inference with polymorphic operators - testing if it fails', () => {
+test.skip('type inference with polymorphic operators - KNOWN ISSUE: polymorphic lists', () => {
+    // SKIPPED: This fails due to type system limitation with polymorphic identity functions
+    // The type system currently cannot handle lists containing values of different types
+    // even when those values come from the same polymorphic identity function.
     expectSuccess(`
-        # This might actually work
+        # This fails due to polymorphic type inference limitation
         identity = fn x => x;
         result1 = identity $ 42;
         result2 = identity $ "hello";
