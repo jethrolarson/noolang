@@ -234,8 +234,63 @@ export const typeApplication = (
 						location: expr.location
 					};
 					
-					// Recursively type the new application
-					return typeApplication(traitApp, currentState);
+					// FIXED: Use direct function application logic instead of recursive typeApplication
+					// to avoid exponential blowup while maintaining compatibility
+					const funcType = traitImplType.type;
+					let resultState = traitImplType.state;
+					
+					// Type arguments first
+					const argResults = expr.args.map(arg => typeExpression(arg, resultState));
+					for (const argResult of argResults) {
+						resultState = argResult.state;
+					}
+					const argTypes = argResults.map(result => result.type);
+					
+					// Apply normal function application logic (copied from main path)
+					if (argTypes.length > funcType.params.length) {
+						throwTypeError(
+							location =>
+								functionApplicationError(
+									funcType.params[funcType.params.length - 1],
+									argTypes[funcType.params.length - 1],
+									funcType.params.length - 1,
+									undefined,
+									location
+								),
+							getExprLocation(expr)
+						);
+					}
+
+					// Unify each argument with the corresponding parameter type
+					for (let i = 0; i < argTypes.length; i++) {
+						const unificationContext = {
+							reason: 'function_application' as const,
+							operation: `applying argument ${i + 1}`,
+							hint: `Argument ${i + 1} has type ${typeToString(
+								argTypes[i],
+								resultState.substitution
+							)} but the function parameter expects ${typeToString(
+								funcType.params[i],
+								resultState.substitution
+							)}.`,
+						};
+						
+						resultState = unify(
+							funcType.params[i],
+							argTypes[i],
+							resultState,
+							getExprLocation(expr),
+							unificationContext
+						);
+					}
+
+					// Return the function's return type with effects
+					const resultType = funcType.return;  // Fixed: should be 'return', not 'returnType'
+					
+
+					
+					const resultEffects = unionEffects(traitImplType.effects, ...argResults.map(r => r.effects));
+					return createTypeResult(resultType, resultEffects, resultState);
 				} else {
 					// The trait implementation should be a function
 					const funcName = expr.func.kind === 'variable' ? expr.func.name : 'unknown';

@@ -3,6 +3,7 @@ import { type TypeResult, unionEffects } from './types';
 import { createTypeState, loadStdlib } from './type-operations';
 import { typeExpression } from './expression-dispatcher';
 import { initializeBuiltins } from './builtins';
+import { substitute } from './substitute';
 
 // Re-export TypeResult and effect helpers from types module
 export {
@@ -89,5 +90,8 @@ export const typeProgram = (program: Program): TypeResult => {
 		finalType = unitType();
 	}
 
-	return { type: finalType, effects: allEffects, state };
+	// Apply substitution to resolve type variables to concrete types
+	const resolvedType = substitute(finalType, state.substitution);
+
+	return { type: resolvedType, effects: allEffects, state };
 };
