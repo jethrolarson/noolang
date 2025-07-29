@@ -10,6 +10,11 @@ export const substitute = (
 	type: Type,
 	substitution: Map<string, Type>
 ): Type => {
+	// Add null check to prevent crashes
+	if (!type) {
+		throw new Error('Cannot substitute undefined type');
+	}
+	
 	let result: Type;
 	// Generate cache key - only for type variables as they're most common
 	if (type.kind === 'variable' && substitution.size < 20) {

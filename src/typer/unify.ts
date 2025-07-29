@@ -115,6 +115,11 @@ const unifyInternal = (
 		constraintContext?: Map<string, TraitConstraint[]>;
 	}
 ): TypeState => {
+	// Add null check for state
+	if (!state) {
+		throw new Error('Cannot unify with undefined state');
+	}
+	
 	// Early equality check before substitution for performance
 	if (t1 === t2) return state;
 
