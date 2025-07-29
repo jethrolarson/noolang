@@ -43,8 +43,15 @@ export const typeTypeDefinition = (
 		args: typeParams.map(param => typeVarMap.get(param)!)
 	};
 
+	// Add the ADT type itself to the environment first (for mutual recursion)
+	const envWithType = new Map(state.environment);
+	envWithType.set(name, {
+		type: adtType,
+		quantifiedVars: typeParams,
+	});
+	
 	// Process constructors and add to environment first (for mutual recursion)
-	let currentState = state;
+	let currentState = { ...state, environment: envWithType };
 	const constructorMap = new Map<string, Type[]>();
 
 	for (const constructor of constructors) {
