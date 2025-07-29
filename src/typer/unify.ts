@@ -30,6 +30,57 @@ const slowUnifyCalls: Array<{ type1: string; type2: string; time: number }> =
 const unifyCallSources = new Map<string, number>(); // Track where unify calls come from
 const unifyTypePatterns = new Map<string, number>(); // Track what types are being unified
 
+// Enhanced logging functionality
+let testStartCount = 0;
+let testStartTime = 0;
+
+export const resetUnificationCounters = () => {
+	testStartCount = unifyCallCount;
+	testStartTime = totalUnifyTime;
+};
+
+export const getUnificationStats = () => {
+	const callsSinceReset = unifyCallCount - testStartCount;
+	const timeSinceReset = totalUnifyTime - testStartTime;
+	
+	if (callsSinceReset > 0) {
+		const topSources = Array.from(unifyCallSources.entries())
+			.sort((a, b) => b[1] - a[1])
+			.slice(0, 5);
+		
+		const topPatterns = Array.from(unifyTypePatterns.entries())
+			.sort((a, b) => b[1] - a[1])
+			.slice(0, 5);
+		
+		return {
+			calls: callsSinceReset,
+			time: timeSinceReset,
+			totalCalls: unifyCallCount,
+			totalTime: totalUnifyTime,
+			topSources,
+			topPatterns,
+			slowCalls: slowUnifyCalls.length
+		};
+	}
+	
+	return null;
+};
+
+export const logUnificationStats = (testName?: string) => {
+	const stats = getUnificationStats();
+	if (stats && stats.calls > 1000) { // Only log if significant number of calls
+		const prefix = testName ? `[${testName}] ` : '';
+		console.warn(
+			`${prefix}Unify: ${stats.calls} calls, ${stats.time}ms, ${stats.slowCalls} slow calls`
+		);
+		if (stats.calls > 5000) {
+			console.warn(`${prefix}Top unify call sources:`, stats.topSources);
+			console.warn(`${prefix}Most repeated unifications:`, stats.topPatterns);
+		}
+	}
+	return stats;
+};
+
 const typeToPattern = (t: Type): string => {
 	switch (t.kind) {
 		case 'variable':
