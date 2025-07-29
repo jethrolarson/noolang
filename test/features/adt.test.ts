@@ -162,7 +162,7 @@ test('Algebraic Data Types (ADTs) - Custom ADT Definition - should handle ADT wi
 
 test('Algebraic Data Types (ADTs) - Pattern Matching - should handle recursive ADTs', () => {
 	const result = runNoolang(`
-		type List a = Cons a (List a) | Nil;
+		type LinkedList a = Cons a (LinkedList a) | Nil;
 		list = Cons 1 (Cons 2 Nil);
 		list
 	`);
@@ -188,22 +188,35 @@ test('Recursive ADT - Binary Tree construction and pattern matching', () => {
 		tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
 		
 		getValue = fn t => match t with (
-			Node value _ _ => value;
+			Node value left right => value;
 			Leaf => 0
 		);
 		
 		getValue tree
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'number',
-		value: 5,
-	});
+	assert.equal(result.finalValue, { tag: 'number', value: 5 });
+});
+
+test('Recursive ADT - LinkedList with pattern matching', () => {
+	const result = runNoolang(`
+		type LinkedList a = Cons a (LinkedList a) | Nil;
+		
+		sum = fn lst => match lst with (
+			Cons h t => h + (sum t);
+			Nil => 0
+		);
+		
+		myList = Cons 1 (Cons 2 (Cons 3 Nil));
+		sum myList
+	`);
+
+	assert.equal(result.finalValue, { tag: 'number', value: 6 });
 });
 
 test('Recursive ADT - List operations with pattern matching', () => {
 	const result = runNoolang(`
-		type List a = Cons a (List a) | Nil;
+		type LinkedList a = Cons a (LinkedList a) | Nil;
 		
 		head = fn list => match list with (
 			Cons h _ => h;
@@ -227,7 +240,7 @@ test('Recursive ADT - List operations with pattern matching', () => {
 
 test('Recursive ADT - Nested pattern matching', () => {
 	const result = runNoolang(`
-		type List a = Cons a (List a) | Nil;
+		type LinkedList a = Cons a (LinkedList a) | Nil;
 		
 		length = fn list => match list with (
 			Nil => 0;
