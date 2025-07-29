@@ -49,6 +49,15 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
+        cache-dependency-path: 'package-lock.json'
+    
+    - name: Cache TypeScript build
+      uses: actions/cache@v4
+      with:
+        path: dist/
+        key: ts-build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig.json', 'package-lock.json') }}
+        restore-keys: |
+          ts-build-${{ runner.os }}-
     
     - name: Install dependencies
       run: npm ci
@@ -62,7 +71,7 @@ jobs:
   # Run core tests with uvu
   core-tests:
     runs-on: ubuntu-latest
-    needs: typescript-check  # Only run tests if TypeScript checking passes
+    # Removed dependency on typescript-check to allow parallel execution
     
     steps:
     - uses: actions/checkout@v4
@@ -72,6 +81,15 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
+        cache-dependency-path: 'package-lock.json'
+    
+    - name: Cache TypeScript build
+      uses: actions/cache@v4
+      with:
+        path: dist/
+        key: ts-build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig.json', 'package-lock.json') }}
+        restore-keys: |
+          ts-build-${{ runner.os }}-
     
     - name: Install dependencies
       run: npm ci
@@ -82,7 +100,7 @@ jobs:
   # Run REPL-specific tests separately  
   repl-tests:
     runs-on: ubuntu-latest
-    needs: [typescript-check, core-tests]  # Only run if TypeScript check and core tests pass
+    # Removed dependencies to allow parallel execution with other jobs
     
     steps:
     - uses: actions/checkout@v4
@@ -92,6 +110,15 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
+        cache-dependency-path: 'package-lock.json'
+    
+    - name: Cache TypeScript build
+      uses: actions/cache@v4
+      with:
+        path: dist/
+        key: ts-build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig.json', 'package-lock.json') }}
+        restore-keys: |
+          ts-build-${{ runner.os }}-
     
     - name: Install dependencies
       run: npm ci
@@ -116,7 +143,7 @@ jobs:
   # Run LSP tests separately
   lsp-tests:
     runs-on: ubuntu-latest
-    needs: [typescript-check, core-tests]  # Only run if TypeScript check and core tests pass
+    # Removed dependencies to allow parallel execution with other jobs
     
     steps:
     - uses: actions/checkout@v4
@@ -126,6 +153,15 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
+        cache-dependency-path: 'package-lock.json'
+    
+    - name: Cache TypeScript build
+      uses: actions/cache@v4
+      with:
+        path: dist/
+        key: ts-build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig.json', 'package-lock.json') }}
+        restore-keys: |
+          ts-build-${{ runner.os }}-
     
     - name: Setup Rust
       uses: actions-rs/toolchain@v1
@@ -140,7 +176,7 @@ jobs:
           ~/.cargo/registry
           ~/.cargo/git
           lsp/target
-        key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+        key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', 'lsp/Cargo.toml') }}
         restore-keys: |
           rust-${{ runner.os }}-
     
@@ -184,7 +220,7 @@ jobs:
   # Validate example files (currently optional due to known type system issues)
   example-validation:
     runs-on: ubuntu-latest
-    needs: [typescript-check, core-tests]  # Only run if TypeScript check and core tests pass
+    # Removed dependencies to allow parallel execution with other jobs
     continue-on-error: true  # Don't fail the entire pipeline if examples fail
     
     steps:
@@ -195,6 +231,15 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
+        cache-dependency-path: 'package-lock.json'
+    
+    - name: Cache TypeScript build
+      uses: actions/cache@v4
+      with:
+        path: dist/
+        key: ts-build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig.json', 'package-lock.json') }}
+        restore-keys: |
+          ts-build-${{ runner.os }}-
     
     - name: Install dependencies
       run: npm ci
@@ -307,6 +352,15 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
+        cache-dependency-path: 'package-lock.json'
+    
+    - name: Cache TypeScript build
+      uses: actions/cache@v4
+      with:
+        path: dist/
+        key: ts-build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig.json', 'package-lock.json') }}
+        restore-keys: |
+          ts-build-${{ runner.os }}-
     
     - name: Install dependencies
       run: npm ci
@@ -402,6 +456,15 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
+        cache-dependency-path: 'package-lock.json'
+    
+    - name: Cache TypeScript build
+      uses: actions/cache@v4
+      with:
+        path: dist/
+        key: ts-build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig.json', 'package-lock.json') }}
+        restore-keys: |
+          ts-build-${{ runner.os }}-
     
     - name: Install dependencies
       run: npm ci
