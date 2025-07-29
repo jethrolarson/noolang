@@ -12,13 +12,14 @@ show_string = show "hello";
 show_bool = show True;
 
 # Nested map operations
-nested_lists = map (map (fn x => x + 1)) [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
+nested_lists = map (fn inner_list => map (fn x => x + 1) inner_list) [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
 
-# Higher-order function using traits
-multiply_by = fn factor => map (fn x => x * factor) [1, 2, 3, 4, 5];
+# Higher-order function using traits  
+multiply_by = fn factor => fn list => map (fn x => x * factor) list;
 
 # Chain map and show operations
-chain_result = map show (map (fn x => x * x) [1, 2, 3, 4, 5]);
+squared_numbers = map (fn x => x * x) [1, 2, 3, 4, 5];
+chain_result = map (fn x => show x) squared_numbers;
 
 # Records (basic language feature, not trait-specific)
 test_record = {@value 42, @name "test", @active True};
@@ -42,7 +43,7 @@ deep_map = map (fn outer_list =>
   @show_string show_string,
   @show_bool show_bool,
   @nested nested_lists,
-  @multiply multiply_by 3,
+  @multiply multiply_by 3 [1, 2, 3, 4, 5],
   @chained chain_result,
   @record_val record_access,
   @record_ops record_ops,
