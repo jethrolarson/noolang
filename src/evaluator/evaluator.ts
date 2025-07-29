@@ -460,8 +460,15 @@ export class Evaluator {
 		this.environment.set(
 			'list_map',
 			createNativeFunction('list_map', (func: Value) => (list: Value) => {
-				if (isFunction(func) && isList(list)) {
-					return createList(list.values.map((item: Value) => func.fn(item)));
+				if ((isFunction(func) || isNativeFunction(func)) && isList(list)) {
+					return createList(list.values.map((item: Value) => {
+						if (isFunction(func)) {
+							return func.fn(item);
+						} else if (isNativeFunction(func)) {
+							return func.fn(item);
+						}
+						throw new Error('Unexpected function type');
+					}));
 				}
 				throw new Error('map requires a function and a list');
 			})
@@ -469,10 +476,10 @@ export class Evaluator {
 		this.environment.set(
 			'filter',
 			createNativeFunction('filter', (pred: Value) => (list: Value) => {
-				if (isFunction(pred) && isList(list)) {
+				if ((isFunction(pred) || isNativeFunction(pred)) && isList(list)) {
 					return createList(
 						list.values.filter((item: Value) => {
-							const result = pred.fn(item);
+							const result = isFunction(pred) ? pred.fn(item) : pred.fn(item);
 							if (isBool(result)) {
 								return boolValue(result);
 							}
@@ -481,7 +488,7 @@ export class Evaluator {
 						})
 					);
 				}
-				throw new Error('filter requires a predicate function and a list');
+				throw new Error('filter requires a function and a list');
 			})
 		);
 		this.environment.set(
@@ -489,11 +496,11 @@ export class Evaluator {
 			createNativeFunction(
 				'reduce',
 				(func: Value) => (initial: Value) => (list: Value) => {
-					if (isFunction(func) && isList(list)) {
+					if ((isFunction(func) || isNativeFunction(func)) && isList(list)) {
 						return list.values.reduce((acc: Value, item: Value) => {
-							const partial = func.fn(acc);
-							if (isFunction(partial)) {
-								return partial.fn(item);
+							const partial = isFunction(func) ? func.fn(acc) : func.fn(acc);
+							if (isFunction(partial) || isNativeFunction(partial)) {
+								return isFunction(partial) ? partial.fn(item) : partial.fn(item);
 							}
 							throw new Error(
 								'reduce function must return a function after first argument'
