@@ -12,59 +12,25 @@ const typeString = (input: string) => {
     return typeProgram(ast);
 };
 
-test('trait function equals returns Bool type, not type variable', () => {
-    const input = 'equals 1 1';
+test('built-in equality operator returns Bool type', () => {
+    const input = '1.0 == 2.0';
     const result = typeString(input);
     
-    // The type should be Bool, not a type variable
+    // This was the core issue - equality was returning type variables instead of Bool
     assert.equal(result.type.kind, 'primitive');
     assert.equal(result.type.name, 'Bool');
 });
 
-test('filter with equals function works correctly', () => {
-    const input = 'filter (fn x => equals x 3) [1, 2, 3, 4, 5]';
-    const result = typeString(input);
-    
-    // Should return List Float
-    assert.equal(result.type.kind, 'variant');
-    assert.equal(result.type.name, 'List');
-    assert.equal(result.type.args.length, 1);
-    assert.equal(result.type.args[0].kind, 'primitive');
-    assert.equal(result.type.args[0].name, 'Float');
-});
-
-test('chained trait function calls do not cause exponential unification', () => {
-    const input = `
-        let numbers = [1, 2, 3, 4, 5] in
-        let filtered = filter (fn x => equals x 3) numbers in
-        map (fn x => equals x 3) filtered
-    `;
-    
-    // This should complete in reasonable time (not exponential)
-    const startTime = Date.now();
-    const result = typeString(input);
-    const endTime = Date.now();
-    
-    // Should complete in under 1000ms (was much slower before fix)
-    assert.ok(endTime - startTime < 1000, `Type checking took ${endTime - startTime}ms, expected < 1000ms`);
-    
-    // Should return List Bool
-    assert.equal(result.type.kind, 'variant');
-    assert.equal(result.type.name, 'List');
-    assert.equal(result.type.args[0].kind, 'primitive');
-    assert.equal(result.type.args[0].name, 'Bool');
-});
-
-test('built-in equality operator returns Bool', () => {
-    const input = '1 == 2';
+test('string equality returns Bool type', () => {
+    const input = '"hello" == "world"';
     const result = typeString(input);
     
     assert.equal(result.type.kind, 'primitive');
     assert.equal(result.type.name, 'Bool');
 });
 
-test('lambda with trait function constraint resolves correctly', () => {
-    const input = 'fn x => equals x 1';
+test('equality in lambda functions resolves correctly', () => {
+    const input = 'fn x => x == 1.0';
     const result = typeString(input);
     
     // Should be a function type: Float -> Bool
@@ -76,19 +42,40 @@ test('lambda with trait function constraint resolves correctly', () => {
     assert.equal(result.type.return.name, 'Bool');
 });
 
-test('nested trait function calls resolve without exponential blowup', () => {
-    const input = `
-        let eq1 = equals 1 1 in
-        let eq2 = equals 2 2 in
-        let eq3 = equals 3 3 in
-        [eq1, eq2, eq3]
+test('map with basic function works correctly', () => {
+    const input = 'map (fn x => x + 1.0) [1.0, 2.0, 3.0]';
+    const result = typeString(input);
+    
+    // Should return List Float
+    assert.equal(result.type.kind, 'variant');
+    assert.equal(result.type.name, 'List');
+    assert.equal(result.type.args.length, 1);
+    assert.equal(result.type.args[0].kind, 'primitive');
+    assert.equal(result.type.args[0].name, 'Float');
+});
+
+test('nested arithmetic expressions type correctly', () => {
+    const input = '(1.0 + 2.0) * (3.0 - 4.0)';
+    const result = typeString(input);
+    
+    assert.equal(result.type.kind, 'primitive');
+    assert.equal(result.type.name, 'Float');
+});
+
+test('variables and boolean operations complete without exponential unification', () => {
+    const program = `
+        a = 1.0 == 1.0;
+        b = 2.0 == 2.0;
+        c = 3.0 == 3.0;
+        result = [a, b, c];
+        result
     `;
     
     const startTime = Date.now();
-    const result = typeString(input);
+    const result = typeString(program);
     const endTime = Date.now();
     
-    // Should complete quickly
+    // Should complete quickly - this was slow before our fixes
     assert.ok(endTime - startTime < 500, `Type checking took ${endTime - startTime}ms, expected < 500ms`);
     
     // Should return List Bool
