@@ -2155,6 +2155,61 @@ export class Evaluator {
 				return { matched: matches, bindings };
 			}
 
+			case 'tuple': {
+				// Tuple pattern only matches tuple values
+				if (value.tag !== 'tuple') {
+					return { matched: false, bindings };
+				}
+
+				// Check element count
+				if (pattern.elements.length !== value.values.length) {
+					return { matched: false, bindings };
+				}
+
+				// Match each element
+				for (let i = 0; i < pattern.elements.length; i++) {
+					const elementMatch = this.tryMatchPattern(pattern.elements[i], value.values[i]);
+					if (!elementMatch.matched) {
+						return { matched: false, bindings };
+					}
+
+					// Merge bindings
+					for (const [name, boundValue] of elementMatch.bindings) {
+						bindings.set(name, boundValue);
+					}
+				}
+
+				return { matched: true, bindings };
+			}
+
+			case 'record': {
+				// Record pattern only matches record values
+				if (value.tag !== 'record') {
+					return { matched: false, bindings };
+				}
+
+				// Match each field pattern
+				for (const field of pattern.fields) {
+					const fieldValue = value.fields[field.fieldName];
+					if (fieldValue === undefined) {
+						// Field doesn't exist in the value - pattern doesn't match
+						return { matched: false, bindings };
+					}
+
+					const fieldMatch = this.tryMatchPattern(field.pattern, fieldValue);
+					if (!fieldMatch.matched) {
+						return { matched: false, bindings };
+					}
+
+					// Merge bindings
+					for (const [name, boundValue] of fieldMatch.bindings) {
+						bindings.set(name, boundValue);
+					}
+				}
+
+				return { matched: true, bindings };
+			}
+
 			default:
 				throw new Error(
 					`Unsupported pattern kind: ${(pattern as Pattern).kind}`

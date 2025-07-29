@@ -1,0 +1,52 @@
+# Tuple and Record Pattern Matching Demo
+
+print "=== Tuple Pattern Matching ===";
+
+# Basic tuple destructuring
+point = {10, 20};
+sum = match point with ({x, y} => x + y);
+println sum;
+
+# Tuple with literals
+origin = {0, 0};
+origin_check = match origin with (
+    {0, 0} => "origin"; 
+    _ => "not origin"
+);
+println origin_check;
+
+print "=== Record Pattern Matching ===";
+
+# Basic record destructuring
+user = { @name "Alice", @age 30 };
+greeting = match user with ({@name n} => "Hello " + n);
+println greeting;
+
+# Partial record matching
+admin = { @name "Bob", @role "admin", @active True };
+role_check = match admin with (
+    {@role "admin"} => "Administrator";
+    {@role "user"} => "Regular user";
+    _ => "Unknown role"
+);
+println role_check;
+
+print "=== ADT Integration ===";
+
+# Constructor with tuple
+point_opt = Some {100, 200};
+point_result = match point_opt with (
+    Some {x, y} => x + y;
+    None => 0
+);
+println point_result;
+
+# Constructor with record
+user_result = Ok { @name "Charlie", @score 95 };
+score_msg = match user_result with (
+    Ok {@score s} => "Score: " + toString s;
+    Err _ => "No score"
+);
+println score_msg;
+
+print "=== Demo Complete ==="

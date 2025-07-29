@@ -106,10 +106,33 @@ favorite = Red;
 type Option a = Some a | None;
 result = match (Some 42) with (Some x => x; None => 0)
 
-# Pattern matching
+# Pattern matching with ADTs
 type Point = Point Float Float;
 point = Point 10 20;
 x = match point with (Point x y => x)
+
+# Tuple pattern matching
+coordinates = {10, 20, 30};
+sum = match coordinates with (
+    {x, y, z} => x + y + z;
+    {x, y} => x + y;
+    _ => 0
+)
+
+# Record pattern matching  
+user = { @name "Alice", @age 30, @city "NYC" };
+greeting = match user with (
+    {@name n, @age a} => "Hello " + n + ", age " + toString a;
+    _ => "Unknown user"
+)
+
+# Nested patterns with constructors
+data = Some {10, 20};
+result = match data with (
+    Some {x, y} => x * y;
+    Some _ => 0;
+    None => -1
+)
 ```
 
 ## Language Syntax
@@ -572,8 +595,41 @@ Pattern matching supports various pattern types:
 # Constructor patterns with variables
 match value with (Some x => x; None => 0)
 
-# Nested patterns (for complex ADTs)
-match nested with (Some (Point x y) => x + y; _ => 0)
+# Tuple patterns - destructure tuples
+match point with (
+    {x, y} => x + y;           # 2D point
+    {x, y, z} => x + y + z;    # 3D point
+    _ => 0                     # Any other case
+)
+
+# Record patterns - destructure records by field name
+match user with (
+    {@name n, @age a} => n + " is " + toString a;
+    {@name n} => "Name: " + n;  # Partial matching
+    _ => "Unknown"
+)
+
+# Mixed literal and variable patterns in tuples
+match coordinates with (
+    {0, 0} => "origin";        # Literal values
+    {x, 0} => "x-axis";        # Mix literals and variables
+    {0, y} => "y-axis";
+    {x, y} => "quadrant"
+)
+
+# Nested patterns (constructors with tuples/records)
+match data with (
+    Some {x, y} => x * y;      # Constructor with tuple pattern
+    Some {@value v} => v;      # Constructor with record pattern
+    None => 0
+)
+
+# Complex nested patterns
+match result with (
+    Ok {@user {@name n, @age a}} => "User: " + n;
+    Ok _ => "Success";
+    Err msg => "Error: " + msg
+)
 
 # Wildcard patterns
 match color with (Red => 1; _ => 0)
@@ -588,6 +644,76 @@ ADTs provide compile-time type safety:
 - **Type inference**: ADT types are inferred correctly
 - **Constraint propagation**: Type constraints work with custom ADTs
 
+### Tuple and Record Pattern Matching
+
+**New Feature**: Noolang now supports comprehensive pattern matching for tuples and records in addition to ADTs:
+
+#### Tuple Patterns
+Destructure tuples by position:
+```noolang
+# Basic tuple destructuring
+point = {10, 20};
+match point with ({x, y} => x + y)  # Returns 30
+
+# Mixed literals and variables
+match coordinates with (
+    {0, 0} => "origin";
+    {x, 0} => "x-axis point";
+    {0, y} => "y-axis point";
+    {x, y} => "general point"
+)
+
+# Variable-length matching
+match data with (
+    {a} => "single: " + toString a;
+    {a, b} => "pair: " + toString (a + b);
+    {a, b, c} => "triple: " + toString (a + b + c);
+    _ => "other"
+)
+```
+
+#### Record Patterns
+Destructure records by field name with partial matching support:
+```noolang
+# Basic record destructuring
+person = { @name "Alice", @age 30, @city "NYC" };
+match person with (
+    {@name n, @age a} => n + " is " + toString a + " years old"
+)
+
+# Partial field matching (ignores extra fields)
+match person with (
+    {@name n} => "Hello " + n;  # Ignores @age and @city
+    _ => "No name found"
+)
+
+# Complex nested record patterns
+user = { @profile { @name "Bob", @settings { @theme "dark" } } };
+match user with (
+    {@profile {@name n, @settings {@theme t}}} => n + " uses " + t + " theme";
+    _ => "unknown user"
+)
+```
+
+#### Integration with ADTs
+Combine constructor, tuple, and record patterns:
+```noolang
+# Constructor with tuple argument
+data = Some {10, 20};
+match data with (
+    Some {x, y} => x * y;    # Destructure tuple inside Some
+    None => 0
+)
+
+# Constructor with record argument  
+user_result = Ok { @name "Alice", @role "admin" };
+match user_result with (
+    Ok {@name n, @role "admin"} => "Admin: " + n;
+    Ok {@name n} => "User: " + n;
+    Err msg => "Error: " + msg
+)
+```
+
 ### Current Implementation Status
 
 - ✅ **Type definitions**: `type Name = Constructor1 | Constructor2`
@@ -600,6 +726,9 @@ ADTs provide compile-time type safety:
 - ✅ **Nested patterns**: Support for complex nested constructor patterns (e.g., `Wrap (Value n)`)
 - ✅ **Recursive types**: Full support for recursive ADT definitions
 - ✅ **Complex patterns**: Complete pattern matching with all pattern types
+- ✅ **Tuple patterns**: Full destructuring with literal/variable mixing
+- ✅ **Record patterns**: Partial field matching with nested support
+- ✅ **Mixed patterns**: Constructor + tuple/record pattern combinations
 
 ## Duck-Typed Records and Accessors
 
