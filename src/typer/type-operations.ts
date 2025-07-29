@@ -117,26 +117,139 @@ export const generalize = (
 	return { type: substitutedType, quantifiedVars };
 };
 
-// Instantiate a type scheme by freshening all quantified variables (threading state)
+// Instantiate a type scheme by replacing quantified variables with fresh variables
 export const instantiate = (
 	scheme: TypeScheme,
 	state: TypeState
 ): [Type, TypeState] => {
-	const mapping = new Map<string, Type>();
-	let currentState = state;
-	for (const varName of scheme.quantifiedVars) {
-		const [freshVar, newState] = freshTypeVariable(currentState);
-		mapping.set(varName, freshVar);
-		currentState = newState;
+	if (scheme.quantifiedVars.length === 0) {
+		// No quantified variables, return the type as-is
+		return [scheme.type, state];
 	}
 
-	const [instantiatedType, finalState] = freshenTypeVariables(
+	// Create fresh variables for each quantified variable
+	const mapping = new Map<string, VariableType>();
+	let currentState = state;
+	
+	for (const varName of scheme.quantifiedVars) {
+		const [freshVar, nextState] = freshTypeVariable(currentState);
+		mapping.set(varName, freshVar);
+		currentState = nextState;
+	}
+
+	// Replace quantified variables in the type with fresh variables
+	const [instantiatedType, finalState] = substituteQuantifiedVars(
 		scheme.type,
 		mapping,
 		currentState
 	);
 
 	return [instantiatedType, finalState];
+};
+
+// Helper function to substitute quantified variables with fresh ones
+const substituteQuantifiedVars = (
+	type: Type,
+	mapping: Map<string, VariableType>,
+	state: TypeState
+): [Type, TypeState] => {
+	switch (type.kind) {
+		case 'variable':
+			const replacement = mapping.get(type.name);
+			return [replacement || type, state];
+			
+		case 'function': {
+			let currentState = state;
+			const newParams: Type[] = [];
+			for (const param of type.params) {
+				const [newParam, nextState] = substituteQuantifiedVars(
+					param,
+					mapping,
+					currentState
+				);
+				newParams.push(newParam);
+				currentState = nextState;
+			}
+			const [newReturn, finalState] = substituteQuantifiedVars(
+				type.return,
+				mapping,
+				currentState
+			);
+			return [{ ...type, params: newParams, return: newReturn }, finalState];
+		}
+		
+		case 'variant': {
+			let currentState = state;
+			const newArgs: Type[] = [];
+			for (const arg of type.args) {
+				const [newArg, nextState] = substituteQuantifiedVars(
+					arg,
+					mapping,
+					currentState
+				);
+				newArgs.push(newArg);
+				currentState = nextState;
+			}
+			return [{ ...type, args: newArgs }, currentState];
+		}
+		
+		case 'list': {
+			const [newElem, nextState] = substituteQuantifiedVars(
+				type.element,
+				mapping,
+				state
+			);
+			return [{ ...type, element: newElem }, nextState];
+		}
+		
+		case 'tuple': {
+			let currentState = state;
+			const newElems: Type[] = [];
+			for (const elem of type.elements) {
+				const [newElem, nextState] = substituteQuantifiedVars(
+					elem,
+					mapping,
+					currentState
+				);
+				newElems.push(newElem);
+				currentState = nextState;
+			}
+			return [{ ...type, elements: newElems }, currentState];
+		}
+		
+		case 'record': {
+			let currentState = state;
+			const newFields: { [key: string]: Type } = {};
+			for (const [key, fieldType] of Object.entries(type.fields)) {
+				const [newField, nextState] = substituteQuantifiedVars(
+					fieldType,
+					mapping,
+					currentState
+				);
+				newFields[key] = newField;
+				currentState = nextState;
+			}
+			return [{ ...type, fields: newFields }, currentState];
+		}
+		
+		case 'union': {
+			let currentState = state;
+			const newTypes: Type[] = [];
+			for (const t of type.types) {
+				const [newType, nextState] = substituteQuantifiedVars(
+					t,
+					mapping,
+					currentState
+				);
+				newTypes.push(newType);
+				currentState = nextState;
+			}
+			return [{ ...type, types: newTypes }, currentState];
+		}
+		
+		default:
+			return [type, state];
+	}
 };
 
 // Replace type variables with fresh ones, threading state

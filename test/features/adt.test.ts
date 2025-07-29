@@ -160,7 +160,7 @@ test('Algebraic Data Types (ADTs) - Custom ADT Definition - should handle ADT wi
 	});
 });
 
-test.skip('Algebraic Data Types (ADTs) - Pattern Matching - should handle recursive ADTs - TODO: Fix recursive type unification', () => {
+test('Algebraic Data Types (ADTs) - Pattern Matching - should handle recursive ADTs', () => {
 	const result = runNoolang(`
 		type List a = Cons a (List a) | Nil;
 		list = Cons 1 (Cons 2 Nil);
@@ -178,6 +178,69 @@ test.skip('Algebraic Data Types (ADTs) - Pattern Matching - should handle recurs
 				args: [{ tag: 'number', value: 2 }, { tag: 'constructor', name: 'Nil', args: [] }],
 			},
 		],
+	});
+});
+
+test('Recursive ADT - Binary Tree construction and pattern matching', () => {
+	const result = runNoolang(`
+		type Tree a = Node a (Tree a) (Tree a) | Leaf;
+		
+		tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
+		
+		getValue = fn t => match t with (
+			Node value _ _ => value;
+			Leaf => 0
+		);
+		
+		getValue tree
+	`);
+
+	assert.equal(result.finalValue, {
+		tag: 'number',
+		value: 5,
+	});
+});
+
+test('Recursive ADT - List operations with pattern matching', () => {
+	const result = runNoolang(`
+		type List a = Cons a (List a) | Nil;
+		
+		head = fn list => match list with (
+			Cons h _ => h;
+			Nil => 0
+		);
+		
+		tail = fn list => match list with (
+			Cons _ t => t;
+			Nil => Nil
+		);
+		
+		list = Cons 1 (Cons 2 (Cons 3 Nil));
+		head (tail list)
+	`);
+
+	assert.equal(result.finalValue, {
+		tag: 'number',
+		value: 2,
+	});
+});
+
+test('Recursive ADT - Nested pattern matching', () => {
+	const result = runNoolang(`
+		type List a = Cons a (List a) | Nil;
+		
+		length = fn list => match list with (
+			Nil => 0;
+			Cons _ tail => 1 + (length tail)
+		);
+		
+		list = Cons 1 (Cons 2 (Cons 3 Nil));
+		length list
+	`);
+
+	assert.equal(result.finalValue, {
+		tag: 'number',
+		value: 3,
 	});
 });
 
