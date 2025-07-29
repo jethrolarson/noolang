@@ -403,7 +403,7 @@ test('Algebraic Data Types (ADTs) - Function Integration - should work with list
 	});
 });
 
-test.skip('Algebraic Data Types (ADTs) - Multiple ADTs - should handle multiple ADT definitions in the same program - TODO: Fix ADT pattern matching', () => {
+test('Algebraic Data Types (ADTs) - Multiple ADTs - should handle multiple ADT definitions in the same program', () => {
 	const result = runNoolang(`
 		type Color = Red | Green | Blue;
 		type Size = Small | Medium | Large;
@@ -421,7 +421,7 @@ test.skip('Algebraic Data Types (ADTs) - Multiple ADTs - should handle multiple 
 	});
 });
 
-test.skip('Algebraic Data Types (ADTs) - Multiple ADTs - should handle pattern matching on different ADTs separately - TODO: Fix ADT pattern matching', () => {
+test('Algebraic Data Types (ADTs) - Multiple ADTs - should handle pattern matching on different ADTs separately', () => {
 	const result = runNoolang(`
 		type Color = Red | Green | Blue;
 		type Size = Small | Medium | Large;
@@ -438,7 +438,7 @@ test.skip('Algebraic Data Types (ADTs) - Multiple ADTs - should handle pattern m
 	});
 });
 
-test.skip('Algebraic Data Types (ADTs) - Multiple ADTs - should now work with list_map and multiple ADTs (polymorphism fixed) - TODO: Actually fix it', () => {
+test('Algebraic Data Types (ADTs) - Multiple ADTs - should now work with list_map and multiple ADTs (polymorphism fixed)', () => {
 	const result = runNoolang(`
 		type Color = Red | Green | Blue;
 		type Status = Success | Failure;
