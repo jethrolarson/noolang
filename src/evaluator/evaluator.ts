@@ -197,6 +197,21 @@ const flattenStatements = (expr: Expression): Expression[] => {
 	return [expr];
 };
 
+// Helper function to apply either regular or native functions
+function applyValueFunction(func: Value, arg: Value): Value {
+	if (isFunction(func)) {
+		return func.fn(arg);
+	} else if (isNativeFunction(func)) {
+		return func.fn(arg);
+	}
+	throw new Error(`Cannot apply argument to non-function: ${func?.tag || 'unknown'}`);
+}
+
+// Helper function for consistent HOF error messages
+function createHOFError(functionName: string, requiredArgs: string[]): string {
+	return `${functionName} requires ${requiredArgs.join(', ')}`;
+}
+
 export class Evaluator {
 	public environment: Environment;
 	private environmentStack: Environment[]; // Stack for efficient scoping
@@ -456,23 +471,23 @@ export class Evaluator {
 			})
 		);
 
-		// List utility functions
-		this.environment.set(
-			'list_map',
-			createNativeFunction('list_map', (func: Value) => (list: Value) => {
-				if (isFunction(func) && isList(list)) {
-					return createList(list.values.map((item: Value) => func.fn(item)));
-				}
-				throw new Error('map requires a function and a list');
-			})
-		);
+						// List utility functions
+				this.environment.set(
+					'list_map',
+					createNativeFunction('list_map', (func: Value) => (list: Value) => {
+						if ((isFunction(func) || isNativeFunction(func)) && isList(list)) {
+							return createList(list.values.map((item: Value) => applyValueFunction(func, item)));
+						}
+						throw new Error(createHOFError('list_map', ['a function', 'a list']));
+					})
+				);
 		this.environment.set(
 			'filter',
 			createNativeFunction('filter', (pred: Value) => (list: Value) => {
-				if (isFunction(pred) && isList(list)) {
+				if ((isFunction(pred) || isNativeFunction(pred)) && isList(list)) {
 					return createList(
 						list.values.filter((item: Value) => {
-							const result = pred.fn(item);
+							const result = applyValueFunction(pred, item);
 							if (isBool(result)) {
 								return boolValue(result);
 							}
@@ -481,7 +496,7 @@ export class Evaluator {
 						})
 					);
 				}
-				throw new Error('filter requires a predicate function and a list');
+				throw new Error(createHOFError('filter', ['a predicate function', 'a list']));
 			})
 		);
 		this.environment.set(
@@ -489,20 +504,18 @@ export class Evaluator {
 			createNativeFunction(
 				'reduce',
 				(func: Value) => (initial: Value) => (list: Value) => {
-					if (isFunction(func) && isList(list)) {
+					if ((isFunction(func) || isNativeFunction(func)) && isList(list)) {
 						return list.values.reduce((acc: Value, item: Value) => {
-							const partial = func.fn(acc);
-							if (isFunction(partial)) {
-								return partial.fn(item);
+							const partial = applyValueFunction(func, acc);
+							if (isFunction(partial) || isNativeFunction(partial)) {
+								return applyValueFunction(partial, item);
 							}
 							throw new Error(
 								'reduce function must return a function after first argument'
 							);
 						}, initial);
 					}
-					throw new Error(
-						'reduce requires a function, initial value, and a list'
-					);
+					throw new Error(createHOFError('reduce', ['a function', 'initial value', 'a list']));
 				}
 			)
 		);
