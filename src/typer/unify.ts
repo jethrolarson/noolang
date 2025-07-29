@@ -82,6 +82,7 @@ export const logUnificationStats = (testName?: string) => {
 };
 
 const typeToPattern = (t: Type): string => {
+	if (!t) return 'undefined';
 	switch (t.kind) {
 		case 'variable':
 			return `var:${t.name}`;

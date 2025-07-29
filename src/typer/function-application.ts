@@ -226,16 +226,39 @@ export const typeApplication = (
 				
 				// Apply the trait implementation to the arguments
 				if (traitImplType.type.kind === 'function') {
-					// Create a new application expression using the trait implementation
-					const traitApp: ApplicationExpression = {
-						kind: 'application',
-						func: resolution.impl,
-						args: expr.args,
-						location: expr.location
-					};
+					// Instead of recursively calling typeApplication (which causes exponential blowup),
+					// we directly apply the function type to the argument types
+					const funcType = traitImplType.type;
+					let resultState = traitImplType.state;
 					
-					// Recursively type the new application
-					return typeApplication(traitApp, currentState);
+					// Type the arguments
+					const argResults = expr.args.map(arg => typeExpression(arg, resultState));
+					for (const argResult of argResults) {
+						resultState = argResult.state;
+					}
+					const argTypes = argResults.map(result => result.type);
+					
+					// Apply function type to argument types
+					let resultType = funcType;
+					for (const argType of argTypes) {
+						if (resultType.kind !== 'function') {
+							throwTypeError(
+								location => ({
+									type: 'TypeError' as const,
+									kind: 'function-application',
+									message: `Expected function type, got ${typeToString(resultType)}`,
+									location
+								}),
+								getExprLocation(expr)
+							);
+						}
+						
+						// Unify the argument type with the parameter type
+						unify(argType, resultType.parameter, getExprLocation(expr));
+						resultType = resultType.body;
+					}
+					
+					return createTypeResult(resultType, resultState);
 				} else {
 					// The trait implementation should be a function
 					const funcName = expr.func.kind === 'variable' ? expr.func.name : 'unknown';
