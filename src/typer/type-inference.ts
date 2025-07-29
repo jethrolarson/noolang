@@ -146,35 +146,69 @@ export const typeVariableExpr = (
 							];
 						}
 						case 'variant': {
-							// For variant types like "m a", freshen the name and args
-							if (!typeVarMapping.has(type.name)) {
-								const [freshVar, newState] = freshTypeVariable(currentState);
-								typeVarMapping.set(type.name, freshVar);
+							// For variant types, we need to distinguish between:
+							// 1. Concrete types like "Bool", "Option", "List" - should NOT be freshened
+							// 2. Type variables like "a", "m" - should be freshened
+							// 
+							// We check if this variant name matches the trait's type parameter
+							// or is a single lowercase letter (common type variable pattern)
+							const isTypeVariable = 
+								type.name === traitInfo.typeParam || 
+								(type.name.length === 1 && type.name >= 'a' && type.name <= 'z');
+							
+							if (isTypeVariable) {
+								// This is a type variable - freshen it
+								if (!typeVarMapping.has(type.name)) {
+									const [freshVar, newState] = freshTypeVariable(currentState);
+									typeVarMapping.set(type.name, freshVar);
 
-								// Also freshen the args
-								let currentState2 = newState;
-								const freshenedArgs: Type[] = [];
-								for (const arg of type.args) {
-									const [freshenedArg, nextState] = freshenType(
-										arg,
-										currentState2
-									);
-									freshenedArgs.push(freshenedArg);
-									currentState2 = nextState;
+									// Also freshen the args
+									let currentState2 = newState;
+									const freshenedArgs: Type[] = [];
+									for (const arg of type.args) {
+										const [freshenedArg, nextState] = freshenType(
+											arg,
+											currentState2
+										);
+										freshenedArgs.push(freshenedArg);
+										currentState2 = nextState;
+									}
+
+									// Return a variant type with the fresh variable name and freshened args
+									return [
+										{
+											kind: 'variant',
+											name: freshVar.name, // Use the fresh variable name
+											args: freshenedArgs,
+										},
+										currentState2,
+									];
+								} else {
+									// Use existing mapping
+									const existingVar = typeVarMapping.get(type.name)!;
+									let currentState2 = currentState;
+									const freshenedArgs: Type[] = [];
+									for (const arg of type.args) {
+										const [freshenedArg, nextState] = freshenType(
+											arg,
+											currentState2
+										);
+										freshenedArgs.push(freshenedArg);
+										currentState2 = nextState;
+									}
+
+									return [
+										{
+											kind: 'variant',
+											name: existingVar.name,
+											args: freshenedArgs,
+										},
+										currentState2,
+									];
 								}
-
-								// Return a variant type with the fresh variable name and freshened args
-								return [
-									{
-										kind: 'variant',
-										name: freshVar.name, // Use the fresh variable name
-										args: freshenedArgs,
-									},
-									currentState2,
-								];
 							} else {
-								// Use existing mapping
-								const existingVar = typeVarMapping.get(type.name)!;
+								// This is a concrete type like "Bool", "Option" - don't freshen the name,
+								// but still freshen any type arguments
 								let currentState2 = currentState;
 								const freshenedArgs: Type[] = [];
 								for (const arg of type.args) {
@@ -189,7 +223,7 @@ export const typeVariableExpr = (
 								return [
 									{
 										kind: 'variant',
-										name: existingVar.name,
+										name: type.name, // Keep the original concrete type name
 										args: freshenedArgs,
 									},
 									currentState2,
