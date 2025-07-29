@@ -1766,6 +1766,13 @@ export class Evaluator {
 				);
 			case 'pipeline':
 				return expr.steps.some(step => this.containsVariable(step, varName));
+			case 'match':
+				return (
+					this.containsVariable(expr.expression, varName) ||
+					expr.cases.some(matchCase => 
+						this.containsVariable(matchCase.expression, varName)
+					)
+				);
 			case 'import':
 			case 'accessor':
 			case 'literal':
