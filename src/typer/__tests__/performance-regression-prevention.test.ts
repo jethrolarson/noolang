@@ -15,9 +15,9 @@ const typeString = (input: string) => {
 
 test('arithmetic operations complete quickly', () => {
     const input = `
-        let a = 1.0 + 2.0 in
-        let b = a * 3.0 in
-        let c = b - 4.0 in
+        a = 1.0 + 2.0;
+        b = a * 3.0;
+        c = b - 4.0;
         [a, b, c]
     `;
     
@@ -36,17 +36,16 @@ test('arithmetic operations complete quickly', () => {
     }
     
     // Should return List Float
-    assert.equal(result.type.kind, 'variant');
-    assert.equal(result.type.name, 'List');
-    assert.equal(result.type.args[0].kind, 'primitive');
-    assert.equal(result.type.args[0].name, 'Float');
+    assert.equal(result.type.kind, 'list');
+    assert.equal(result.type.element.kind, 'primitive');
+    assert.equal(result.type.element.name, 'Float');
 });
 
 test('equality operations remain performant', () => {
     const input = `
-        let eq1 = 1.0 == 1.0 in
-        let eq2 = 2.0 == 3.0 in
-        let eq3 = "hello" == "world" in
+        eq1 = 1.0 == 1.0;
+        eq2 = 2.0 == 3.0;
+        eq3 = "hello" == "world";
         [eq1, eq2, eq3]
     `;
     
@@ -65,18 +64,17 @@ test('equality operations remain performant', () => {
     }
     
     // Should return List Bool
-    assert.equal(result.type.kind, 'variant');
-    assert.equal(result.type.name, 'List');
-    assert.equal(result.type.args[0].kind, 'primitive');
-    assert.equal(result.type.args[0].name, 'Bool');
+    assert.equal(result.type.kind, 'list');
+    assert.equal(result.type.element.kind, 'variant');
+    assert.equal(result.type.element.name, 'Bool');
 });
 
 test('nested function application performs well', () => {
     const input = `
-        let add = fn x y => x + y in
-        let mul = fn x y => x * y in
-        let result1 = add 1.0 2.0 in
-        let result2 = mul result1 3.0 in
+        myAdd = fn x y => x + y;
+        myMul = fn x y => x * y;
+        result1 = myAdd 1.0 2.0;
+        result2 = myMul result1 3.0;
         result2
     `;
     
@@ -113,10 +111,9 @@ test('stdlib loading does not cause performance regression', () => {
     assert.ok(endTime - startTime < 2000, `Type checking took ${endTime - startTime}ms, expected < 2000ms`);
     
     // Should return List Float
-    assert.equal(result.type.kind, 'variant');
-    assert.equal(result.type.name, 'List');
-    assert.equal(result.type.args[0].kind, 'primitive');
-    assert.equal(result.type.args[0].name, 'Float');
+    assert.equal(result.type.kind, 'list');
+    assert.equal(result.type.element.kind, 'primitive');
+    assert.equal(result.type.element.name, 'Float');
 });
 
 test.run();

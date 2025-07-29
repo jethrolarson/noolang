@@ -17,7 +17,7 @@ test('built-in equality operator returns Bool type', () => {
     const result = typeString(input);
     
     // This was the core issue - equality was returning type variables instead of Bool
-    assert.equal(result.type.kind, 'primitive');
+    assert.equal(result.type.kind, 'variant');
     assert.equal(result.type.name, 'Bool');
 });
 
@@ -25,7 +25,7 @@ test('string equality returns Bool type', () => {
     const input = '"hello" == "world"';
     const result = typeString(input);
     
-    assert.equal(result.type.kind, 'primitive');
+    assert.equal(result.type.kind, 'variant');
     assert.equal(result.type.name, 'Bool');
 });
 
@@ -38,7 +38,7 @@ test('equality in lambda functions resolves correctly', () => {
     assert.equal(result.type.params.length, 1);
     assert.equal(result.type.params[0].kind, 'primitive');
     assert.equal(result.type.params[0].name, 'Float');
-    assert.equal(result.type.return.kind, 'primitive');
+    assert.equal(result.type.return.kind, 'variant');
     assert.equal(result.type.return.name, 'Bool');
 });
 
@@ -47,11 +47,9 @@ test('map with basic function works correctly', () => {
     const result = typeString(input);
     
     // Should return List Float
-    assert.equal(result.type.kind, 'variant');
-    assert.equal(result.type.name, 'List');
-    assert.equal(result.type.args.length, 1);
-    assert.equal(result.type.args[0].kind, 'primitive');
-    assert.equal(result.type.args[0].name, 'Float');
+    assert.equal(result.type.kind, 'list');
+    assert.equal(result.type.element.kind, 'primitive');
+    assert.equal(result.type.element.name, 'Float');
 });
 
 test('nested arithmetic expressions type correctly', () => {
@@ -79,10 +77,9 @@ test('variables and boolean operations complete without exponential unification'
     assert.ok(endTime - startTime < 500, `Type checking took ${endTime - startTime}ms, expected < 500ms`);
     
     // Should return List Bool
-    assert.equal(result.type.kind, 'variant');
-    assert.equal(result.type.name, 'List');
-    assert.equal(result.type.args[0].kind, 'primitive');
-    assert.equal(result.type.args[0].name, 'Bool');
+    assert.equal(result.type.kind, 'list');
+    assert.equal(result.type.element.kind, 'variant');
+    assert.equal(result.type.element.name, 'Bool');
 });
 
 test.run();
