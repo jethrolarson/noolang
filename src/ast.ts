@@ -343,7 +343,16 @@ export type Pattern =
 	| { kind: 'constructor'; name: string; args: Pattern[]; location: Location }
 	| { kind: 'variable'; name: string; location: Location }
 	| { kind: 'literal'; value: number | string | boolean; location: Location }
-	| { kind: 'wildcard'; location: Location };
+	| { kind: 'wildcard'; location: Location }
+	| { kind: 'tuple'; elements: Pattern[]; location: Location }
+	| { kind: 'record'; fields: RecordPatternField[]; location: Location };
+
+// Supporting type for record pattern fields
+export interface RecordPatternField {
+	fieldName: string;  // Without @ prefix
+	pattern: Pattern;
+	location: Location;
+}
 
 // Pattern matching case
 export interface MatchCase {

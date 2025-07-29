@@ -302,6 +302,133 @@ const typePattern = (
 			return { state: unifiedState, bindings };
 		}
 
+		case 'tuple': {
+			// Validate expected type is tuple
+			if (!isTypeKind(expectedType, 'tuple') && !isTypeKind(expectedType, 'variable')) {
+				throw new Error(
+					`Pattern expects tuple but got ${typeToString(
+						expectedType,
+						state.substitution
+					)}`
+				);
+			}
+
+			let actualType = expectedType;
+			let currentState = state;
+
+			// If expected type is a type variable, create a fresh tuple type
+			if (isTypeKind(expectedType, 'variable')) {
+				const elementTypes: Type[] = [];
+				for (let i = 0; i < pattern.elements.length; i++) {
+					const [freshVar, nextState] = freshTypeVariable(currentState);
+					elementTypes.push(freshVar);
+					currentState = nextState;
+				}
+				actualType = { kind: 'tuple', elements: elementTypes };
+
+				// Unify the type variable with the tuple type
+				currentState = unify(expectedType, actualType, currentState, pattern.location.start);
+			}
+
+			if (!isTypeKind(actualType, 'tuple')) {
+				throw new Error('Internal error: actualType should be tuple');
+			}
+
+			// Check element count
+			if (pattern.elements.length !== actualType.elements.length) {
+				throw new Error(
+					`Tuple pattern expects ${pattern.elements.length} elements but type has ${actualType.elements.length}`
+				);
+			}
+
+			// Type each element pattern
+			for (let i = 0; i < pattern.elements.length; i++) {
+				const elementResult = typePattern(
+					pattern.elements[i],
+					actualType.elements[i],
+					currentState
+				);
+				currentState = elementResult.state;
+
+				// Merge bindings
+				for (const [name, type] of elementResult.bindings) {
+					bindings.set(name, type);
+				}
+			}
+
+			return { state: currentState, bindings };
+		}
+
+		case 'record': {
+			// Validate expected type is record or type variable
+			if (!isTypeKind(expectedType, 'record') && !isTypeKind(expectedType, 'variable')) {
+				throw new Error(
+					`Pattern expects record but got ${typeToString(
+						expectedType,
+						state.substitution
+					)}`
+				);
+			}
+
+			let actualType = expectedType;
+			let currentState = state;
+
+			// If expected type is a type variable, create a fresh record type
+			if (isTypeKind(expectedType, 'variable')) {
+				const recordFields: { [key: string]: Type } = {};
+				for (const field of pattern.fields) {
+					const [freshVar, nextState] = freshTypeVariable(currentState);
+					recordFields[field.fieldName] = freshVar;
+					currentState = nextState;
+				}
+				actualType = { kind: 'record', fields: recordFields };
+
+				// Unify the type variable with the record type
+				currentState = unify(expectedType, actualType, currentState, pattern.location.start);
+			}
+
+			if (!isTypeKind(actualType, 'record')) {
+				throw new Error('Internal error: actualType should be record');
+			}
+
+			// Type each field pattern
+			for (const field of pattern.fields) {
+				const fieldType = actualType.fields[field.fieldName];
+				if (!fieldType) {
+					// For duck-typed records, we allow fields that don't exist in the type
+					// In this case, we create a fresh type variable for the field
+					const [freshVar, nextState] = freshTypeVariable(currentState);
+					currentState = nextState;
+					
+					const fieldResult = typePattern(
+						field.pattern,
+						freshVar,
+						currentState
+					);
+					currentState = fieldResult.state;
+
+					// Merge bindings
+					for (const [name, type] of fieldResult.bindings) {
+						bindings.set(name, type);
+					}
+				} else {
+					const fieldResult = typePattern(
+						field.pattern,
+						fieldType,
+						currentState
+					);
+					currentState = fieldResult.state;
+
+					// Merge bindings
+					for (const [name, type] of fieldResult.bindings) {
+						bindings.set(name, type);
+					}
+				}
+			}
+
+			return { state: currentState, bindings };
+		}
+
 		default:
 			throw new Error(`Unsupported pattern kind: ${(pattern as Pattern).kind}`);
 	}

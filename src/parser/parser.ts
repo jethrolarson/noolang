@@ -31,6 +31,7 @@ import {
 	type MatchExpression,
 	type ConstructorDefinition,
 	type Pattern,
+	type RecordPatternField,
 	type MatchCase,
 	type UnitExpression,
 	type RecordExpression,
@@ -1658,6 +1659,126 @@ const parseBasicPattern: C.Parser<Pattern> = C.choice(
 	})
 );
 
+// --- Tuple/Record Pattern Parsing ---
+const parsePatternFieldOrElement = (index: number): C.Parser<{ isRecord: boolean; fieldName?: string; pattern: Pattern }> => {
+	// Try record field pattern first: @field pattern
+	const recordFieldResult = C.seq(
+		C.accessor(),
+		C.lazy(() => parsePattern)
+	);
+	
+	return (tokens: Token[]): C.ParseResult<{ isRecord: boolean; fieldName?: string; pattern: Pattern }> => {
+		const result = recordFieldResult(tokens);
+		if (result.success) {
+			const [accessor, pattern] = result.value;
+			return {
+				success: true,
+				value: {
+					isRecord: true,
+					fieldName: accessor.value, // Accessor value already excludes the @ prefix
+					pattern
+				},
+				remaining: result.remaining
+			};
+		}
+		
+		// Try tuple element pattern: pattern
+		const elementResult = C.lazy(() => parsePattern)(tokens);
+		if (elementResult.success) {
+			return {
+				success: true,
+				value: {
+					isRecord: false,
+					pattern: elementResult.value
+				},
+				remaining: elementResult.remaining
+			};
+		}
+		
+		return {
+			success: false,
+			error: 'Expected pattern or @field pattern',
+			position: tokens[0]?.location.start.line || 0
+		};
+	};
+};
+
+const parsePatternFields: C.Parser<{ isRecord: boolean; fieldName?: string; pattern: Pattern }[]> = (tokens: Token[]): C.ParseResult<{ isRecord: boolean; fieldName?: string; pattern: Pattern }[]> => {
+	const fields: { isRecord: boolean; fieldName?: string; pattern: Pattern }[] = [];
+	let rest = tokens;
+	
+	// Parse first field/element
+	const firstResult = parsePatternFieldOrElement(0)(rest);
+	if (!firstResult.success) {
+		return firstResult;
+	}
+	
+	fields.push(firstResult.value);
+	rest = firstResult.remaining;
+	
+	// Parse remaining fields/elements with comma separators
+	while (rest.length > 0 && rest[0].type === 'PUNCTUATION' && rest[0].value === ',') {
+		rest = rest.slice(1); // consume comma
+		
+		const fieldResult = parsePatternFieldOrElement(fields.length)(rest);
+		if (!fieldResult.success) {
+			break;
+		}
+		
+		fields.push(fieldResult.value);
+		rest = fieldResult.remaining;
+	}
+	
+	return {
+		success: true,
+		value: fields,
+		remaining: rest
+	};
+};
+
+const parseTupleOrRecordPattern: C.Parser<Pattern> = C.map(
+	C.seq(C.punctuation('{'), C.optional(parsePatternFields), C.punctuation('}')),
+	([open, fields, close]): Pattern => {
+		const fieldsList = fields || [];
+		
+		if (fieldsList.length === 0) {
+			// Empty braces - this could be unit pattern, but for now treat as empty tuple
+			return {
+				kind: 'tuple',
+				elements: [],
+				location: createLocation(open.location.start, close.location.end)
+			};
+		}
+		
+		// Check if all fields are record fields or all are tuple elements
+		const allRecord = fieldsList.every(f => f.isRecord);
+		const allTuple = fieldsList.every(f => !f.isRecord);
+		
+		if (allRecord) {
+			// Record pattern
+			return {
+				kind: 'record',
+				fields: fieldsList.map(f => ({
+					fieldName: f.fieldName!,
+					pattern: f.pattern,
+					location: f.pattern.location
+				})),
+				location: createLocation(open.location.start, close.location.end)
+			};
+		} else if (allTuple) {
+			// Tuple pattern
+			return {
+				kind: 'tuple',
+				elements: fieldsList.map(f => f.pattern),
+				location: createLocation(open.location.start, close.location.end)
+			};
+		} else {
+			// Mixed - error
+			throw new Error('Cannot mix record fields (@field) and tuple elements in the same pattern');
+		}
+	}
+);
+
 const parsePattern: C.Parser<Pattern> = C.choice(
 	// Wildcard pattern: _
 	C.map(
@@ -1683,6 +1804,21 @@ const parsePattern: C.Parser<Pattern> = C.choice(
 			kind: 'literal',
 			value: str.value,
 			location: str.location,
+		})
+	),
+	// Tuple/Record pattern: {pattern, pattern} or {@field pattern, @field pattern}
+	parseTupleOrRecordPattern,
+	// Constructor pattern with tuple/record argument: Some {x, y}
+	C.map(
+		C.seq(C.identifier(), parseTupleOrRecordPattern),
+		([name, tupleOrRecordPattern]): Pattern => ({
+			kind: 'constructor',
+			name: name.value,
+			args: [tupleOrRecordPattern],
+			location: createLocation(
+				name.location.start,
+				tupleOrRecordPattern.location.end
+			),
 		})
 	),
 	// Constructor pattern with arguments: Some x y
