@@ -20,6 +20,7 @@ import {
 	typeImplementDefinition,
 	typeTyped,
 	typeConstrained,
+	typeImport,
 } from './type-inference';
 import { typeApplication, typePipeline } from './function-application';
 import { typeMatch, typeTypeDefinition } from './pattern-matching';
@@ -98,6 +99,9 @@ export const typeExpression = (
 
 		case 'constrained':
 			return typeConstrained(expr, state);
+
+		case 'import':
+			return typeImport(expr, state);
 
 		default:
 			throw new Error(`Unknown expression kind: ${(expr as any).kind}`);

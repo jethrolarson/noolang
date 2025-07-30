@@ -35,11 +35,17 @@ import {
 	tupleType,
 	recordType,
 	variantType,
+	primitiveType,
+	type Effect,
 	ApplicationExpression,
 	hasConstraint,
 	implementsConstraint,
 	type VariableType,
 } from '../ast';
+import { Lexer } from '../lexer/lexer';
+import { parse } from '../parser/parser';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
 	undefinedVariableError,
 	nonFunctionApplicationError,
@@ -64,6 +70,8 @@ import {
 	unionEffects,
 	emptyEffects,
 } from './types';
+import { createTypeState, loadStdlib } from './type-operations';
+import { initializeBuiltins } from './builtins';
 // NOTE: validateConstraintName import removed - constraint validation disabled
 import {
 	freshTypeVariable,
@@ -552,7 +560,7 @@ export const typeFunction = (
 	currentState = { ...currentState, environment: state.environment };
 
 	// Collect implicit constraints from function body (e.g., from + operator)
-	const implicitConstraints = collectImplicitConstraints(bodyResult.type, paramTypes, currentState);
+	const implicitConstraints = collectImplicitConstraints(expr.body, expr.params, bodyResult.type, paramTypes, currentState);
 
 	// Special handling for constrained function bodies
 	let funcType: Type;
@@ -617,28 +625,127 @@ export const typeFunction = (
 
 // Helper function to collect implicit constraints from function bodies
 function collectImplicitConstraints(
+	bodyAST: Expression,
+	params: string[],
 	bodyType: Type, 
 	paramTypes: Type[], 
 	state: TypeState
 ): Constraint[] {
 	const constraints: Constraint[] = [];
 	
-	const allTypeVars = new Set<string>();
-	for (const paramType of paramTypes) {
-		collectTypeVariables(paramType, allTypeVars);
-	}
-	collectTypeVariables(bodyType, allTypeVars);
+	// Check for operators that require constraints and add appropriate constraints
+	const operatorConstraints = analyzeOperatorConstraints(bodyAST);
 	
-	const typeVarList = Array.from(allTypeVars).sort();
-	
-	// Heuristic: if we have multiple type variables, this is likely a polymorphic function
-	// that uses operators like +, so add an Add constraint
-	if (typeVarList.length >= 2) {
-		const canonicalVar = typeVarList[0];
-		constraints.push(implementsConstraint(canonicalVar, 'Add'));
+	if (operatorConstraints.needsAdd || operatorConstraints.needsNumeric) {
+		// Get the first type variable to add constraints to
+		const allTypeVars = new Set<string>();
+		for (const paramType of paramTypes) {
+			collectTypeVariables(paramType, allTypeVars);
+		}
+		
+		if (allTypeVars.size > 0) {
+			const firstTypeVar = Array.from(allTypeVars).sort()[0];
+			
+			if (operatorConstraints.needsAdd) {
+				constraints.push(implementsConstraint(firstTypeVar, 'Add'));
+			}
+			if (operatorConstraints.needsNumeric) {
+				constraints.push(implementsConstraint(firstTypeVar, 'Numeric'));
+			}
+		}
 	}
 	
 	return constraints;
+}
+
+// Analyze what operator constraints are needed based on actual operator usage
+function analyzeOperatorConstraints(expr: Expression): { needsAdd: boolean; needsNumeric: boolean } {
+	if (!expr) return { needsAdd: false, needsNumeric: false };
+	
+	switch (expr.kind) {
+		case 'binary':
+			// Check current operator
+			const currentNeeds = getOperatorConstraints(expr.operator);
+			
+			// Check operands recursively
+			const leftNeeds = analyzeOperatorConstraints(expr.left);
+			const rightNeeds = analyzeOperatorConstraints(expr.right);
+			
+			return {
+				needsAdd: currentNeeds.needsAdd || leftNeeds.needsAdd || rightNeeds.needsAdd,
+				needsNumeric: currentNeeds.needsNumeric || leftNeeds.needsNumeric || rightNeeds.needsNumeric
+			};
+		
+		case 'application':
+			const funcNeeds = analyzeOperatorConstraints(expr.func);
+			const argsNeeds = expr.args.map(arg => analyzeOperatorConstraints(arg));
+			
+			return {
+				needsAdd: funcNeeds.needsAdd || argsNeeds.some(a => a.needsAdd),
+				needsNumeric: funcNeeds.needsNumeric || argsNeeds.some(a => a.needsNumeric)
+			};
+		
+		case 'function':
+			return analyzeOperatorConstraints(expr.body);
+		
+		case 'if':
+			const condNeeds = analyzeOperatorConstraints(expr.condition);
+			const thenNeeds = analyzeOperatorConstraints(expr.then);
+			const elseNeeds = expr.else ? analyzeOperatorConstraints(expr.else) : { needsAdd: false, needsNumeric: false };
+			
+			return {
+				needsAdd: condNeeds.needsAdd || thenNeeds.needsAdd || elseNeeds.needsAdd,
+				needsNumeric: condNeeds.needsNumeric || thenNeeds.needsNumeric || elseNeeds.needsNumeric
+			};
+		
+		case 'record':
+			const fieldNeeds = Object.values(expr.fields).map(field => analyzeOperatorConstraints(field.value));
+			
+			return {
+				needsAdd: fieldNeeds.some(f => f.needsAdd),
+				needsNumeric: fieldNeeds.some(f => f.needsNumeric)
+			};
+		
+		case 'tuple':
+			const elemNeeds = expr.elements.map(elem => analyzeOperatorConstraints(elem));
+			
+			return {
+				needsAdd: elemNeeds.some(e => e.needsAdd),
+				needsNumeric: elemNeeds.some(e => e.needsNumeric)
+			};
+		
+		case 'list':
+			const listNeeds = expr.elements.map(elem => analyzeOperatorConstraints(elem));
+			
+			return {
+				needsAdd: listNeeds.some(e => e.needsAdd),
+				needsNumeric: listNeeds.some(e => e.needsNumeric)
+			};
+		
+		// Leaf nodes don't use operators
+		case 'literal':
+		case 'variable':
+		case 'unit':
+		case 'accessor':
+			return { needsAdd: false, needsNumeric: false };
+		
+		default:
+			return { needsAdd: false, needsNumeric: false };
+	}
+}
+
+// Map operators to their required constraints (based on builtins.ts)
+function getOperatorConstraints(operator: string): { needsAdd: boolean; needsNumeric: boolean } {
+	switch (operator) {
+		case '+':
+			return { needsAdd: true, needsNumeric: false };
+		case '-':
+		case '*':
+		case '/':
+			return { needsAdd: false, needsNumeric: true };
+		default:
+			return { needsAdd: false, needsNumeric: false };
+	}
 }
 
 function collectTypeVariables(type: Type, vars: Set<string>): void {
@@ -1086,14 +1193,87 @@ export const typeMutation = (
 	return createTypeResult(unitType(), valueResult.effects, newState); // Mutations return unit
 };
 
-// Type inference for imports
+// Module cache for type inference
+type ModuleTypeCache = Map<string, { type: Type; effects: Set<Effect> }>;
+const moduleTypeCache: ModuleTypeCache = new Map();
+
+// Type inference for imports - with real module loading and type checking
 export const typeImport = (
 	expr: ImportExpression,
 	state: TypeState
 ): TypeResult => {
-	// For now, assume imports return a record type
-	return createPureTypeResult(recordType({}), state);
+	try {
+		// Resolve the import path
+		const filePath = expr.path.endsWith('.noo') ? expr.path : `${expr.path}.noo`;
+		
+		// Check cache first
+		const cached = moduleTypeCache.get(filePath);
+		if (cached) {
+			// Import always adds !read effect for file I/O
+			const totalEffects = new Set<Effect>([...cached.effects, 'read']);
+			return createTypeResult(cached.type, totalEffects, state);
+		}
+		
+		// Actual module loading and type inference
+		try {
+			// 1. Load the module file
+			const resolvedPath = path.resolve(filePath);
+			const moduleContent = fs.readFileSync(resolvedPath, 'utf8');
+			
+			// 2. Lex and parse the module
+			const lexer = new Lexer(moduleContent);
+			const tokens = lexer.tokenize();
+			const moduleProgram = parse(tokens);
+			
+			// 3. Type-check in a clean environment
+			let moduleState = createTypeState();
+			moduleState = initializeBuiltins(moduleState);
+			moduleState = loadStdlib(moduleState);
+			
+			// Type-check all statements in the module
+			let finalType: Type = unitType();
+			let moduleEffects = new Set<Effect>();
+			
+			for (const statement of moduleProgram.statements) {
+				const result = typeExpression(statement, moduleState);
+				moduleState = result.state;
+				finalType = result.type;
+				
+				// Collect effects from the module
+				for (const effect of result.effects) {
+					moduleEffects.add(effect);
+				}
+			}
+			
+			// 4. Cache the result
+			moduleTypeCache.set(filePath, { type: finalType, effects: moduleEffects });
+			
+			// Import always has the !read effect (file I/O) plus module effects
+			const totalEffects = new Set<Effect>([...moduleEffects, 'read']);
+			
+			return createTypeResult(finalType, totalEffects, state);
+			
+		} catch (moduleError) {
+			// If module loading/parsing fails, return empty record but don't crash
+			// The evaluator will handle the actual error at runtime
+			const moduleType = recordType({});
+			const moduleEffects = new Set<Effect>();
+			
+			// Cache the failed result to avoid repeated attempts
+			moduleTypeCache.set(filePath, { type: moduleType, effects: moduleEffects });
+			
+			const totalEffects = new Set<Effect>([...moduleEffects, 'read']);
+			return createTypeResult(moduleType, totalEffects, state);
+		}
+		
+	} catch (error) {
+		// If anything else fails, return a generic record
+		const importEffects = new Set<Effect>(['read']);
+		return createTypeResult(recordType({}), importEffects, state);
+	}
 };
+
+
 
 // Type inference for records
 export const typeRecord = (

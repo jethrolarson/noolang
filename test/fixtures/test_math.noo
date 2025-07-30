@@ -1,0 +1,6 @@
+# Test module with simple functions
+{ 
+  @first fn x y => x, 
+  @second fn x y => y, 
+  @identity fn x => x 
+}
