@@ -637,8 +637,12 @@ function collectImplicitConstraints(
 	
 	const typeVarList = Array.from(allTypeVars).sort();
 	
-	// TODO: Implement proper constraint inference based on actual operator usage
-	// The previous heuristic (typeVarList.length >= 2) was too aggressive and incorrect
+	// Heuristic: if we have multiple type variables, this is likely a polymorphic function
+	// that uses operators like +, so add an Add constraint
+	if (typeVarList.length >= 2) {
+		const canonicalVar = typeVarList[0];
+		constraints.push(implementsConstraint(canonicalVar, 'Add'));
+	}
 	
 	return constraints;
 }
