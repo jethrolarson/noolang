@@ -12,6 +12,8 @@ import {
 	typeTuple,
 	typeAccessor,
 	typeDefinition,
+	typeTupleDestructuring,
+	typeRecordDestructuring,
 	typeMutableDefinition,
 	typeMutation,
 	typeConstraintDefinition,
@@ -60,6 +62,12 @@ export const typeExpression = (
 
 		case 'definition':
 			return typeDefinition(expr, state);
+
+		case 'tuple-destructuring':
+			return typeTupleDestructuring(expr, state);
+
+		case 'record-destructuring':
+			return typeRecordDestructuring(expr, state);
 
 		case 'mutable-definition':
 			return typeMutableDefinition(expr, state);

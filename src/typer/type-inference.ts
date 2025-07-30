@@ -6,6 +6,8 @@ import {
 	type BinaryExpression,
 	type IfExpression,
 	type DefinitionExpression,
+	type TupleDestructuringExpression,
+	type RecordDestructuringExpression,
 	type MutableDefinitionExpression,
 	type MutationExpression,
 	type ImportExpression,
@@ -1415,4 +1417,121 @@ export const typeImplementDefinition = (
 
 	// Implement definitions have unit type
 	return createTypeResult(unitType(), allEffects, currentState);
+};
+
+// Type inference for tuple destructuring
+export const typeTupleDestructuring = (
+	expr: TupleDestructuringExpression,
+	state: TypeState
+): TypeResult => {
+	let currentState = state;
+
+	// Type the value first
+	const valueResult = typeExpression(expr.value, currentState);
+	currentState = valueResult.state;
+
+	// Create fresh type variables for each destructured element
+	const elementTypes: Type[] = [];
+	const elementNames: string[] = [];
+	
+	// Extract variable names and create types for them
+	for (const element of expr.pattern.elements) {
+		if (element.kind === 'variable') {
+			const [elementType, newState] = freshTypeVariable(currentState);
+			currentState = newState;
+			elementTypes.push(elementType);
+			elementNames.push(element.name);
+		} else {
+			// TODO: Handle nested destructuring
+			throw new Error('Nested tuple destructuring not yet implemented');
+		}
+	}
+
+	// Create tuple type and unify with value
+	const expectedTupleType = tupleType(elementTypes);
+	currentState = unify(
+		valueResult.type,
+		expectedTupleType,
+		currentState,
+		getExprLocation(expr)
+	);
+
+	// Add all destructured variables to environment
+	for (let i = 0; i < elementNames.length; i++) {
+		const scheme = generalize(
+			elementTypes[i],
+			currentState.environment,
+			currentState.substitution
+		);
+		const finalEnv = mapSet(currentState.environment, elementNames[i], scheme);
+		currentState = { ...currentState, environment: finalEnv };
+	}
+
+	// Return the tuple type and effects
+	return createTypeResult(expectedTupleType, valueResult.effects, currentState);
+};
+
+// Type inference for record destructuring
+export const typeRecordDestructuring = (
+	expr: RecordDestructuringExpression,
+	state: TypeState
+): TypeResult => {
+	let currentState = state;
+
+	// Type the value first
+	const valueResult = typeExpression(expr.value, currentState);
+	currentState = valueResult.state;
+
+	// Create fresh type variables for each destructured field and collect bindings
+	const fieldTypes: { [key: string]: Type } = {};
+	const localBindings: { localName: string; fieldName: string; type: Type }[] = [];
+	
+	// Extract field information and create types
+	for (const field of expr.pattern.fields) {
+		if (field.kind === 'shorthand') {
+			const [fieldType, newState] = freshTypeVariable(currentState);
+			currentState = newState;
+			fieldTypes[field.fieldName] = fieldType;
+			localBindings.push({
+				localName: field.fieldName, // shorthand: @name -> name
+				fieldName: field.fieldName,
+				type: fieldType
+			});
+		} else if (field.kind === 'rename') {
+			const [fieldType, newState] = freshTypeVariable(currentState);
+			currentState = newState;
+			fieldTypes[field.fieldName] = fieldType;
+			localBindings.push({
+				localName: field.localName, // rename: @name userName -> userName
+				fieldName: field.fieldName,
+				type: fieldType
+			});
+		} else {
+			// TODO: Handle nested destructuring
+			throw new Error('Nested record destructuring not yet implemented');
+		}
+	}
+
+	// Create record type and unify with value
+	const expectedRecordType = recordType(fieldTypes);
+	currentState = unify(
+		valueResult.type,
+		expectedRecordType,
+		currentState,
+		getExprLocation(expr)
+	);
+
+	// Add all destructured variables to environment
+	for (const binding of localBindings) {
+		const scheme = generalize(
+			binding.type,
+			currentState.environment,
+			currentState.substitution
+		);
+		const finalEnv = mapSet(currentState.environment, binding.localName, scheme);
+		currentState = { ...currentState, environment: finalEnv };
+	}
+
+	// Return the record type and effects
+	return createTypeResult(expectedRecordType, valueResult.effects, currentState);
 };

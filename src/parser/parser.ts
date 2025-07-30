@@ -8,6 +8,12 @@ import {
 	type FunctionExpression,
 	createLocation,
 	type DefinitionExpression,
+	type TupleDestructuringExpression,
+	type RecordDestructuringExpression,
+	type TupleDestructuringPattern,
+	type RecordDestructuringPattern,
+	type DestructuringElement,
+	type RecordDestructuringField,
 	type MutableDefinitionExpression,
 	type ImportExpression,
 	type AccessorExpression,
@@ -1342,25 +1348,205 @@ const parsePostfixFromResult = (
 	return { success: true, value: result, remaining };
 };
 
-// --- Definition ---
-const parseDefinition: C.Parser<DefinitionExpression> = C.map(
-	C.seq(
-		C.identifier(),
-		C.operator('='),
-		C.lazy(() => parseSequenceTermWithIf)
-	),
-	([name, _equals, value]): DefinitionExpression => {
-		return {
-			kind: 'definition',
-			name: name.value,
-			value,
-			location: name.location,
-		};
-	}
+// --- Destructuring Element Parser ---
+const parseDestructuringElement: C.Parser<DestructuringElement> = C.choice(
+	C.map(C.identifier(), (name): DestructuringElement => ({
+		kind: 'variable',
+		name: name.value,
+		location: name.location,
+	})),
+	C.map(C.lazy(() => parseTupleDestructuringPattern), (pattern): DestructuringElement => ({
+		kind: 'nested-tuple',
+		pattern,
+		location: pattern.location,
+	})),
+	C.map(C.lazy(() => parseRecordDestructuringPattern), (pattern): DestructuringElement => ({
+		kind: 'nested-record',
+		pattern,
+		location: pattern.location,
+	}))
 );
 
+// --- Tuple Destructuring Pattern Parser ---
+const parseTupleDestructuringPattern: C.Parser<TupleDestructuringPattern> = C.map(
+	C.seq(
+		C.punctuation('{'),
+		C.sepBy(parseDestructuringElement, C.punctuation(',')),
+		C.punctuation('}')
+	),
+	([openBrace, elements, _closeBrace]): TupleDestructuringPattern => ({
+		kind: 'tuple-destructuring-pattern',
+		elements,
+		location: openBrace.location,
+	})
+);
+
+// --- Record Destructuring Field Parser ---
+const parseRecordDestructuringField: C.Parser<RecordDestructuringField> = C.choice(
+	// {@field localName} - rename
+	C.map(
+		C.seq(C.accessor(), C.identifier()),
+		([accessor, localName]): RecordDestructuringField => ({
+			kind: 'rename',
+			fieldName: accessor.value,
+			localName: localName.value,
+			location: accessor.location,
+		})
+	),
+	// {@field {x, y}} - nested tuple
+	C.map(
+		C.seq(C.accessor(), parseTupleDestructuringPattern),
+		([accessor, pattern]): RecordDestructuringField => ({
+			kind: 'nested-tuple',
+			fieldName: accessor.value,
+			pattern,
+			location: accessor.location,
+		})
+	),
+	// {@field {@nested}} - nested record
+	C.map(
+		C.seq(C.accessor(), C.lazy(() => parseRecordDestructuringPattern)),
+		([accessor, pattern]): RecordDestructuringField => ({
+			kind: 'nested-record',
+			fieldName: accessor.value,
+			pattern,
+			location: accessor.location,
+		})
+	),
+	// {@field} - shorthand
+	C.map(
+		C.accessor(),
+		(accessor): RecordDestructuringField => ({
+			kind: 'shorthand',
+			fieldName: accessor.value,
+			location: accessor.location,
+		})
+	)
+);
+
+// --- Record Destructuring Pattern Parser ---
+const parseRecordDestructuringPattern: C.Parser<RecordDestructuringPattern> = C.map(
+	C.seq(
+		C.punctuation('{'),
+		C.sepBy(parseRecordDestructuringField, C.punctuation(',')),
+		C.punctuation('}')
+	),
+	([openBrace, fields, _closeBrace]): RecordDestructuringPattern => ({
+		kind: 'record-destructuring-pattern',
+		fields,
+		location: openBrace.location,
+	})
+);
+
+// --- Lookahead to detect destructuring vs expression ---
+const isDestructuringPattern = (tokens: Token[]): boolean => {
+	if (tokens.length < 3) return false;
+	if (tokens[0].type !== 'PUNCTUATION' || tokens[0].value !== '{') return false;
+	
+	let braceCount = 0;
+	let i = 0;
+	
+	// Look for the closing brace and then an equals sign
+	while (i < tokens.length) {
+		const token = tokens[i];
+		if (token.type === 'PUNCTUATION' && token.value === '{') {
+			braceCount++;
+		} else if (token.type === 'PUNCTUATION' && token.value === '}') {
+			braceCount--;
+			if (braceCount === 0) {
+				// Found the closing brace, check if next token is '='
+				if (i + 1 < tokens.length && 
+					tokens[i + 1].type === 'OPERATOR' && 
+					tokens[i + 1].value === '=') {
+					return true;
+				}
+				return false;
+			}
+		}
+		i++;
+	}
+	
+	return false;
+};
+
+// --- Tuple Destructuring Expression Parser ---
+const parseTupleDestructuring: C.Parser<TupleDestructuringExpression> = tokens => {
+	if (!isDestructuringPattern(tokens)) {
+		return { success: false, error: 'Not a destructuring pattern', position: 0 };
+	}
+	
+	return C.map(
+		C.seq(
+			parseTupleDestructuringPattern,
+			C.operator('='),
+			C.lazy(() => parseSequenceTermWithIf)
+		),
+		([pattern, _equals, value]): TupleDestructuringExpression => ({
+			kind: 'tuple-destructuring',
+			pattern,
+			value,
+			location: pattern.location,
+		})
+	)(tokens);
+};
+
+// --- Record Destructuring Expression Parser ---
+const parseRecordDestructuring: C.Parser<RecordDestructuringExpression> = tokens => {
+	if (!isDestructuringPattern(tokens)) {
+		return { success: false, error: 'Not a destructuring pattern', position: 0 };
+	}
+	
+	return C.map(
+		C.seq(
+			parseRecordDestructuringPattern,
+			C.operator('='),
+			C.lazy(() => parseSequenceTermWithIf)
+		),
+		([pattern, _equals, value]): RecordDestructuringExpression => ({
+			kind: 'record-destructuring',
+			pattern,
+			value,
+			location: pattern.location,
+		})
+	)(tokens);
+};
+
+// --- Combined Definition Parser (handles regular definitions and destructuring) ---
+const parseDefinition: C.Parser<Expression> = tokens => {
+	// First try destructuring patterns
+	if (isDestructuringPattern(tokens)) {
+		// Try tuple destructuring first
+		const tupleResult = parseTupleDestructuring(tokens);
+		if (tupleResult.success) {
+			return tupleResult;
+		}
+		// Try record destructuring
+		const recordResult = parseRecordDestructuring(tokens);
+		if (recordResult.success) {
+			return recordResult;
+		}
+	}
+	
+	// Fallback to regular definition
+	return C.map(
+		C.seq(
+			C.identifier(),
+			C.operator('='),
+			C.lazy(() => parseSequenceTermWithIf)
+		),
+		([name, _equals, value]): DefinitionExpression => {
+			return {
+				kind: 'definition',
+				name: name.value,
+				value,
+				location: name.location,
+			};
+		}
+	)(tokens);
+};
+
 // --- Definition with typed expression (now just a regular definition) ---
-const parseDefinitionWithType: C.Parser<DefinitionExpression> = parseDefinition;
+const parseDefinitionWithType: C.Parser<Expression> = parseDefinition;
 
 // --- Mutable Definition ---
 const parseMutableDefinition: C.Parser<MutableDefinitionExpression> = C.map(
@@ -1400,18 +1586,49 @@ const parseMutation: C.Parser<MutationExpression> = C.map(
 
 // Custom parser for where clause definitions (both regular and mutable)
 const parseWhereDefinition: C.Parser<
-	DefinitionExpression | MutableDefinitionExpression
+	DefinitionExpression | TupleDestructuringExpression | RecordDestructuringExpression | MutableDefinitionExpression
 > = tokens => {
 	// Try mutable definition first
 	const mutableResult = parseMutableDefinition(tokens);
 	if (mutableResult.success) {
 		return mutableResult;
 	}
-	// Try regular definition
-	const regularResult = parseDefinition(tokens);
+	
+	// Try destructuring patterns
+	if (isDestructuringPattern(tokens)) {
+		// Try tuple destructuring first
+		const tupleResult = parseTupleDestructuring(tokens);
+		if (tupleResult.success) {
+			return tupleResult;
+		}
+		// Try record destructuring
+		const recordResult = parseRecordDestructuring(tokens);
+		if (recordResult.success) {
+			return recordResult;
+		}
+	}
+	
+	// Fallback to regular definition
+	const regularResult = C.map(
+		C.seq(
+			C.identifier(),
+			C.operator('='),
+			C.lazy(() => parseSequenceTermWithIf)
+		),
+		([name, _equals, value]): DefinitionExpression => {
+			return {
+				kind: 'definition',
+				name: name.value,
+				value,
+				location: name.location,
+			};
+		}
+	)(tokens);
+	
 	if (regularResult.success) {
 		return regularResult;
 	}
+	
 	return {
 		success: false,
 		error: 'Expected definition in where clause',
@@ -1947,8 +2164,8 @@ const parseSequenceTerm: C.Parser<Expression> = C.choice(
 	parseMutation, // starts with "mut!"
 	parseImportExpression, // starts with "import"
 	parseIfAfterDollar, // if expressions (starts with "if")
-	// Then parse identifier-based expressions
-	parseDefinitionWithType, // allow definitions with type annotations
+	// Then parse identifier-based expressions (including destructuring)
+	parseDefinitionWithType, // allow definitions with type annotations (includes destructuring)
 	parseDefinition, // fallback to regular definitions
 	parseWhereExpression,
 	parseThrush, // full expression hierarchy (includes all primaries and type annotations)
@@ -1967,8 +2184,8 @@ const parseSequenceTermExceptRecord: C.Parser<Expression> = C.choice(
 	parseMutableDefinition,
 	parseMutation,
 	parseImportExpression,
-	// Then identifier-based expressions
-	parseDefinition, // Regular definitions
+	// Then identifier-based expressions (including destructuring)
+	parseDefinition, // Regular definitions (includes destructuring)
 	parseThrush,
 	parseLambdaExpression,
 	parseNumber,
