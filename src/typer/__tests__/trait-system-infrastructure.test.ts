@@ -183,7 +183,7 @@ test('Trait System Phase 1 Infrastructure - Constraint Type Infrastructure - sho
 	`);
 	const result = typeProgram(program);
 	
-	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
+	expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 });
 
 test('Trait System Phase 1 Infrastructure - Constraint Type Infrastructure - should handle function composition', () => {
@@ -196,7 +196,7 @@ test('Trait System Phase 1 Infrastructure - Constraint Type Infrastructure - sho
 	`);
 	const result = typeProgram(program);
 	
-	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
+	expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 });
 
 test('Trait System Phase 1 Infrastructure - Constraint Type Infrastructure - should handle partial application correctly', () => {
@@ -207,7 +207,7 @@ test('Trait System Phase 1 Infrastructure - Constraint Type Infrastructure - sho
 	`);
 	const result = typeProgram(program);
 	
-	expect(typeToString(result.type).toBe(result.state.substitution), '(Float) -> Float');
+	expect(typeToString(result.type, result.state.substitution)).toBe('(Float) -> Float');
 });
 
 test('Trait System Phase 1 Infrastructure - Trait Function Type Inference Integration - should generate generic function type for trait function lookups', () => {

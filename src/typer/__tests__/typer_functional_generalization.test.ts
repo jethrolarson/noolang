@@ -14,7 +14,7 @@ const parseProgram = (source: string) => {
 test('Functional Typer - Let-Polymorphism - Core Let-Polymorphism - should generalize polymorphic identity function', () => {
 	const program = parseProgram('id = fn x => x');
 	const result = typeProgram(program);
-	expect(typeToString(result.type).toBe(result.state.substitution), '(α) -> α');
+	expect(typeToString(result.type, result.state.substitution)).toBe('(α) -> α');
 });
 
 test('Functional Typer - Let-Polymorphism - Core Let-Polymorphism - should allow polymorphic function to be used with different types', () => {
@@ -26,7 +26,7 @@ test('Functional Typer - Let-Polymorphism - Core Let-Polymorphism - should allow
       `);
 	const result = typeProgram(program);
 	// The sequence returns the type of the rightmost expression
-	expect(typeToString(result.type).toBe(result.state.substitution), 'Bool');
+	expect(typeToString(result.type, result.state.substitution)).toBe('Bool');
 });
 
 test('Functional Typer - Let-Polymorphism - Core Let-Polymorphism - should handle higher-order functions with generalization', () => {
@@ -37,7 +37,7 @@ test('Functional Typer - Let-Polymorphism - Core Let-Polymorphism - should handl
       `);
 	const result = typeProgram(program);
 	// The sequence returns the type of the rightmost expression
-	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
+	expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 });
 
 test('Functional Typer - Let-Polymorphism - Let-Polymorphism Edge Cases - should handle nested function definitions', () => {
@@ -49,7 +49,7 @@ test('Functional Typer - Let-Polymorphism - Let-Polymorphism Edge Cases - should
       `);
 	const result = typeProgram(program);
 	// This should work with proper generalization
-	expect(typeToString(result.type).toBe(result.state.substitution), '(α) -> α');
+	expect(typeToString(result.type, result.state.substitution)).toBe('(α) -> α');
 });
 
 test('Functional Typer - Let-Polymorphism - Let-Polymorphism Edge Cases - should handle curried polymorphic functions', () => {
@@ -59,7 +59,7 @@ test('Functional Typer - Let-Polymorphism - Let-Polymorphism Edge Cases - should
         result = sumFive 3
       `);
 	const result = typeProgram(program);
-	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
+	expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 });
 
 test('Functional Typer - Let-Polymorphism - Let-Polymorphism Edge Cases - should handle multiple polymorphic functions in sequence', () => {
@@ -71,7 +71,7 @@ test('Functional Typer - Let-Polymorphism - Let-Polymorphism Edge Cases - should
         result3 = id True
       `);
 	const result = typeProgram(program);
-	expect(typeToString(result.type).toBe(result.state.substitution), 'Bool');
+	expect(typeToString(result.type, result.state.substitution)).toBe('Bool');
 });
 
 test('Functional Typer - Let-Polymorphism - Type Environment Consistency - should properly instantiate polymorphic functions in single program', () => {
@@ -83,7 +83,7 @@ test('Functional Typer - Let-Polymorphism - Type Environment Consistency - shoul
         numResult
       `);
 	const result = typeProgram(program);
-	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
+	expect(typeToString(result.type, result.state.substitution)).toBe('Float');
 });
 
 test('Functional Typer - Let-Polymorphism - Type Environment Consistency - should handle polymorphic function with multiple instantiations', () => {
@@ -94,6 +94,6 @@ test('Functional Typer - Let-Polymorphism - Type Environment Consistency - shoul
         id True
       `);
 	const result = typeProgram(program);
-	expect(typeToString(result.type).toBe(result.state.substitution), 'Bool');
+	expect(typeToString(result.type, result.state.substitution)).toBe('Bool');
 });
 
