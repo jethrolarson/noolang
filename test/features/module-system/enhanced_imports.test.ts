@@ -5,39 +5,9 @@ import { parse } from '../../../src/parser/parser';
 import { typeAndDecorate } from '../../../src/typer';
 import { Evaluator } from '../../../src/evaluator/evaluator';
 
-// Test suite: Enhanced Import System
-const mockFs = {
-	readFileSync: (filePath: unknown, encoding: string) => {
-		if (typeof filePath === 'string') {
-			if (filePath.includes('stdlib.noo')) {
-				return '# Standard library';
-			}
-			if (filePath.includes('math_functions.noo')) {
-				return '{ @add fn x y => x + y, @multiply fn x y => x * y, @square fn x => x * x }';
-			}
-			if (filePath.includes('logger.noo')) {
-				return '{ @info fn msg => log msg, @error fn msg => log ("ERROR: " + msg) }';
-			}
-			if (filePath.includes('pure_math.noo')) {
-				return '{ @double fn x => x * 2, @triple fn x => x * 3 }';
-			}
-		}
-		throw new Error(`File not found: ${filePath}`);
-	},
-	existsSync: (filePath: unknown) => {
-		if (typeof filePath === 'string') {
-			return filePath.includes('stdlib.noo') || 
-				   filePath.includes('math_functions.noo') || 
-				   filePath.includes('logger.noo') ||
-				   filePath.includes('pure_math.noo');
-		}
-		return false;
-	},
-};
-
 // TDD: Test 1 - Import should have proper type inference
 test('import should infer correct module type for math functions', () => {
-	const code = 'math = import "math_functions"';
+	const code = 'math = import "test/fixtures/test_math"';
 	const lexer = new Lexer(code);
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
@@ -54,7 +24,7 @@ test('import should infer correct module type for math functions', () => {
 
 // TDD: Test 2 - Accessing imported functions should work with proper types
 test('accessing functions from imported module should work', () => {
-	const code = 'math = import "math_functions"; @add math 2 3';
+	const code = 'math = import "test/fixtures/test_math"; @add math 2 3';
 	const lexer = new Lexer(code);
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);

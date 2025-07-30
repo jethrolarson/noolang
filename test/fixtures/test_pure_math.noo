@@ -1,0 +1,5 @@
+# Test pure math module
+{ 
+  @double fn x => x * 2, 
+  @triple fn x => x * 3 
+}

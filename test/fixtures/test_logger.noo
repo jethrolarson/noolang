@@ -1,0 +1,5 @@
+# Test logger module  
+{ 
+  @info fn msg => log msg, 
+  @error fn msg => log ("ERROR: " + msg) 
+}

@@ -1,0 +1,6 @@
+# Test math module
+{ 
+  @add fn x y => x + y, 
+  @multiply fn x y => x * y, 
+  @square fn x => x * x 
+}
