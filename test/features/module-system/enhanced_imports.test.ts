@@ -29,7 +29,7 @@ test('accessing functions from imported module should work', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	
-	const evaluator = new Evaluator({ fs: mockFs as any });
+	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 	
 	assert.equal(result.finalResult, { tag: 'number', value: 5 });
@@ -48,7 +48,7 @@ test('multiple function access from same module should work', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	
-	const evaluator = new Evaluator({ fs: mockFs as any });
+	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 	
 	// Should return tuple with results
@@ -77,7 +77,7 @@ test('module type caching should work for repeated imports', () => {
 	assert.ok(typedProgram.finalType, 'Should successfully type check with cached imports');
 	
 	// Evaluation should work correctly
-	const evaluator = new Evaluator({ fs: mockFs as any });
+	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 	
 	assert.equal(result.finalResult.tag, 'tuple');
@@ -123,7 +123,7 @@ test('pipeline syntax with imported functions should work', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	
-	const evaluator = new Evaluator({ fs: mockFs as any });
+	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 	
 	assert.equal(result.finalResult, { tag: 'number', value: 25 });
@@ -136,7 +136,7 @@ test('nested function calls with imports should work', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	
-	const evaluator = new Evaluator({ fs: mockFs as any });
+	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 	
 	assert.equal(result.finalResult, { tag: 'number', value: 7 }); // 1 + (2 * 3)
