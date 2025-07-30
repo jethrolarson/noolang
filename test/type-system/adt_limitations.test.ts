@@ -1,10 +1,9 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../src/lexer/lexer';
 import { parse } from '../../src/parser/parser';
 import { typeAndDecorate } from '../../src/typer';
 import { Evaluator } from '../../src/evaluator/evaluator';
 import { typeToString } from '../../src/typer/helpers';
+import { describe, test, expect } from 'bun:test';
 
 // Helper function to run Noolang code and get both value and type
 const runNoolang = (code: string) => {
@@ -44,7 +43,7 @@ test.skip('should now work with list_map and multiple ADTs', () => {
         color_numbers
       `);
 
-	assert.equal(colorResult.finalValue, {
+	expect(colorResult.finalValue).toEqual({
 		tag: 'list',
 		values: [
 			{ tag: 'number', value: 1 },
@@ -62,7 +61,7 @@ test.skip('should now work with list_map and multiple ADTs', () => {
         areas
       `);
 
-	assert.equal(shapeResult.finalValue, {
+	expect(shapeResult.finalValue).toEqual({
 		tag: 'list',
 		values: [
 			{ tag: 'number', value: 27 },
@@ -81,7 +80,7 @@ test.skip('should work when ADTs are used in separate programs - TODO: Fix type 
         color_numbers
       `);
 
-	assert.equal(colorResult.finalValue, {
+	expect(colorResult.finalValue).toEqual({
 		tag: 'list',
 		values: [
 			{ tag: 'number', value: 1 },
@@ -98,7 +97,7 @@ test.skip('should work when ADTs are used in separate programs - TODO: Fix type 
         areas
       `);
 
-	assert.equal(shapeResult.finalValue, {
+	expect(shapeResult.finalValue).toEqual({
 		tag: 'list',
 		values: [
 			{ tag: 'number', value: 27 },
@@ -119,7 +118,7 @@ test.skip('should work when ADTs are used sequentially without list_map (require
         { @color color_result, @shape shape_result }
       `);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'record',
 		fields: {
 			color: { tag: 'number', value: 1 },
@@ -132,7 +131,7 @@ test.skip('should demonstrate that the type unification issue is now fixed - TOD
 	// The issue was in the type system when it tried to unify
 	// type variables that had been associated with different ADT types
 	// This is now fixed with proper let-polymorphism for list_map
-	assert.ok(() =>
+	expect(() =>
 		runNoolang(`
         type Color = Red | Green | Blue;
         type Shape a = Circle a | Rectangle a a | Triangle a a a;
@@ -146,8 +145,7 @@ test.skip('should demonstrate that the type unification issue is now fixed - TOD
         color_numbers = list_map color_to_number colors;
         areas = list_map calculate_area shapes;
         color_numbers
-      `)
-	);
+      `)).toBeTruthy();
 });
 
 test('should work with separate type definitions', () => {
@@ -159,7 +157,7 @@ test('should work with separate type definitions', () => {
         list_map color_to_number colors
       `);
 
-	assert.equal(result1.finalValue, {
+	expect(result1.finalValue).toEqual({
 		tag: 'list',
 		values: [
 			{ tag: 'number', value: 1 },
@@ -187,7 +185,7 @@ test.skip('should work with manual iteration instead of list_map (requires Phase
         { @colors [color1, color2, color3], @shapes [shape1, shape2] }
       `);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'record',
 		fields: {
 			colors: {
@@ -209,4 +207,3 @@ test.skip('should work with manual iteration instead of list_map (requires Phase
 	});
 });
 
-test.run();

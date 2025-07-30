@@ -1,10 +1,9 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../../src/lexer/lexer';
 import { parse } from '../../../src/parser/parser';
 import { Evaluator } from '../../../src/evaluator/evaluator';
 import { typeAndDecorate } from '../../../src/typer';
 import { Value } from '../../../src/evaluator/evaluator';
+import { describe, test, expect } from 'bun:test';
 
 let evaluator: Evaluator;
 
@@ -60,13 +59,13 @@ function unwrapValue(val: Value): any {
 test('Dollar Operator ($) - Basic Function Application - simple function application', () => {
 	evaluator = new Evaluator();
 	const result = runCode('(fn x => x * 2) $ 5');
-	assert.equal(unwrapValue(result.finalResult), 10);
+	expect(unwrapValue(result.finalResult)).toEqual(10);
 });
 
 test('Dollar Operator ($) - Basic Function Application - curried function application', () => {
 	evaluator = new Evaluator();
 	const result = runCode('sum = fn x y => x + y; (sum $ 3) $ 5');
-	assert.equal(unwrapValue(result.finalResult), 8);
+	expect(unwrapValue(result.finalResult)).toEqual(8);
 });
 
 test('Dollar Operator ($) - Basic Function Application - multiple arguments', () => {
@@ -74,7 +73,7 @@ test('Dollar Operator ($) - Basic Function Application - multiple arguments', ()
 	const result = runCode(
 		'mul = fn x y z => x * y * z; ((mul $ 2) $ 3) $ 4'
 	);
-	assert.equal(unwrapValue(result.finalResult), 24);
+	expect(unwrapValue(result.finalResult)).toEqual(24);
 });
 
 test('Dollar Operator ($) - Right Associativity - f $ g $ h should parse as f $ (g $ h)', () => {
@@ -85,7 +84,7 @@ test('Dollar Operator ($) - Right Associativity - f $ g $ h should parse as f $ 
 		'const = fn x y => x; f = fn x => x + 1; (const $ f $ 5) 999'
 	);
 	// const gets f(5) = 6, so const $ f $ 5 = const 6, which when applied to 999 returns 6
-	assert.equal(unwrapValue(result.finalResult), 6);
+	expect(unwrapValue(result.finalResult)).toEqual(6);
 });
 
 test('Dollar Operator ($) - Right Associativity - right associativity with arithmetic', () => {
@@ -101,25 +100,25 @@ test('Dollar Operator ($) - Right Associativity - right associativity with arith
 	const result3 = runCode(
 		'const = fn x y => x; sum = fn x y => x + y; ((const $ (sum $ 1)) $ 99) 7'
 	);
-	assert.equal(unwrapValue(result3.finalResult), 8); // (add $ 1) 7 = 1 + 7 = 8
+	expect(unwrapValue(result3.finalResult)).toEqual(8); // (add $ 1) 7 = 1 + 7 = 8
 
 	// Better test: proper right associativity with valid functions
 	const result4 = runCode(
 		'const = fn x y => x; id = fn x => x; (const $ id $ 99) 123'
 	);
-	assert.equal(unwrapValue(result4.finalResult), 99); // const gets (id 99) = 99, so const 99 123 = 99
+	expect(unwrapValue(result4.finalResult)).toEqual(99); // const gets (id 99) = 99, so const 99 123 = 99
 });
 
 test('Dollar Operator ($) - Precedence with Other Operators - $ has lower precedence than |', () => {
 	evaluator = new Evaluator();
 	const result = runCode('sum = fn x y => x + y; [1, 2] | list_map $ sum 1');
-	assert.equal(unwrapValue(result.finalResult), [2, 3]);
+	expect(unwrapValue(result.finalResult)).toEqual([2, 3]);
 });
 
 test('Dollar Operator ($) - Precedence with Other Operators - $ has lower precedence than function application', () => {
 	evaluator = new Evaluator();
 	const result = runCode('sum = fn x y => x + y; list_map (sum 1) $ [1, 2, 3]');
-	assert.equal(unwrapValue(result.finalResult), [2, 3, 4]);
+	expect(unwrapValue(result.finalResult)).toEqual([2, 3, 4]);
 });
 
 test('Dollar Operator ($) - Precedence with Other Operators - $ works with complex expressions', () => {
@@ -127,26 +126,26 @@ test('Dollar Operator ($) - Precedence with Other Operators - $ works with compl
 	const result = runCode(
 		'list_map (fn x => x * 2) $ filter (fn x => x > 5) $ [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]'
 	);
-	assert.equal(unwrapValue(result.finalResult), [12, 14, 16, 18, 20]);
+	expect(unwrapValue(result.finalResult)).toEqual([12, 14, 16, 18, 20]);
 });
 
 test('Dollar Operator ($) - Type Checking - $ with built-in functions type checks correctly', () => {
 	evaluator = new Evaluator();
 	// Just verify it doesn't throw type errors
-	assert.not.throws(() => {
+	expect(() => {
 		runCode(
 			'sum = fn x y => x + y; result = list_map $ sum 1; result [1, 2, 3]'
 		);
-	});
+	}).not.toThrow();
 });
 
 test('Dollar Operator ($) - Type Checking - $ with user-defined functions type checks correctly', () => {
 	evaluator = new Evaluator();
-	assert.not.throws(() => {
+	expect(() => {
 		runCode(
 			'sum = fn x y => x + y; mylist_map = fn f list => list_map f list; result = mylist_map $ sum 1; result [1, 2, 3]'
 		);
-	});
+	}).not.toThrow();
 });
 
 test('Dollar Operator ($) - Type Checking - $ creates partial application correctly', () => {
@@ -154,13 +153,13 @@ test('Dollar Operator ($) - Type Checking - $ creates partial application correc
 	const result = runCode(
 		'addThree = fn x y z => x + y + z; partialAdd = addThree $ 1; partialAdd 2 3'
 	);
-	assert.equal(unwrapValue(result.finalResult), 6);
+	expect(unwrapValue(result.finalResult)).toEqual(6);
 });
 
 test('Dollar Operator ($) - Integration with Other Features - $ with pipeline operators', () => {
 	evaluator = new Evaluator();
 	const result = runCode('sum = fn x y => x + y; [1, 2, 3] | list_map $ sum 10');
-	assert.equal(unwrapValue(result.finalResult), [11, 12, 13]);
+	expect(unwrapValue(result.finalResult)).toEqual([11, 12, 13]);
 });
 
 test('Dollar Operator ($) - Integration with Other Features - $ with records and accessors', () => {
@@ -168,7 +167,7 @@ test('Dollar Operator ($) - Integration with Other Features - $ with records and
 	const result = runCode(
 		'person = { @name "Alice", @age 30 }; f = fn x => x; f $ person | @name'
 	);
-	assert.equal(unwrapValue(result.finalResult), 'Alice');
+	expect(unwrapValue(result.finalResult)).toEqual('Alice');
 });
 
 test('Dollar Operator ($) - Integration with Other Features - $ with higher-order functions', () => {
@@ -176,13 +175,13 @@ test('Dollar Operator ($) - Integration with Other Features - $ with higher-orde
 	const result = runCode(
 		'compose = fn f g => fn x => f (g x); add1 = fn x => x + 1; mul2 = fn x => x * 2; ((compose $ add1) $ mul2) 5'
 	);
-	assert.equal(unwrapValue(result.finalResult), 11); // add1(mul2(5)) = add1(10) = 11
+	expect(unwrapValue(result.finalResult)).toEqual(11); // add1(mul2(5)) = add1(10) = 11
 });
 
 test('Dollar Operator ($) - Integration with Other Features - $ with constraint functions', () => {
 	evaluator = new Evaluator();
 	const result = runCode('(filter $ (fn x => x > 3)) $ [1, 2, 3, 4, 5]');
-	assert.equal(unwrapValue(result.finalResult), [4, 5]);
+	expect(unwrapValue(result.finalResult)).toEqual([4, 5]);
 });
 
 test('Dollar Operator ($) - Complex Chaining - deep $ chaining', () => {
@@ -190,7 +189,7 @@ test('Dollar Operator ($) - Complex Chaining - deep $ chaining', () => {
 	const result = runCode(
 		'f = fn a b c d => a + b + c + d; (((f $ 1) $ 2) $ 3) $ 4'
 	);
-	assert.equal(unwrapValue(result.finalResult), 10);
+	expect(unwrapValue(result.finalResult)).toEqual(10);
 });
 
 test('Dollar Operator ($) - Complex Chaining - $ with mixed operators', () => {
@@ -198,7 +197,7 @@ test('Dollar Operator ($) - Complex Chaining - $ with mixed operators', () => {
 	const result = runCode(
 		'sum = fn x y => x + y; opt = [10] | head; match opt with (Some x => (sum $ x) $ 5; None => 0)'
 	);
-	assert.equal(unwrapValue(result.finalResult), 15);
+	expect(unwrapValue(result.finalResult)).toEqual(15);
 });
 
 test('Dollar Operator ($) - Complex Chaining - $ in complex data flow', () => {
@@ -209,23 +208,23 @@ test('Dollar Operator ($) - Complex Chaining - $ in complex data flow', () => {
         data = [1, 2, 3];
         data | process $ transform
       `);
-	assert.equal(unwrapValue(result.finalResult), [3, 5, 7]);
+	expect(unwrapValue(result.finalResult)).toEqual([3, 5, 7]);
 });
 
 test('Dollar Operator ($) - Error Handling - $ with non-function should error', () => {
 	evaluator = new Evaluator();
-	assert.throws(() => {
+	expect(() => {
 		runCode('5 $ 3');
-	});
+	}).toThrow();
 });
 
 test('Dollar Operator ($) - Error Handling - $ with wrong arity should error appropriately', () => {
 	evaluator = new Evaluator();
 	// This should work - partial application
-	assert.not.throws(() => {
+	expect(() => {
 		const result = runCode('sum = fn x y => x + y; sum $ 1');
 		// This should return a function, not throw
-	});
+	}).not.toThrow();
 });
 
 test('Dollar Operator ($) - Trait Function Application - should work with built-in trait functions', () => {
@@ -237,7 +236,7 @@ test('Dollar Operator ($) - Trait Function Application - should work with built-
 				result = mapInc $ [1, 2, 3]
 			`);
 	
-	assert.equal(unwrapValue(result.finalResult), [2, 3, 4]);
+	expect(unwrapValue(result.finalResult)).toEqual([2, 3, 4]);
 });
 
 test('Dollar Operator ($) - Trait Function Application - should match regular function application behavior', () => {
@@ -255,10 +254,7 @@ test('Dollar Operator ($) - Trait Function Application - should match regular fu
 			`);
 	
 	// Both should produce the same result
-	assert.equal(
-		unwrapValue(dollarResult.finalResult),
-		unwrapValue(directResult.finalResult)
-	);
+	expect(unwrapValue(dollarResult.finalResult)).toEqual(unwrapValue(directResult.finalResult));
 });
 
 test('Dollar Operator ($) - Trait Function Application - should handle partial application with dollar operator', () => {
@@ -271,7 +267,6 @@ test('Dollar Operator ($) - Trait Function Application - should handle partial a
 				result = sum5 $ 3
 			`);
 	
-	assert.equal(unwrapValue(result.finalResult), 8);
+	expect(unwrapValue(result.finalResult)).toEqual(8);
 });
 
-test.run();

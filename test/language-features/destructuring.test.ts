@@ -1,8 +1,7 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Evaluator, Value } from '../../src/evaluator/evaluator';
 import { parse } from '../../src/parser/parser';
 import { Lexer } from '../../src/lexer/lexer';
+import { describe, test, expect } from 'bun:test';
 
 function unwrapValue(val: Value): any {
 	if (val === null) return null;
@@ -39,7 +38,7 @@ test('should destructure simple tuple', () => {
 	
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(parsed);
-	assert.equal(unwrapValue(result.finalResult), 3);
+	expect(unwrapValue(result.finalResult)).toEqual(3);
 });
 
 test('should destructure record with shorthand', () => {
@@ -51,7 +50,7 @@ test('should destructure record with shorthand', () => {
 	
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(parsed);
-	assert.equal(unwrapValue(result.finalResult), "Bob is 25");
+	expect(unwrapValue(result.finalResult)).toEqual("Bob is 25");
 });
 
 test('should fail parsing for list destructuring', () => {
@@ -59,7 +58,6 @@ test('should fail parsing for list destructuring', () => {
 	const lexer = new Lexer(source);
 	const tokens = lexer.tokenize();
 	
-	assert.throws(() => parse(tokens), 'Should fail to parse list destructuring');
+	expect(() => parse(tokens)).toThrow();
 });
 
-test.run();

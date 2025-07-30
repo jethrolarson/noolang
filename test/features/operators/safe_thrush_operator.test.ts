@@ -1,10 +1,9 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Evaluator, Value } from '../../../src/evaluator/evaluator';
 import { Lexer } from '../../../src/lexer/lexer';
 import { parse } from '../../../src/parser/parser';
 import { typeAndDecorate, typeProgram } from '../../../src/typer';
 import { typeToString } from '../../../src/typer/helpers';
+import { describe, test, expect } from 'bun:test';
 
 function unwrapValue(val: Value): any {
 	if (val === null) return null;
@@ -63,7 +62,7 @@ test('should apply function to Some value', () => {
         add_ten = fn x => x + 10;
         Some 5 |? add_ten
       `);
-	assert.equal(result, {
+	expect(result).toEqual({
 		tag: 'constructor',
 		name: 'Some',
 		args: [{ tag: 'number', value: 15 }],
@@ -76,7 +75,7 @@ test('should short-circuit on None', () => {
         add_ten = fn x => x + 10;
         None |? add_ten
       `);
-	assert.equal(result, {
+	expect(result).toEqual({
 		tag: 'constructor',
 		name: 'None',
 		args: [],
@@ -86,7 +85,7 @@ test('should short-circuit on None', () => {
 test('should work with inline function', () => {
 	setup();
 	const result = evalExpression(`Some 10 |? (fn x => x * 2)`);
-	assert.equal(result, {
+	expect(result).toEqual({
 		tag: 'constructor',
 		name: 'Some',
 		args: [{ tag: 'number', value: 20 }],
@@ -100,7 +99,7 @@ test('should handle function returning Option (monadic bind)', () => {
         double_wrap = fn x => Some (x * 2);
         Some 5 |? double_wrap
       `);
-	assert.equal(result, {
+	expect(result).toEqual({
 		tag: 'constructor',
 		name: 'Some',
 		args: [{ tag: 'number', value: 10 }],
@@ -113,7 +112,7 @@ test('should return None when function returns None', () => {
         always_none = fn x => None;
         Some 10 |? always_none
       `);
-	assert.equal(result, {
+	expect(result).toEqual({
 		tag: 'constructor',
 		name: 'None',
 		args: [],
@@ -127,7 +126,7 @@ test('should not double-wrap Option results', () => {
         Some 5 |? wrap_some
       `);
 	// Result should be Some 6, not Some (Some 6)
-	assert.equal(result, {
+	expect(result).toEqual({
 		tag: 'constructor',
 		name: 'Some',
 		args: [{ tag: 'number', value: 6 }],
@@ -142,7 +141,7 @@ test('should support chaining multiple |? operations', () => {
         multiply_two = fn x => x * 2;
         Some 5 |? add_one |? multiply_two
       `);
-	assert.equal(result, {
+	expect(result).toEqual({
 		tag: 'constructor',
 		name: 'Some',
 		args: [{ tag: 'number', value: 12 }],
@@ -157,7 +156,7 @@ test('should short-circuit in chains when None encountered', () => {
         multiply_two = fn x => x * 2;
         Some 5 |? add_one |? to_none |? multiply_two
       `);
-	assert.equal(result, {
+	expect(result).toEqual({
 		tag: 'constructor',
 		name: 'None',
 		args: [],
@@ -171,7 +170,7 @@ test('should work with mixed regular and Option-returning functions', () => {
         safe_wrap = fn x => Some (x * 2);
         Some 5 |? add_one |? safe_wrap
       `);
-	assert.equal(result, {
+	expect(result).toEqual({
 		tag: 'constructor',
 		name: 'Some',
 		args: [{ tag: 'number', value: 12 }],
@@ -185,7 +184,7 @@ test('should infer Option type for result', () => {
         add_ten = fn x => x + 10;
         Some 5 |? add_ten
       `);
-	assert.match(type, /Option/);
+	expect(type).toMatch(/Option/);
 });
 
 test('should handle None type correctly', () => {
@@ -194,15 +193,14 @@ test('should handle None type correctly', () => {
         add_ten = fn x => x + 10;
         None |? add_ten
       `);
-	assert.match(type, /Option/);
+	expect(type).toMatch(/Option/);
 });
 
 // Test suite: Error Cases
 test('should require right operand to be a function', () => {
 	setup();
-	assert.throws(() => {
+	expect(() => {
 		evalExpression(`Some 5 |? 10`);
-	});
+	}).toThrow();
 });
 
-test.run();

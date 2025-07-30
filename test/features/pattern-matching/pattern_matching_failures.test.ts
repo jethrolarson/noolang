@@ -2,9 +2,7 @@ import { Lexer } from '../../../src/lexer/lexer';
 import { parse } from '../../../src/parser/parser';
 import { typeAndDecorate } from '../../../src/typer';
 import { Evaluator, Value } from '../../../src/evaluator/evaluator';
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
-
+import { describe, test, expect } from 'bun:test';
 /**
  * PATTERN MATCHING FAILURES - TYPE SYSTEM LIMITATION
  *
@@ -78,7 +76,7 @@ test.skip('should handle parametric ADT pattern matching', () => {
       get_x origin
     `;
 	const result = runCode(code);
-	assert.is(unwrapValue(result.finalResult), 0);
+	expect(unwrapValue(result.finalResult)).toBe(0);
 });
 
 test.skip('should handle Option pattern matching in functions', () => {
@@ -92,7 +90,7 @@ test.skip('should handle Option pattern matching in functions', () => {
       handle_option (Some 21)
     `;
 	const result = runCode(code);
-	assert.is(unwrapValue(result.finalResult), 42);
+	expect(unwrapValue(result.finalResult)).toBe(42);
 });
 
 test.skip('should handle Result pattern matching', () => {
@@ -106,7 +104,7 @@ test.skip('should handle Result pattern matching', () => {
       handle_result (Ok 32)
     `;
 	const result = runCode(code);
-	assert.is(unwrapValue(result.finalResult), 42);
+	expect(unwrapValue(result.finalResult)).toBe(42);
 });
 
 test.skip('should handle complex Shape pattern matching', () => {
@@ -121,9 +119,8 @@ test.skip('should handle complex Shape pattern matching', () => {
       calculate_area (Circle 5)
     `;
 	const result = runCode(code);
-	assert.is(unwrapValue(result.finalResult), 75);
+	expect(unwrapValue(result.finalResult)).toBe(75);
 });
 
 
 
-test.run();

@@ -1,9 +1,8 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../src/lexer/lexer';
 import { parse } from '../../src/parser/parser';
 import { typeAndDecorate } from '../../src/typer';
 import { Evaluator, Value } from '../../src/evaluator/evaluator';
+import { describe, test, expect } from 'bun:test';
 
 function unwrapValue(val: Value): any {
 	if (val === null) return null;
@@ -52,8 +51,8 @@ test('should handle simple Option construction', () => {
 	const code = `Some 42`;
 	const result = runCode(code);
 	const unwrapped = unwrapValue(result.finalResult);
-	assert.is(unwrapped.name, 'Some');
-	assert.equal(unwrapped.args, [42]);
+	expect(unwrapped.name).toBe('Some');
+	expect(unwrapped.args).toEqual([42]);
 });
 
 test('should handle None construction', () => {
@@ -61,8 +60,8 @@ test('should handle None construction', () => {
 	const code = `None`;
 	const result = runCode(code);
 	const unwrapped = unwrapValue(result.finalResult);
-	assert.is(unwrapped.name, 'None');
-	assert.equal(unwrapped.args, []);
+	expect(unwrapped.name).toBe('None');
+	expect(unwrapped.args).toEqual([]);
 });
 
 test('should handle Option in conditional expressions', () => {
@@ -74,8 +73,8 @@ test('should handle Option in conditional expressions', () => {
     `;
 	const result = runCode(code);
 	const unwrapped = unwrapValue(result.finalResult);
-	assert.is(unwrapped.name, 'Some');
-	assert.equal(unwrapped.args, [42]);
+	expect(unwrapped.name).toBe('Some');
+	expect(unwrapped.args).toEqual([42]);
 });
 
 test('should handle Option function return types', () => {
@@ -86,8 +85,7 @@ test('should handle Option function return types', () => {
     `;
 	const result = runCode(code);
 	const unwrapped = unwrapValue(result.finalResult);
-	assert.is(unwrapped.name, 'Some');
-	assert.equal(unwrapped.args, [5]);
+	expect(unwrapped.name).toBe('Some');
+	expect(unwrapped.args).toEqual([5]);
 });
 
-test.run();

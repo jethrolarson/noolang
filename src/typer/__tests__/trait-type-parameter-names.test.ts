@@ -1,8 +1,7 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { typeProgram } from '../index';
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
+import { describe, test, expect } from 'bun:test';
 
 // Helper function to parse and type check a string
 const typeString = (input: string) => {
@@ -31,8 +30,8 @@ test('trait functions work with descriptive type parameter names', () => {
     const result = typeString(program);
     
     // Should return String
-    assert.equal(result.type.kind, 'primitive');
-    assert.equal(result.type.name, 'String');
+    expect(result.type.kind).toEqual('primitive');
+    expect(result.type.name).toEqual('String');
 });
 
 test('trait functions work with uppercase type parameter names', () => {
@@ -54,8 +53,8 @@ test('trait functions work with uppercase type parameter names', () => {
     const result = typeString(program);
     
     // Should return a constrained type with variant baseType (ContainerType a)
-    assert.equal(result.type.kind, 'constrained');
-    assert.equal(result.type.baseType.kind, 'variant');
+    expect(result.type.kind).toEqual('constrained');
+    expect(result.type.baseType.kind).toEqual('variant');
 });
 
 test('trait functions work with creative type parameter names', () => {
@@ -75,8 +74,8 @@ test('trait functions work with creative type parameter names', () => {
     const result = typeString(program);
     
     // Should return String
-    assert.equal(result.type.kind, 'primitive');
-    assert.equal(result.type.name, 'String');
+    expect(result.type.kind).toEqual('primitive');
+    expect(result.type.name).toEqual('String');
 });
 
 test('trait functions work with single uppercase letter (breaking the convention)', () => {
@@ -96,9 +95,9 @@ test('trait functions work with single uppercase letter (breaking the convention
     const result = typeString(program);
     
     // Should return List Float
-    assert.equal(result.type.kind, 'list');
-    assert.equal(result.type.element.kind, 'primitive');
-    assert.equal(result.type.element.name, 'Float');
+    expect(result.type.kind).toEqual('list');
+    expect(result.type.element.kind).toEqual('primitive');
+    expect(result.type.element.name).toEqual('Float');
 });
 
 test('trait functions work with multi-word type parameter names', () => {
@@ -118,8 +117,8 @@ test('trait functions work with multi-word type parameter names', () => {
     const result = typeString(program);
     
     // Should return String
-    assert.equal(result.type.kind, 'primitive');
-    assert.equal(result.type.name, 'String');
+    expect(result.type.kind).toEqual('primitive');
+    expect(result.type.name).toEqual('String');
 });
 
 test('concrete variant types are never treated as type parameters', () => {
@@ -139,8 +138,7 @@ test('concrete variant types are never treated as type parameters', () => {
     const result = typeString(program);
     
     // Should return Bool (variant type), not some freshened type variable
-    assert.equal(result.type.kind, 'variant');
-    assert.equal(result.type.name, 'Bool');
+    expect(result.type.kind).toEqual('variant');
+    expect(result.type.name).toEqual('Bool');
 });
 
-test.run();

@@ -1,10 +1,9 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../../src/lexer/lexer';
 import { parse } from '../../../src/parser/parser';
 import { Evaluator } from '../../../src/evaluator/evaluator';
 import { typeProgram } from '../../../src/typer';
 import type { MatchExpression } from '../../../src/ast';
+import { describe, test, expect } from 'bun:test';
 
 // Helper function for type-safe testing
 function assertMatchExpression(expr: any): MatchExpression {
@@ -35,18 +34,18 @@ test('Tuple Pattern Parsing - should parse simple tuple pattern', () => {
 	const lexer = new Lexer('match point with ( {x, y} => x + y; _ => 0 )');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	
 	const matchExpr = assertMatchExpression(program.statements[0]);
-	assert.is(matchExpr.cases.length, 2);
-	assert.is(matchExpr.cases[0].pattern.kind, 'tuple');
+	expect(matchExpr.cases.length).toBe(2);
+	expect(matchExpr.cases[0].pattern.kind).toBe('tuple');
 	
 	const tuplePattern = matchExpr.cases[0].pattern as any;
-	assert.is(tuplePattern.elements.length, 2);
-	assert.is(tuplePattern.elements[0].kind, 'variable');
-	assert.is(tuplePattern.elements[0].name, 'x');
-	assert.is(tuplePattern.elements[1].kind, 'variable');
-	assert.is(tuplePattern.elements[1].name, 'y');
+	expect(tuplePattern.elements.length).toBe(2);
+	expect(tuplePattern.elements[0].kind).toBe('variable');
+	expect(tuplePattern.elements[0].name).toBe('x');
+	expect(tuplePattern.elements[1].kind).toBe('variable');
+	expect(tuplePattern.elements[1].name).toBe('y');
 });
 
 test('Record Pattern Parsing - should parse simple record pattern', () => {
@@ -56,16 +55,16 @@ test('Record Pattern Parsing - should parse simple record pattern', () => {
 	
 	const matchExpr = assertMatchExpression(program.statements[0]);
 	const recordPattern = matchExpr.cases[0].pattern as any;
-	assert.is(recordPattern.kind, 'record');
-	assert.is(recordPattern.fields.length, 2);
+	expect(recordPattern.kind).toBe('record');
+	expect(recordPattern.fields.length).toBe(2);
 	
-	assert.is(recordPattern.fields[0].fieldName, 'name');
-	assert.is(recordPattern.fields[0].pattern.kind, 'variable');
-	assert.is(recordPattern.fields[0].pattern.name, 'n');
+	expect(recordPattern.fields[0].fieldName).toBe('name');
+	expect(recordPattern.fields[0].pattern.kind).toBe('variable');
+	expect(recordPattern.fields[0].pattern.name).toBe('n');
 	
-	assert.is(recordPattern.fields[1].fieldName, 'age');
-	assert.is(recordPattern.fields[1].pattern.kind, 'variable');
-	assert.is(recordPattern.fields[1].pattern.name, 'a');
+	expect(recordPattern.fields[1].fieldName).toBe('age');
+	expect(recordPattern.fields[1].pattern.kind).toBe('variable');
+	expect(recordPattern.fields[1].pattern.name).toBe('a');
 });
 
 // --- Evaluation Tests ---
@@ -78,7 +77,7 @@ test('Tuple Pattern Evaluation - should match and bind tuple elements', () => {
 			_ => 0
 		)
 	`);
-	assert.is(result.value, 30);
+	expect(result.value).toBe(30);
 });
 
 test('Tuple Pattern Evaluation - should match literal values in tuples', () => {
@@ -91,7 +90,7 @@ test('Tuple Pattern Evaluation - should match literal values in tuples', () => {
 			_ => "other"
 		)
 	`);
-	assert.is(result.value, 'origin');
+	expect(result.value).toBe('origin');
 });
 
 test('Record Pattern Evaluation - should match and bind record fields', () => {
@@ -102,7 +101,7 @@ test('Record Pattern Evaluation - should match and bind record fields', () => {
 			_ => "unknown"
 		)
 	`);
-	assert.is(result.value, 'Alice is 30');
+	expect(result.value).toBe('Alice is 30');
 });
 
 test('Record Pattern Evaluation - should match specific field values', () => {
@@ -114,7 +113,7 @@ test('Record Pattern Evaluation - should match specific field values', () => {
 			_ => "unknown role"
 		)
 	`);
-	assert.is(result.value, 'Administrator: Alice');
+	expect(result.value).toBe('Administrator: Alice');
 });
 
 test('Nested Pattern Evaluation - should handle nested tuple patterns', () => {
@@ -125,7 +124,7 @@ test('Nested Pattern Evaluation - should handle nested tuple patterns', () => {
 			_ => 0
 		)
 	`);
-	assert.is(result.value, 6);
+	expect(result.value).toBe(6);
 });
 
 test('Nested Pattern Evaluation - should handle nested record patterns', () => {
@@ -137,7 +136,7 @@ test('Nested Pattern Evaluation - should handle nested record patterns', () => {
 			_ => "unknown"
 		)
 	`);
-	assert.is(result.value, 'Alice is active');
+	expect(result.value).toBe('Alice is active');
 });
 
 test('Mixed ADT and Data Structure Patterns - should work with Option types', () => {
@@ -149,7 +148,7 @@ test('Mixed ADT and Data Structure Patterns - should work with Option types', ()
 			None => -1
 		)
 	`);
-	assert.is(result.value, 200);
+	expect(result.value).toBe(200);
 });
 
 test('Record Pattern Evaluation - should support partial field matching', () => {
@@ -161,7 +160,6 @@ test('Record Pattern Evaluation - should support partial field matching', () => 
 			_ => "No name"
 		)
 	`);
-	assert.is(result.value, 'User: Bob');
+	expect(result.value).toBe('User: Bob');
 });
 
-test.run();

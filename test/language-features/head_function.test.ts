@@ -1,9 +1,8 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../src/lexer/lexer';
 import { parse } from '../../src/parser/parser';
 import { typeAndDecorate } from '../../src/typer';
 import { Evaluator, type Value } from '../../src/evaluator/evaluator';
+import { describe, test, expect } from 'bun:test';
 
 function unwrapValue(val: Value): any {
 	if (val === null) return null;
@@ -56,8 +55,8 @@ test('should work with integer lists', () => {
 	const result = runCode(code);
 	// head now returns Some 1, so we check for the constructor
 	const finalResult = unwrapValue(result.finalResult);
-	assert.is(finalResult.name, 'Some');
-	assert.is(unwrapValue(finalResult.args[0]), 1);
+	expect(finalResult.name).toBe('Some');
+	expect(unwrapValue(finalResult.args[0])).toBe(1);
 });
 
 test('should work with string lists', () => {
@@ -69,8 +68,8 @@ test('should work with string lists', () => {
 	const result = runCode(code);
 	// head now returns Some "hello"
 	const finalResult = unwrapValue(result.finalResult);
-	assert.is(finalResult.name, 'Some');
-	assert.is(unwrapValue(finalResult.args[0]), 'hello');
+	expect(finalResult.name).toBe('Some');
+	expect(unwrapValue(finalResult.args[0])).toBe('hello');
 });
 
 test('should work with boolean lists', () => {
@@ -82,10 +81,10 @@ test('should work with boolean lists', () => {
 	const result = runCode(code);
 	// head now returns Some True
 	const finalResult = unwrapValue(result.finalResult);
-	assert.is(finalResult.name, 'Some');
+	expect(finalResult.name).toBe('Some');
 	const boolResult = finalResult.args[0];
 	// The Bool constructor gets unwrapped to JavaScript boolean
-	assert.is(boolResult, true);
+	expect(boolResult).toBe(true);
 });
 
 test('should work with nested lists', () => {
@@ -97,8 +96,7 @@ test('should work with nested lists', () => {
 	const result = runCode(code);
 	// head now returns Some [1, 2]
 	const finalResult = unwrapValue(result.finalResult);
-	assert.is(finalResult.name, 'Some');
-	assert.equal(unwrapValue(finalResult.args[0]), [1, 2]);
+	expect(finalResult.name).toBe('Some');
+	expect(unwrapValue(finalResult.args[0])).toEqual([1, 2]);
 });
 
-test.run();

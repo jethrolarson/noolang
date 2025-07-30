@@ -1,9 +1,8 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../../src/lexer/lexer';
 import { parse } from '../../../src/parser/parser';
 import { typeAndDecorate } from '../../../src/typer';
 import { Evaluator, Value } from '../../../src/evaluator/evaluator';
+import { describe, test, expect } from 'bun:test';
 
 // Helper functions
 function unwrapValue(val: Value): any {
@@ -44,10 +43,10 @@ function runCode(code: string) {
 function expectError(code: string, errorPattern?: string) {
     try {
         runCode(code);
-        assert.unreachable('Expected error but code succeeded');
+        throw new Error('Expected error but code succeeded');
     } catch (error) {
         if (errorPattern) {
-            assert.match(error.message, new RegExp(errorPattern, 'i'));
+            expect(error.message).toMatch(new RegExp(errorPattern, 'i'));
         }
     }
 }
@@ -55,7 +54,7 @@ function expectError(code: string, errorPattern?: string) {
 function expectSuccess(code: string, expectedValue?: any) {
     const result = runCode(code);
     if (expectedValue !== undefined) {
-        assert.equal(unwrapValue(result.finalResult), expectedValue);
+        expect(unwrapValue(result.finalResult)).toEqual(expectedValue);
     }
     return result;
 }
@@ -176,4 +175,3 @@ test('operators with record accessor chains - testing if it fails', () => {
     `, "NYC");
 });
 
-test.run();

@@ -1,9 +1,8 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { typeProgram } from '../index';
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
 import { resetUnificationCounters, getUnificationStats } from '../unify';
+import { describe, test, expect } from 'bun:test';
 
 // Helper function to parse and type check a string
 const typeString = (input: string) => {
@@ -28,17 +27,17 @@ test('arithmetic operations complete quickly', () => {
     const stats = getUnificationStats();
     
     // Should complete quickly
-    assert.ok(endTime - startTime < 500, `Type checking took ${endTime - startTime}ms, expected < 500ms`);
+    expect(endTime - startTime < 500).toBeTruthy();
     
     // Should not have excessive unification calls
     if (stats) {
-        assert.ok(stats.calls < 1000, `Used ${stats.calls} unification calls, expected < 1000`);
+        expect(stats.calls < 1000).toBeTruthy();
     }
     
     // Should return List Float
-    assert.equal(result.type.kind, 'list');
-    assert.equal(result.type.element.kind, 'primitive');
-    assert.equal(result.type.element.name, 'Float');
+    expect(result.type.kind).toEqual('list');
+    expect(result.type.element.kind).toEqual('primitive');
+    expect(result.type.element.name).toEqual('Float');
 });
 
 test('equality operations remain performant', () => {
@@ -56,17 +55,17 @@ test('equality operations remain performant', () => {
     const stats = getUnificationStats();
     
     // Should complete quickly
-    assert.ok(endTime - startTime < 800, `Type checking took ${endTime - startTime}ms, expected < 800ms`);
+    expect(endTime - startTime < 800).toBeTruthy();
     
     // Should not have excessive unification calls
     if (stats) {
-        assert.ok(stats.calls < 1500, `Used ${stats.calls} unification calls, expected < 1500`);
+        expect(stats.calls < 1500).toBeTruthy();
     }
     
     // Should return List Bool
-    assert.equal(result.type.kind, 'list');
-    assert.equal(result.type.element.kind, 'variant');
-    assert.equal(result.type.element.name, 'Bool');
+    expect(result.type.kind).toEqual('list');
+    expect(result.type.element.kind).toEqual('variant');
+    expect(result.type.element.name).toEqual('Bool');
 });
 
 test('nested function application performs well', () => {
@@ -85,16 +84,16 @@ test('nested function application performs well', () => {
     const stats = getUnificationStats();
     
     // Should complete quickly
-    assert.ok(endTime - startTime < 600, `Type checking took ${endTime - startTime}ms, expected < 600ms`);
+    expect(endTime - startTime < 600).toBeTruthy();
     
     // Should not have excessive unification calls
     if (stats) {
-        assert.ok(stats.calls < 1200, `Used ${stats.calls} unification calls, expected < 1200`);
+        expect(stats.calls < 1200).toBeTruthy();
     }
     
     // Should return Float
-    assert.equal(result.type.kind, 'primitive');
-    assert.equal(result.type.name, 'Float');
+    expect(result.type.kind).toEqual('primitive');
+    expect(result.type.name).toEqual('Float');
 });
 
 test('stdlib loading does not cause performance regression', () => {
@@ -108,12 +107,11 @@ test('stdlib loading does not cause performance regression', () => {
     const stats = getUnificationStats();
     
     // Should complete in reasonable time even with stdlib loading
-    assert.ok(endTime - startTime < 2000, `Type checking took ${endTime - startTime}ms, expected < 2000ms`);
+    expect(endTime - startTime < 2000).toBeTruthy();
     
     // Should return List Float
-    assert.equal(result.type.kind, 'list');
-    assert.equal(result.type.element.kind, 'primitive');
-    assert.equal(result.type.element.name, 'Float');
+    expect(result.type.kind).toEqual('list');
+    expect(result.type.element.kind).toEqual('primitive');
+    expect(result.type.element.name).toEqual('Float');
 });
 
-test.run();

@@ -1,10 +1,9 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
 import { typeProgram, createTypeState } from '..';
 import { typeToString } from '../helpers';
 import { initializeBuiltins } from '../builtins';
+import { describe, test, expect } from 'bun:test';
 
 // Helper function to parse a string into a program
 const parseProgram = (source: string) => {
@@ -19,11 +18,11 @@ test('Structural Constraints with `has` keyword - Basic Structural Constraints -
 			: a -> String given a has {@name String}
 	`);
 	const result = typeProgram(program);
-	assert.ok(result);
+	expect(result).toBeTruthy();
 	
 	// Function should have constraint in its type
 	const typeStr = typeToString(result.type, result.state.substitution);
-	assert.ok(typeStr.includes('String'));
+	expect(typeStr.includes('String')).toBeTruthy();
 });
 
 test('Structural Constraints with `has` keyword - Basic Structural Constraints - should support has constraint with multiple fields', () => {
@@ -32,7 +31,7 @@ test('Structural Constraints with `has` keyword - Basic Structural Constraints -
 			: a -> String given a has {@firstName String, @lastName String}
 	`);
 	const result = typeProgram(program);
-	assert.ok(result);
+	expect(result).toBeTruthy();
 });
 
 test('Structural Constraints with `has` keyword - Basic Structural Constraints - should work with record that has extra fields (duck typing)', () => {
@@ -42,7 +41,7 @@ test('Structural Constraints with `has` keyword - Basic Structural Constraints -
 	`);
 	const result = typeProgram(program);
 	const typeStr = typeToString(result.type, result.state.substitution);
-	assert.is(typeStr, 'String');
+	expect(typeStr).toBe('String');
 });
 
 test('Structural Constraints with `has` keyword - Constraint Validation - should reject record missing required field', () => {
@@ -51,7 +50,7 @@ test('Structural Constraints with `has` keyword - Constraint Validation - should
 		result = getName {@age 30}
 	`);
 	
-	assert.throws(() => typeProgram(program));
+	expect(() => typeProgram(program)).toThrow();
 });
 
 test('Structural Constraints with `has` keyword - Constraint Validation - should reject record with wrong field type', () => {
@@ -60,7 +59,7 @@ test('Structural Constraints with `has` keyword - Constraint Validation - should
 		result = getName {@name 42}
 	`);
 	
-	assert.throws(() => typeProgram(program));
+	expect(() => typeProgram(program)).toThrow();
 });
 
 test('Structural Constraints with `has` keyword - Constraint Validation - should validate multiple fields correctly', () => {
@@ -71,7 +70,7 @@ test('Structural Constraints with `has` keyword - Constraint Validation - should
 	`);
 	const result = typeProgram(program);
 	const typeStr = typeToString(result.type, result.state.substitution);
-	assert.is(typeStr, 'String');
+	expect(typeStr).toBe('String');
 });
 
 test('Structural Constraints with `has` keyword - Working Examples - should work with polymorphic field types', () => {
@@ -80,7 +79,7 @@ test('Structural Constraints with `has` keyword - Working Examples - should work
 			: a -> List b given a has {@items List b}
 	`);
 	const result = typeProgram(program);
-	assert.ok(result);
+	expect(result).toBeTruthy();
 });
 
 test('Structural Constraints with `has` keyword - Accessor Constraints (Automatic has constraints) - should automatically add has constraints to accessors', () => {
@@ -89,7 +88,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		result = getName {@name "Alice", @age 30}
 	`);
 	const result = typeProgram(program);
-	assert.ok(result);
+	expect(result).toBeTruthy();
 	// The accessor should work with records that have the required field
 });
 
@@ -99,7 +98,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		result = getName {@age 30}
 	`);
 	
-	assert.throws(() => typeProgram(program));
+	expect(() => typeProgram(program)).toThrow();
 });
 
 test('Structural Constraints with `has` keyword - Accessor Constraints (Automatic has constraints) - should work with accessor on different field types', () => {
@@ -108,7 +107,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		result = getAge {@age 30}
 	`);
 	const result = typeProgram(program);
-	assert.ok(result);
+	expect(result).toBeTruthy();
 	// The accessor should work with any field type
 });
 
@@ -121,7 +120,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		age = getAge person
 	`);
 	const result = typeProgram(program);
-	assert.ok(result);
+	expect(result).toBeTruthy();
 });
 
 test('Structural Constraints with `has` keyword - Accessor Constraints (Automatic has constraints) - should work with accessor composition', () => {
@@ -132,7 +131,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		result = getFullAddress {@address {@street "123 Main St", @city "NYC"}, @name "Alice"}
 	`);
 	const result = typeProgram(program);
-	assert.ok(result);
+	expect(result).toBeTruthy();
 	// Accessor composition should work correctly
 });
 
@@ -142,7 +141,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		result = greet {@name "Alice", @occupation "Engineer"}
 	`);
 	const result = typeProgram(program);
-	assert.ok(result);
+	expect(result).toBeTruthy();
 	// Accessors in function bodies should work correctly
 });
 
@@ -153,7 +152,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		result = getNames people
 	`);
 	const result = typeProgram(program);
-	assert.ok(result);
+	expect(result).toBeTruthy();
 	// Mapping accessors over lists should work
 });
 
@@ -163,7 +162,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		stringValue = getValue {@value "hello"}
 	`);
 	const result = typeProgram(program);
-	assert.ok(result);
+	expect(result).toBeTruthy();
 	// Accessor should work with polymorphic field types
 });
 
@@ -173,7 +172,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		result = getName 42
 	`);
 	
-	assert.throws(() => typeProgram(program));
+	expect(() => typeProgram(program)).toThrow();
 });
 
 test('Structural Constraints with `has` keyword - Accessor Constraints (Automatic has constraints) - should work with nested record access', () => {
@@ -187,7 +186,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		}
 	`);
 	const result = typeProgram(program);
-	assert.ok(result);
+	expect(result).toBeTruthy();
 	// Nested accessor chains should work
 });
 
@@ -199,8 +198,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		result = mapGetName people
 	`);
 	const result = typeProgram(program);
-	assert.ok(result);
+	expect(result).toBeTruthy();
 	// Partial application of accessors should work
 });
 
-test.run();

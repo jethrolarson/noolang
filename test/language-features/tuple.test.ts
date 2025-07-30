@@ -1,8 +1,7 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Evaluator, Value } from '../../src/evaluator/evaluator';
 import { parse } from '../../src/parser/parser';
 import { Lexer } from '../../src/lexer/lexer';
+import { describe, test, expect } from 'bun:test';
 
 function unwrapValue(val: Value): any {
 	if (val === null) return null;
@@ -41,32 +40,31 @@ const evaluateSource = (source: string) => {
 test('length of empty tuple', () => {
 	const source = 'tuple = {}; tupleLength tuple';
 	// { } is now unit, not an empty tuple, so this should throw an error
-	assert.throws(() => evaluateSource(source));
+	expect(() => evaluateSource(source)).toThrow();
 });
 
 test('length of singleton tuple', () => {
 	const source = 'tuple = { 1 }; tupleLength tuple';
 	const result = evaluateSource(source);
-	assert.is(unwrapValue(result.finalResult), 1);
+	expect(unwrapValue(result.finalResult)).toBe(1);
 });
 
 test('length of pair tuple', () => {
 	const source = 'tuple = { 1, 2 }; tupleLength tuple';
 	const result = evaluateSource(source);
-	assert.is(unwrapValue(result.finalResult), 2);
+	expect(unwrapValue(result.finalResult)).toBe(2);
 });
 
 // Test suite: tupleIsEmpty
 test('returns true for empty tuple', () => {
 	const source = 'tuple = {}; tupleIsEmpty tuple';
 	// { } is now unit, not an empty tuple, so this should throw an error
-	assert.throws(() => evaluateSource(source));
+	expect(() => evaluateSource(source)).toThrow();
 });
 
 test('returns false for non-empty tuple', () => {
 	const source = 'tuple = { 1, 2, 3 }; tupleIsEmpty tuple';
 	const result = evaluateSource(source);
-	assert.is(unwrapValue(result.finalResult), false);
+	expect(unwrapValue(result.finalResult)).toBe(false);
 });
 
-test.run();

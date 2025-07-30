@@ -1,10 +1,9 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
 import { typeAndDecorate } from '../decoration';
 import * as fs from 'fs';
 import * as path from 'path';
+import { describe, test, expect } from 'bun:test';
 
 test('LSP Regression Tests - should reproduce the exact LSP --types-file code path', () => {
   // Simulate exactly what the LSP does when calling --types-file
@@ -26,8 +25,8 @@ test('LSP Regression Tests - should reproduce the exact LSP --types-file code pa
   // This is where the error occurs - typeAndDecorate calls loadStdlib
   const { program: decoratedProgram, state } = typeAndDecorate(program);
   
-  assert.ok(decoratedProgram);
-  assert.ok(state);
+  expect(decoratedProgram).toBeTruthy();
+  expect(state).toBeTruthy();
 });
 
 test('LSP Regression Tests - should handle multiple calls to typeAndDecorate', () => {
@@ -48,7 +47,7 @@ test('LSP Regression Tests - should handle multiple calls to typeAndDecorate', (
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const { program: decoratedProgram } = typeAndDecorate(program);
-    assert.ok(decoratedProgram);
+    expect(decoratedProgram).toBeTruthy();
   }
 });
 
@@ -72,10 +71,10 @@ test('LSP Regression Tests - should handle concurrent typeAndDecorate calls', as
   });
 
   const results = await Promise.all(promises);
-  assert.is(results.length, 5);
+  expect(results.length).toBe(5);
   results.forEach(result => {
-    assert.ok(result.program);
-    assert.ok(result.state);
+    expect(result.program).toBeTruthy();
+    expect(result.state).toBeTruthy();
   });
 });
 
@@ -97,7 +96,7 @@ test('LSP Regression Tests - should handle typeAndDecorate with empty initial st
   
   // Call with undefined initial state (forces stdlib loading)
   const { program: decoratedProgram } = typeAndDecorate(program, undefined);
-  assert.ok(decoratedProgram);
+  expect(decoratedProgram).toBeTruthy();
 });
 
 test('LSP Regression Tests - should isolate stdlib loading error with specific line tracking', () => {
@@ -120,7 +119,7 @@ test('LSP Regression Tests - should isolate stdlib loading error with specific l
     // This should trigger the stdlib loading and potential error
     const { program: decoratedProgram } = typeAndDecorate(program);
     
-    assert.ok(decoratedProgram);
+    expect(decoratedProgram).toBeTruthy();
   } catch (error) {
     // If there IS an error, let's analyze it
     const errorMessage = (error as Error).message;
@@ -137,4 +136,3 @@ test('LSP Regression Tests - should isolate stdlib loading error with specific l
   }
 });
 
-test.run();

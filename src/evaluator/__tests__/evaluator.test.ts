@@ -1,10 +1,9 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
 import { typeAndDecorate } from '../../typer';
 import { Evaluator } from '../evaluator';
 import { Value } from '../evaluator';
+import { describe, test, expect } from 'bun:test';
 
 function unwrapValue(val: Value): any {
 	if (val === null) return null;
@@ -49,7 +48,7 @@ test('Evaluator - should set a field in a record using set', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.equal(unwrapValue(result.finalResult), { name: 'Alice', age: 31 });
+	expect(unwrapValue(result.finalResult)).toEqual({ name: 'Alice', age: 31 });
 });
 
 test('Evaluator - should add a new field to a record using set', () => {
@@ -60,7 +59,7 @@ test('Evaluator - should add a new field to a record using set', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.equal(unwrapValue(result.finalResult), { name: 'Alice', age: 42 });
+	expect(unwrapValue(result.finalResult)).toEqual({ name: 'Alice', age: 42 });
 });
 
 test('Evaluator - set should not mutate the original record', () => {
@@ -71,7 +70,7 @@ test('Evaluator - set should not mutate the original record', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.equal(unwrapValue(result.finalResult), { name: 'Alice', age: 30 });
+	expect(unwrapValue(result.finalResult)).toEqual({ name: 'Alice', age: 30 });
 });
 
 test('Evaluator - should evaluate number literals', () => {
@@ -81,8 +80,8 @@ test('Evaluator - should evaluate number literals', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 42);
-	assert.is(result.executionTrace.length, 1);
+	expect(unwrapValue(result.finalResult)).toBe(42);
+	expect(result.executionTrace.length).toBe(1);
 });
 
 test('Evaluator - should evaluate string literals', () => {
@@ -92,14 +91,14 @@ test('Evaluator - should evaluate string literals', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 'hello');
-	assert.is(result.executionTrace.length, 1);
+	expect(unwrapValue(result.finalResult)).toBe('hello');
+	expect(result.executionTrace.length).toBe(1);
 });
 
 test('Evaluator - should evaluate boolean literals', () => {
 	const result = runCode('True');
-	assert.is(unwrapValue(result.finalResult), true);
-	assert.is(result.executionTrace.length, 1);
+	expect(unwrapValue(result.finalResult)).toBe(true);
+	expect(result.executionTrace.length).toBe(1);
 });
 
 test('Evaluator - should evaluate arithmetic operations', () => {
@@ -109,8 +108,8 @@ test('Evaluator - should evaluate arithmetic operations', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 5);
-	assert.is(result.executionTrace.length, 1);
+	expect(unwrapValue(result.finalResult)).toBe(5);
+	expect(result.executionTrace.length).toBe(1);
 });
 
 test('Evaluator - should evaluate function definitions and applications', () => {
@@ -120,8 +119,8 @@ test('Evaluator - should evaluate function definitions and applications', () => 
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 3);
-	assert.is(result.executionTrace.length, 1);
+	expect(unwrapValue(result.finalResult)).toBe(3);
+	expect(result.executionTrace.length).toBe(1);
 });
 
 test('Evaluator - should evaluate list operations', () => {
@@ -132,9 +131,9 @@ test('Evaluator - should evaluate list operations', () => {
 	const result = evaluator.evaluateProgram(program);
 
 	const finalResult = unwrapValue(result.finalResult);
-	assert.is(finalResult.name, 'Some');
-	assert.is(unwrapValue(finalResult.args[0]), 1);
-	assert.is(result.executionTrace.length, 1);
+	expect(finalResult.name).toBe('Some');
+	expect(unwrapValue(finalResult.args[0])).toBe(1);
+	expect(result.executionTrace.length).toBe(1);
 });
 
 test('Evaluator - should evaluate map function', () => {
@@ -144,8 +143,8 @@ test('Evaluator - should evaluate map function', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.equal(unwrapValue(result.finalResult), [2, 4, 6]);
-	assert.is(result.executionTrace.length, 1);
+	expect(unwrapValue(result.finalResult)).toEqual([2, 4, 6]);
+	expect(result.executionTrace.length).toBe(1);
 });
 
 test('Evaluator - should evaluate filter function', () => {
@@ -154,8 +153,8 @@ test('Evaluator - should evaluate filter function', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.equal(unwrapValue(result.finalResult), [3, 4, 5]);
-	assert.is(result.executionTrace.length, 1);
+	expect(unwrapValue(result.finalResult)).toEqual([3, 4, 5]);
+	expect(result.executionTrace.length).toBe(1);
 });
 
 test('Evaluator - should evaluate reduce function', () => {
@@ -164,8 +163,8 @@ test('Evaluator - should evaluate reduce function', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.is(unwrapValue(result.finalResult), 15);
-	assert.is(result.executionTrace.length, 1);
+	expect(unwrapValue(result.finalResult)).toBe(15);
+	expect(result.executionTrace.length).toBe(1);
 });
 
 test('Evaluator - should evaluate length function', () => {
@@ -175,8 +174,8 @@ test('Evaluator - should evaluate length function', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 5);
-	assert.is(result.executionTrace.length, 1);
+	expect(unwrapValue(result.finalResult)).toBe(5);
+	expect(result.executionTrace.length).toBe(1);
 });
 
 test('Evaluator - should evaluate isEmpty function', () => {
@@ -186,8 +185,8 @@ test('Evaluator - should evaluate isEmpty function', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), false);
-	assert.is(result.executionTrace.length, 1);
+	expect(unwrapValue(result.finalResult)).toBe(false);
+	expect(result.executionTrace.length).toBe(1);
 });
 
 test('Evaluator - should evaluate append function', () => {
@@ -197,8 +196,8 @@ test('Evaluator - should evaluate append function', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.equal(unwrapValue(result.finalResult), [1, 2, 3, 4]);
-	assert.is(result.executionTrace.length, 1);
+	expect(unwrapValue(result.finalResult)).toEqual([1, 2, 3, 4]);
+	expect(result.executionTrace.length).toBe(1);
 });
 
 test('Evaluator - should evaluate math utility functions', () => {
@@ -207,8 +206,8 @@ test('Evaluator - should evaluate math utility functions', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.is(unwrapValue(result.finalResult), 3);
-	assert.is(result.executionTrace.length, 1);
+	expect(unwrapValue(result.finalResult)).toBe(3);
+	expect(result.executionTrace.length).toBe(1);
 });
 
 test('Evaluator - should evaluate string utility functions', () => {
@@ -218,20 +217,20 @@ test('Evaluator - should evaluate string utility functions', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), '42');
-	assert.is(result.executionTrace.length, 1);
+	expect(unwrapValue(result.finalResult)).toBe('42');
+	expect(result.executionTrace.length).toBe(1);
 });
 
 test('Evaluator - should evaluate if expressions', () => {
 	const result = runCode('if True then 1 else 2');
-	assert.is(unwrapValue(result.finalResult), 1);
-	assert.is(result.executionTrace.length, 1);
+	expect(unwrapValue(result.finalResult)).toBe(1);
+	expect(result.executionTrace.length).toBe(1);
 });
 
 test('Evaluator - should evaluate if expressions with false condition', () => {
 	const result = runCode('if False then 1 else 2');
-	assert.is(unwrapValue(result.finalResult), 2);
-	assert.is(result.executionTrace.length, 1);
+	expect(unwrapValue(result.finalResult)).toBe(2);
+	expect(result.executionTrace.length).toBe(1);
 });
 
 test('Evaluator - should evaluate comparison operations', () => {
@@ -241,8 +240,8 @@ test('Evaluator - should evaluate comparison operations', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), true);
-	assert.is(result.executionTrace.length, 1);
+	expect(unwrapValue(result.finalResult)).toBe(true);
+	expect(result.executionTrace.length).toBe(1);
 });
 
 test('Evaluator - should handle undefined variables', () => {
@@ -251,9 +250,9 @@ test('Evaluator - should handle undefined variables', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 
-	assert.throws(() => {
+	expect(() => {
 		evaluator.evaluateProgram(program);
-	}, /Undefined variable: undefined_var/);
+	}).toThrow();
 });
 
 test('Evaluator - should handle type errors in arithmetic', () => {
@@ -262,9 +261,9 @@ test('Evaluator - should handle type errors in arithmetic', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 
-	assert.throws(() => {
+	expect(() => {
 		evaluator.evaluateProgram(program);
-	}, /Cannot add string and number/);
+	}).toThrow();
 });
 
 test('Evaluator - Recursion - should handle factorial recursion', () => {
@@ -278,7 +277,7 @@ test('Evaluator - Recursion - should handle factorial recursion', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 120);
+	expect(unwrapValue(result.finalResult)).toBe(120);
 });
 
 test('Evaluator - Recursion - should handle factorial with 0', () => {
@@ -292,7 +291,7 @@ test('Evaluator - Recursion - should handle factorial with 0', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 1);
+	expect(unwrapValue(result.finalResult)).toBe(1);
 });
 
 test('Evaluator - Recursion - should handle factorial with 1', () => {
@@ -306,7 +305,7 @@ test('Evaluator - Recursion - should handle factorial with 1', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 1);
+	expect(unwrapValue(result.finalResult)).toBe(1);
 });
 
 test('Evaluator - Recursion - should handle fibonacci recursion', () => {
@@ -320,7 +319,7 @@ test('Evaluator - Recursion - should handle fibonacci recursion', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 55);
+	expect(unwrapValue(result.finalResult)).toBe(55);
 });
 
 test('Evaluator - Recursion - should handle fibonacci with small values', () => {
@@ -334,7 +333,7 @@ test('Evaluator - Recursion - should handle fibonacci with small values', () => 
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 2);
+	expect(unwrapValue(result.finalResult)).toBe(2);
 });
 
 test('Evaluator - Recursion - should handle recursive list length', () => {
@@ -348,7 +347,7 @@ test('Evaluator - Recursion - should handle recursive list length', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 5);
+	expect(unwrapValue(result.finalResult)).toBe(5);
 });
 
 test('Evaluator - Recursion - should handle recursive list sum', () => {
@@ -364,7 +363,7 @@ test('Evaluator - Recursion - should handle recursive list sum', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 15);
+	expect(unwrapValue(result.finalResult)).toBe(15);
 });
 
 test('Evaluator - Recursion - should handle recursive list reverse', () => {
@@ -380,7 +379,7 @@ test('Evaluator - Recursion - should handle recursive list reverse', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.equal(unwrapValue(result.finalResult), [3, 2, 1]);
+	expect(unwrapValue(result.finalResult)).toEqual([3, 2, 1]);
 });
 
 test('Evaluator - Recursion - should handle recursive power function', () => {
@@ -394,7 +393,7 @@ test('Evaluator - Recursion - should handle recursive power function', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 256);
+	expect(unwrapValue(result.finalResult)).toBe(256);
 });
 
 test('Evaluator - Recursion - should handle recursive gcd function', () => {
@@ -411,7 +410,7 @@ test('Evaluator - Recursion - should handle recursive gcd function', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 6);
+	expect(unwrapValue(result.finalResult)).toBe(6);
 });
 
 test('Evaluator - Recursion - should handle recursive function with multiple parameters', () => {
@@ -425,7 +424,7 @@ test('Evaluator - Recursion - should handle recursive function with multiple par
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 12);
+	expect(unwrapValue(result.finalResult)).toBe(12);
 });
 
 test('Evaluator - Recursion - should handle recursive function in sequence', () => {
@@ -441,7 +440,7 @@ test('Evaluator - Recursion - should handle recursive function in sequence', () 
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 30);
+	expect(unwrapValue(result.finalResult)).toBe(30);
 });
 
 test('Evaluator - should evaluate top-level definitions and use them', () => {
@@ -450,7 +449,7 @@ test('Evaluator - should evaluate top-level definitions and use them', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.is(unwrapValue(result.finalResult), 5);
+	expect(unwrapValue(result.finalResult)).toBe(5);
 });
 
 test('Evaluator - should evaluate basic import', () => {
@@ -459,7 +458,7 @@ test('Evaluator - should evaluate basic import', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.is(unwrapValue(result.finalResult), 42);
+	expect(unwrapValue(result.finalResult)).toBe(42);
 });
 
 test('Evaluator - should evaluate single-field record', () => {
@@ -468,7 +467,7 @@ test('Evaluator - should evaluate single-field record', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.equal(unwrapValue(result.finalResult), { name: 'Alice', age: 30 });
+	expect(unwrapValue(result.finalResult)).toEqual({ name: 'Alice', age: 30 });
 });
 
 test('Evaluator - should evaluate multi-field record (semicolon separated)', () => {
@@ -477,7 +476,7 @@ test('Evaluator - should evaluate multi-field record (semicolon separated)', () 
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.equal(unwrapValue(result.finalResult), { name: 'Alice', age: 30 });
+	expect(unwrapValue(result.finalResult)).toEqual({ name: 'Alice', age: 30 });
 });
 
 test('Evaluator - should evaluate accessor on record', () => {
@@ -486,7 +485,7 @@ test('Evaluator - should evaluate accessor on record', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.is(unwrapValue(result.finalResult), 'Alice');
+	expect(unwrapValue(result.finalResult)).toBe('Alice');
 });
 
 test('Evaluator - definition with sequence on right side using parentheses', () => {
@@ -495,7 +494,7 @@ test('Evaluator - definition with sequence on right side using parentheses', () 
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.is(unwrapValue(result.finalResult), 2);
+	expect(unwrapValue(result.finalResult)).toBe(2);
 });
 
 test('Evaluator - multiple definitions sequenced', () => {
@@ -504,7 +503,7 @@ test('Evaluator - multiple definitions sequenced', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.is(unwrapValue(result.finalResult), 2);
+	expect(unwrapValue(result.finalResult)).toBe(2);
 });
 
 test('Evaluator - should evaluate function with unit parameter', () => {
@@ -513,7 +512,7 @@ test('Evaluator - should evaluate function with unit parameter', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.is(unwrapValue(result.finalResult), 'joe');
+	expect(unwrapValue(result.finalResult)).toBe('joe');
 });
 
 test('Evaluator - should evaluate thrush operator', () => {
@@ -522,7 +521,7 @@ test('Evaluator - should evaluate thrush operator', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.is(unwrapValue(result.finalResult), 11);
+	expect(unwrapValue(result.finalResult)).toBe(11);
 });
 
 test('Evaluator - should evaluate chained thrush operators', () => {
@@ -533,7 +532,7 @@ test('Evaluator - should evaluate chained thrush operators', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.equal(unwrapValue(result.finalResult), [4, 9, 16]);
+	expect(unwrapValue(result.finalResult)).toEqual([4, 9, 16]);
 });
 
 test('Evaluator - Top-level sequence evaluation - multiple definitions and final expression', () => {
@@ -542,7 +541,7 @@ test('Evaluator - Top-level sequence evaluation - multiple definitions and final
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.is(unwrapValue(result.finalResult), 3);
+	expect(unwrapValue(result.finalResult)).toBe(3);
 });
 
 test('Evaluator - Top-level sequence evaluation - multiple definitions and final record', () => {
@@ -558,10 +557,10 @@ test('Evaluator - Top-level sequence evaluation - multiple definitions and final
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 	const mathRecord = unwrapValue(result.finalResult) as any;
-	assert.ok(mathRecord.add);
-	assert.ok(mathRecord.sub);
-	assert.is(mathRecord.add.tag, 'function');
-	assert.is(mathRecord.sub.tag, 'function');
+	expect(mathRecord.add).toBeTruthy();
+	expect(mathRecord.sub).toBeTruthy();
+	expect(mathRecord.add.tag).toBe('function');
+	expect(mathRecord.sub.tag).toBe('function');
 });
 
 test('Evaluator - Top-level sequence evaluation - sequence with trailing semicolon', () => {
@@ -570,7 +569,7 @@ test('Evaluator - Top-level sequence evaluation - sequence with trailing semicol
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.is(unwrapValue(result.finalResult), 3);
+	expect(unwrapValue(result.finalResult)).toBe(3);
 });
 
 test('Evaluator - duck-typed record accessor chain', () => {
@@ -583,7 +582,7 @@ test('Evaluator - duck-typed record accessor chain', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.equal(result.finalResult, { tag: 'number', value: 1 });
+	expect(result.finalResult).toEqual({ tag: 'number', value: 1 });
 });
 
 function evalNoo(src: string) {
@@ -595,31 +594,25 @@ function evalNoo(src: string) {
 }
 
 test('Evaluator - Semicolon sequencing - returns only the rightmost value', () => {
-	assert.is(unwrapValue(evalNoo('1; 2; 3')), 3);
-	assert.is(unwrapValue(evalNoo('42; "hello"')), 'hello');
+	expect(unwrapValue(evalNoo('1; 2; 3'))).toBe(3);
+	expect(unwrapValue(evalNoo('42; "hello"'))).toBe('hello');
 });
 
 test('Evaluator - Semicolon sequencing - if-expression in sequence', () => {
-	assert.is(unwrapValue(evalNoo('1; if 2 < 3 then 4 else 5')), 4);
-	assert.is(unwrapValue(evalNoo('1; if 2 > 3 then 4 else 5')), 5);
-	assert.is(unwrapValue(evalNoo('1; if 2 < 3 then 4 else 5; 99')), 99);
-	assert.is(unwrapValue(evalNoo('if 2 < 3 then 4 else 5; 42')), 42);
+	expect(unwrapValue(evalNoo('1; if 2 < 3 then 4 else 5'))).toBe(4);
+	expect(unwrapValue(evalNoo('1; if 2 > 3 then 4 else 5'))).toBe(5);
+	expect(unwrapValue(evalNoo('1; if 2 < 3 then 4 else 5; 99'))).toBe(99);
+	expect(unwrapValue(evalNoo('if 2 < 3 then 4 else 5; 42'))).toBe(42);
 });
 
 test('Evaluator - Semicolon sequencing - definitions in sequence', () => {
-	assert.is(unwrapValue(evalNoo('x = 10; x + 5')), 15);
-	assert.is(unwrapValue(evalNoo('a = 1; b = 2; a + b')), 3);
+	expect(unwrapValue(evalNoo('x = 10; x + 5'))).toBe(15);
+	expect(unwrapValue(evalNoo('a = 1; b = 2; a + b'))).toBe(3);
 });
 
 test('Evaluator - Semicolon sequencing - complex sequencing', () => {
-	assert.is(
-		unwrapValue(evalNoo('x = 1; if x == 1 then 100 else 200; x + 1')),
-		2
-	);
-	assert.is(
-		unwrapValue(evalNoo('x = 1; y = 2; if x < y then x else y; x + y')),
-		3
-	);
+	expect(unwrapValue(evalNoo('x = 1; if x == 1 then 100 else 200; x + 1'))).toBe(2);
+	expect(unwrapValue(evalNoo('x = 1; y = 2; if x < y then x else y; x + y'))).toBe(3);
 });
 
 function evalIfChain(x: number) {
@@ -632,19 +625,19 @@ function evalIfChain(x: number) {
 }
 
 test('Evaluator - If associativity and nesting - returns 0 for x == 0', () => {
-	assert.is(unwrapValue(evalIfChain(0)), 0);
+	expect(unwrapValue(evalIfChain(0))).toBe(0);
 });
 
 test('Evaluator - If associativity and nesting - returns 1 for x == 1', () => {
-	assert.is(unwrapValue(evalIfChain(1)), 1);
+	expect(unwrapValue(evalIfChain(1))).toBe(1);
 });
 
 test('Evaluator - If associativity and nesting - returns 2 for x == 2', () => {
-	assert.is(unwrapValue(evalIfChain(2)), 2);
+	expect(unwrapValue(evalIfChain(2))).toBe(2);
 });
 
 test('Evaluator - If associativity and nesting - returns 99 for x == 3', () => {
-	assert.is(unwrapValue(evalIfChain(3)), 99);
+	expect(unwrapValue(evalIfChain(3))).toBe(99);
 });
 
 test('Evaluator - Local Mutation - should allow defining and mutating a local variable', () => {
@@ -654,9 +647,9 @@ test('Evaluator - Local Mutation - should allow defining and mutating a local va
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.is(result.finalResult.tag, 'number');
+	expect(result.finalResult.tag).toBe('number');
 	if (result.finalResult.tag === 'number') {
-		assert.is(result.finalResult.value, 42);
+		expect(result.finalResult.value).toBe(42);
 	}
 });
 
@@ -667,9 +660,9 @@ test('Evaluator - Local Mutation - should not affect other variables or outer sc
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.is(result.finalResult.tag, 'number');
+	expect(result.finalResult.tag).toBe('number');
 	if (result.finalResult.tag === 'number') {
-		assert.is(result.finalResult.value, 5 + 99);
+		expect(result.finalResult.value).toBe(5 + 99);
 	}
 });
 
@@ -679,7 +672,7 @@ test('Evaluator - Local Mutation - should throw if mut! is used on non-mutable v
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
-	assert.throws(() => evaluator.evaluateProgram(program), /Cannot mutate non-mutable variable/);
+	expect(() => evaluator.evaluateProgram(program)).toThrow();
 });
 
 test('Evaluator - Local Mutation - should allow returning a mutable variable value (pass-by-value)', () => {
@@ -689,9 +682,9 @@ test('Evaluator - Local Mutation - should allow returning a mutable variable val
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
-	assert.is(result.finalResult.tag, 'number');
+	expect(result.finalResult.tag).toBe('number');
 	if (result.finalResult.tag === 'number') {
-		assert.is(result.finalResult.value, 8);
+		expect(result.finalResult.value).toBe(8);
 	}
 });
 
@@ -702,7 +695,7 @@ test('Evaluator - Additional Coverage - should handle wildcard pattern', () => {
           _ => "wildcard matched"
         )
       `);
-	assert.is(unwrapValue(result.finalResult), 'wildcard matched');
+	expect(unwrapValue(result.finalResult)).toBe('wildcard matched');
 });
 
 test('Evaluator - Additional Coverage - should handle variable pattern with binding', () => {
@@ -712,7 +705,7 @@ test('Evaluator - Additional Coverage - should handle variable pattern with bind
           x => x + 1
         )
       `);
-	assert.is(unwrapValue(result.finalResult), 124);
+	expect(unwrapValue(result.finalResult)).toBe(124);
 });
 
 test('Evaluator - Additional Coverage - should handle constructor pattern matching', () => {
@@ -724,63 +717,63 @@ test('Evaluator - Additional Coverage - should handle constructor pattern matchi
           B x => x
         )
       `);
-	assert.is(unwrapValue(result.finalResult), 42);
+	expect(unwrapValue(result.finalResult)).toBe(42);
 });
 
 test('Evaluator - Additional Coverage - should throw error when no pattern matches', () => {
-	assert.throws(() =>
+	expect(() =>
 		runCode(`
         type Color = Red | Blue;
         value = Red;
         match value with (
           Blue => "blue"
         )
-      `), /No pattern matched in match expression/);
+      `)).toThrow();
 });
 
 test('Evaluator - Additional Coverage - should convert number to string', () => {
 	const result = runCode('toString 42');
-	assert.is(unwrapValue(result.finalResult), '42');
+	expect(unwrapValue(result.finalResult)).toBe('42');
 });
 
 test('Evaluator - Additional Coverage - should convert string to string with quotes', () => {
 	const result = runCode('toString "hello"');
-	assert.is(unwrapValue(result.finalResult), '"hello"');
+	expect(unwrapValue(result.finalResult)).toBe('"hello"');
 });
 
 test('Evaluator - Additional Coverage - should convert boolean True to string', () => {
 	const result = runCode('toString True');
-	assert.is(unwrapValue(result.finalResult), 'True');
+	expect(unwrapValue(result.finalResult)).toBe('True');
 });
 
 test('Evaluator - Additional Coverage - should convert boolean False to string', () => {
 	const result = runCode('toString False');
-	assert.is(unwrapValue(result.finalResult), 'False');
+	expect(unwrapValue(result.finalResult)).toBe('False');
 });
 
 test('Evaluator - Additional Coverage - should convert list to string', () => {
 	const result = runCode('toString [1, 2, 3]');
-	assert.is(unwrapValue(result.finalResult), '[1; 2; 3]');
+	expect(unwrapValue(result.finalResult)).toBe('[1; 2; 3]');
 });
 
 test('Evaluator - Additional Coverage - should convert tuple to string', () => {
 	const result = runCode('toString {1, 2, 3}');
-	assert.is(unwrapValue(result.finalResult), '{1; 2; 3}');
+	expect(unwrapValue(result.finalResult)).toBe('{1; 2; 3}');
 });
 
 test('Evaluator - Additional Coverage - should convert record to string', () => {
 	const result = runCode('toString { @name "Alice", @age 30 }');
-	assert.is(unwrapValue(result.finalResult), '{@name "Alice"; @age 30}');
+	expect(unwrapValue(result.finalResult)).toBe('{@name "Alice"; @age 30}');
 });
 
 test('Evaluator - Additional Coverage - should convert unit to string', () => {
 	const result = runCode('toString {}');
-	assert.is(unwrapValue(result.finalResult), 'unit');
+	expect(unwrapValue(result.finalResult)).toBe('unit');
 });
 
 test('Evaluator - Additional Coverage - should convert function to string', () => {
 	const result = runCode('toString (fn x => x + 1)');
-	assert.is(unwrapValue(result.finalResult), '<function>');
+	expect(unwrapValue(result.finalResult)).toBe('<function>');
 });
 
 test('Evaluator - Additional Coverage - should convert constructor without args to string', () => {
@@ -788,7 +781,7 @@ test('Evaluator - Additional Coverage - should convert constructor without args 
         type Color = Red | Green | Blue;
         toString Red
       `);
-	assert.is(unwrapValue(result.finalResult), 'Red');
+	expect(unwrapValue(result.finalResult)).toBe('Red');
 });
 
 test('Evaluator - Additional Coverage - should convert constructor with args to string', () => {
@@ -796,27 +789,27 @@ test('Evaluator - Additional Coverage - should convert constructor with args to 
         type Option a = Some a | None;
         toString (Some 42)
       `);
-	assert.is(unwrapValue(result.finalResult), 'Some 42');
+	expect(unwrapValue(result.finalResult)).toBe('Some 42');
 });
 
 test('Evaluator - Additional Coverage - should handle abs function', () => {
 	const result = runCode('abs (-5)');
-	assert.is(unwrapValue(result.finalResult), 5);
+	expect(unwrapValue(result.finalResult)).toBe(5);
 });
 
 test('Evaluator - Additional Coverage - should handle max function', () => {
 	const result = runCode('max 5 10');
-	assert.is(unwrapValue(result.finalResult), 10);
+	expect(unwrapValue(result.finalResult)).toBe(10);
 });
 
 test('Evaluator - Additional Coverage - should handle min function', () => {
 	const result = runCode('min 5 10');
-	assert.is(unwrapValue(result.finalResult), 5);
+	expect(unwrapValue(result.finalResult)).toBe(5);
 });
 
 test('Evaluator - Additional Coverage - should handle concat function', () => {
 	const result = runCode('concat "hello" " world"');
-	assert.is(unwrapValue(result.finalResult), 'hello world');
+	expect(unwrapValue(result.finalResult)).toBe('hello world');
 });
 
 test('Evaluator - Additional Coverage - should handle hasKey function', () => {
@@ -824,7 +817,7 @@ test('Evaluator - Additional Coverage - should handle hasKey function', () => {
         record = { @name "Alice", @age 30 };
         hasKey record "name"
       `);
-	assert.is(unwrapValue(result.finalResult), true);
+	expect(unwrapValue(result.finalResult)).toBe(true);
 });
 
 test('Evaluator - Additional Coverage - should handle hasKey with missing key', () => {
@@ -832,7 +825,7 @@ test('Evaluator - Additional Coverage - should handle hasKey with missing key', 
         record = { @name "Alice", @age 30 };
         hasKey record "height"
       `);
-	assert.is(unwrapValue(result.finalResult), false);
+	expect(unwrapValue(result.finalResult)).toBe(false);
 });
 
 test('Evaluator - Additional Coverage - should handle hasValue with missing value', () => {
@@ -840,28 +833,28 @@ test('Evaluator - Additional Coverage - should handle hasValue with missing valu
         record = { @name "Alice", @age 30 };
         hasValue record 42
       `);
-	assert.is(unwrapValue(result.finalResult), false);
+	expect(unwrapValue(result.finalResult)).toBe(false);
 });
 
 test('Evaluator - Additional Coverage - should handle randomRange function', () => {
 	const result = runCode('randomRange 1 10');
-	assert.is(result.finalResult.tag, 'number');
+	expect(result.finalResult.tag).toBe('number');
 	if (result.finalResult.tag === 'number') {
-		assert.ok(result.finalResult.value >= 1);
-		assert.ok(result.finalResult.value <= 10);
+		expect(result.finalResult.value >= 1).toBeTruthy();
+		expect(result.finalResult.value <= 10).toBeTruthy();
 	}
 });
 
 test('Evaluator - Additional Coverage - should handle invalid function application', () => {
-	assert.throws(() => runCode('42 5'));
+	expect(() => runCode('42 5')).toThrow();
 });
 
 test('Evaluator - Additional Coverage - should handle mutGet error with non-mutable', () => {
-	assert.throws(() => runCode('mutGet 42'), /mutGet requires a mutable reference/);
+	expect(() => runCode('mutGet 42')).toThrow();
 });
 
 test('Evaluator - Additional Coverage - should handle mutSet error with non-mutable', () => {
-	assert.throws(() => runCode('mutSet 42 100'), /mutSet requires a mutable reference/);
+	expect(() => runCode('mutSet 42 100')).toThrow();
 });
 
 test('Evaluator - Additional Coverage - should handle nullary constructors', () => {
@@ -869,10 +862,10 @@ test('Evaluator - Additional Coverage - should handle nullary constructors', () 
         type Color = Red | Green | Blue;
         Red
       `);
-	assert.is(result.finalResult.tag, 'constructor');
+	expect(result.finalResult.tag).toBe('constructor');
 	if (result.finalResult.tag === 'constructor') {
-		assert.is(result.finalResult.name, 'Red');
-		assert.equal(result.finalResult.args, []);
+		expect(result.finalResult.name).toBe('Red');
+		expect(result.finalResult.args).toEqual([]);
 	}
 });
 
@@ -881,10 +874,10 @@ test('Evaluator - Additional Coverage - should handle constructor with arguments
         type Point = Point Float Float;
         Point 10 20
       `);
-	assert.is(result.finalResult.tag, 'constructor');
+	expect(result.finalResult.tag).toBe('constructor');
 	if (result.finalResult.tag === 'constructor') {
-		assert.is(result.finalResult.name, 'Point');
-		assert.is(result.finalResult.args.length, 2);
+		expect(result.finalResult.name).toBe('Point');
+		expect(result.finalResult.args.length).toBe(2);
 	}
 });
 
@@ -894,10 +887,10 @@ test('Evaluator - Additional Coverage - should handle curried constructor applic
         partialPoint = Point 10;
         partialPoint 20
       `);
-	assert.is(result.finalResult.tag, 'constructor');
+	expect(result.finalResult.tag).toBe('constructor');
 	if (result.finalResult.tag === 'constructor') {
-		assert.is(result.finalResult.name, 'Point');
-		assert.is(result.finalResult.args.length, 2);
+		expect(result.finalResult.name).toBe('Point');
+		expect(result.finalResult.args.length).toBe(2);
 	}
 });
 
@@ -909,7 +902,7 @@ test('Evaluator - Additional Coverage - should handle nested scopes with pattern
           x => x + outer
         )
       `);
-	assert.is(unwrapValue(result.finalResult), 52);
+	expect(unwrapValue(result.finalResult)).toBe(52);
 });
 
 test('Evaluator - Additional Coverage - should handle function scoping', () => {
@@ -918,7 +911,6 @@ test('Evaluator - Additional Coverage - should handle function scoping', () => {
         f = fn y => x + y;
         f 10
       `);
-	assert.is(unwrapValue(result.finalResult), 11);
+	expect(unwrapValue(result.finalResult)).toBe(11);
 });
 
-test.run();

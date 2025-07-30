@@ -1,8 +1,7 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Evaluator, Value } from '../../src/evaluator/evaluator';
 import { parse } from '../../src/parser/parser';
 import { Lexer } from '../../src/lexer/lexer';
+import { describe, test, expect } from 'bun:test';
 
 function unwrapValue(val: Value): any {
 	if (val === null) return null;
@@ -46,7 +45,7 @@ test('simple closure: makeAdder', () => {
       result = add5 10;
       result
     `;
-	assert.is(unwrapValue(evalNoo(src)), 15);
+	expect(unwrapValue(evalNoo(src))).toBe(15);
 });
 
 test('closure in a record', () => {
@@ -62,7 +61,7 @@ test('closure in a record', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 10);
+	expect(unwrapValue(result.finalResult)).toBe(10);
 });
 
 test('closure with function in record', () => {
@@ -80,7 +79,6 @@ test('closure with function in record', () => {
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 
-	assert.is(unwrapValue(result.finalResult), 30);
+	expect(unwrapValue(result.finalResult)).toBe(30);
 });
 
-test.run();

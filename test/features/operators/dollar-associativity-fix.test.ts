@@ -1,9 +1,8 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../../src/lexer/lexer';
 import { parse } from '../../../src/parser/parser';
 import { typeAndDecorate } from '../../../src/typer';
 import { Evaluator, Value } from '../../../src/evaluator/evaluator';
+import { describe, test, expect } from 'bun:test';
 
 // Helper functions
 function unwrapValue(val: Value): any {
@@ -42,13 +41,13 @@ function runCode(code: string) {
 }
 
 function expectError(code: string) {
-    assert.throws(() => runCode(code));
+    expect(() => runCode(code)).toThrow();
 }
 
 function expectSuccess(code: string, expectedValue?: any) {
     const result = runCode(code);
     if (expectedValue !== undefined) {
-        assert.equal(unwrapValue(result.finalResult), expectedValue);
+        expect(unwrapValue(result.finalResult)).toEqual(expectedValue);
     }
     return result;
 }
@@ -125,4 +124,3 @@ test('investigate parsing vs type checking', () => {
     `, 3);
 });
 
-test.run();

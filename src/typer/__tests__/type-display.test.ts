@@ -1,7 +1,6 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { typeToString } from '../helpers';
 import { recordType, stringType, floatType } from '../../ast';
+import { describe, test, expect } from 'bun:test';
 
 test('Type Display (typeToString) - Record Type Display - should display record type with @field syntax', () => {
 	const recordTypeWithFields = recordType({
@@ -10,7 +9,7 @@ test('Type Display (typeToString) - Record Type Display - should display record 
 	});
 
 	const result = typeToString(recordTypeWithFields);
-	assert.is(result, '{ @name String, @age Float }');
+	expect(result).toBe('{ @name String, @age Float }');
 });
 
 test('Type Display (typeToString) - Record Type Display - should display single field record type', () => {
@@ -19,14 +18,14 @@ test('Type Display (typeToString) - Record Type Display - should display single 
 	});
 
 	const result = typeToString(singleFieldRecord);
-	assert.is(result, '{ @name String }');
+	expect(result).toBe('{ @name String }');
 });
 
 test('Type Display (typeToString) - Record Type Display - should display empty record type', () => {
 	const emptyRecord = recordType({});
 
 	const result = typeToString(emptyRecord);
-	assert.is(result, '{ }');
+	expect(result).toBe('{ }');
 });
 
 test('Type Display (typeToString) - Record Type Display - should display record type with multiple fields in consistent order', () => {
@@ -38,10 +37,10 @@ test('Type Display (typeToString) - Record Type Display - should display record 
 
 	const result = typeToString(multiFieldRecord);
 	// Note: Object.entries() order should be consistent in modern JS
-	assert.match(result, /^{ @\w+ \w+(?:, @\w+ \w+)* }$/);
-	assert.ok(result.includes('@name String'));
-	assert.ok(result.includes('@age Float'));
-	assert.ok(result.includes('@active Bool'));
+	expect(result).toMatch(/^{ @\w+ \w+(?:, @\w+ \w+)* }$/);
+	expect(result.includes('@name String')).toBeTruthy();
+	expect(result.includes('@age Float')).toBeTruthy();
+	expect(result.includes('@active Bool')).toBeTruthy();
 });
 
 test('Type Display (typeToString) - Record Type Display - should display nested record types correctly', () => {
@@ -53,7 +52,7 @@ test('Type Display (typeToString) - Record Type Display - should display nested 
 	});
 
 	const result = typeToString(nestedRecord);
-	assert.is(result, '{ @person { @name String, @age Float } }');
+	expect(result).toBe('{ @person { @name String, @age Float } }');
 });
 
 test('Type Display (typeToString) - Record Type Display Consistency - should use commas between fields', () => {
@@ -63,7 +62,7 @@ test('Type Display (typeToString) - Record Type Display Consistency - should use
 	});
 
 	const result = typeToString(recordTypeWithFields);
-	assert.ok(result.includes(', '));
+	expect(result.includes(', ')).toBeTruthy();
 });
 
 test('Type Display (typeToString) - Record Type Display Consistency - should not use colons in field definitions', () => {
@@ -73,7 +72,7 @@ test('Type Display (typeToString) - Record Type Display Consistency - should not
 	});
 
 	const result = typeToString(recordTypeWithFields);
-	assert.ok(!result.includes(':'));
+	expect(!result.includes(':')).toBeTruthy();
 });
 
 test('Type Display (typeToString) - Record Type Display Consistency - should use @ prefix for all field names', () => {
@@ -85,10 +84,10 @@ test('Type Display (typeToString) - Record Type Display Consistency - should use
 
 	const result = typeToString(recordTypeWithFields);
 	const fields = result.match(/@\w+/g);
-	assert.is(fields?.length, 3);
-	assert.ok(fields?.includes('@name'));
-	assert.ok(fields?.includes('@age'));
-	assert.ok(fields?.includes('@active'));
+	expect(fields?.length).toBe(3);
+	expect(fields?.includes('@name')).toBeTruthy();
+	expect(fields?.includes('@age')).toBeTruthy();
+	expect(fields?.includes('@active')).toBeTruthy();
 });
 
 test('Type Display (typeToString) - Record Type Display Consistency - should match input syntax format', () => {
@@ -101,7 +100,6 @@ test('Type Display (typeToString) - Record Type Display Consistency - should mat
 	const result = typeToString(recordTypeWithFields);
 
 	// Should match the format: { @field Type, @field Type }
-	assert.match(result, /^{ @\w+ \w+(?:, @\w+ \w+)* }$/);
+	expect(result).toMatch(/^{ @\w+ \w+(?:, @\w+ \w+)* }$/);
 });
 
-test.run();

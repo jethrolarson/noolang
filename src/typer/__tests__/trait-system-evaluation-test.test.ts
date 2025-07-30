@@ -1,9 +1,8 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
 import { Evaluator } from '../../evaluator/evaluator';
 import { assertListValue, assertNumberValue, assertConstrainedType } from '../../../test/utils';
+import { describe, test, expect } from 'bun:test';
 
 const parseTypeAndEvaluate = (code: string) => {
 		const lexer = new Lexer(code);
@@ -30,10 +29,10 @@ test('Trait System Evaluation Test - should evaluate map with list successfully'
 	
 	// If Phase 3 is complete, this should actually work
 	assertListValue(evalResult.finalResult);
-	assert.is(evalResult.finalResult.values.length, 3);
-	assert.equal(evalResult.finalResult.values[0], { tag: 'number', value: 2 });
-	assert.equal(evalResult.finalResult.values[1], { tag: 'number', value: 3 });
-	assert.equal(evalResult.finalResult.values[2], { tag: 'number', value: 4 });
+	expect(evalResult.finalResult.values.length).toBe(3);
+	expect(evalResult.finalResult.values[0]).toEqual({ tag: 'number', value: 2 });
+	expect(evalResult.finalResult.values[1]).toEqual({ tag: 'number', value: 3 });
+	expect(evalResult.finalResult.values[2]).toEqual({ tag: 'number', value: 4 });
 });
 
 test('Trait System Evaluation Test - should work with custom trait function', () => {
@@ -50,10 +49,10 @@ test('Trait System Evaluation Test - should work with custom trait function', ()
 	
 	// This should also work if constraint resolution is functional
 	assertListValue(evalResult.finalResult);
-	assert.is(evalResult.finalResult.values.length, 3);
-	assert.equal(evalResult.finalResult.values[0], { tag: 'number', value: 2 });
-	assert.equal(evalResult.finalResult.values[1], { tag: 'number', value: 4 });
-	assert.equal(evalResult.finalResult.values[2], { tag: 'number', value: 6 });
+	expect(evalResult.finalResult.values.length).toBe(3);
+	expect(evalResult.finalResult.values[0]).toEqual({ tag: 'number', value: 2 });
+	expect(evalResult.finalResult.values[1]).toEqual({ tag: 'number', value: 4 });
+	expect(evalResult.finalResult.values[2]).toEqual({ tag: 'number', value: 6 });
 });
 
 test('Trait System Evaluation Test - should compare direct list_map vs trait map', () => {
@@ -67,20 +66,19 @@ test('Trait System Evaluation Test - should compare direct list_map vs trait map
 	// Both evaluations verified
 	
 	// Both should produce the same result
-	assert.equal(result1.evalResult.finalResult, result2.evalResult.finalResult);
+	expect(result1.evalResult.finalResult).toEqual(result2.evalResult.finalResult);
 	
 	// Both should be [11, 12, 13]
-	assert.is(result1.evalResult.finalResult.tag, 'list');
-	assert.is(result2.evalResult.finalResult.tag, 'list');
+	expect(result1.evalResult.finalResult.tag).toBe('list');
+	expect(result2.evalResult.finalResult.tag).toBe('list');
 	
 	if (result1.evalResult.finalResult.tag === 'list' && result2.evalResult.finalResult.tag === 'list') {
-		assert.equal(result1.evalResult.finalResult.values, [
+		expect(result1.evalResult.finalResult.values).toEqual([
 			{ tag: 'number', value: 11 },
 			{ tag: 'number', value: 12 },
 			{ tag: 'number', value: 13 }
 		]);
-		assert.equal(result2.evalResult.finalResult.values, result1.evalResult.finalResult.values);
+		expect(result2.evalResult.finalResult.values).toEqual(result1.evalResult.finalResult.values);
 	}
 });
 
-test.run();

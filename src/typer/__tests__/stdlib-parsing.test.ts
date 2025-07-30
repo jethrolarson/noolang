@@ -1,11 +1,10 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
 import { loadStdlib, createTypeState } from '../type-operations';
 import { initializeBuiltins } from '../builtins';
 import * as fs from 'fs';
 import * as path from 'path';
+import { describe, test, expect } from 'bun:test';
 
 test('Stdlib Parsing Regression Tests - should parse the problematic implement statement from line 81', () => {
   // Isolate the exact code that's failing from around line 81
@@ -24,7 +23,7 @@ implement Show (Option a) given a implements Show (
   const lexer = new Lexer(problematicCode);
   const tokens = lexer.tokenize();
   const program = parse(tokens);
-  assert.ok(program.statements);
+  expect(program.statements).toBeTruthy();
 });
 
 test('Stdlib Parsing Regression Tests - should handle another complex implement statement', () => {
@@ -42,8 +41,8 @@ implement Functor List (
   const lexer = new Lexer(complexCode);
   const tokens = lexer.tokenize();
   const program = parse(tokens);
-  assert.ok(program.statements);
-  assert.is(program.statements.length, 1);
+  expect(program.statements).toBeTruthy();
+  expect(program.statements.length).toBe(1);
 });
 
 test('Stdlib Parsing Regression Tests - should parse simple type definition', () => {
@@ -54,8 +53,8 @@ type Option a = Some a | None;
   const lexer = new Lexer(simpleCode);
   const tokens = lexer.tokenize();
   const program = parse(tokens);
-  assert.ok(program.statements);
-  assert.is(program.statements.length, 1);
+  expect(program.statements).toBeTruthy();
+  expect(program.statements.length).toBe(1);
 });
 
 test('Stdlib Parsing Regression Tests - should parse stdlib without errors', () => {
@@ -71,10 +70,10 @@ test('Stdlib Parsing Regression Tests - should parse stdlib without errors', () 
     const lexer = new Lexer(stdlibContent);
     const tokens = lexer.tokenize();
     const program = parse(tokens);
-    assert.ok(program.statements);
+    expect(program.statements).toBeTruthy();
     
     // Should have multiple statements
-    assert.ok(program.statements.length > 0);
+    expect(program.statements.length > 0).toBeTruthy();
   } catch (error) {
     if (!stdlibExists) {
       // Skip this test if stdlib doesn't exist
@@ -90,8 +89,7 @@ test('Stdlib Parsing Regression Tests - should handle type state initialization'
   initializeBuiltins(typeState);
   
   // Should have initialized type state
-  assert.ok(typeState);
-  assert.ok(typeState.substitution !== undefined);
+  expect(typeState).toBeTruthy();
+  expect(typeState.substitution !== undefined).toBeTruthy();
 });
 
-test.run();

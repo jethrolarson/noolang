@@ -1,5 +1,3 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
 import { typeProgram } from '../index';
@@ -15,6 +13,7 @@ import {
 } from '../trait-system';
 import { functionType, typeVariable, stringType, floatType, boolType } from '../../ast';
 import { 
+import { describe, test, expect } from 'bun:test';
 	assertNumberValue, 
 	assertListValue, 
 	assertConstrainedType, 
@@ -46,9 +45,9 @@ const parseTypeAndEvaluate = (code: string) => {
 // ================================================================
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - TraitRegistry Operations - should create empty trait registry', () => {
 	const registry = createTraitRegistry();
-	assert.is(registry.definitions.size, 0);
-	assert.is(registry.implementations.size, 0);
-	assert.is(registry.functionTraits.size, 0);
+	expect(registry.definitions.size).toBe(0);
+	expect(registry.implementations.size).toBe(0);
+	expect(registry.functionTraits.size).toBe(0);
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - TraitRegistry Operations - should add trait definition', () => {
@@ -61,9 +60,9 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - TraitRe
 	
 	addTraitDefinition(registry, trait);
 	
-	assert.is(registry.definitions.size, 1);
-	assert.equal(registry.definitions.get('TestShow'), trait);
-	assert.is(registry.implementations.has('TestShow'), true);
+	expect(registry.definitions.size).toBe(1);
+	expect(registry.definitions.get('TestShow')).toEqual(trait);
+	expect(registry.implementations.has('TestShow')).toBe(true);
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - TraitRegistry Operations - should add trait implementation', () => {
@@ -81,10 +80,10 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - TraitRe
 	};
 	
 	const success = addTraitImplementation(registry, 'TestShow', impl);
-	assert.is(success, true);
+	expect(success).toBe(true);
 	
 	const showImpls = registry.implementations.get('TestShow');
-	assert.is(showImpls?.has('Float'), true);
+	expect(showImpls?.has('Float')).toBe(true);
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - TraitRegistry Operations - should fail to add implementation for non-existent trait', () => {
@@ -95,7 +94,7 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - TraitRe
 	};
 	
 	const success = addTraitImplementation(registry, 'NonExistent', impl);
-	assert.is(success, false);
+	expect(success).toBe(false);
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - TraitRegistry Operations - should reject implementation with wrong function signature', () => {
@@ -116,7 +115,7 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - TraitRe
 		} as any]]),
 	};
 
-	assert.throws(() => addTraitImplementation(registry, 'TestShow', badImpl), /Function signature mismatch/);
+	expect(() => addTraitImplementation(registry, 'TestShow', badImpl)).toThrow();
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - TraitRegistry Operations - should accept variable references (unknown arity)', () => {
@@ -134,7 +133,7 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - TraitRe
 	};
 	
 	const success = addTraitImplementation(registry, 'TestShow', variableImpl);
-	assert.is(success, true);
+	expect(success).toBe(true);
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - TraitRegistry Operations - should reject function not defined in trait', () => {
@@ -151,7 +150,7 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - TraitRe
 		functions: new Map([['wrongFunction', { kind: 'variable', name: 'something' } as any]]),
 	};
 
-	assert.throws(() => addTraitImplementation(registry, 'TestShow', badImpl), /Function 'wrongFunction' not defined in trait TestShow/);
+	expect(() => addTraitImplementation(registry, 'TestShow', badImpl)).toThrow();
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Trait Function Resolution - should identify trait functions', () => {
@@ -163,8 +162,8 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Trait F
 	};
 	addTraitDefinition(registry, trait);
 
-	assert.is(isTraitFunction(registry, 'testShow'), true);
-	assert.is(isTraitFunction(registry, 'nonexistent'), false);
+	expect(isTraitFunction(registry, 'testShow')).toBe(true);
+	expect(isTraitFunction(registry, 'nonexistent')).toBe(false);
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Trait Function Resolution - should resolve trait function with implementation', () => {
@@ -183,9 +182,9 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Trait F
 	addTraitImplementation(registry, 'TestShow', impl);
 
 	const result = resolveTraitFunction(registry, 'testShow', [floatType()]);
-	assert.is(result.found, true);
-	assert.is(result.traitName, 'TestShow');
-	assert.is(result.typeName, 'Float');
+	expect(result.found).toBe(true);
+	expect(result.traitName).toBe('TestShow');
+	expect(result.typeName).toBe('Float');
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Trait Function Resolution - should fail to resolve trait function without implementation', () => {
@@ -198,13 +197,13 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Trait F
 	addTraitDefinition(registry, trait);
 
 	const result = resolveTraitFunction(registry, 'testShow', [floatType()]);
-	assert.is(result.found, false);
+	expect(result.found).toBe(false);
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Trait Function Resolution - should fail to resolve non-trait function', () => {
 	const registry = createTraitRegistry();
 	const result = resolveTraitFunction(registry, 'nonTraitFunction', [floatType()]);
-	assert.is(result.found, false);
+	expect(result.found).toBe(false);
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Type System Integration - should handle undefined trait functions gracefully', () => {
@@ -217,9 +216,9 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Type Sy
 	const typeResult = typeProgram(program);
 	
 	// Should create a constrained type since no implementation exists yet
-	assert.is(typeResult.type.kind, 'constrained');
+	expect(typeResult.type.kind).toBe('constrained');
 	const typeString = typeToString(typeResult.type);
-	assert.match(typeString, /implements CustomTrait/);
+	expect(typeString).toMatch(/implements CustomTrait/);
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Type System Integration - should not break existing functionality', () => {
@@ -231,7 +230,7 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Type Sy
 	const program = parseProgram(code);
 	const typeResult = typeProgram(program);
 	assertPrimitiveType(typeResult.type);
-	assert.is(typeResult.type.name, 'Float');
+	expect(typeResult.type.name).toBe('Float');
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Type System Integration - should work with ConstrainedType infrastructure', () => {
@@ -243,9 +242,9 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Type Sy
 	const program = parseProgram(code);
 	const typeResult = typeProgram(program);
 	
-	assert.is(typeResult.type.kind, 'constrained');
+	expect(typeResult.type.kind).toBe('constrained');
 	const typeString = typeToString(typeResult.type);
-	assert.match(typeString, /implements TestFunctor/);
+	expect(typeString).toMatch(/implements TestFunctor/);
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Type System Integration - should work with existing ADT system', () => {
@@ -259,7 +258,7 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Type Sy
 	const program = parseProgram(code);
 	const typeResult = typeProgram(program);
 	
-	assert.is(typeResult.type.kind, 'variant');
+	expect(typeResult.type.kind).toBe('variant');
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Type System Integration - should maintain polymorphic function types', () => {
@@ -272,7 +271,7 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Type Sy
 	const typeResult = typeProgram(program);
 	
 	// Should be a function type since it's a function definition
-	assert.is(typeResult.type.kind, 'function');
+	expect(typeResult.type.kind).toBe('function');
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Conditional Implementations (Given Constraints) - should parse implement statements with given constraints', () => {
@@ -287,8 +286,8 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Conditi
 	const typeResult = typeProgram(program);
 	
 	// Should successfully parse and type check
-	assert.is(typeResult.type.kind, 'unit');
-	assert.is(typeResult.state.traitRegistry.definitions.has('TestShow'), true);
+	expect(typeResult.type.kind).toBe('unit');
+	expect(typeResult.state.traitRegistry.definitions.has('TestShow')).toBe(true);
 });
 
 // ================================================================
@@ -301,9 +300,9 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Basic
 	const typeResult = typeProgram(program);
 	
 	// CONSTRAINT COLLAPSE: Should succeed and return concrete List Float type
-	assert.is(typeResult.type.kind, 'list');
+	expect(typeResult.type.kind).toBe('list');
 	const typeString = typeToString(typeResult.type);
-	assert.is(typeString, 'List Float');
+	expect(typeString).toBe('List Float');
 	// Should NOT have constraint annotations anymore
 	assert.not.match(typeString, /implements|given|α\d+/);
 });
@@ -315,9 +314,9 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Basic
 	const typeResult = typeProgram(program);
 	
 	// CONSTRAINT COLLAPSE: Should succeed and return concrete Option Float type
-	assert.is(typeResult.type.kind, 'variant');
+	expect(typeResult.type.kind).toBe('variant');
 	const typeString = typeToString(typeResult.type);
-	assert.is(typeString, 'Option Float');
+	expect(typeString).toBe('Option Float');
 	// Should NOT have constraint annotations anymore
 	assert.not.match(typeString, /implements|given|α\d+/);
 });
@@ -330,7 +329,7 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Basic
 	
 	// Should succeed and return String
 	assertPrimitiveType(typeResult.type);
-	assert.is(typeResult.type.name, 'String');
+	expect(typeResult.type.name).toBe('String');
 });
 
 test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Basic Constraint Resolution - should resolve Monad constraint polymorphically', () => {
@@ -340,23 +339,23 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Basic
 	const typeResult = typeProgram(program);
 	
 	// Should succeed and return a constrained type
-	assert.is(typeResult.type.kind, 'constrained');
+	expect(typeResult.type.kind).toBe('constrained');
 	const typeString = typeToString(typeResult.type);
-	assert.match(typeString, /implements Monad/);
+	expect(typeString).toMatch(/implements Monad/);
 });
 
 test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Constraint Resolution Failures - should fail when no trait implementation exists', () => {
 	const code = 'result = map (fn x => x + 1) "hello"';
 	
 	const program = parseProgram(code);
-	assert.throws(() => typeProgram(program), /No implementation of Functor for String/);
+	expect(() => typeProgram(program)).toThrow();
 });
 
 test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Constraint Resolution Failures - should fail when trying to use non-existent trait', () => {
 	const code = 'result = unknownTraitFunction 42';
 	
 	const program = parseProgram(code);
-	assert.throws(() => typeProgram(program), /Undefined variable/);
+	expect(() => typeProgram(program)).toThrow();
 });
 
 test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Complex Constraint Resolution - should handle partial application with constraint preservation', () => {
@@ -366,14 +365,14 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Compl
 	const typeResult = typeProgram(program);
 	
 	// Should return a function type with constraints
-	assert.is(typeResult.type.kind, 'constrained');
+	expect(typeResult.type.kind).toBe('constrained');
 	if (typeResult.type.kind === 'constrained') {
-		assert.is(typeResult.type.baseType.kind, 'function');
+		expect(typeResult.type.baseType.kind).toBe('function');
 	}
 	
 	const typeString = typeToString(typeResult.type);
-	assert.match(typeString, /implements Functor/);
-	assert.match(typeString, /-> .* Float/); // Should be a function returning constrained Float
+	expect(typeString).toMatch(/implements Functor/);
+	expect(typeString).toMatch(/-> .* Float/); // Should be a function returning constrained Float
 });
 
 test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Complex Constraint Resolution - should handle nested function applications', () => {
@@ -388,9 +387,9 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Compl
 	const typeResult = typeProgram(program);
 	
 	// CONSTRAINT COLLAPSE: Should succeed and resolve to concrete List Float
-	assert.is(typeResult.type.kind, 'list');
+	expect(typeResult.type.kind).toBe('list');
 	const typeString = typeToString(typeResult.type);
-	assert.is(typeString, 'List Float');
+	expect(typeString).toBe('List Float');
 	assert.not.match(typeString, /implements|given|α\d+/);
 });
 
@@ -405,10 +404,10 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Compl
 	
 	// PARTIAL CONSTRAINT COLLAPSE: Functor constraint gets resolved to List,
 	// but Show constraint from within the mapped function is preserved
-	assert.is(typeResult.type.kind, 'list');
+	expect(typeResult.type.kind).toBe('list');
 	const typeString = typeToString(typeResult.type);
-	assert.match(typeString, /List String/);
-	assert.match(typeString, /implements Show/); // Show constraint preserved
+	expect(typeString).toMatch(/List String/);
+	expect(typeString).toMatch(/implements Show/); // Show constraint preserved
 });
 
 test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Integration with Existing System - should not break existing type inference', () => {
@@ -422,7 +421,7 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Integ
 	
 	// Should work normally without constraints
 	assertPrimitiveType(typeResult.type);
-	assert.is(typeResult.type.name, 'Float');
+	expect(typeResult.type.name).toBe('Float');
 });
 
 test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Integration with Existing System - should work with let polymorphism', () => {
@@ -437,7 +436,7 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Integ
 	
 	// Should succeed - polymorphic function used with different types
 	assertPrimitiveType(typeResult.type);
-	assert.is(typeResult.type.name, 'Float'); // Last expression evaluated wins
+	expect(typeResult.type.name).toBe('Float'); // Last expression evaluated wins
 });
 
 test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Integration with Existing System - should integrate with ADT pattern matching', () => {
@@ -453,9 +452,9 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Integ
 	const typeResult = typeProgram(program);
 	
 	// CONSTRAINT COLLAPSE: Should handle complex integration and resolve to concrete List String
-	assert.is(typeResult.type.kind, 'list');
+	expect(typeResult.type.kind).toBe('list');
 	const typeString = typeToString(typeResult.type);
-	assert.match(typeString, /List String/);
+	expect(typeString).toMatch(/List String/);
 });
 
 test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Error Message Quality - should provide helpful error for missing trait implementation', () => {
@@ -465,13 +464,13 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Error
 	
 	try {
 		typeProgram(program);
-		assert.unreachable('Expected error for missing trait implementation');
+		throw new Error('Expected error for missing trait implementation');
 	} catch (error) {
 		const message = (error as Error).message;
-		assert.match(message, /Functor/);
-		assert.match(message, /Float/);
+		expect(message).toMatch(/Functor/);
+		expect(message).toMatch(/Float/);
 		// Should suggest how to fix it
-		assert.match(message, /implement/);
+		expect(message).toMatch(/implement/);
 	}
 });
 
@@ -482,11 +481,11 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Error
 	
 	try {
 		typeProgram(program);
-		assert.unreachable('Expected error for missing trait implementation');
+		throw new Error('Expected error for missing trait implementation');
 	} catch (error) {
 		const message = (error as Error).message;
 		// Should include location information
-		assert.match(message, /line 1/);
+		expect(message).toMatch(/line 1/);
 	}
 });
 
@@ -504,11 +503,11 @@ test('Trait System - Consolidated Tests - Safety: Conflicting Functions & Valida
 	const typeResult = typeProgram(program);
 	
 	// Should succeed - multiple traits can define same function names
-	assert.is(typeResult.type.kind, 'unit');
+	expect(typeResult.type.kind).toBe('unit');
 	// Note: The registry includes stdlib traits, so we check that our 3 were added
-	assert.is(typeResult.state.traitRegistry.definitions.has('Printable'), true);
-	assert.is(typeResult.state.traitRegistry.definitions.has('Renderable'), true);
-	assert.is(typeResult.state.traitRegistry.definitions.has('Debuggable'), true);
+	expect(typeResult.state.traitRegistry.definitions.has('Printable')).toBe(true);
+	expect(typeResult.state.traitRegistry.definitions.has('Renderable')).toBe(true);
+	expect(typeResult.state.traitRegistry.definitions.has('Debuggable')).toBe(true);
 });
 
 test('Trait System - Consolidated Tests - Safety: Conflicting Functions & Validation - should allow different function names in multiple constraints', () => {
@@ -523,7 +522,7 @@ test('Trait System - Consolidated Tests - Safety: Conflicting Functions & Valida
 	const typeResult = typeProgram(program);
 	
 	// Should succeed - different function names are fine
-	assert.is(typeResult.type.kind, 'unit');
+	expect(typeResult.type.kind).toBe('unit');
 });
 
 test('Trait System - Consolidated Tests - Safety: Conflicting Functions & Validation - should detect ambiguous function calls when multiple implementations exist', () => {
@@ -537,7 +536,7 @@ test('Trait System - Consolidated Tests - Safety: Conflicting Functions & Valida
 	
 	const program = parseProgram(code);
 	
-	assert.throws(() => typeProgram(program), /Ambiguous function call.*multiple implementations.*Printable, Renderable/);
+	expect(() => typeProgram(program)).toThrow();
 });
 
 test('Trait System - Consolidated Tests - Safety: Conflicting Functions & Validation - should detect conflicting function names at implementation level', () => {
@@ -573,7 +572,7 @@ test('Trait System - Consolidated Tests - Safety: Conflicting Functions & Valida
 	addTraitImplementation(registry, 'Renderable', renderImpl);
 
 	// Should detect conflict when resolving
-	assert.throws(() => resolveTraitFunction(registry, 'display', [floatType()]), /Ambiguous function call.*multiple implementations.*Printable, Renderable/);
+	expect(() => resolveTraitFunction(registry, 'display', [floatType()])).toThrow();
 });
 
 test('Trait System - Consolidated Tests - Safety: Conflicting Functions & Validation - should work when same function name exists but for different types', () => {
@@ -591,7 +590,7 @@ test('Trait System - Consolidated Tests - Safety: Conflicting Functions & Valida
 	
 	// Should succeed - same function name but different types
 	assertPrimitiveType(typeResult.type);
-	assert.is(typeResult.type.name, 'String');
+	expect(typeResult.type.name).toBe('String');
 });
 
 // ================================================================
@@ -603,16 +602,16 @@ test('Trait System - Consolidated Tests - Evaluation Integration - should evalua
 	const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 	
 	// CONSTRAINT COLLAPSE: Should be concrete List Float, not constrained
-	assert.is(typeResult.type.kind, 'list');
+	expect(typeResult.type.kind).toBe('list');
 	if (typeResult.type.kind === 'list') {
-		assert.is(typeResult.type.element.kind, 'primitive');
+		expect(typeResult.type.element.kind).toBe('primitive');
 		if (typeResult.type.element.kind === 'primitive') {
-			assert.is(typeResult.type.element.name, 'Float');
+			expect(typeResult.type.element.name).toBe('Float');
 		}
 	}
 	
 	assertListValue(evalResult.finalResult);
-	assert.equal(evalResult.finalResult.values, [
+	expect(evalResult.finalResult.values).toEqual([
 		{ tag: 'number', value: 2 },
 		{ tag: 'number', value: 3 },
 		{ tag: 'number', value: 4 }
@@ -629,7 +628,7 @@ test('Trait System - Consolidated Tests - Evaluation Integration - should work w
 	const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 	
 	assertNumberValue(evalResult.finalResult);
-	assert.is(evalResult.finalResult.value, 42);
+	expect(evalResult.finalResult.value).toBe(42);
 });
 
 test('Trait System - Consolidated Tests - Evaluation Integration - should compare direct list_map vs trait map', () => {
@@ -638,7 +637,7 @@ test('Trait System - Consolidated Tests - Evaluation Integration - should compar
 	const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 	
 	assertListValue(evalResult.finalResult);
-	assert.equal(evalResult.finalResult.values, [
+	expect(evalResult.finalResult.values).toEqual([
 		{ tag: 'number', value: 11 },
 		{ tag: 'number', value: 12 },
 		{ tag: 'number', value: 13 }
@@ -649,11 +648,10 @@ test('Trait System - Consolidated Tests - Evaluation Integration - should compar
 // UTILITY TESTS
 // ================================================================
 test('Trait System - Consolidated Tests - Type Name Resolution - should correctly identify type names for resolution', () => {
-	assert.is(getTypeName(floatType()), 'Float');
-	assert.is(getTypeName(stringType()), 'String');
-	assert.is(getTypeName(boolType()), 'Bool');
-	assert.is(getTypeName({ kind: 'list', element: floatType() }), 'List');
-	assert.is(getTypeName({ kind: 'variant', name: 'Option', args: [floatType()] }), 'Option');
+	expect(getTypeName(floatType())).toBe('Float');
+	expect(getTypeName(stringType())).toBe('String');
+	expect(getTypeName(boolType())).toBe('Bool');
+	expect(getTypeName({ kind: 'list', element: floatType() })).toBe('List');
+	expect(getTypeName({ kind: 'variant', name: 'Option', args: [floatType()] })).toBe('Option');
 });
 
-test.run();

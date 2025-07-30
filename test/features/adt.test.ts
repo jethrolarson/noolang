@@ -1,10 +1,9 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../src/lexer/lexer';
 import { parse } from '../../src/parser/parser';
 import { Evaluator } from '../../src/evaluator/evaluator';
 import { typeProgram } from '../../src/typer';
 import { typeToString } from '../../src/typer/helpers';
+import { describe, test, expect } from 'bun:test';
 
 // Helper function to parse and evaluate Noolang code
 const runNoolang = (source: string) => {
@@ -33,7 +32,7 @@ test('Algebraic Data Types (ADTs) - Built-in Option Type - should create Some va
 		x
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'constructor',
 		name: 'Some',
 		args: [{ tag: 'number', value: 42 }],
@@ -46,7 +45,7 @@ test('Algebraic Data Types (ADTs) - Built-in Option Type - should create None va
 		x
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'constructor',
 		name: 'None',
 		args: [],
@@ -62,7 +61,7 @@ test('Algebraic Data Types (ADTs) - Built-in Option Type - should pattern match 
 		)
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'number',
 		value: 42,
 	});
@@ -77,7 +76,7 @@ test('Algebraic Data Types (ADTs) - Built-in Option Type - should pattern match 
 		)
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'number',
 		value: 0,
 	});
@@ -93,7 +92,7 @@ test('Algebraic Data Types (ADTs) - Built-in Option Type - should handle nested 
 		)
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'number',
 		value: 42,
 	});
@@ -106,7 +105,7 @@ test('Algebraic Data Types (ADTs) - Custom ADT Definition - should define simple
 		x
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'constructor',
 		name: 'Red',
 		args: [],
@@ -126,7 +125,7 @@ test('Algebraic Data Types (ADTs) - Custom ADT Definition - should pattern match
 		colorToString Red
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'string',
 		value: 'red',
 	});
@@ -139,7 +138,7 @@ test('Algebraic Data Types (ADTs) - Custom ADT Definition - should define ADT wi
 		x
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'constructor',
 		name: 'Full',
 		args: [{ tag: 'number', value: 42 }],
@@ -153,7 +152,7 @@ test('Algebraic Data Types (ADTs) - Custom ADT Definition - should handle ADT wi
 		x
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'constructor',
 		name: 'Wrap',
 		args: [{ tag: 'number', value: 42 }],
@@ -167,7 +166,7 @@ test.skip('Algebraic Data Types (ADTs) - Pattern Matching - should handle recurs
 		list
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'constructor',
 		name: 'Cons',
 		args: [
@@ -193,7 +192,7 @@ test('Algebraic Data Types (ADTs) - Pattern Matching - should handle complex pat
 		unwrap (Ok 42)
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'number',
 		value: 42,
 	});
@@ -210,7 +209,7 @@ test('Algebraic Data Types (ADTs) - Pattern Matching - should match on ADT with 
 		getX (Point 3 4)
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'number',
 		value: 3,
 	});
@@ -230,7 +229,7 @@ test('Algebraic Data Types (ADTs) - Pattern Matching - should handle nested patt
 		getValue (OuterValue (InnerValue 42))
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'number',
 		value: 42,
 	});
@@ -243,8 +242,8 @@ test('Algebraic Data Types (ADTs) - Type Inference - should infer ADT types corr
 		x
 	`);
 
-	assert.is(result.finalType, 'Maybe Float');
-	assert.equal(result.finalValue, {
+	expect(result.finalType).toBe('Maybe Float');
+	expect(result.finalValue).toEqual({
 		tag: 'constructor',
 		name: 'Just',
 		args: [{ tag: 'number', value: 42 }],
@@ -263,7 +262,7 @@ test('Algebraic Data Types (ADTs) - Type Inference - should handle polymorphic A
 		stringContainer
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'constructor',
 		name: 'Container',
 		args: [{ tag: 'string', value: 'hello' }],
@@ -279,7 +278,7 @@ test('Algebraic Data Types (ADTs) - Function Integration - should work with func
 		checkNumber 5
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'constructor',
 		name: 'Success',
 		args: [],
@@ -298,7 +297,7 @@ test('Algebraic Data Types (ADTs) - Function Integration - should work with func
 		statusToNumber Success
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'number',
 		value: 1,
 	});
@@ -317,7 +316,7 @@ test('Algebraic Data Types (ADTs) - Function Integration - should work with list
 		list_map statusToNumber statuses
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'list',
 		values: [
 			{ tag: 'number', value: 1 },
@@ -336,7 +335,7 @@ test.skip('Algebraic Data Types (ADTs) - Multiple ADTs - should handle multiple 
 		item
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'tuple',
 		values: [
 			{ tag: 'constructor', name: 'Red', args: [] },
@@ -356,7 +355,7 @@ test.skip('Algebraic Data Types (ADTs) - Multiple ADTs - should handle pattern m
 		colorToString Red
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'string',
 		value: 'red',
 	});
@@ -377,7 +376,7 @@ test.skip('Algebraic Data Types (ADTs) - Multiple ADTs - should now work with li
 		list_map colorToStatus colors
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'list',
 		values: [
 			{ tag: 'constructor', name: 'Failure', args: [] },
@@ -394,7 +393,7 @@ test.skip('Algebraic Data Types (ADTs) - Edge Cases - should handle ADT construc
 		x
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'constructor',
 		name: 'Unit',
 		args: [],
@@ -412,7 +411,7 @@ test.skip('Algebraic Data Types (ADTs) - Edge Cases - should handle ADT with sam
 		isUnit Unit
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'constructor',
 		name: 'True',
 		args: [],
@@ -429,7 +428,7 @@ test.skip('Algebraic Data Types (ADTs) - Complex Scenarios - should work when sh
 		areas
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'list',
 		values: [
 			{ tag: 'number', value: 27 },
@@ -445,7 +444,7 @@ test('Algebraic Data Types (ADTs) - Generic Constructors - should handle Point w
 		origin
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'constructor',
 		name: 'Point',
 		args: [
@@ -462,7 +461,7 @@ test('Algebraic Data Types (ADTs) - Generic Constructors - should handle Shape w
 		circle
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'constructor',
 		name: 'Circle',
 		args: [{ tag: 'number', value: 5.0 }],
@@ -477,7 +476,7 @@ test('Algebraic Data Types (ADTs) - Generic Constructors - should handle partial
 		point
 	`);
 
-	assert.equal(result.finalValue, {
+	expect(result.finalValue).toEqual({
 		tag: 'constructor',
 		name: 'Point',
 		args: [
@@ -502,7 +501,7 @@ test('Recursive ADT - Binary Tree construction and pattern matching', () => {
 		getValue tree
 	`);
 
-	assert.equal(result.finalValue, { tag: 'number', value: 5 });
+	expect(result.finalValue).toEqual({ tag: 'number', value: 5 });
 });
 
 test('Recursive ADT - LinkedList with pattern matching', () => {
@@ -518,7 +517,7 @@ test('Recursive ADT - LinkedList with pattern matching', () => {
 		sum myList
 	`);
 
-	assert.equal(result.finalValue, { tag: 'number', value: 6 });
+	expect(result.finalValue).toEqual({ tag: 'number', value: 6 });
 });
 
 test('Recursive ADT - List operations with proper recursion', () => {
@@ -534,7 +533,7 @@ test('Recursive ADT - List operations with proper recursion', () => {
 		length lst
 	`);
 
-	assert.equal(result.finalValue, { tag: 'number', value: 3 });
+	expect(result.finalValue).toEqual({ tag: 'number', value: 3 });
 });
 
 test('Recursive ADT - Nested pattern matching', () => {
@@ -550,7 +549,6 @@ test('Recursive ADT - Nested pattern matching', () => {
 		sumTree tree
 	`);
 
-	assert.equal(result.finalValue, { tag: 'number', value: 6 });
+	expect(result.finalValue).toEqual({ tag: 'number', value: 6 });
 });
 
-test.run();
