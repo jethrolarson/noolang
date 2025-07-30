@@ -1,0 +1,278 @@
+# Noolang Recursive ADT Examples
+# Demonstrates recursive algebraic data types and pattern matching
+
+# =============================================================================
+# 1. BINARY TREES
+# =============================================================================
+
+# Define a recursive binary tree type
+type Tree a = Node a (Tree a) (Tree a) | Leaf;
+
+# Create sample trees
+numberTree = Node 5 (Node 3 (Node 1 Leaf Leaf) (Node 4 Leaf Leaf)) (Node 7 (Node 6 Leaf Leaf) (Node 9 Leaf Leaf));
+stringTree = Node "root" (Node "left" Leaf Leaf) (Node "right" Leaf Leaf);
+
+# Basic tree operations
+getValue = fn tree => match tree with (
+    Node value _ _ => value;
+    Leaf => 0
+);
+
+# Sum all values in a numeric tree
+sumTree = fn tree => match tree with (
+    Node value left right => value + (sumTree left) + (sumTree right);
+    Leaf => 0
+);
+
+# Calculate tree depth
+depth = fn tree => match tree with (
+    Node _ left right => 1 + max (depth left) (depth right);
+    Leaf => 0
+);
+
+# Count total nodes
+nodeCount = fn tree => match tree with (
+    Node _ left right => 1 + (nodeCount left) + (nodeCount right);
+    Leaf => 0
+);
+
+# Find if value exists in tree
+contains = fn target tree => match tree with (
+    Node value left right => 
+        if value == target 
+        then True 
+        else (contains target left) || (contains target right);
+    Leaf => False
+);
+
+# Transform all values in tree
+mapTree = fn f tree => match tree with (
+    Node value left right => Node (f value) (mapTree f left) (mapTree f right);
+    Leaf => Leaf
+);
+
+# Example tree operations
+treeValue = getValue numberTree;         # => 5
+treeSum = sumTree numberTree;           # => 35 (1+3+4+5+6+7+9)
+treeDepth = depth numberTree;           # => 3
+treeNodes = nodeCount numberTree;       # => 7
+hasThree = contains 3 numberTree;       # => True
+hasZero = contains 0 numberTree;        # => False
+doubledTree = mapTree (multiply 2) numberTree;  # Double all values
+
+# =============================================================================
+# 2. LINKED LISTS
+# =============================================================================
+
+# Define a recursive linked list type
+type LinkedList a = Cons a (LinkedList a) | Nil;
+
+# Create sample lists
+numbers = Cons 1 (Cons 2 (Cons 3 (Cons 4 (Cons 5 Nil))));
+words = Cons "hello" (Cons "world" (Cons "from" (Cons "noolang" Nil)));
+
+# Basic list operations
+head = fn lst => match lst with (
+    Cons h _ => Some h;
+    Nil => None
+);
+
+tail = fn lst => match lst with (
+    Cons _ t => Some t;
+    Nil => None
+);
+
+# List length
+length = fn lst => match lst with (
+    Cons _ tail => 1 + (length tail);
+    Nil => 0
+);
+
+# Sum numeric list
+sum = fn lst => match lst with (
+    Cons head tail => head + (sum tail);
+    Nil => 0
+);
+
+# Map function over list
+listMap = fn f lst => match lst with (
+    Cons head tail => Cons (f head) (listMap f tail);
+    Nil => Nil
+);
+
+# Filter list elements
+filter = fn predicate lst => match lst with (
+    Cons head tail => 
+        if predicate head 
+        then Cons head (filter predicate tail)
+        else filter predicate tail;
+    Nil => Nil
+);
+
+# Fold (reduce) list from left
+foldLeft = fn f acc lst => match lst with (
+    Cons head tail => foldLeft f (f acc head) tail;
+    Nil => acc
+);
+
+# Append two lists
+append = fn list1 list2 => match list1 with (
+    Cons head tail => Cons head (append tail list2);
+    Nil => list2
+);
+
+# Reverse a list
+reverse = fn lst => 
+    let reverseHelper = fn acc remaining => match remaining with (
+        Cons head tail => reverseHelper (Cons head acc) tail;
+        Nil => acc
+    ) in
+    reverseHelper Nil lst;
+
+# Example list operations  
+numbersLength = length numbers;          # => 5
+numbersSum = sum numbers;               # => 15
+squaredNumbers = listMap (multiply 2) numbers;  # [2,4,6,8,10]
+evenNumbers = filter (fn x => (x % 2) == 0) numbers;  # [2,4]
+wordsLength = length words;             # => 4
+firstWord = head words;                 # => Some "hello"
+restWords = tail words;                 # => Some (Cons "world" ...)
+
+# =============================================================================
+# 3. EXPRESSION TREES (SIMPLE CALCULATOR)
+# =============================================================================
+
+# Define expression tree for mathematical operations
+type Expr = 
+    Add Expr Expr |
+    Multiply Expr Expr |
+    Subtract Expr Expr |
+    Divide Expr Expr |
+    Number Float;
+
+# Evaluate expression tree
+eval = fn expr => match expr with (
+    Add left right => (eval left) + (eval right);
+    Multiply left right => (eval left) * (eval right);
+    Subtract left right => (eval left) - (eval right);
+    Divide left right => (eval left) / (eval right);
+    Number n => n
+);
+
+# Convert expression to string representation
+exprToString = fn expr => match expr with (
+    Add left right => "(" + (exprToString left) + " + " + (exprToString right) + ")";
+    Multiply left right => "(" + (exprToString left) + " * " + (exprToString right) + ")";
+    Subtract left right => "(" + (exprToString left) + " - " + (exprToString right) + ")";
+    Divide left right => "(" + (exprToString left) + " / " + (exprToString right) + ")";
+    Number n => toString n
+);
+
+# Example expressions
+# Represents: (2 + 3) * (4 - 1)
+complexExpr = Multiply (Add (Number 2) (Number 3)) (Subtract (Number 4) (Number 1));
+
+# Represents: 10 / (2 + 3)
+divisionExpr = Divide (Number 10) (Add (Number 2) (Number 3));
+
+# Evaluate expressions
+complexResult = eval complexExpr;       # => 15 ((2+3) * (4-1) = 5*3 = 15)
+divisionResult = eval divisionExpr;     # => 2  (10 / (2+3) = 10/5 = 2)
+
+# Get string representations
+complexString = exprToString complexExpr;     # => "((2 + 3) * (4 - 1))"
+divisionString = exprToString divisionExpr;   # => "(10 / (2 + 3))"
+
+# =============================================================================
+# 4. JSON-LIKE DATA STRUCTURE
+# =============================================================================
+
+# Define a recursive JSON-like data structure
+type JsonValue = 
+    JsonObject (LinkedList {String, JsonValue}) |
+    JsonArray (LinkedList JsonValue) |
+    JsonString String |
+    JsonNumber Float |
+    JsonBool Bool |
+    JsonNull;
+
+# Helper function to create JSON objects from field lists
+jsonObject = fn fields => JsonObject fields;
+jsonArray = fn values => JsonArray values;
+
+# Example JSON data
+# Represents: {"name": "Alice", "age": 30, "active": true, "scores": [85, 92, 78]}
+sampleJson = JsonObject (
+    Cons {"name", JsonString "Alice"} (
+        Cons {"age", JsonNumber 30} (
+            Cons {"active", JsonBool True} (
+                Cons {"scores", JsonArray (
+                    Cons (JsonNumber 85) (
+                        Cons (JsonNumber 92) (
+                            Cons (JsonNumber 78) Nil
+                        )
+                    )
+                )} Nil
+            )
+        )
+    )
+);
+
+# Extract string representation of JSON
+jsonToString = fn json => match json with (
+    JsonObject fields => "{" + (fieldsToString fields) + "}";
+    JsonArray values => "[" + (arrayToString values) + "]";
+    JsonString s => "\"" + s + "\"";
+    JsonNumber n => toString n;
+    JsonBool True => "true";
+    JsonBool False => "false"; 
+    JsonNull => "null"
+);
+
+# Helper for object fields
+fieldsToString = fn fields => match fields with (
+    Cons {key, value} tail => 
+        "\"" + key + "\": " + (jsonToString value) + 
+        (match tail with (Nil => ""; _ => ", " + (fieldsToString tail)));
+    Nil => ""
+);
+
+# Helper for arrays
+arrayToString = fn values => match values with (
+    Cons value tail =>
+        (jsonToString value) + 
+        (match tail with (Nil => ""; _ => ", " + (arrayToString tail)));
+    Nil => ""
+);
+
+# Convert sample JSON to string
+jsonString = jsonToString sampleJson;
+
+# =============================================================================
+# 5. DEMONSTRATIONS AND TESTS
+# =============================================================================
+
+# Test all our recursive data structures
+"=== Binary Tree Results ===";
+"Tree root value: " + toString treeValue;
+"Tree sum: " + toString treeSum;
+"Tree depth: " + toString treeDepth;
+"Tree node count: " + toString treeNodes;
+"Contains 3: " + toString hasThree;
+"Contains 0: " + toString hasZero;
+
+"=== Linked List Results ===";
+"Numbers length: " + toString numbersLength;
+"Numbers sum: " + toString numbersSum;
+"Words length: " + toString wordsLength;
+
+"=== Expression Tree Results ===";
+"Complex expression: " + complexString;
+"Complex result: " + toString complexResult;
+"Division expression: " + divisionString;  
+"Division result: " + toString divisionResult;
+
+"=== JSON Structure Result ===";
+"JSON string: " + jsonString;
+
+"All recursive ADT examples completed successfully!"
