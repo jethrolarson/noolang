@@ -11,6 +11,8 @@ import type {
 	BinaryExpression,
 	IfExpression,
 	DefinitionExpression,
+	TupleDestructuringExpression,
+	RecordDestructuringExpression,
 	ImportExpression,
 	RecordExpression,
 	AccessorExpression,
@@ -976,6 +978,68 @@ export class Evaluator {
 		}
 	}
 
+	private evaluateTupleDestructuring(expr: TupleDestructuringExpression): Value {
+		// Evaluate the right-hand side (tuple value)
+		const value = this.evaluateExpression(expr.value);
+		
+		// Extract the tuple elements
+		if (value.tag !== 'tuple') {
+			throw new Error('Expected tuple value for tuple destructuring');
+		}
+		
+		// Check that the number of pattern elements matches tuple elements
+		if (expr.pattern.elements.length !== value.values.length) {
+			throw new Error(`Tuple destructuring length mismatch: pattern has ${expr.pattern.elements.length} elements but value has ${value.values.length}`);
+		}
+		
+		// Bind each pattern element to its corresponding value
+		for (let i = 0; i < expr.pattern.elements.length; i++) {
+			const element = expr.pattern.elements[i];
+			const elementValue = value.values[i];
+			
+			if (element.kind === 'variable') {
+				this.environment.set(element.name, elementValue);
+			} else {
+				// TODO: Handle nested destructuring
+				throw new Error('Nested tuple destructuring not yet implemented');
+			}
+		}
+		
+		return value;
+	}
+
+	private evaluateRecordDestructuring(expr: RecordDestructuringExpression): Value {
+		// Evaluate the right-hand side (record value)
+		const value = this.evaluateExpression(expr.value);
+		
+		// Extract the record fields
+		if (value.tag !== 'record') {
+			throw new Error('Expected record value for record destructuring');
+		}
+		
+		// Bind each pattern field to its corresponding value
+		for (const field of expr.pattern.fields) {
+			if (field.kind === 'shorthand') {
+				// @name -> name
+				if (!(field.fieldName in value.fields)) {
+					throw new Error(`Field '${field.fieldName}' not found in record`);
+				}
+				this.environment.set(field.fieldName, value.fields[field.fieldName]);
+			} else if (field.kind === 'rename') {
+				// @name userName -> userName
+				if (!(field.fieldName in value.fields)) {
+					throw new Error(`Field '${field.fieldName}' not found in record`);
+				}
+				this.environment.set(field.localName, value.fields[field.fieldName]);
+			} else {
+				// TODO: Handle nested destructuring
+				throw new Error('Nested record destructuring not yet implemented');
+			}
+		}
+		
+		return value;
+	}
+
 	private evaluateMutableDefinition(expr: MutableDefinitionExpression): Value {
 		// Evaluate the right-hand side
 		const value = this.evaluateExpression(expr.value);
@@ -1020,8 +1084,14 @@ export class Evaluator {
 			case 'if':
 				return this.evaluateIf(expr);
 
-			case 'definition':
+								case 'definition':
 				return this.evaluateDefinition(expr);
+
+			case 'tuple-destructuring':
+				return this.evaluateTupleDestructuring(expr);
+
+			case 'record-destructuring':
+				return this.evaluateRecordDestructuring(expr);
 
 			case 'mutable-definition':
 				return this.evaluateMutableDefinition(expr);

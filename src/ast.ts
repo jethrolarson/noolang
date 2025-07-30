@@ -131,6 +131,8 @@ export type Expression =
 	| BinaryExpression
 	| IfExpression
 	| DefinitionExpression
+	| TupleDestructuringExpression
+	| RecordDestructuringExpression
 	| MutableDefinitionExpression
 	| MutationExpression
 	| ImportExpression
@@ -228,6 +230,22 @@ export interface DefinitionExpression {
 	location: Location;
 }
 
+export interface TupleDestructuringExpression {
+	kind: 'tuple-destructuring';
+	pattern: TupleDestructuringPattern;
+	value: Expression;
+	type?: Type;
+	location: Location;
+}
+
+export interface RecordDestructuringExpression {
+	kind: 'record-destructuring';
+	pattern: RecordDestructuringPattern;
+	value: Expression;
+	type?: Type;
+	location: Location;
+}
+
 export interface MutableDefinitionExpression {
 	kind: 'mutable-definition';
 	name: string;
@@ -316,7 +334,7 @@ export interface ListExpression {
 export interface WhereExpression {
 	kind: 'where';
 	main: Expression;
-	definitions: (DefinitionExpression | MutableDefinitionExpression)[];
+	definitions: (DefinitionExpression | TupleDestructuringExpression | RecordDestructuringExpression | MutableDefinitionExpression)[];
 	type?: Type;
 	location: Location;
 }
@@ -353,6 +371,30 @@ export interface RecordPatternField {
 	pattern: Pattern;
 	location: Location;
 }
+
+// Destructuring patterns (different from match patterns)
+export type TupleDestructuringPattern = {
+	kind: 'tuple-destructuring-pattern';
+	elements: DestructuringElement[];
+	location: Location;
+};
+
+export type RecordDestructuringPattern = {
+	kind: 'record-destructuring-pattern';
+	fields: RecordDestructuringField[];
+	location: Location;
+};
+
+export type DestructuringElement = 
+	| { kind: 'variable'; name: string; location: Location }
+	| { kind: 'nested-tuple'; pattern: TupleDestructuringPattern; location: Location }
+	| { kind: 'nested-record'; pattern: RecordDestructuringPattern; location: Location };
+
+export type RecordDestructuringField = 
+	| { kind: 'shorthand'; fieldName: string; location: Location }  // {@name} -> name
+	| { kind: 'rename'; fieldName: string; localName: string; location: Location }  // {@name userName} -> userName
+	| { kind: 'nested-tuple'; fieldName: string; pattern: TupleDestructuringPattern; location: Location }  // {@coords {x, y}}
+	| { kind: 'nested-record'; fieldName: string; pattern: RecordDestructuringPattern; location: Location }; // {@user {@name}}
 
 // Pattern matching case
 export interface MatchCase {
