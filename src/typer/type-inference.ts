@@ -631,11 +631,11 @@ function collectImplicitConstraints(
 ): Constraint[] {
 	const constraints: Constraint[] = [];
 	
-	// Simple check: if the function body uses +, add Add constraint to first parameter
-	// This is a simplified implementation - a complete one would track which specific
-	// parameters are used in + operations and map them to their type variables
-	if (usesAddOperator(bodyAST)) {
-		// For now, add constraint to the first type variable (usually the first parameter)
+	// Check for operators that require constraints and add appropriate constraints
+	const operatorConstraints = analyzeOperatorConstraints(bodyAST);
+	
+	if (operatorConstraints.needsAdd || operatorConstraints.needsNumeric) {
+		// Get the first type variable to add constraints to
 		const allTypeVars = new Set<string>();
 		for (const paramType of paramTypes) {
 			collectTypeVariables(paramType, allTypeVars);
@@ -643,53 +643,106 @@ function collectImplicitConstraints(
 		
 		if (allTypeVars.size > 0) {
 			const firstTypeVar = Array.from(allTypeVars).sort()[0];
-			constraints.push(implementsConstraint(firstTypeVar, 'Add'));
+			
+			if (operatorConstraints.needsAdd) {
+				constraints.push(implementsConstraint(firstTypeVar, 'Add'));
+			}
+			if (operatorConstraints.needsNumeric) {
+				constraints.push(implementsConstraint(firstTypeVar, 'Numeric'));
+			}
 		}
 	}
 	
 	return constraints;
 }
 
-// Simple recursive check for + operator usage
-function usesAddOperator(expr: Expression): boolean {
-	if (!expr) return false;
+// Analyze what operator constraints are needed based on actual operator usage
+function analyzeOperatorConstraints(expr: Expression): { needsAdd: boolean; needsNumeric: boolean } {
+	if (!expr) return { needsAdd: false, needsNumeric: false };
 	
 	switch (expr.kind) {
 		case 'binary':
-			return expr.operator === '+' || 
-				   usesAddOperator(expr.left) || 
-				   usesAddOperator(expr.right);
+			// Check current operator
+			const currentNeeds = getOperatorConstraints(expr.operator);
+			
+			// Check operands recursively
+			const leftNeeds = analyzeOperatorConstraints(expr.left);
+			const rightNeeds = analyzeOperatorConstraints(expr.right);
+			
+			return {
+				needsAdd: currentNeeds.needsAdd || leftNeeds.needsAdd || rightNeeds.needsAdd,
+				needsNumeric: currentNeeds.needsNumeric || leftNeeds.needsNumeric || rightNeeds.needsNumeric
+			};
 		
 		case 'application':
-			return usesAddOperator(expr.func) || 
-				   expr.args.some(arg => usesAddOperator(arg));
+			const funcNeeds = analyzeOperatorConstraints(expr.func);
+			const argsNeeds = expr.args.map(arg => analyzeOperatorConstraints(arg));
+			
+			return {
+				needsAdd: funcNeeds.needsAdd || argsNeeds.some(a => a.needsAdd),
+				needsNumeric: funcNeeds.needsNumeric || argsNeeds.some(a => a.needsNumeric)
+			};
 		
 		case 'function':
-			return usesAddOperator(expr.body);
+			return analyzeOperatorConstraints(expr.body);
 		
 		case 'if':
-			return usesAddOperator(expr.condition) || 
-				   usesAddOperator(expr.then) || 
-				   (expr.else ? usesAddOperator(expr.else) : false);
+			const condNeeds = analyzeOperatorConstraints(expr.condition);
+			const thenNeeds = analyzeOperatorConstraints(expr.then);
+			const elseNeeds = expr.else ? analyzeOperatorConstraints(expr.else) : { needsAdd: false, needsNumeric: false };
+			
+			return {
+				needsAdd: condNeeds.needsAdd || thenNeeds.needsAdd || elseNeeds.needsAdd,
+				needsNumeric: condNeeds.needsNumeric || thenNeeds.needsNumeric || elseNeeds.needsNumeric
+			};
 		
 		case 'record':
-			return Object.values(expr.fields).some(field => usesAddOperator(field.value));
+			const fieldNeeds = Object.values(expr.fields).map(field => analyzeOperatorConstraints(field.value));
+			
+			return {
+				needsAdd: fieldNeeds.some(f => f.needsAdd),
+				needsNumeric: fieldNeeds.some(f => f.needsNumeric)
+			};
 		
 		case 'tuple':
-			return expr.elements.some(elem => usesAddOperator(elem));
+			const elemNeeds = expr.elements.map(elem => analyzeOperatorConstraints(elem));
+			
+			return {
+				needsAdd: elemNeeds.some(e => e.needsAdd),
+				needsNumeric: elemNeeds.some(e => e.needsNumeric)
+			};
 		
 		case 'list':
-			return expr.elements.some(elem => usesAddOperator(elem));
+			const listNeeds = expr.elements.map(elem => analyzeOperatorConstraints(elem));
+			
+			return {
+				needsAdd: listNeeds.some(e => e.needsAdd),
+				needsNumeric: listNeeds.some(e => e.needsNumeric)
+			};
 		
-		// Leaf nodes
+		// Leaf nodes don't use operators
 		case 'literal':
 		case 'variable':
 		case 'unit':
 		case 'accessor':
-			return false;
+			return { needsAdd: false, needsNumeric: false };
 		
 		default:
-			return false;
+			return { needsAdd: false, needsNumeric: false };
+	}
+}
+
+// Map operators to their required constraints (based on builtins.ts)
+function getOperatorConstraints(operator: string): { needsAdd: boolean; needsNumeric: boolean } {
+	switch (operator) {
+		case '+':
+			return { needsAdd: true, needsNumeric: false };
+		case '-':
+		case '*':
+		case '/':
+			return { needsAdd: false, needsNumeric: true };
+		default:
+			return { needsAdd: false, needsNumeric: false };
 	}
 }
 
