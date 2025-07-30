@@ -40,6 +40,10 @@ import {
 	implementsConstraint,
 	type VariableType,
 } from '../ast';
+import { Lexer } from '../lexer/lexer';
+import { parse } from '../parser/parser';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
 	undefinedVariableError,
 	nonFunctionApplicationError,
@@ -64,6 +68,8 @@ import {
 	unionEffects,
 	emptyEffects,
 } from './types';
+import { createTypeState, loadStdlib } from './type-operations';
+import { initializeBuiltins } from './builtins';
 // NOTE: validateConstraintName import removed - constraint validation disabled
 import {
 	freshTypeVariable,
@@ -1090,7 +1096,7 @@ export const typeMutation = (
 type ModuleTypeCache = Map<string, { type: Type; effects: Set<Effect> }>;
 const moduleTypeCache: ModuleTypeCache = new Map();
 
-// Type inference for imports
+// Type inference for imports - with real module loading and type checking
 export const typeImport = (
 	expr: ImportExpression,
 	state: TypeState
@@ -1107,29 +1113,60 @@ export const typeImport = (
 			return createTypeResult(cached.type, totalEffects, state);
 		}
 		
-		// TODO: Implement actual module loading and type inference
-		// For now, this is a placeholder that should be replaced with:
-		// 1. fs.readFileSync(filePath)
-		// 2. lex and parse the module
-		// 3. type-check in clean environment  
-		// 4. extract final type and effects
+		// Actual module loading and type inference
+		try {
+			// 1. Load the module file
+			const resolvedPath = path.resolve(filePath);
+			const moduleContent = fs.readFileSync(resolvedPath, 'utf8');
+			
+			// 2. Lex and parse the module
+			const lexer = new Lexer(moduleContent);
+			const tokens = lexer.tokenize();
+			const moduleProgram = parse(tokens);
+			
+			// 3. Type-check in a clean environment
+			let moduleState = createTypeState();
+			moduleState = initializeBuiltins(moduleState);
+			moduleState = loadStdlib(moduleState);
+			
+			// Type-check all statements in the module
+			let finalType: Type = unitType();
+			let moduleEffects = new Set<Effect>();
+			
+			for (const statement of moduleProgram.statements) {
+				const result = typeExpression(statement, moduleState);
+				moduleState = result.state;
+				finalType = result.type;
+				
+				// Collect effects from the module
+				for (const effect of result.effects) {
+					moduleEffects.add(effect);
+				}
+			}
+			
+			// 4. Cache the result
+			moduleTypeCache.set(filePath, { type: finalType, effects: moduleEffects });
+			
+			// Import always has the !read effect (file I/O) plus module effects
+			const totalEffects = new Set<Effect>([...moduleEffects, 'read']);
+			
+			return createTypeResult(finalType, totalEffects, state);
+			
+		} catch (moduleError) {
+			// If module loading/parsing fails, return empty record but don't crash
+			// The evaluator will handle the actual error at runtime
+			const moduleType = recordType({});
+			const moduleEffects = new Set<Effect>();
+			
+			// Cache the failed result to avoid repeated attempts
+			moduleTypeCache.set(filePath, { type: moduleType, effects: moduleEffects });
+			
+			const totalEffects = new Set<Effect>([...moduleEffects, 'read']);
+			return createTypeResult(moduleType, totalEffects, state);
+		}
 		
-		// Temporary fallback - return empty record
-		// This will cause accessor tests to fail, which is correct behavior
-		// until we implement proper module type inference
-		const moduleType = recordType({});
-		const moduleEffects = new Set<Effect>();
-		
-		// Cache the result
-		moduleTypeCache.set(filePath, { type: moduleType, effects: moduleEffects });
-		
-		// Import always has the !read effect (file I/O) plus module effects
-		const totalEffects = new Set<Effect>([...moduleEffects, 'read']);
-		
-		return createTypeResult(moduleType, totalEffects, state);
 	} catch (error) {
-		// If import fails during type checking, return a generic record
-		// Let the evaluator handle the actual import error
+		// If anything else fails, return a generic record
 		const importEffects = new Set<Effect>(['read']);
 		return createTypeResult(recordType({}), importEffects, state);
 	}
