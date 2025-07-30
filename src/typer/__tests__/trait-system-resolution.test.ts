@@ -63,7 +63,7 @@ test('Trait System Phase 3: Constraint Resolution - Constraint Collapse - should
 		
 		// Check constraint collapse behavior
 		if (testCase.shouldCollapse) {
-			assert.not.match(typeString, /implements|given|α\d+/);
+			  expect(typeString).not.toMatch(/implements|given|α\d+/);
 		} else {
 			expect(typeString).toMatch(/implements|given|α\d+/);
 		}

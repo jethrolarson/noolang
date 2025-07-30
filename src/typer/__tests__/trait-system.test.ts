@@ -12,8 +12,8 @@ import {
 	getTypeName 
 } from '../trait-system';
 import { functionType, typeVariable, stringType, floatType, boolType } from '../../ast';
-import { 
 import { describe, test, expect } from 'bun:test';
+import { 
 	assertNumberValue, 
 	assertListValue, 
 	assertConstrainedType, 
@@ -304,7 +304,7 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Basic
 	const typeString = typeToString(typeResult.type);
 	expect(typeString).toBe('List Float');
 	// Should NOT have constraint annotations anymore
-	assert.not.match(typeString, /implements|given|α\d+/);
+	expect(typeString).not.toMatch(/implements|given|α\d+/);
 });
 
 test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Basic Constraint Resolution - should resolve Functor constraint for Option', () => {
@@ -318,7 +318,7 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Basic
 	const typeString = typeToString(typeResult.type);
 	expect(typeString).toBe('Option Float');
 	// Should NOT have constraint annotations anymore
-	assert.not.match(typeString, /implements|given|α\d+/);
+	expect(typeString).not.toMatch(/implements|given|α\d+/);
 });
 
 test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Basic Constraint Resolution - should resolve Show constraint for Float', () => {
@@ -390,7 +390,7 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Compl
 	expect(typeResult.type.kind).toBe('list');
 	const typeString = typeToString(typeResult.type);
 	expect(typeString).toBe('List Float');
-	assert.not.match(typeString, /implements|given|α\d+/);
+	expect(typeString).not.toMatch(/implements|given|α\d+/);
 });
 
 test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Complex Constraint Resolution - should handle multiple different constraints', () => {
