@@ -1159,6 +1159,38 @@ function inferModuleType(path: string): Type {
 		});
 	}
 	
+	// Handle pure_math module
+	if (path === 'pure_math') {
+		return recordType({
+			double: functionType(
+				[primitiveType('Float')],
+				primitiveType('Float'),
+				new Set()
+			),
+			triple: functionType(
+				[primitiveType('Float')],
+				primitiveType('Float'),
+				new Set()
+			)
+		});
+	}
+	
+	// Handle logger module
+	if (path === 'logger') {
+		return recordType({
+			info: functionType(
+				[primitiveType('String')],
+				primitiveType('String'),
+				new Set(['log'])
+			),
+			error: functionType(
+				[primitiveType('String')],
+				primitiveType('String'),
+				new Set(['log'])
+			)
+		});
+	}
+	
 	// Default to empty record for unknown modules
 	// In a complete implementation, this would parse and type-check the module
 	return recordType({});
