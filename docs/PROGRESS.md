@@ -288,8 +288,45 @@ valid = input ^ matches pattern
 3. **Trait Function Name Policy**: Review whether trait functions should prevent variable shadowing
 4. **Standard Library Expansion**: Add missing common functions
 
+### **Destructuring Assignment Implementation (Medium-Lower Priority)**
+
+A comprehensive destructuring system has been designed and documented in `docs/TYPE_SYSTEM.md`. While not immediately critical due to current ergonomic workarounds, destructuring would significantly improve import and data manipulation ergonomics.
+
+#### **Current Status:**
+- ✅ **Complete design specification** in TYPE_SYSTEM.md with syntax, semantics, and safety guarantees
+- ✅ **Pattern matching foundation** exists for destructuring implementation 
+- ❌ **Parser support** for destructuring patterns in assignments
+- ❌ **AST nodes** for `TupleDestructuringExpression`, `RecordDestructuringExpression`
+- ❌ **Evaluator implementation** for binding multiple variables from patterns
+
+#### **Key Features Planned:**
+```noolang
+# Tuple destructuring
+{x, y, z} = {1, 2, 3};
+
+# Record destructuring with renaming  
+{@name userName, @age} = user;
+
+# Import destructuring (major ergonomic win)
+{@add, @multiply, @min} = import "math" : MathModule;
+result = add 2 3;  # Clean function calls
+```
+
+#### **Implementation Priority:**
+- **High value for imports**: Would eliminate `@function module args` awkwardness
+- **Low urgency**: Current accessor syntax (`@add math 2 3`) works acceptably
+- **Good incremental feature**: Can be added without breaking existing code
+- **Foundation for other features**: Enables more ergonomic patterns
+
+#### **Implementation Roadmap:**
+1. **Parser**: Extend definition expressions to support destructuring patterns
+2. **AST**: Add destructuring expression node types
+3. **Type System**: Implement type inference for destructured bindings
+4. **Evaluator**: Add pattern-based variable binding
+5. **Integration**: Ensure destructuring works with imports, constraints, and effects
+
 ### **Advanced Features (Lower Priority)**
-1. **Destructuring Assignment**: Pattern-based assignment for ergonomic variable binding
+1. **Enhanced Destructuring**: Nested patterns, default values, type annotations
 2. **Unknown Type & Type Refinement**: Pattern matching on dynamically typed values with `forget` operation
 3. **Monadic Operators**: Enhanced `|?` operator for Option/Result chaining
 4. **FFI System**: Foreign function interface with platform adapters (requires Unknown type)
