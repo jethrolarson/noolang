@@ -72,7 +72,7 @@ test('multiple function access from same module should work', () => {
 		sum = @add math 2 3;
 		product = @multiply math 4 5;
 		squared = @square math 6;
-		{sum, product, squared}
+{sum, product, squared}
 	`;
 	const lexer = new Lexer(code);
 	const tokens = lexer.tokenize();
@@ -96,7 +96,7 @@ test('module type caching should work for repeated imports', () => {
 	const code = `
 		math1 = import "pure_math";
 		math2 = import "pure_math";
-		{@double math1 5, @triple math2 4}
+{@double math1 5, @triple math2 4}
 	`;
 	const lexer = new Lexer(code);
 	const tokens = lexer.tokenize();
