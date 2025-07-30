@@ -48,7 +48,7 @@ function expectSuccess(code: string, expectedValue?: any) {
 }
 
 function expectError(code: string) {
-    expect(().toThrow() => runCode(code));
+    expect(() => runCode(code).toThrow());
 }
 
 // Test the specific list_map toString issue

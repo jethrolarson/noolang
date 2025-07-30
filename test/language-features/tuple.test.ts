@@ -40,7 +40,7 @@ const evaluateSource = (source: string) => {
 test('length of empty tuple', () => {
 	const source = 'tuple = {}; tupleLength tuple';
 	// { } is now unit, not an empty tuple, so this should throw an error
-	expect(().toThrow() => evaluateSource(source));
+	expect(() => evaluateSource(source).toThrow());
 });
 
 test('length of singleton tuple', () => {
@@ -59,7 +59,7 @@ test('length of pair tuple', () => {
 test('returns true for empty tuple', () => {
 	const source = 'tuple = {}; tupleIsEmpty tuple';
 	// { } is now unit, not an empty tuple, so this should throw an error
-	expect(().toThrow() => evaluateSource(source));
+	expect(() => evaluateSource(source).toThrow());
 });
 
 test('returns false for non-empty tuple', () => {

@@ -1,9 +1,8 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { parse } from '../../parser/parser';
 import { Lexer } from '../../lexer/lexer';
 import { typeAndDecorate } from '../index';
 import { floatType, stringType, optionType } from '../../ast';
+import { describe, test, expect } from 'bun:test';
 
 test('Unified Math Trait System (Float-only) - Add Trait (supports Float, String) - should add numbers', () => {
     const code = '3 + 4';
@@ -11,7 +10,7 @@ test('Unified Math Trait System (Float-only) - Add Trait (supports Float, String
     const program = parse(tokens);
     const result = typeAndDecorate(program);
     
-    assert.equal(result.finalType, floatType());
+    expect(result.finalType).toEqual(floatType());
 });
 
 test('Unified Math Trait System (Float-only) - Add Trait (supports Float, String) - should add floats', () => {
@@ -20,7 +19,7 @@ test('Unified Math Trait System (Float-only) - Add Trait (supports Float, String
     const program = parse(tokens);
     const result = typeAndDecorate(program);
     
-    assert.equal(result.finalType, floatType());
+    expect(result.finalType).toEqual(floatType());
 });
 
 test('Unified Math Trait System (Float-only) - Add Trait (supports Float, String) - should add strings', () => {
@@ -29,7 +28,7 @@ test('Unified Math Trait System (Float-only) - Add Trait (supports Float, String
     const program = parse(tokens);
     const result = typeAndDecorate(program);
     
-    assert.equal(result.finalType, stringType());
+    expect(result.finalType).toEqual(stringType());
 });
 
 test('Unified Math Trait System (Float-only) - Add Trait (supports Float, String) - should reject mixed type addition', () => {
@@ -37,7 +36,7 @@ test('Unified Math Trait System (Float-only) - Add Trait (supports Float, String
     const tokens = new Lexer(code).tokenize();
     const program = parse(tokens);
     
-    assert.throws(() => typeAndDecorate(program), /type mismatch|Expected.*Float.*Got.*String/i);
+    expect(() => typeAndDecorate(program).toThrow(), /type mismatch|Expected.*Float.*Got.*String/i);
 });
 
 test('Unified Math Trait System (Float-only) - Numeric Trait (supports Float for -, *, /) - should subtract numbers', () => {
@@ -46,7 +45,7 @@ test('Unified Math Trait System (Float-only) - Numeric Trait (supports Float for
     const program = parse(tokens);
     const result = typeAndDecorate(program);
     
-    assert.equal(result.finalType, floatType());
+    expect(result.finalType).toEqual(floatType());
 });
 
 test('Unified Math Trait System (Float-only) - Numeric Trait (supports Float for -, *, /) - should subtract floats', () => {
@@ -55,7 +54,7 @@ test('Unified Math Trait System (Float-only) - Numeric Trait (supports Float for
     const program = parse(tokens);
     const result = typeAndDecorate(program);
     
-    assert.equal(result.finalType, floatType());
+    expect(result.finalType).toEqual(floatType());
 });
 
 test('Unified Math Trait System (Float-only) - Numeric Trait (supports Float for -, *, /) - should multiply numbers', () => {
@@ -64,7 +63,7 @@ test('Unified Math Trait System (Float-only) - Numeric Trait (supports Float for
     const program = parse(tokens);
     const result = typeAndDecorate(program);
     
-    assert.equal(result.finalType, floatType());
+    expect(result.finalType).toEqual(floatType());
 });
 
 test('Unified Math Trait System (Float-only) - Numeric Trait (supports Float for -, *, /) - should multiply floats', () => {
@@ -73,7 +72,7 @@ test('Unified Math Trait System (Float-only) - Numeric Trait (supports Float for
     const program = parse(tokens);
     const result = typeAndDecorate(program);
     
-    assert.equal(result.finalType, floatType());
+    expect(result.finalType).toEqual(floatType());
 });
 
 test('Unified Math Trait System (Float-only) - Numeric Trait (supports Float for -, *, /) - should allow string operations through type-checking (caught at runtime)', () => {
@@ -86,7 +85,7 @@ test('Unified Math Trait System (Float-only) - Numeric Trait (supports Float for
         const program = parse(tokens);
         
         // Type checking should pass (constraint resolution allows it)
-        assert.not.throws(() => typeAndDecorate(program));
+        expect(().not.toThrow() => typeAndDecorate(program));
     });
 });
 
@@ -96,7 +95,7 @@ test('Unified Math Trait System (Float-only) - Safe Division (returns Option Flo
     const program = parse(tokens);
     const result = typeAndDecorate(program);
     
-    assert.equal(result.finalType, optionType(floatType()));
+    expect(result.finalType).toEqual(optionType(floatType()));
 });
 
 test('Unified Math Trait System (Float-only) - Safe Division (returns Option Float) - should divide floats and return Option Float', () => {
@@ -105,7 +104,7 @@ test('Unified Math Trait System (Float-only) - Safe Division (returns Option Flo
     const program = parse(tokens);
     const result = typeAndDecorate(program);
     
-    assert.equal(result.finalType, optionType(floatType()));
+    expect(result.finalType).toEqual(optionType(floatType()));
 });
 
 test('Unified Math Trait System (Float-only) - Safe Division (returns Option Float) - should handle all division as safe (returning Option Float)', () => {
@@ -116,7 +115,7 @@ test('Unified Math Trait System (Float-only) - Safe Division (returns Option Flo
         const program = parse(tokens);
         const result = typeAndDecorate(program);
         
-        assert.equal(result.finalType, optionType(floatType()));
+        expect(result.finalType).toEqual(optionType(floatType()));
     });
 });
 
@@ -126,7 +125,7 @@ test('Unified Math Trait System (Float-only) - Complex Expressions - should hand
     const program = parse(tokens);
     const result = typeAndDecorate(program);
     
-    assert.equal(result.finalType, floatType());
+    expect(result.finalType).toEqual(floatType());
 });
 
 test('Unified Math Trait System (Float-only) - Complex Expressions - should handle polymorphic functions with math operations', () => {
@@ -136,7 +135,7 @@ test('Unified Math Trait System (Float-only) - Complex Expressions - should hand
     const result = typeAndDecorate(program);
     
     // Should infer as a polymorphic function constrained by Add and Numeric
-    assert.is(result.finalType.kind, 'function');
+    expect(result.finalType.kind).toBe('function');
 });
 
 test('Unified Math Trait System (Float-only) - Type Safety - should accept all Float operations since everything is Float', () => {
@@ -145,7 +144,7 @@ test('Unified Math Trait System (Float-only) - Type Safety - should accept all F
     const program = parse(tokens);
     const result = typeAndDecorate(program);
     
-    assert.equal(result.finalType, floatType());
+    expect(result.finalType).toEqual(floatType());
 });
 
 test('Unified Math Trait System (Float-only) - Type Safety - should allow string numeric operations through type-checking', () => {
@@ -160,7 +159,7 @@ test('Unified Math Trait System (Float-only) - Type Safety - should allow string
     operations.forEach(code => {
         const tokens = new Lexer(code).tokenize();
         const program = parse(tokens);
-        assert.not.throws(() => typeAndDecorate(program));
+        expect(().not.toThrow() => typeAndDecorate(program));
     });
 });
 
@@ -172,7 +171,7 @@ test('Unified Math Trait System (Float-only) - Type Safety - should type all num
         const tokens = new Lexer(code).tokenize();
         const program = parse(tokens);
         const result = typeAndDecorate(program);
-        assert.equal(result.finalType, floatType());
+        expect(result.finalType).toEqual(floatType());
     });
 });
 
@@ -192,8 +191,7 @@ test('Unified Math Trait System (Float-only) - Design Verification - should demo
         const tokens = new Lexer(code).tokenize();
         const program = parse(tokens);
         const result = typeAndDecorate(program);
-        assert.equal(result.finalType, type);
+        expect(result.finalType).toEqual(type);
     });
 });
 
-test.run();

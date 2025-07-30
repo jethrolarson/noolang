@@ -1,8 +1,7 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../parser';
 import type { ConstraintDefinitionExpression, ImplementDefinitionExpression } from '../../ast';
+import { describe, test, expect } from 'bun:test';
 
 // Helper functions for type-safe testing
 function assertConstraintDefinitionExpression(expr: any): ConstraintDefinitionExpression {
@@ -23,14 +22,14 @@ test('Constraint Definitions and Implementations - should parse constraint defin
 	const lexer = new Lexer('constraint Show a ( show : a -> String )');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const constraintDef = assertConstraintDefinitionExpression(
 		program.statements[0]
 	);
-	assert.is(constraintDef.name, 'Show');
-	assert.equal(constraintDef.typeParams, ['a']);
-	assert.is(constraintDef.functions.length, 1);
-	assert.is(constraintDef.functions[0].name, 'show');
+	expect(constraintDef.name).toBe('Show');
+	expect(constraintDef.typeParams).toEqual(['a']);
+	expect(constraintDef.functions.length).toBe(1);
+	expect(constraintDef.functions[0].name).toBe('show');
 });
 
 test('Constraint Definitions and Implementations - should parse implement definition', () => {
@@ -39,29 +38,29 @@ test('Constraint Definitions and Implementations - should parse implement defini
 	);
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const implDef = assertImplementDefinitionExpression(program.statements[0]);
-	assert.is(implDef.constraintName, 'Monad');
-	assert.is(implDef.typeExpr.kind, 'variant');
-	assert.is((implDef.typeExpr as any).name, 'Option');
-	assert.is(implDef.implementations.length, 2);
-	assert.is(implDef.implementations[0].name, 'return');
-	assert.is(implDef.implementations[1].name, 'bind');
+	expect(implDef.constraintName).toBe('Monad');
+	expect(implDef.typeExpr.kind).toBe('variant');
+	expect((implDef.typeExpr as any).name).toBe('Option');
+	expect(implDef.implementations.length).toBe(2);
+	expect(implDef.implementations[0].name).toBe('return');
+	expect(implDef.implementations[1].name).toBe('bind');
 });
 
 test('Constraint Definitions and Implementations - should parse constraint with simple functions', () => {
 	const lexer = new Lexer('constraint Eq a ( eq a : a -> a -> Bool )');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const constraintDef = assertConstraintDefinitionExpression(
 		program.statements[0]
 	);
-	assert.is(constraintDef.name, 'Eq');
-	assert.equal(constraintDef.typeParams, ['a']);
-	assert.is(constraintDef.functions.length, 1);
-	assert.is(constraintDef.functions[0].name, 'eq');
-	assert.equal(constraintDef.functions[0].typeParams, ['a']);
+	expect(constraintDef.name).toBe('Eq');
+	expect(constraintDef.typeParams).toEqual(['a']);
+	expect(constraintDef.functions.length).toBe(1);
+	expect(constraintDef.functions[0].name).toBe('eq');
+	expect(constraintDef.functions[0].typeParams).toEqual(['a']);
 });
 
 test('Constraint Definitions and Implementations - should parse constraint definition with multiple type parameters', () => {
@@ -69,14 +68,13 @@ test('Constraint Definitions and Implementations - should parse constraint defin
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const constraintDef = assertConstraintDefinitionExpression(
 		program.statements[0]
 	);
-	assert.is(constraintDef.name, 'Eq');
-	assert.equal(constraintDef.typeParams, ['a', 'b']);
-	assert.is(constraintDef.functions.length, 1);
-	assert.is(constraintDef.functions[0].name, 'eq');
+	expect(constraintDef.name).toBe('Eq');
+	expect(constraintDef.typeParams).toEqual(['a', 'b']);
+	expect(constraintDef.functions.length).toBe(1);
+	expect(constraintDef.functions[0].name).toBe('eq');
 });
 
-test.run();

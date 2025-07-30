@@ -41,7 +41,7 @@ function runCode(code: string) {
 }
 
 function expectError(code: string) {
-    expect(().toThrow() => runCode(code));
+    expect(() => runCode(code).toThrow());
 }
 
 function expectSuccess(code: string, expectedValue?: any) {

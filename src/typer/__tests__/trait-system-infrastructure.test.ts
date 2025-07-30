@@ -1,11 +1,10 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { typeProgram } from '..';
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
 import { typeToString } from '../helpers';
 import { createTraitRegistry, addTraitDefinition, addTraitImplementation, isTraitFunction, resolveTraitFunction } from '../trait-system';
 import { functionType, typeVariable, stringType, floatType } from '../../ast';
+import { describe, test, expect } from 'bun:test';
 
 const parseProgram = (source: string) => {
 	const lexer = new Lexer(source);
@@ -15,8 +14,8 @@ const parseProgram = (source: string) => {
 
 test('Trait System Phase 1 Infrastructure - TraitRegistry - should create empty trait registry', () => {
 	const registry = createTraitRegistry();
-	assert.is(registry.definitions.size, 0);
-	assert.is(registry.implementations.size, 0);
+	expect(registry.definitions.size).toBe(0);
+	expect(registry.implementations.size).toBe(0);
 });
 
 test('Trait System Phase 1 Infrastructure - TraitRegistry - should add trait definition', () => {
@@ -29,9 +28,9 @@ test('Trait System Phase 1 Infrastructure - TraitRegistry - should add trait def
 	
 	addTraitDefinition(registry, trait);
 	
-	assert.is(registry.definitions.size, 1);
-	assert.equal(registry.definitions.get('Show'), trait);
-	assert.is(registry.implementations.has('Show'), true);
+	expect(registry.definitions.size).toBe(1);
+	expect(registry.definitions.get('Show')).toEqual(trait);
+	expect(registry.implementations.has('Show')).toBe(true);
 });
 
 test('Trait System Phase 1 Infrastructure - TraitRegistry - should add trait implementation', () => {
@@ -50,8 +49,8 @@ test('Trait System Phase 1 Infrastructure - TraitRegistry - should add trait imp
 	
 	const success = addTraitImplementation(registry, 'Show', impl);
 	
-	assert.is(success, true);
-	assert.equal(registry.implementations.get('Show')?.get('Float'), impl);
+	expect(success).toBe(true);
+	expect(registry.implementations.get('Show')?.get('Float')).toEqual(impl);
 });
 
 test('Trait System Phase 1 Infrastructure - TraitRegistry - should fail to add implementation for non-existent trait', () => {
@@ -63,7 +62,7 @@ test('Trait System Phase 1 Infrastructure - TraitRegistry - should fail to add i
 	
 	const success = addTraitImplementation(registry, 'NonExistent', impl);
 	
-	assert.is(success, false);
+	expect(success).toBe(false);
 });
 
 test('Trait System Phase 1 Infrastructure - TraitRegistry - should reject implementation with wrong function signature', () => {
@@ -85,7 +84,7 @@ test('Trait System Phase 1 Infrastructure - TraitRegistry - should reject implem
 		} as any]]),
 	};
 	
-	assert.throws(() => addTraitImplementation(registry, 'Show', badImpl),
+	expect(() => addTraitImplementation(registry, 'Show', badImpl).toThrow(),
 		/Function signature mismatch for 'show' in Show implementation for Option: expected 1 parameters, got 2/);
 });
 
@@ -107,7 +106,7 @@ test('Trait System Phase 1 Infrastructure - TraitRegistry - should reject implem
 		} as any]]),
 	};
 	
-	assert.throws(() => addTraitImplementation(registry, 'Test', badImpl),
+	expect(() => addTraitImplementation(registry, 'Test', badImpl).toThrow(),
 		/Function signature mismatch for 'fn2' in Test implementation for Float: expected 2 parameters, got 1/);
 });
 
@@ -130,7 +129,7 @@ test('Trait System Phase 1 Infrastructure - TraitRegistry - should accept implem
 	};
 	
 	const success = addTraitImplementation(registry, 'Show', correctImpl);
-	assert.is(success, true);
+	expect(success).toBe(true);
 });
 
 test('Trait System Phase 1 Infrastructure - TraitRegistry - should accept variable references (unknown arity)', () => {
@@ -149,7 +148,7 @@ test('Trait System Phase 1 Infrastructure - TraitRegistry - should accept variab
 	};
 	
 	const success = addTraitImplementation(registry, 'Show', variableImpl);
-	assert.is(success, true);
+	expect(success).toBe(true);
 });
 
 test('Trait System Phase 1 Infrastructure - TraitRegistry - should reject function not defined in trait', () => {
@@ -170,7 +169,7 @@ test('Trait System Phase 1 Infrastructure - TraitRegistry - should reject functi
 		} as any]]),
 	};
 	
-	assert.throws(() => addTraitImplementation(registry, 'Show', badImpl),
+	expect(() => addTraitImplementation(registry, 'Show', badImpl).toThrow(),
 		/Function 'nonExistentFunction' not defined in trait Show/);
 });
 
@@ -184,7 +183,7 @@ test('Trait System Phase 1 Infrastructure - Constraint Type Infrastructure - sho
 	`);
 	const result = typeProgram(program);
 	
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Trait System Phase 1 Infrastructure - Constraint Type Infrastructure - should handle function composition', () => {
@@ -197,7 +196,7 @@ test('Trait System Phase 1 Infrastructure - Constraint Type Infrastructure - sho
 	`);
 	const result = typeProgram(program);
 	
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Trait System Phase 1 Infrastructure - Constraint Type Infrastructure - should handle partial application correctly', () => {
@@ -208,7 +207,7 @@ test('Trait System Phase 1 Infrastructure - Constraint Type Infrastructure - sho
 	`);
 	const result = typeProgram(program);
 	
-	assert.is(typeToString(result.type, result.state.substitution), '(Float) -> Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), '(Float) -> Float');
 });
 
 test('Trait System Phase 1 Infrastructure - Trait Function Type Inference Integration - should generate generic function type for trait function lookups', () => {
@@ -220,7 +219,7 @@ test('Trait System Phase 1 Infrastructure - Trait Function Type Inference Integr
 	};
 	addTraitDefinition(registry, trait);
 
-	assert.is(isTraitFunction(registry, 'show'), true);
+	expect(isTraitFunction(registry).toBe('show'), true);
 });
 
 test('Trait System Phase 1 Infrastructure - Trait Function Type Inference Integration - should maintain registry state through type inference', () => {
@@ -230,7 +229,7 @@ test('Trait System Phase 1 Infrastructure - Trait Function Type Inference Integr
 		result = show2 42
 	`);
 
-	assert.not.throws(() => typeProgram(program));
+	expect(().not.toThrow() => typeProgram(program));
 });
 
 test('Trait System Phase 1 Infrastructure - Conditional Implementations (Given Constraints) - should parse implement statements with given constraints', () => {
@@ -241,21 +240,21 @@ test('Trait System Phase 1 Infrastructure - Conditional Implementations (Given C
 		);
 	`);
 
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	// The parser treats constraint; implement as a binary expression
 	const binaryExpr = program.statements[0] as any;
-	assert.is(binaryExpr.kind, 'binary');
-	assert.is(binaryExpr.operator, ';');
+	expect(binaryExpr.kind).toBe('binary');
+	expect(binaryExpr.operator).toBe(';');
 	
 	// The implement statement is the right side of the binary expression
 	const implementStmt = binaryExpr.right;
-	assert.is(implementStmt.kind, 'implement-definition');
+	expect(implementStmt.kind).toBe('implement-definition');
 	
-	assert.is(implementStmt.constraintName, 'Show');
-	assert.ok(implementStmt.givenConstraints);
-	assert.is(implementStmt.givenConstraints.kind, 'implements');
-	assert.is(implementStmt.givenConstraints.typeVar, 'a');
-	assert.is(implementStmt.givenConstraints.interfaceName, 'Show');
+	expect(implementStmt.constraintName).toBe('Show');
+	expect(expect(implementStmt.givenConstraints)).toBeTruthy();
+	expect(implementStmt.givenConstraints.kind).toBe('implements');
+	expect(implementStmt.givenConstraints.typeVar).toBe('a');
+	expect(implementStmt.givenConstraints.interfaceName).toBe('Show');
 });
 
 test('Trait System Phase 1 Infrastructure - Conditional Implementations (Given Constraints) - should validate given constraints are satisfied during implementation', () => {
@@ -286,7 +285,7 @@ test('Trait System Phase 1 Infrastructure - Conditional Implementations (Given C
 
 	// TODO: This should eventually check that the given constraint is satisfied
 	// For now, just test that it doesn't crash
-	assert.not.throws(() => addTraitImplementation(registry, 'Show', conditionalImpl));
+	expect(().not.toThrow() => addTraitImplementation(registry, 'Show', conditionalImpl));
 });
 
 test('Trait System Phase 1 Infrastructure - Conditional Implementations (Given Constraints) - should accept conditional implementations when constraints are satisfied', () => {
@@ -323,7 +322,6 @@ test('Trait System Phase 1 Infrastructure - Conditional Implementations (Given C
 	};
 
 	const success = addTraitImplementation(registry, 'Show', conditionalImpl);
-	assert.is(success, true);
+	expect(success).toBe(true);
 });
 
-test.run();

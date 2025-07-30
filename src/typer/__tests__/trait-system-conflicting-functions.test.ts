@@ -1,7 +1,6 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
+import { describe, test, expect } from 'bun:test';
 
 const parseAndType = (code: string) => {
 	const lexer = new Lexer(code);
@@ -25,17 +24,17 @@ test('Trait System Conflicting Functions Safety - should allow multiple traits t
 	// This should succeed because Float implements Processable and String implements Formatter
 	// No ambiguity because each type has only one implementation of 'process'
 	const result = parseAndType(code);
-	assert.is(result.type.kind, 'unit');
+	expect(result.type.kind).toBe('unit');
 	
 	// Both traits should be registered
-	assert.is(result.state.traitRegistry.definitions.has('Processable'), true);
-	assert.is(result.state.traitRegistry.definitions.has('Formatter'), true);
+	expect(result.state.traitRegistry.definitions.has('Processable')).toBe(true);
+	expect(result.state.traitRegistry.definitions.has('Formatter')).toBe(true);
 	
 	// Both implementations should exist
 	const processableImpls = result.state.traitRegistry.implementations.get('Processable');
 	const formatterImpls = result.state.traitRegistry.implementations.get('Formatter');
-	assert.is(processableImpls?.has('Float'), true);
-	assert.is(formatterImpls?.has('String'), true);
+	expect(processableImpls?.has('Float')).toBe(true);
+	expect(formatterImpls?.has('String')).toBe(true);
 });
 
 test('Trait System Conflicting Functions Safety - should allow different function names in multiple constraints', () => {
@@ -48,17 +47,17 @@ test('Trait System Conflicting Functions Safety - should allow different functio
 	`;
 	
 	const result = parseAndType(code);
-	assert.is(result.type.kind, 'unit');
+	expect(result.type.kind).toBe('unit');
 	
 	// Both traits should be registered
-	assert.is(result.state.traitRegistry.definitions.has('Displayable'), true);
-	assert.is(result.state.traitRegistry.definitions.has('Formattable'), true);
+	expect(result.state.traitRegistry.definitions.has('Displayable')).toBe(true);
+	expect(result.state.traitRegistry.definitions.has('Formattable')).toBe(true);
 	
 	// Both implementations should exist
 	const displayImpls = result.state.traitRegistry.implementations.get('Displayable');
 	const formatImpls = result.state.traitRegistry.implementations.get('Formattable');
-	assert.is(displayImpls?.has('Float'), true);
-	assert.is(formatImpls?.has('Float'), true);
+	expect(displayImpls?.has('Float')).toBe(true);
+	expect(formatImpls?.has('Float')).toBe(true);
 });
 
 test('Trait System Conflicting Functions Safety - should detect ambiguous function calls when multiple implementations exist', () => {
@@ -72,10 +71,10 @@ test('Trait System Conflicting Functions Safety - should detect ambiguous functi
 	
 	// The setup should work (registering multiple implementations of 'convert' for Float)
 	const setupResult = parseAndType(setupCode);
-	assert.is(setupResult.type.kind, 'unit');
+	expect(setupResult.type.kind).toBe('unit');
 	
 	// But using the conflicting function should error due to ambiguity
-	assert.throws(() => parseAndType(setupCode + '; result = convert 42'), /ambiguous function call/i);
+	expect(() => parseAndType(setupCode + '; result = convert 42').toThrow(), /ambiguous function call/i);
 });
 
 test('Trait System Conflicting Functions Safety - should detect conflicting function names at implementation level', () => {
@@ -89,7 +88,7 @@ test('Trait System Conflicting Functions Safety - should detect conflicting func
 	`;
 	
 	// This should fail because Float has two implementations of 'display'
-	assert.throws(() => parseAndType(code), /ambiguous function call.*display.*Float/i);
+	expect(() => parseAndType(code).toThrow(), /ambiguous function call.*display.*Float/i);
 });
 
 test('Trait System Conflicting Functions Safety - should work when same function name exists but for different types', () => {
@@ -104,8 +103,7 @@ test('Trait System Conflicting Functions Safety - should work when same function
 	`;
 	
 	const result = parseAndType(code);
-	assert.is(result.type.kind, 'primitive');
-	assert.is(result.type.name, 'String');
+	expect(result.type.kind).toBe('primitive');
+	expect(result.type.name).toBe('String');
 });
 
-test.run();

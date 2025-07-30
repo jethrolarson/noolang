@@ -1,10 +1,9 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
 import { typeAndDecorate } from '../index';
 import { floatType, stringType, optionType } from '../../ast';
 import { Evaluator } from '../../evaluator/evaluator';
+import { describe, test, expect } from 'bun:test';
 
 const parseTypeAndEvaluate = (code: string) => {
 	const lexer = new Lexer(code);
@@ -28,16 +27,16 @@ test('Built-in Trait Implementations - Add Trait - Float - should type check Flo
 	const code = '1.0 + 2.0';
 	const { typeResult } = parseTypeAndEvaluate(code);
 	
-	assert.equal(typeResult.finalType, floatType());
+	expect(typeResult.finalType).toEqual(floatType());
 });
 
 test('Built-in Trait Implementations - Add Trait - Float - should evaluate Float addition at runtime', () => {
 	const code = '1.0 + 2.0';
 	const { evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'number');
+	expect(evalResult.finalResult.tag).toBe('number');
 	if (evalResult.finalResult.tag === 'number') {
-		assert.is(evalResult.finalResult.value, 3);
+		expect(evalResult.finalResult.value).toBe(3);
 	}
 });
 
@@ -45,10 +44,10 @@ test('Built-in Trait Implementations - Add Trait - Float - should work with inte
 	const code = '5 + 7';
 	const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.equal(typeResult.finalType, floatType());
-	assert.is(evalResult.finalResult.tag, 'number');
+	expect(typeResult.finalType).toEqual(floatType());
+	expect(evalResult.finalResult.tag).toBe('number');
 	if (evalResult.finalResult.tag === 'number') {
-		assert.is(evalResult.finalResult.value, 12);
+		expect(evalResult.finalResult.value).toBe(12);
 	}
 });
 
@@ -56,10 +55,10 @@ test('Built-in Trait Implementations - Add Trait - Float - should work with mixe
 	const code = '3 + 4.5';
 	const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.equal(typeResult.finalType, floatType());
-	assert.is(evalResult.finalResult.tag, 'number');
+	expect(typeResult.finalType).toEqual(floatType());
+	expect(evalResult.finalResult.tag).toBe('number');
 	if (evalResult.finalResult.tag === 'number') {
-		assert.is(evalResult.finalResult.value, 7.5);
+		expect(evalResult.finalResult.value).toBe(7.5);
 	}
 });
 
@@ -67,16 +66,16 @@ test('Built-in Trait Implementations - Add Trait - String - should type check St
 	const code = '"hello" + " world"';
 	const { typeResult } = parseTypeAndEvaluate(code);
 	
-	assert.equal(typeResult.finalType, stringType());
+	expect(typeResult.finalType).toEqual(stringType());
 });
 
 test('Built-in Trait Implementations - Add Trait - String - should evaluate String addition at runtime', () => {
 	const code = '"hello" + " world"';
 	const { evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'string');
+	expect(evalResult.finalResult.tag).toBe('string');
 	if (evalResult.finalResult.tag === 'string') {
-		assert.is(evalResult.finalResult.value, 'hello world');
+		expect(evalResult.finalResult.value).toBe('hello world');
 	}
 });
 
@@ -84,10 +83,10 @@ test('Built-in Trait Implementations - Add Trait - String - should work with emp
 	const code = '"" + "test"';
 	const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.equal(typeResult.finalType, stringType());
-	assert.is(evalResult.finalResult.tag, 'string');
+	expect(typeResult.finalType).toEqual(stringType());
+	expect(evalResult.finalResult.tag).toBe('string');
 	if (evalResult.finalResult.tag === 'string') {
-		assert.is(evalResult.finalResult.value, 'test');
+		expect(evalResult.finalResult.value).toBe('test');
 	}
 });
 
@@ -97,7 +96,7 @@ test('Built-in Trait Implementations - Add Trait - Mixed Types - should reject F
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	
-	assert.throws(() => typeAndDecorate(program), /type mismatch|Expected.*Float.*Got.*String/i);
+	expect(() => typeAndDecorate(program).toThrow(), /type mismatch|Expected.*Float.*Got.*String/i);
 });
 
 // ========================================
@@ -108,16 +107,16 @@ test('Built-in Trait Implementations - Numeric Trait - Subtract - should type ch
 	const code = '10.0 - 3.0';
 	const { typeResult } = parseTypeAndEvaluate(code);
 	
-	assert.equal(typeResult.finalType, floatType());
+	expect(typeResult.finalType).toEqual(floatType());
 });
 
 test('Built-in Trait Implementations - Numeric Trait - Subtract - should evaluate Float subtraction at runtime', () => {
 	const code = '10.0 - 3.0';
 	const { evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'number');
+	expect(evalResult.finalResult.tag).toBe('number');
 	if (evalResult.finalResult.tag === 'number') {
-		assert.is(evalResult.finalResult.value, 7);
+		expect(evalResult.finalResult.value).toBe(7);
 	}
 });
 
@@ -125,9 +124,9 @@ test('Built-in Trait Implementations - Numeric Trait - Subtract - should handle 
 	const code = '3.0 - 8.0';
 	const { evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'number');
+	expect(evalResult.finalResult.tag).toBe('number');
 	if (evalResult.finalResult.tag === 'number') {
-		assert.is(evalResult.finalResult.value, -5);
+		expect(evalResult.finalResult.value).toBe(-5);
 	}
 });
 
@@ -139,16 +138,16 @@ test('Built-in Trait Implementations - Numeric Trait - Multiply - should type ch
 	const code = '4.0 * 2.5';
 	const { typeResult } = parseTypeAndEvaluate(code);
 	
-	assert.equal(typeResult.finalType, floatType());
+	expect(typeResult.finalType).toEqual(floatType());
 });
 
 test('Built-in Trait Implementations - Numeric Trait - Multiply - should evaluate Float multiplication at runtime', () => {
 	const code = '4.0 * 2.5';
 	const { evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'number');
+	expect(evalResult.finalResult.tag).toBe('number');
 	if (evalResult.finalResult.tag === 'number') {
-		assert.is(evalResult.finalResult.value, 10);
+		expect(evalResult.finalResult.value).toBe(10);
 	}
 });
 
@@ -156,9 +155,9 @@ test('Built-in Trait Implementations - Numeric Trait - Multiply - should handle 
 	const code = '5.0 * 0.0';
 	const { evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'number');
+	expect(evalResult.finalResult.tag).toBe('number');
 	if (evalResult.finalResult.tag === 'number') {
-		assert.is(evalResult.finalResult.value, 0);
+		expect(evalResult.finalResult.value).toBe(0);
 	}
 });
 
@@ -170,18 +169,18 @@ test('Built-in Trait Implementations - Numeric Trait - Divide - should type chec
 	const code = '10.0 / 2.0';
 	const { typeResult } = parseTypeAndEvaluate(code);
 	
-	assert.equal(typeResult.finalType, optionType(floatType()));
+	expect(typeResult.finalType).toEqual(optionType(floatType()));
 });
 
 test('Built-in Trait Implementations - Numeric Trait - Divide - should evaluate Float division at runtime', () => {
 	const code = '10.0 / 2.0';
 	const { evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'constructor');
+	expect(evalResult.finalResult.tag).toBe('constructor');
 	if (evalResult.finalResult.tag === 'constructor') {
-		assert.is(evalResult.finalResult.name, 'Some');
-		assert.is(evalResult.finalResult.args.length, 1);
-		assert.equal(evalResult.finalResult.args[0], { tag: 'number', value: 5 });
+		expect(evalResult.finalResult.name).toBe('Some');
+		expect(evalResult.finalResult.args.length).toBe(1);
+		expect(evalResult.finalResult.args[0]).toEqual({ tag: 'number', value: 5 });
 	}
 });
 
@@ -189,10 +188,10 @@ test('Built-in Trait Implementations - Numeric Trait - Divide - should handle di
 	const code = '10.0 / 0.0';
 	const { evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'constructor');
+	expect(evalResult.finalResult.tag).toBe('constructor');
 	if (evalResult.finalResult.tag === 'constructor') {
-		assert.is(evalResult.finalResult.name, 'None');
-		assert.is(evalResult.finalResult.args.length, 0);
+		expect(evalResult.finalResult.name).toBe('None');
+		expect(evalResult.finalResult.args.length).toBe(0);
 	}
 });
 
@@ -200,11 +199,11 @@ test('Built-in Trait Implementations - Numeric Trait - Divide - should handle fr
 	const code = '7.0 / 2.0';
 	const { evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'constructor');
+	expect(evalResult.finalResult.tag).toBe('constructor');
 	if (evalResult.finalResult.tag === 'constructor') {
-		assert.is(evalResult.finalResult.name, 'Some');
-		assert.is(evalResult.finalResult.args.length, 1);
-		assert.equal(evalResult.finalResult.args[0], { tag: 'number', value: 3.5 });
+		expect(evalResult.finalResult.name).toBe('Some');
+		expect(evalResult.finalResult.args.length).toBe(1);
+		expect(evalResult.finalResult.args[0]).toEqual({ tag: 'number', value: 3.5 });
 	}
 });
 
@@ -216,11 +215,11 @@ test('Built-in Trait Implementations - Complex Expressions - should handle multi
 	const code = '1.0 + 2.0 * 3.0 - 4.0';
 	const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.equal(typeResult.finalType, floatType());
-	assert.is(evalResult.finalResult.tag, 'number');
+	expect(typeResult.finalType).toEqual(floatType());
+	expect(evalResult.finalResult.tag).toBe('number');
 	if (evalResult.finalResult.tag === 'number') {
 		// Expected: 1 + (2 * 3) - 4 = 1 + 6 - 4 = 3
-		assert.is(evalResult.finalResult.value, 3);
+		expect(evalResult.finalResult.value).toBe(3);
 	}
 });
 
@@ -228,11 +227,11 @@ test('Built-in Trait Implementations - Complex Expressions - should work with pa
 	const code = '(10.0 + 5.0) * 2.0 - 3.0';
 	const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.equal(typeResult.finalType, floatType());
-	assert.is(evalResult.finalResult.tag, 'number');
+	expect(typeResult.finalType).toEqual(floatType());
+	expect(evalResult.finalResult.tag).toBe('number');
 	if (evalResult.finalResult.tag === 'number') {
 		// Expected: (10 + 5) * 2 - 3 = 15 * 2 - 3 = 30 - 3 = 27
-		assert.is(evalResult.finalResult.value, 27);
+		expect(evalResult.finalResult.value).toBe(27);
 	}
 });
 
@@ -244,12 +243,12 @@ test('Built-in Trait Implementations - Higher-Order Functions - should work with
 	const code = 'map (fn x => x + 1.0) [1.0, 2.0, 3.0]';
 	const { evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'list');
+	expect(evalResult.finalResult.tag).toBe('list');
 	if (evalResult.finalResult.tag === 'list') {
-		assert.is(evalResult.finalResult.values.length, 3);
-		assert.equal(evalResult.finalResult.values[0], { tag: 'number', value: 2 });
-		assert.equal(evalResult.finalResult.values[1], { tag: 'number', value: 3 });
-		assert.equal(evalResult.finalResult.values[2], { tag: 'number', value: 4 });
+		expect(evalResult.finalResult.values.length).toBe(3);
+		expect(evalResult.finalResult.values[0]).toEqual({ tag: 'number', value: 2 });
+		expect(evalResult.finalResult.values[1]).toEqual({ tag: 'number', value: 3 });
+		expect(evalResult.finalResult.values[2]).toEqual({ tag: 'number', value: 4 });
 	}
 });
 
@@ -257,12 +256,12 @@ test('Built-in Trait Implementations - Higher-Order Functions - should work with
 	const code = 'map (fn x => x * 2.0) [1.0, 2.0, 3.0]';
 	const { evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'list');
+	expect(evalResult.finalResult.tag).toBe('list');
 	if (evalResult.finalResult.tag === 'list') {
-		assert.is(evalResult.finalResult.values.length, 3);
-		assert.equal(evalResult.finalResult.values[0], { tag: 'number', value: 2 });
-		assert.equal(evalResult.finalResult.values[1], { tag: 'number', value: 4 });
-		assert.equal(evalResult.finalResult.values[2], { tag: 'number', value: 6 });
+		expect(evalResult.finalResult.values.length).toBe(3);
+		expect(evalResult.finalResult.values[0]).toEqual({ tag: 'number', value: 2 });
+		expect(evalResult.finalResult.values[1]).toEqual({ tag: 'number', value: 4 });
+		expect(evalResult.finalResult.values[2]).toEqual({ tag: 'number', value: 6 });
 	}
 });
 
@@ -270,9 +269,9 @@ test('Built-in Trait Implementations - Higher-Order Functions - should work with
 	const code = 'reduce (fn acc x => acc + x) 0.0 [1.0, 2.0, 3.0]';
 	const { evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'number');
+	expect(evalResult.finalResult.tag).toBe('number');
 	if (evalResult.finalResult.tag === 'number') {
-		assert.is(evalResult.finalResult.value, 6);
+		expect(evalResult.finalResult.value).toBe(6);
 	}
 });
 
@@ -288,10 +287,10 @@ test('Built-in Trait Implementations - Variables - should work with variable add
 	`;
 	const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.equal(typeResult.finalType, floatType());
-	assert.is(evalResult.finalResult.tag, 'number');
+	expect(typeResult.finalType).toEqual(floatType());
+	expect(evalResult.finalResult.tag).toBe('number');
 	if (evalResult.finalResult.tag === 'number') {
-		assert.is(evalResult.finalResult.value, 8);
+		expect(evalResult.finalResult.value).toBe(8);
 	}
 });
 
@@ -302,9 +301,9 @@ test('Built-in Trait Implementations - Function Definitions - should work with f
 	`;
 	const { evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'number');
+	expect(evalResult.finalResult.tag).toBe('number');
 	if (evalResult.finalResult.tag === 'number') {
-		assert.is(evalResult.finalResult.value, 6);
+		expect(evalResult.finalResult.value).toBe(6);
 	}
 });
 
@@ -315,10 +314,10 @@ test('Built-in Trait Implementations - Function Definitions - should work with f
 	`;
 	const { evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'number');
+	expect(evalResult.finalResult.tag).toBe('number');
 	if (evalResult.finalResult.tag === 'number') {
 		// Expected: 3 * 2 + 5 - 1 = 6 + 5 - 1 = 10
-		assert.is(evalResult.finalResult.value, 10);
+		expect(evalResult.finalResult.value).toBe(10);
 	}
 });
 
@@ -331,12 +330,12 @@ test('Built-in Trait Implementations - Built-in Resolution - should resolve Add 
 	const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 	
 	// Type checking should pass (constraint checking works)
-	assert.equal(typeResult.finalType, floatType());
+	expect(typeResult.finalType).toEqual(floatType());
 	
 	// Runtime should work (built-in resolution works)
-	assert.is(evalResult.finalResult.tag, 'number');
+	expect(evalResult.finalResult.tag).toBe('number');
 	if (evalResult.finalResult.tag === 'number') {
-		assert.is(evalResult.finalResult.value, 3);
+		expect(evalResult.finalResult.value).toBe(3);
 	}
 });
 
@@ -345,12 +344,12 @@ test('Built-in Trait Implementations - Built-in Resolution - should resolve Add 
 	const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 	
 	// Type checking should pass (constraint checking works)
-	assert.equal(typeResult.finalType, stringType());
+	expect(typeResult.finalType).toEqual(stringType());
 	
 	// Runtime should work (built-in resolution works)
-	assert.is(evalResult.finalResult.tag, 'string');
+	expect(evalResult.finalResult.tag).toBe('string');
 	if (evalResult.finalResult.tag === 'string') {
-		assert.is(evalResult.finalResult.value, 'hello world');
+		expect(evalResult.finalResult.value).toBe('hello world');
 	}
 });
 
@@ -359,12 +358,12 @@ test('Built-in Trait Implementations - Built-in Resolution - should resolve Nume
 	const { typeResult, evalResult } = parseTypeAndEvaluate(code);
 	
 	// Type checking should pass (constraint checking works)
-	assert.equal(typeResult.finalType, floatType());
+	expect(typeResult.finalType).toEqual(floatType());
 	
 	// Runtime should work (built-in resolution works)
-	assert.is(evalResult.finalResult.tag, 'number');
+	expect(evalResult.finalResult.tag).toBe('number');
 	if (evalResult.finalResult.tag === 'number') {
-		assert.is(evalResult.finalResult.value, 5);
+		expect(evalResult.finalResult.value).toBe(5);
 	}
 });
 
@@ -376,9 +375,9 @@ test('Built-in Trait Implementations - Edge Cases - should handle very large num
 	const code = '999999.0 + 1.0';
 	const { evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'number');
+	expect(evalResult.finalResult.tag).toBe('number');
 	if (evalResult.finalResult.tag === 'number') {
-		assert.is(evalResult.finalResult.value, 1000000);
+		expect(evalResult.finalResult.value).toBe(1000000);
 	}
 });
 
@@ -386,9 +385,9 @@ test('Built-in Trait Implementations - Edge Cases - should handle very small num
 	const code = '0.001 * 0.001';
 	const { evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'number');
+	expect(evalResult.finalResult.tag).toBe('number');
 	if (evalResult.finalResult.tag === 'number') {
-		assert.is(evalResult.finalResult.value, 0.000001);
+		expect(evalResult.finalResult.value).toBe(0.000001);
 	}
 });
 
@@ -396,10 +395,9 @@ test('Built-in Trait Implementations - Edge Cases - should handle string concate
 	const code = '"123" + "456"';
 	const { evalResult } = parseTypeAndEvaluate(code);
 	
-	assert.is(evalResult.finalResult.tag, 'string');
+	expect(evalResult.finalResult.tag).toBe('string');
 	if (evalResult.finalResult.tag === 'string') {
-		assert.is(evalResult.finalResult.value, '123456');
+		expect(evalResult.finalResult.value).toBe('123456');
 	}
 });
 
-test.run();

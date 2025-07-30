@@ -348,19 +348,19 @@ test('Effects Phase 3 - Effect System Architecture Validation - function returni
 
 test('Effects Phase 3 - Effect Type System Integration - TypeResult includes effects field for effectful expressions', () => {
 	const result = runNoolang('print 42');
-	expect(result.hasOwnProperty('type').toBeTruthy(), 'result should have type property');
-	expect(result.hasOwnProperty('effects').toBeTruthy(), 'result should have effects property');
-	expect(result.hasOwnProperty('state').toBeTruthy(), 'result should have state property');
-	expect(result.effects instanceof Set, 'effects should be a Set').toBeTruthy();
-	expect(result.effects.has('write').toBeTruthy(), 'effects should contain write effect');
+	expect(expect(result.hasOwnProperty('type')).toBeTruthy(), 'result should have type property');
+	expect(expect(result.hasOwnProperty('effects')).toBeTruthy(), 'result should have effects property');
+	expect(expect(result.hasOwnProperty('state')).toBeTruthy(), 'result should have state property');
+	expect(expect(result.effects instanceof Set, 'effects should be a Set')).toBeTruthy();
+	expect(expect(result.effects.has('write')).toBeTruthy(), 'effects should contain write effect');
 });
 
 test('Effects Phase 3 - Effect Type System Integration - TypeResult includes effects field for pure expressions', () => {
 	const result = runNoolang('42');
-	expect(result.hasOwnProperty('type').toBeTruthy(), 'result should have type property');
-	expect(result.hasOwnProperty('effects').toBeTruthy(), 'result should have effects property');
-	expect(result.hasOwnProperty('state').toBeTruthy(), 'result should have state property');
-	expect(result.effects instanceof Set, 'effects should be a Set').toBeTruthy();
+	expect(expect(result.hasOwnProperty('type')).toBeTruthy(), 'result should have type property');
+	expect(expect(result.hasOwnProperty('effects')).toBeTruthy(), 'result should have effects property');
+	expect(expect(result.hasOwnProperty('state')).toBeTruthy(), 'result should have state property');
+	expect(expect(result.effects instanceof Set, 'effects should be a Set')).toBeTruthy();
 	expect(result.effects.size).toEqual(0, 'pure expression should have no effects');
 });
 
@@ -372,8 +372,8 @@ test('Effects Phase 3 - Effect Type System Integration - complex expressions hav
 				);
 				loggedRandom 5
 			`);
-	expect(result.effects.has('log').toBeTruthy(), 'effects should contain log effect');
-	expect(result.effects.has('rand').toBeTruthy(), 'effects should contain rand effect');
+	expect(expect(result.effects.has('log')).toBeTruthy(), 'effects should contain log effect');
+	expect(expect(result.effects.has('rand')).toBeTruthy(), 'effects should contain rand effect');
 	expect(result.effects.size).toEqual(2, 'should have exactly 2 effects');
 });
 

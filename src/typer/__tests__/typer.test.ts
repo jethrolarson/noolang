@@ -1,11 +1,10 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
 import { typeProgram } from '..';
 import { typeToString } from '../helpers';
 import { createTypeState } from '..';
 import { initializeBuiltins } from '../builtins';
+import { describe, test, expect } from 'bun:test';
 
 // Helper function to parse a string into a program
 const parseProgram = (source: string) => {
@@ -17,32 +16,32 @@ const parseProgram = (source: string) => {
 test('Functional Type Inference - Basic Types - should infer integer literal', () => {
 	const program = parseProgram('42');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Basic Types - should infer string literal', () => {
 	const program = parseProgram('"hello"');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'String');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'String');
 });
 
 test('Functional Type Inference - Basic Types - should infer boolean literal', () => {
 	const program = parseProgram('True');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Bool');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Bool');
 });
 
 test('Functional Type Inference - Function Types - should infer identity function', () => {
 	const program = parseProgram('fn x => x');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), '(α) -> α');
+	expect(typeToString(result.type).toBe(result.state.substitution), '(α) -> α');
 });
 
 test('Functional Type Inference - Function Types - should infer function with multiple parameters', () => {
 	const program = parseProgram('fn x y => x + y');
 	const result = typeProgram(program);
 	// With trait system, + operator is polymorphic: Add a => a -> a -> a
-	assert.is(typeToString(result.type, result.state.substitution), '(α) -> (α) -> α given α implements Add');
+	expect(typeToString(result.type).toBe(result.state.substitution), '(α) -> (α) -> α given α implements Add');
 });
 
 test('Functional Type Inference - Function Types - should infer nested function', () => {
@@ -50,19 +49,19 @@ test('Functional Type Inference - Function Types - should infer nested function'
 	const result = typeProgram(program);
 	// With trait system, + operator is polymorphic: Add a => a -> a -> a
 	// Note: May show duplicate constraints due to nested function constraint collection
-	assert.is(typeToString(result.type, result.state.substitution), '(α) -> (α) -> α given α implements Add given α implements Add');
+	expect(typeToString(result.type).toBe(result.state.substitution), '(α) -> (α) -> α given α implements Add given α implements Add');
 });
 
 test('Functional Type Inference - Let Polymorphism - should generalize identity function', () => {
 	const program = parseProgram('id = fn x => x; id 42');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Let Polymorphism - should allow polymorphic function to be used with different types', () => {
 	const program = parseProgram('id = fn x => x; id 42; id "hello"');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'String');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'String');
 });
 
 test('Functional Type Inference - Let Polymorphism - should handle recursive definitions', () => {
@@ -70,13 +69,13 @@ test('Functional Type Inference - Let Polymorphism - should handle recursive def
 		'fact = fn n => if n == 0 then 1 else n * (fact (n - 1)); fact 5'
 	);
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Function Application - should apply function to argument', () => {
 	const program = parseProgram('(fn x => x + 1) 42');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Function Application - should handle partial application', () => {
@@ -84,127 +83,127 @@ test('Functional Type Inference - Function Application - should handle partial a
 		'sum = fn x y => x + y; sum5 = sum 5; sum5 3'
 	);
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Function Application - should handle curried application', () => {
 	const program = parseProgram('sum = fn x y => x + y; sum 2 3');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Binary Operators - should infer arithmetic operations', () => {
 	const program = parseProgram('2 + 3');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Binary Operators - should infer comparison operations', () => {
 	const program = parseProgram('2 < 3');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Bool');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Bool');
 });
 
 test('Functional Type Inference - Binary Operators - should infer equality operations', () => {
 	const program = parseProgram('2 == 3');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Bool');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Bool');
 });
 
 test('Functional Type Inference - If Expressions - should infer if expression with same types', () => {
 	const program = parseProgram('if True then 1 else 2');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - If Expressions - should handle if expression with different types', () => {
 	const program = parseProgram('if True then 1 else "hello"');
-	assert.throws(() => typeProgram(program));
+	expect(() => typeProgram(program).toThrow());
 });
 
 test('Functional Type Inference - Sequences - should handle semicolon sequences', () => {
 	const program = parseProgram('1; 2; 3');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Sequences - should handle sequences with definitions', () => {
 	const program = parseProgram('x = 1; y = 2; x + y');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Built-in Functions - should handle built-in arithmetic operators', () => {
 	const program = parseProgram('2 + 3');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Built-in Functions - should handle built-in comparison operators', () => {
 	const program = parseProgram('2 == 3');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Bool');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Bool');
 });
 
 test('Functional Type Inference - Type Environment - should initialize with built-ins', () => {
 	const state = createTypeState();
 	const newState = initializeBuiltins(state);
 
-	assert.is(newState.environment.has('+'), true);
-	assert.is(newState.environment.has('-'), true);
-	assert.is(newState.environment.has('*'), true);
-	assert.is(newState.environment.has('/'), true);
-	assert.is(newState.environment.has('=='), true);
-	assert.is(newState.environment.has(';'), true);
+	expect(newState.environment.has('+')).toBe(true);
+	expect(newState.environment.has('-')).toBe(true);
+	expect(newState.environment.has('*')).toBe(true);
+	expect(newState.environment.has('/')).toBe(true);
+	expect(newState.environment.has('==')).toBe(true);
+	expect(newState.environment.has(';')).toBe(true);
 });
 
 test('Functional Type Inference - Error Cases - should reject undefined variables', () => {
 	const program = parseProgram('undefined_var');
-	assert.throws(() => typeProgram(program), /Undefined variable/);
+	expect(() => typeProgram(program).toThrow(), /Undefined variable/);
 });
 
 test('Functional Type Inference - Error Cases - should reject type mismatches in function application', () => {
 	const program = parseProgram('(fn x => x + 1) "hello"');
-	assert.throws(() => typeProgram(program));
+	expect(() => typeProgram(program).toThrow());
 });
 
 test('Functional Type Inference - Error Cases - should reject non-boolean conditions in if expressions', () => {
 	const program = parseProgram('if 42 then 1 else 2');
-	assert.throws(() => typeProgram(program));
+	expect(() => typeProgram(program).toThrow());
 });
 
 test('Functional Type Inference - Mutation Types - should type mutable definition with simple value', () => {
 	const program = parseProgram('mut x = 42; x');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Mutation Types - should type mutable definition with function', () => {
 	const program = parseProgram('mut f = fn x => x + 1; f 5');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Mutation Types - should type mutation with same type', () => {
 	const program = parseProgram('mut x = 10; mut! x = 20; x');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Mutation Types - should type mutation with compatible types', () => {
 	const program = parseProgram('mut x = 10; mut! x = 15; x + 5');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Mutation Types - should reject mutation of undefined variable', () => {
 	const program = parseProgram('mut! x = 42');
-	assert.throws(() => typeProgram(program), /Undefined variable/);
+	expect(() => typeProgram(program).toThrow(), /Undefined variable/);
 });
 
 test('Functional Type Inference - Mutation Types - should reject mutation with incompatible types', () => {
 	const program = parseProgram('mut x = 10; mut! x = "hello"');
-	assert.throws(() => typeProgram(program));
+	expect(() => typeProgram(program).toThrow());
 });
 
 test('Functional Type Inference - Mutation Types - should reject mutation of non-mutable variable', () => {
@@ -212,25 +211,25 @@ test('Functional Type Inference - Mutation Types - should reject mutation of non
 	// This should be caught at runtime, not type time
 	// The type system allows it but the evaluator will throw
 	const result = typeProgram(program);
-	assert.ok(result);
+	expect(expect(result)).toBeTruthy();
 });
 
 test('Functional Type Inference - Mutation Types - should handle mutation in sequences', () => {
 	const program = parseProgram('mut x = 1; mut! x = 2; x');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Mutation Types - should handle multiple mutations of same variable', () => {
 	const program = parseProgram('mut x = 0; mut! x = 1; mut! x = 2; x');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Mutation Types - should handle mutation with complex expressions', () => {
 	const program = parseProgram('mut x = 1; mut! x = x + 1; x');
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Mutation Types - should handle mutation with function calls', () => {
@@ -238,7 +237,7 @@ test('Functional Type Inference - Mutation Types - should handle mutation with f
 		'sum = fn x y => x + y; mut x = 5; mut! x = sum x 3; x'
 	);
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Mutation Types - should handle mutation with conditional expressions', () => {
@@ -246,7 +245,7 @@ test('Functional Type Inference - Mutation Types - should handle mutation with c
 		'mut x = 10; mut! x = if x > 5 then 20 else 0; x'
 	);
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Mutation Types - should handle mutation with record values', () => {
@@ -254,7 +253,7 @@ test('Functional Type Inference - Mutation Types - should handle mutation with r
 		'mut point = {10, 20}; mut! point = {30, 40}; point'
 	);
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), '(Float Float)');
+	expect(typeToString(result.type).toBe(result.state.substitution), '(Float Float)');
 });
 
 test('Functional Type Inference - Mutation Types - should handle mutation with list values', () => {
@@ -262,7 +261,7 @@ test('Functional Type Inference - Mutation Types - should handle mutation with l
 		'mut items = [1, 2, 3]; mut! items = [4, 5, 6]; head items'
 	);
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Option Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Option Float');
 });
 
 test('Functional Type Inference - Mutation Types - should handle mutation with external variables', () => {
@@ -273,7 +272,7 @@ test('Functional Type Inference - Mutation Types - should handle mutation with e
 		inner
 	`);
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Mutation Types - should handle mutation with polymorphic functions', () => {
@@ -281,7 +280,7 @@ test('Functional Type Inference - Mutation Types - should handle mutation with p
 		'id = fn x => x; mut x = 42; mut! x = id x; x'
 	);
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Functional Type Inference - Mutation Types - should handle mutation with built-in functions', () => {
@@ -289,7 +288,7 @@ test('Functional Type Inference - Mutation Types - should handle mutation with b
 		'mut list = [1, 2, 3]; mut! list = list_map (fn x => x * 2) list; length list'
 	);
 	const result = typeProgram(program);
-	assert.is(typeToString(result.type, result.state.substitution), 'Float');
+	expect(typeToString(result.type).toBe(result.state.substitution), 'Float');
 });
 
 test('Constraint Propagation (Functional Typer) - should throw a type error when constraints are not satisfied in composition', () => {
@@ -301,7 +300,7 @@ test('Constraint Propagation (Functional Typer) - should throw a type error when
     `);
 	// This should work now since head is safe and returns Option
 	const result = typeProgram(program);
-	assert.ok(result);
+	expect(expect(result)).toBeTruthy();
 });
 
 test('Constraint Propagation (Functional Typer) - should allow composition when constraints are satisfied (functional typer)', () => {
@@ -314,7 +313,6 @@ test('Constraint Propagation (Functional Typer) - should allow composition when 
 	const result = typeProgram(program);
 	const typeStr = typeToString(result.type, result.state.substitution);
 	// head now returns Option List Float instead of List Float
-	assert.is(typeStr, 'Option List Float');
+	expect(typeStr).toBe('Option List Float');
 });
 
-test.run();

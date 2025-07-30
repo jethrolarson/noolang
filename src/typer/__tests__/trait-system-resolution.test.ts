@@ -1,9 +1,8 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../../parser/parser';
 import { typeProgram } from '../index';
 import { typeToString } from '../helpers';
+import { describe, test, expect } from 'bun:test';
 
 test('Trait System Phase 3: Constraint Resolution - Constraint Collapse - should handle constraint collapse for various concrete types', () => {
 	const testCases = [
@@ -53,11 +52,11 @@ test('Trait System Phase 3: Constraint Resolution - Constraint Collapse - should
 		const typeString = typeToString(typeResult.type);
 		
 		// Check type kind
-		assert.is(typeResult.type.kind, testCase.expectedKind);
+		expect(typeResult.type.kind).toBe(testCase.expectedKind);
 		
 		// Check type string
 		if (typeof testCase.expectedType === 'string') {
-			assert.is(typeString, testCase.expectedType);
+			expect(typeString).toBe(testCase.expectedType);
 		} else {
 			assert.match(typeString, testCase.expectedType);
 		}
@@ -85,7 +84,7 @@ test('Trait System Phase 3: Constraint Resolution - Complex Constraint Resolutio
 	
 	// PARTIAL CONSTRAINT COLLAPSE: Functor constraint gets resolved to List,
 	// but Show constraint from within the mapped function is preserved
-	assert.is(typeResult.type.kind, 'list');
+	expect(typeResult.type.kind).toBe('list');
 	const typeString = typeToString(typeResult.type);
 	assert.match(typeString, /List String/);
 	assert.match(typeString, /implements Show/); // Show constraint preserved for now
@@ -104,7 +103,6 @@ test('Trait System Phase 3: Constraint Resolution - Advanced Edge Cases - should
 	const typeResult = typeProgram(program);
 	
 	// Should propagate constraints through polymorphic functions
-	assert.is(typeResult.type.kind, 'constrained');
+	expect(typeResult.type.kind).toBe('constrained');
 });
 
-test.run();

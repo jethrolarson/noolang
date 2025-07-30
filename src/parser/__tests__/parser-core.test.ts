@@ -1,5 +1,3 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../lexer/lexer';
 import { parse, parseTypeExpression } from '../parser';
 import type {
@@ -28,6 +26,7 @@ import type {
 	ConstrainedExpression,
 } from '../../ast';
 import type { ParseError, ParseResult, ParseSuccess } from '../combinators';
+import { describe, test, expect } from 'bun:test';
 
 // Helper functions for type-safe testing
 function assertLiteralExpression(expr: Expression): LiteralExpression {
@@ -207,9 +206,9 @@ test('Parser - should parse simple literals', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const literal = assertLiteralExpression(program.statements[0]);
-	assert.is(literal.value, 42);
+	expect(literal.value).toBe(42);
 });
 
 test('Parser - should parse string literals', () => {
@@ -217,9 +216,9 @@ test('Parser - should parse string literals', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const literal = assertLiteralExpression(program.statements[0]);
-	assert.is(literal.value, 'hello');
+	expect(literal.value).toBe('hello');
 });
 
 test('Parser - should parse boolean literals', () => {
@@ -227,9 +226,9 @@ test('Parser - should parse boolean literals', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 
-	assert.is(program.statements.length, 1);
-	assert.is(program.statements[0].kind, 'variable');
-	assert.is((program.statements[0] as any).name, 'True');
+	expect(program.statements.length).toBe(1);
+	expect(program.statements[0].kind).toBe('variable');
+	expect((program.statements[0] as any).name).toBe('True');
 });
 
 test('Parser - should parse variable references', () => {
@@ -237,9 +236,9 @@ test('Parser - should parse variable references', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const variable = assertVariableExpression(program.statements[0]);
-	assert.is(variable.name, 'x');
+	expect(variable.name).toBe('x');
 });
 
 test('Parser - should parse function definitions', () => {
@@ -247,10 +246,10 @@ test('Parser - should parse function definitions', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const func = assertFunctionExpression(program.statements[0]);
-	assert.equal(func.params, ['x']);
-	assert.is(func.body.kind, 'binary');
+	expect(func.params).toEqual(['x']);
+	expect(func.body.kind).toBe('binary');
 });
 
 test('Parser - should parse function applications', () => {
@@ -258,12 +257,12 @@ test('Parser - should parse function applications', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const app = assertApplicationExpression(program.statements[0]);
-	assert.is(app.func.kind, 'function');
-	assert.is(app.args.length, 1);
+	expect(app.func.kind).toBe('function');
+	expect(app.args.length).toBe(1);
 	const arg = assertLiteralExpression(app.args[0]);
-	assert.is(arg.value, 2);
+	expect(arg.value).toBe(2);
 });
 
 test('Parser - should parse binary expressions', () => {
@@ -271,9 +270,9 @@ test('Parser - should parse binary expressions', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const binary = assertBinaryExpression(program.statements[0]);
-	assert.is(binary.operator, '+');
+	expect(binary.operator).toBe('+');
 });
 
 test('Parser - should parse lists', () => {
@@ -281,17 +280,17 @@ test('Parser - should parse lists', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 
-	assert.is(program.statements.length, 1);
-	assert.is(program.statements[0].kind, 'list');
+	expect(program.statements.length).toBe(1);
+	expect(program.statements[0].kind).toBe('list');
 	const elements = (program.statements[0] as any).elements;
-	assert.ok(Array.isArray(elements));
-	assert.is(elements.length, 3);
-	assert.is(elements[0].kind, 'literal');
-	assert.is(elements[0].value, 1);
-	assert.is(elements[1].kind, 'literal');
-	assert.is(elements[1].value, 2);
-	assert.is(elements[2].kind, 'literal');
-	assert.is(elements[2].value, 3);
+	expect(expect(Array.isArray(elements)).toBeTruthy());
+	expect(elements.length).toBe(3);
+	expect(elements[0].kind).toBe('literal');
+	expect(elements[0].value).toBe(1);
+	expect(elements[1].kind).toBe('literal');
+	expect(elements[1].value).toBe(2);
+	expect(elements[2].kind).toBe('literal');
+	expect(elements[2].value).toBe(3);
 });
 
 test('Parser - should parse if expressions', () => {
@@ -299,86 +298,86 @@ test('Parser - should parse if expressions', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 
-	assert.is(program.statements.length, 1);
-	assert.is(program.statements[0].kind, 'if');
+	expect(program.statements.length).toBe(1);
+	expect(program.statements[0].kind).toBe('if');
 	const ifExpr = program.statements[0] as any;
-	assert.is(ifExpr.condition.name, 'True');
-	assert.is(ifExpr.then.value, 1);
-	assert.is(ifExpr.else.value, 2);
+	expect(ifExpr.condition.name).toBe('True');
+	expect(ifExpr.then.value).toBe(1);
+	expect(ifExpr.else.value).toBe(2);
 });
 
 test('Parser - should parse pipeline expressions', () => {
 	const lexer = new Lexer('[1, 2, 3] |> map');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const pipeline = program.statements[0] as any;
-	assert.is(pipeline.kind, 'pipeline');
-	assert.is(pipeline.steps[0].kind, 'list');
-	assert.is(pipeline.steps[1].kind, 'variable');
+	expect(pipeline.kind).toBe('pipeline');
+	expect(pipeline.steps[0].kind).toBe('list');
+	expect(pipeline.steps[1].kind).toBe('variable');
 });
 
 test('Parser - should parse single-field record', () => {
 	const lexer = new Lexer('{ @name "Alice", @age 30 }');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
-	assert.is(program.statements[0].kind, 'record');
+	expect(program.statements.length).toBe(1);
+	expect(program.statements[0].kind).toBe('record');
 	const record = program.statements[0] as any;
-	assert.is(record.fields.length, 2);
-	assert.is(record.fields[0].name, 'name');
-	assert.is(record.fields[0].value.value, 'Alice');
-	assert.is(record.fields[1].name, 'age');
-	assert.is(record.fields[1].value.value, 30);
+	expect(record.fields.length).toBe(2);
+	expect(record.fields[0].name).toBe('name');
+	expect(record.fields[0].value.value).toBe('Alice');
+	expect(record.fields[1].name).toBe('age');
+	expect(record.fields[1].value.value).toBe(30);
 });
 
 test('Parser - should parse multi-field record (semicolon separated)', () => {
 	const lexer = new Lexer('{ @name "Alice", @age 30 }');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
-	assert.is(program.statements[0].kind, 'record');
+	expect(program.statements.length).toBe(1);
+	expect(program.statements[0].kind).toBe('record');
 	const record = program.statements[0] as any;
-	assert.is(record.fields.length, 2);
-	assert.is(record.fields[0].name, 'name');
-	assert.is(record.fields[0].value.value, 'Alice');
-	assert.is(record.fields[1].name, 'age');
-	assert.is(record.fields[1].value.value, 30);
+	expect(record.fields.length).toBe(2);
+	expect(record.fields[0].name).toBe('name');
+	expect(record.fields[0].value.value).toBe('Alice');
+	expect(record.fields[1].name).toBe('age');
+	expect(record.fields[1].value.value).toBe(30);
 });
 
 test('Parser - should parse multi-field record (semicolon separated) 2', () => {
 	const lexer = new Lexer('{ @name "Alice", @age 30 }');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
-	assert.is(program.statements[0].kind, 'record');
+	expect(program.statements.length).toBe(1);
+	expect(program.statements[0].kind).toBe('record');
 	const record = program.statements[0] as any;
-	assert.is(record.fields.length, 2);
-	assert.is(record.fields[0].name, 'name');
-	assert.is(record.fields[0].value.value, 'Alice');
-	assert.is(record.fields[1].name, 'age');
-	assert.is(record.fields[1].value.value, 30);
+	expect(record.fields.length).toBe(2);
+	expect(record.fields[0].name).toBe('name');
+	expect(record.fields[0].value.value).toBe('Alice');
+	expect(record.fields[1].name).toBe('age');
+	expect(record.fields[1].value.value).toBe(30);
 });
 
 test('Parser - should parse accessor', () => {
 	const lexer = new Lexer('@name');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
-	assert.is(program.statements[0].kind, 'accessor');
+	expect(program.statements.length).toBe(1);
+	expect(program.statements[0].kind).toBe('accessor');
 	const accessor = program.statements[0] as any;
-	assert.is(accessor.field, 'name');
+	expect(accessor.field).toBe('name');
 });
 
 test('Parser - should parse function with unit parameter', () => {
 	const lexer = new Lexer('fn {} => 42');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const func = assertFunctionExpression(program.statements[0]);
-	assert.equal(func.params, ['_unit']); // Unit parameter
-	assert.is(func.body.kind, 'literal');
-	assert.is((func.body as LiteralExpression).value, 42);
+	expect(func.params).toEqual(['_unit']); // Unit parameter
+	expect(func.body.kind).toBe('literal');
+	expect((func.body as LiteralExpression).value).toBe(42);
 });
 
 test('Parser - should parse deeply nested tuples in records', () => {
@@ -386,259 +385,258 @@ test('Parser - should parse deeply nested tuples in records', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	// Check the outermost record
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const outer = program.statements[0];
-	assert.is(outer.kind, 'record');
+	expect(outer.kind).toBe('record');
 	const keyField = (outer as any).fields[0];
-	assert.is(keyField.name, 'key');
+	expect(keyField.name).toBe('key');
 	// Check that keyField.value is a list with two elements
-	assert.is(keyField.value.kind, 'list');
-	assert.is(keyField.value.elements.length, 2);
+	expect(keyField.value.kind).toBe('list');
+	expect(keyField.value.elements.length).toBe(2);
 	// First element should be a literal
-	assert.is(keyField.value.elements[0].kind, 'literal');
-	assert.is(keyField.value.elements[0].value, 1);
+	expect(keyField.value.elements[0].kind).toBe('literal');
+	expect(keyField.value.elements[0].value).toBe(1);
 	// Second element should be a nested tuple structure
 	let nestedTuple = keyField.value.elements[1];
-	assert.is(nestedTuple.kind, 'tuple');
+	expect(nestedTuple.kind).toBe('tuple');
 	// Check the nested structure: tuple -> tuple -> tuple -> literal
 	for (let i = 0; i < 3; i++) {
-		assert.is(nestedTuple.kind, 'tuple');
-		assert.is(nestedTuple.elements.length, 1);
+		expect(nestedTuple.kind).toBe('tuple');
+		expect(nestedTuple.elements.length).toBe(1);
 		nestedTuple = nestedTuple.elements[0];
 	}
-	assert.is(nestedTuple.kind, 'literal');
-	assert.is(nestedTuple.value, 1);
+	expect(nestedTuple.kind).toBe('literal');
+	expect(nestedTuple.value).toBe(1);
 });
 
 test('Parser - should parse records with nested lists and records', () => {
 	const lexer = new Lexer('{ @key [1, { @inner [2, 3] }] }');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const outer = program.statements[0];
-	assert.is(outer.kind, 'record');
+	expect(outer.kind).toBe('record');
 	const keyField = (outer as any).fields[0];
-	assert.is(keyField.name, 'key');
+	expect(keyField.name).toBe('key');
 	const list = keyField.value as any;
-	assert.is(list.kind, 'list');
-	assert.is(list.elements[0].kind, 'literal');
-	assert.is(list.elements[0].value, 1);
+	expect(list.kind).toBe('list');
+	expect(list.elements[0].kind).toBe('literal');
+	expect(list.elements[0].value).toBe(1);
 	const nestedRecord = list.elements[1];
-	assert.is(nestedRecord.kind, 'record');
+	expect(nestedRecord.kind).toBe('record');
 	const innerField = nestedRecord.fields[0];
-	assert.is(innerField.name, 'inner');
+	expect(innerField.name).toBe('inner');
 	const innerList = innerField.value as any;
-	assert.is(innerList.kind, 'list');
-	assert.equal(innerList.elements.map((e: any) => e.value), [2, 3]);
+	expect(innerList.kind).toBe('list');
+	expect(innerList.elements.map((e: any) => e.value)).toEqual([2, 3]);
 });
 
 test('Parser - should parse lists of records', () => {
 	const lexer = new Lexer('[{ @a 1 }, { @b 2 }]');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const list = program.statements[0] as any;
-	assert.is(list.kind, 'list');
-	assert.is(list.elements[0].kind, 'record');
-	assert.is(list.elements[1].kind, 'record');
-	assert.is(list.elements[0].fields[0].name, 'a');
-	assert.is(list.elements[0].fields[0].value.value, 1);
-	assert.is(list.elements[1].fields[0].name, 'b');
-	assert.is(list.elements[1].fields[0].value.value, 2);
+	expect(list.kind).toBe('list');
+	expect(list.elements[0].kind).toBe('record');
+	expect(list.elements[1].kind).toBe('record');
+	expect(list.elements[0].fields[0].name).toBe('a');
+	expect(list.elements[0].fields[0].value.value).toBe(1);
+	expect(list.elements[1].fields[0].name).toBe('b');
+	expect(list.elements[1].fields[0].value.value).toBe(2);
 });
 
 test('Parser - should parse a single tuple', () => {
 	const lexer = new Lexer('{1}');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const tuple = program.statements[0] as any;
-	assert.is(tuple.kind, 'tuple');
-	assert.is(tuple.elements[0].kind, 'literal');
-	assert.is(tuple.elements[0].value, 1);
+	expect(tuple.kind).toBe('tuple');
+	expect(tuple.elements[0].kind).toBe('literal');
+	expect(tuple.elements[0].value).toBe(1);
 });
 
 test('Parser - should parse a single record', () => {
 	const lexer = new Lexer('{ @foo 1 }');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const record = program.statements[0] as any;
-	assert.is(record.kind, 'record');
-	assert.is(record.fields[0].name, 'foo');
-	assert.is(record.fields[0].value.value, 1);
+	expect(record.kind).toBe('record');
+	expect(record.fields[0].name).toBe('foo');
+	expect(record.fields[0].value.value).toBe(1);
 });
 
 test('Parser - should parse a list of literals', () => {
 	const lexer = new Lexer('[1, 2]');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const list = program.statements[0] as any;
-	assert.is(list.kind, 'list');
-	assert.is(list.elements[0].kind, 'literal');
-	assert.is(list.elements[0].value, 1);
-	assert.is(list.elements[1].kind, 'literal');
-	assert.is(list.elements[1].value, 2);
+	expect(list.kind).toBe('list');
+	expect(list.elements[0].kind).toBe('literal');
+	expect(list.elements[0].value).toBe(1);
+	expect(list.elements[1].kind).toBe('literal');
+	expect(list.elements[1].value).toBe(2);
 });
 
 test('Parser - should parse a list of tuples', () => {
 	const lexer = new Lexer('[{1}, {2}]');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const list = program.statements[0] as any;
-	assert.is(list.kind, 'list');
-	assert.is(list.elements[0].kind, 'tuple');
-	assert.is(list.elements[0].elements[0].value, 1);
-	assert.is(list.elements[1].kind, 'tuple');
-	assert.is(list.elements[1].elements[0].value, 2);
+	expect(list.kind).toBe('list');
+	expect(list.elements[0].kind).toBe('tuple');
+	expect(list.elements[0].elements[0].value).toBe(1);
+	expect(list.elements[1].kind).toBe('tuple');
+	expect(list.elements[1].elements[0].value).toBe(2);
 });
 
 test('Parser - should parse a list of records', () => {
 	const lexer = new Lexer('[{ @foo 1 }, { @bar 2 }]');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const list = program.statements[0] as any;
-	assert.is(list.kind, 'list');
-	assert.is(list.elements[0].kind, 'record');
-	assert.is(list.elements[0].fields[0].name, 'foo');
-	assert.is(list.elements[0].fields[0].value.value, 1);
-	assert.is(list.elements[1].kind, 'record');
-	assert.is(list.elements[1].fields[0].name, 'bar');
-	assert.is(list.elements[1].fields[0].value.value, 2);
+	expect(list.kind).toBe('list');
+	expect(list.elements[0].kind).toBe('record');
+	expect(list.elements[0].fields[0].name).toBe('foo');
+	expect(list.elements[0].fields[0].value.value).toBe(1);
+	expect(list.elements[1].kind).toBe('record');
+	expect(list.elements[1].fields[0].name).toBe('bar');
+	expect(list.elements[1].fields[0].value.value).toBe(2);
 });
 
 test('Parser - should parse thrush operator', () => {
 	const lexer = new Lexer('10 | (fn x => x + 1)');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const thrush = program.statements[0] as any;
-	assert.is(thrush.kind, 'binary');
-	assert.is(thrush.operator, '|');
-	assert.is(thrush.left.kind, 'literal');
-	assert.is(thrush.right.kind, 'function');
+	expect(thrush.kind).toBe('binary');
+	expect(thrush.operator).toBe('|');
+	expect(thrush.left.kind).toBe('literal');
+	expect(thrush.right.kind).toBe('function');
 });
 
 test('Parser - should parse chained thrush operators as left-associative', () => {
 	const lexer = new Lexer('a | b | c');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const chain = program.statements[0] as any;
-	assert.is(chain.kind, 'binary');
-	assert.is(chain.operator, '|');
-	assert.is(chain.left.kind, 'binary');
-	assert.is(chain.left.operator, '|');
-	assert.is(chain.left.left.kind, 'variable');
-	assert.is(chain.left.left.name, 'a');
-	assert.is(chain.left.right.kind, 'variable');
-	assert.is(chain.left.right.name, 'b');
-	assert.is(chain.right.kind, 'variable');
-	assert.is(chain.right.name, 'c');
+	expect(chain.kind).toBe('binary');
+	expect(chain.operator).toBe('|');
+	expect(chain.left.kind).toBe('binary');
+	expect(chain.left.operator).toBe('|');
+	expect(chain.left.left.kind).toBe('variable');
+	expect(chain.left.left.name).toBe('a');
+	expect(chain.left.right.kind).toBe('variable');
+	expect(chain.left.right.name).toBe('b');
+	expect(chain.right.kind).toBe('variable');
+	expect(chain.right.name).toBe('c');
 });
 
 test('Parser - should parse thrush operator after record', () => {
 	const lexer = new Lexer('{@key 1, @key2 False} | @key');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 
 	// Verify it's a binary expression with thrush operator
 	const expr = program.statements[0] as BinaryExpression;
-	assert.is(expr.kind, 'binary');
-	assert.is(expr.operator, '|');
-	assert.is(expr.left.kind, 'record');
-	assert.is(expr.right.kind, 'accessor');
+	expect(expr.kind).toBe('binary');
+	expect(expr.operator).toBe('|');
+	expect(expr.left.kind).toBe('record');
+	expect(expr.right.kind).toBe('accessor');
 });
 
 test('Parser - should parse empty braces as unit', () => {
 	const lexer = new Lexer('{}');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const unit = assertUnitExpression(program.statements[0]);
-	assert.is(unit.kind, 'unit');
+	expect(unit.kind).toBe('unit');
 });
 
 test('Parser - should parse function with empty parentheses', () => {
 	const lexer = new Lexer('fn () => 42');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const func = assertFunctionExpression(program.statements[0]);
-	assert.equal(func.params, []);
-	assert.is(func.body.kind, 'literal');
+	expect(func.params).toEqual([]);
+	expect(func.body.kind).toBe('literal');
 });
 
 test('Parser - should parse function with multiple parameters', () => {
 	const lexer = new Lexer('fn x y z => x + y + z');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const func = assertFunctionExpression(program.statements[0]);
-	assert.equal(func.params, ['x', 'y', 'z']);
-	assert.is(func.body.kind, 'binary');
+	expect(func.params).toEqual(['x', 'y', 'z']);
+	expect(func.body.kind).toBe('binary');
 });
 
 test('Parser - should parse empty list', () => {
 	const lexer = new Lexer('[]');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
-	assert.is(program.statements[0].kind, 'list');
+	expect(program.statements.length).toBe(1);
+	expect(program.statements[0].kind).toBe('list');
 	const list = program.statements[0] as any;
-	assert.is(list.elements.length, 0);
+	expect(list.elements.length).toBe(0);
 });
 
 test('Parser - should parse list with trailing comma', () => {
 	const lexer = new Lexer('[1, 2, 3,]');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
-	assert.is(program.statements[0].kind, 'list');
+	expect(program.statements.length).toBe(1);
+	expect(program.statements[0].kind).toBe('list');
 	const list = program.statements[0] as any;
-	assert.is(list.elements.length, 3);
+	expect(list.elements.length).toBe(3);
 });
 
 test('Parser - should parse record with trailing comma', () => {
 	const lexer = new Lexer('{ @name "Alice", @age 30, }');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
-	assert.is(program.statements[0].kind, 'record');
+	expect(program.statements.length).toBe(1);
+	expect(program.statements[0].kind).toBe('record');
 	const record = program.statements[0] as any;
-	assert.is(record.fields.length, 2);
+	expect(record.fields.length).toBe(2);
 });
 
 test('Parser - should parse unary minus (adjacent)', () => {
 	const lexer = new Lexer('-42');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
-	assert.is(program.statements[0].kind, 'binary');
+	expect(program.statements.length).toBe(1);
+	expect(program.statements[0].kind).toBe('binary');
 	const binary = program.statements[0] as any;
-	assert.is(binary.operator, '*');
-	assert.is(binary.left.kind, 'literal');
-	assert.is(binary.left.value, -1);
-	assert.is(binary.right.kind, 'literal');
-	assert.is(binary.right.value, 42);
+	expect(binary.operator).toBe('*');
+	expect(binary.left.kind).toBe('literal');
+	expect(binary.left.value).toBe(-1);
+	expect(binary.right.kind).toBe('literal');
+	expect(binary.right.value).toBe(42);
 });
 
 test('Parser - should parse minus operator (non-adjacent)', () => {
 	const lexer = new Lexer('10 - 5');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
-	assert.is(program.statements[0].kind, 'binary');
+	expect(program.statements.length).toBe(1);
+	expect(program.statements[0].kind).toBe('binary');
 	const binary = program.statements[0] as any;
-	assert.is(binary.operator, '-');
-	assert.is(binary.left.kind, 'literal');
-	assert.is(binary.left.value, 10);
-	assert.is(binary.right.kind, 'literal');
-	assert.is(binary.right.value, 5);
+	expect(binary.operator).toBe('-');
+	expect(binary.left.kind).toBe('literal');
+	expect(binary.left.value).toBe(10);
+	expect(binary.right.kind).toBe('literal');
+	expect(binary.right.value).toBe(5);
 });
 
-test.run();

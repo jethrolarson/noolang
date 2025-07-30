@@ -58,6 +58,6 @@ test('should fail parsing for list destructuring', () => {
 	const lexer = new Lexer(source);
 	const tokens = lexer.tokenize();
 	
-	expect(().toThrow() => parse(tokens), 'Should fail to parse list destructuring');
+	expect(() => parse(tokens).toThrow(), 'Should fail to parse list destructuring');
 });
 
