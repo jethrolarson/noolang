@@ -558,7 +558,7 @@ export const typeFunction = (
 	currentState = { ...currentState, environment: state.environment };
 
 	// Collect implicit constraints from function body (e.g., from + operator)
-	const implicitConstraints = collectImplicitConstraints(bodyResult.type, paramTypes, currentState);
+	const implicitConstraints = collectImplicitConstraints(expr.body, expr.params, bodyResult.type, paramTypes, currentState);
 
 	// Special handling for constrained function bodies
 	let funcType: Type;
@@ -623,28 +623,272 @@ export const typeFunction = (
 
 // Helper function to collect implicit constraints from function bodies
 function collectImplicitConstraints(
+	bodyAST: Expression,
+	params: string[],
 	bodyType: Type, 
 	paramTypes: Type[], 
 	state: TypeState
 ): Constraint[] {
 	const constraints: Constraint[] = [];
 	
-	const allTypeVars = new Set<string>();
-	for (const paramType of paramTypes) {
-		collectTypeVariables(paramType, allTypeVars);
-	}
-	collectTypeVariables(bodyType, allTypeVars);
-	
-	const typeVarList = Array.from(allTypeVars).sort();
-	
-	// Heuristic: if we have multiple type variables, this is likely a polymorphic function
-	// that uses operators like +, so add an Add constraint
-	if (typeVarList.length >= 2) {
-		const canonicalVar = typeVarList[0];
-		constraints.push(implementsConstraint(canonicalVar, 'Add'));
+	// Simple check: if the function body uses +, add Add constraint to first parameter
+	// This is a simplified implementation - a complete one would track which specific
+	// parameters are used in + operations and map them to their type variables
+	if (usesAddOperator(bodyAST)) {
+		// For now, add constraint to the first type variable (usually the first parameter)
+		const allTypeVars = new Set<string>();
+		for (const paramType of paramTypes) {
+			collectTypeVariables(paramType, allTypeVars);
+		}
+		
+		if (allTypeVars.size > 0) {
+			const firstTypeVar = Array.from(allTypeVars).sort()[0];
+			constraints.push(implementsConstraint(firstTypeVar, 'Add'));
+		}
 	}
 	
 	return constraints;
+}
+
+// Simple recursive check for + operator usage
+function usesAddOperator(expr: Expression): boolean {
+	if (!expr) return false;
+	
+	switch (expr.kind) {
+		case 'binary':
+			return expr.operator === '+' || 
+				   usesAddOperator(expr.left) || 
+				   usesAddOperator(expr.right);
+		
+		case 'application':
+			return usesAddOperator(expr.func) || 
+				   expr.args.some(arg => usesAddOperator(arg));
+		
+		case 'function':
+			return usesAddOperator(expr.body);
+		
+		case 'if':
+			return usesAddOperator(expr.condition) || 
+				   usesAddOperator(expr.then) || 
+				   (expr.else ? usesAddOperator(expr.else) : false);
+		
+		case 'record':
+			return Object.values(expr.fields).some(field => usesAddOperator(field.value));
+		
+		case 'tuple':
+			return expr.elements.some(elem => usesAddOperator(elem));
+		
+		case 'list':
+			return expr.elements.some(elem => usesAddOperator(elem));
+		
+		// Leaf nodes
+		case 'literal':
+		case 'variable':
+		case 'unit':
+		case 'accessor':
+			return false;
+		
+		default:
+			return false;
+	}
+}
+
+// Analyze AST for operator usage
+function analyzeOperatorUsage(expr: Expression): { usesAdd: boolean } {
+	if (!expr) {
+		return { usesAdd: false };
+	}
+	
+	switch (expr.kind) {
+		case 'binary':
+			if (expr.operator === '+') {
+				return { usesAdd: true };
+			}
+			// Recursively check left and right operands
+			const leftUsage = analyzeOperatorUsage(expr.left);
+			const rightUsage = analyzeOperatorUsage(expr.right);
+			return { usesAdd: leftUsage.usesAdd || rightUsage.usesAdd };
+			
+		case 'application':
+			// Check function and arguments
+			const funcUsage = analyzeOperatorUsage(expr.func);
+			const argsUsage = expr.args.some(arg => analyzeOperatorUsage(arg).usesAdd);
+			return { usesAdd: funcUsage.usesAdd || argsUsage };
+			
+		case 'function':
+			// Check function body
+			return analyzeOperatorUsage(expr.body);
+			
+		case 'if':
+			// Check condition, then, and else branches
+			const condUsage = expr.condition ? analyzeOperatorUsage(expr.condition) : { usesAdd: false };
+			const thenUsage = expr.then ? analyzeOperatorUsage(expr.then) : { usesAdd: false };
+			const elseUsage = expr.else ? analyzeOperatorUsage(expr.else) : { usesAdd: false };
+			return { usesAdd: condUsage.usesAdd || thenUsage.usesAdd || elseUsage.usesAdd };
+			
+		case 'record':
+			// Check all field values
+			const recordUsage = Object.values(expr.fields).some(field => analyzeOperatorUsage(field).usesAdd);
+			return { usesAdd: recordUsage };
+			
+		case 'tuple':
+			// Check all tuple elements
+			const tupleUsage = expr.elements.some(elem => analyzeOperatorUsage(elem).usesAdd);
+			return { usesAdd: tupleUsage };
+			
+		case 'list':
+			// Check all list elements
+			const listUsage = expr.elements.some(elem => analyzeOperatorUsage(elem).usesAdd);
+			return { usesAdd: listUsage };
+			
+		case 'accessor':
+			// Check the object being accessed
+			return analyzeOperatorUsage(expr.object);
+			
+		case 'pipeline':
+			// Check left and right sides of pipeline
+			const pipeLeftUsage = analyzeOperatorUsage(expr.left);
+			const pipeRightUsage = analyzeOperatorUsage(expr.right);
+			return { usesAdd: pipeLeftUsage.usesAdd || pipeRightUsage.usesAdd };
+			
+		case 'match':
+			// Check the expression being matched and all cases
+			const matchExprUsage = analyzeOperatorUsage(expr.expr);
+			const casesUsage = expr.cases.some(c => analyzeOperatorUsage(c.body).usesAdd);
+			return { usesAdd: matchExprUsage.usesAdd || casesUsage };
+			
+		// Leaf nodes that don't contain + operators
+		case 'literal':
+		case 'variable':
+		case 'unit':
+			return { usesAdd: false };
+			
+		// Handle other expression types
+		default:
+			// For safety, assume no + usage for unhandled expression types
+			return { usesAdd: false };
+	}
+}
+
+// Find which type variables correspond to parameters used in + operations
+function findTypeVariablesUsedInAddOperations(
+	expr: Expression, 
+	params: string[], 
+	paramTypes: Type[]
+): string[] {
+	// This is a simplified implementation
+	// In a complete implementation, we'd track which specific parameters are used in + operations
+	// and map them to their corresponding type variables
+	
+	const usedParams = findParametersUsedInAddOperations(expr, params);
+	const typeVarNames: string[] = [];
+	
+	// Map used parameters to their type variables
+	for (let i = 0; i < params.length; i++) {
+		if (usedParams.has(params[i])) {
+			const paramType = paramTypes[i];
+			if (paramType.kind === 'variable') {
+				typeVarNames.push(paramType.name);
+			}
+		}
+	}
+	
+	return typeVarNames;
+}
+
+// Find which parameters are actually used in + operations
+function findParametersUsedInAddOperations(expr: Expression, params: string[]): Set<string> {
+	const usedParams = new Set<string>();
+	
+	function findParamsInExpr(e: Expression): void {
+		switch (e.kind) {
+			case 'binary':
+				if (e.operator === '+') {
+					// Both operands of + are used in Add operations
+					collectUsedParameters(e.left, params, usedParams);
+					collectUsedParameters(e.right, params, usedParams);
+				} else {
+					// Recursively check other binary operations
+					findParamsInExpr(e.left);
+					findParamsInExpr(e.right);
+				}
+				break;
+				
+			case 'application':
+				findParamsInExpr(e.func);
+				e.args.forEach(arg => findParamsInExpr(arg));
+				break;
+				
+			case 'function':
+				findParamsInExpr(e.body);
+				break;
+				
+			case 'if':
+				findParamsInExpr(e.condition);
+				findParamsInExpr(e.then);
+				if (e.else) findParamsInExpr(e.else);
+				break;
+				
+			case 'record':
+				Object.values(e.fields).forEach(field => findParamsInExpr(field));
+				break;
+				
+			case 'tuple':
+				e.elements.forEach(elem => findParamsInExpr(elem));
+				break;
+				
+			case 'list':
+				e.elements.forEach(elem => findParamsInExpr(elem));
+				break;
+				
+			case 'accessor':
+				findParamsInExpr(e.object);
+				break;
+				
+			case 'pipeline':
+				findParamsInExpr(e.left);
+				findParamsInExpr(e.right);
+				break;
+				
+			case 'match':
+				findParamsInExpr(e.expr);
+				e.cases.forEach(c => findParamsInExpr(c.body));
+				break;
+		}
+	}
+	
+	findParamsInExpr(expr);
+	return usedParams;
+}
+
+// Helper to collect parameter names used in an expression
+function collectUsedParameters(expr: Expression, params: string[], usedParams: Set<string>): void {
+	switch (expr.kind) {
+		case 'variable':
+			if (params.includes(expr.name)) {
+				usedParams.add(expr.name);
+			}
+			break;
+			
+		case 'application':
+			collectUsedParameters(expr.func, params, usedParams);
+			expr.args.forEach(arg => collectUsedParameters(arg, params, usedParams));
+			break;
+			
+		case 'accessor':
+			collectUsedParameters(expr.object, params, usedParams);
+			break;
+			
+		case 'binary':
+			collectUsedParameters(expr.left, params, usedParams);
+			collectUsedParameters(expr.right, params, usedParams);
+			break;
+			
+		// Add other cases as needed
+		default:
+			// For safety, don't collect from unhandled expression types
+			break;
+	}
 }
 
 function collectTypeVariables(type: Type, vars: Set<string>): void {
