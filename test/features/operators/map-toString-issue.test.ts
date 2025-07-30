@@ -1,9 +1,8 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../../src/lexer/lexer';
 import { parse } from '../../../src/parser/parser';
 import { typeAndDecorate } from '../../../src/typer';
 import { Evaluator, Value } from '../../../src/evaluator/evaluator';
+import { describe, test, expect } from 'bun:test';
 
 function unwrapValue(val: Value): any {
     if (val === null) return null;
@@ -43,13 +42,13 @@ function runCode(code: string) {
 function expectSuccess(code: string, expectedValue?: any) {
     const result = runCode(code);
     if (expectedValue !== undefined) {
-        assert.equal(unwrapValue(result.finalResult), expectedValue);
+        expect(unwrapValue(result.finalResult)).toEqual(expectedValue);
     }
     return result;
 }
 
 function expectError(code: string) {
-    assert.throws(() => runCode(code));
+    expect(().toThrow() => runCode(code));
 }
 
 // Test the specific list_map toString issue
@@ -120,4 +119,3 @@ test('investigate if issue is with | and built-in functions', () => {
     `, 3);
 });
 
-test.run();
