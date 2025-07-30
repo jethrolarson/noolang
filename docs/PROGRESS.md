@@ -204,6 +204,78 @@ The FFI system revealed a dependency chain that requires foundational features:
 
 ## 🚀 Next Steps (Prioritized)
 
+### **Module System Implementation (High Priority)**
+
+The existing import system is partially working but needs completion for practical use.
+
+#### **Current Status:**
+- ✅ **Basic import syntax**: `import "path"` parsing and evaluation working
+- ✅ **File resolution**: Relative/absolute paths with proper error handling
+- ✅ **Function extraction**: `@function module args` syntax already works cleanly
+- ❌ **Type inference**: `typeImport` returns empty record `{}` instead of actual module types
+- ❌ **Performance**: No caching, re-parses/re-evaluates same files repeatedly
+- ❌ **Effects**: Import caching not effect-aware
+
+#### **Implementation Plan:**
+
+**Phase 1: Fix Type Inference**
+1. **Enhance `typeImport`**: Parse and type-check imported modules to get actual types
+2. **Module type caching**: Cache AST parsing and type inference results
+3. **Integration testing**: Ensure imports work with complex type constraints
+
+**Phase 2: Effect-Aware Caching**
+1. **Pure module caching**: Cache evaluation results for modules with no external effects
+2. **Effect propagation**: Import effects properly tracked in type system (`import "foo" : ModuleType !log`)
+3. **Performance optimization**: Avoid re-evaluation of pure modules
+
+**Phase 3: Enhanced Import Ergonomics**
+1. **Effect annotations**: Support `import "module" : ModuleType !effect1 !effect2`
+2. **Import patterns**: Consider import with immediate destructuring if useful
+3. **Module path resolution**: Standardized module paths and search directories
+
+#### **Design Decisions:**
+- **Expression-based**: Imports remain pure expressions, no special statement syntax
+- **Effect-driven caching**: Pure modules cached, effectful modules fresh each evaluation
+- **Current syntax works**: `@function module args` already provides clean function calls
+- **No destructuring needed immediately**: Current accessor syntax is ergonomic enough
+
+### **Infix Combinator (`^`) Implementation (Medium Priority)**
+
+The thrush operator `|` provides "almost infix" notation but with reversed arguments. A true infix combinator would improve mathematical expression readability.
+
+#### **Problem Analysis:**
+```noolang
+1 | multiply 4    # Works but reads as "1 pipe-to multiply 4"
+5 | subtract 4    # Works but feels backwards for "5 minus 4"
+```
+
+#### **Proposed Solution - `^` Infix Combinator:**
+```noolang
+# Syntax: x ^ function y
+5 ^ subtract 4    # "5 subtract 4" → 1 (natural reading)
+1 ^ multiply 4    # "1 multiply 4" → 4 (mathematical feel)
+width ^ multiply height  # Natural for mathematical operations
+```
+
+#### **Implementation Details:**
+- **Semantics**: `x ^ f y ≡ f x y` (function gets both arguments in order)
+- **Precedence**: Higher than `|`, lower than function application
+- **Associativity**: Right-associative for natural chaining
+- **Type signature**: `a -> (a -> b -> c) -> b -> c`
+
+#### **Use Cases:**
+```noolang
+# Mathematical operations
+area = width ^ multiply height
+speed = distance ^ divide time
+compound = principal ^ multiply (1 ^ add rate)
+
+# Binary operations
+result = list1 ^ append list2
+found = haystack ^ contains needle
+valid = input ^ matches pattern
+```
+
 ### **Critical Type System Fixes (High Priority)**
 1. **Generic ADT Constructor Issues**: Fix type unification problems with generic ADT constructors
 2. **Trait Function Constraint Resolution**: Fix constraint resolution for trait functions in higher-order contexts
@@ -217,12 +289,12 @@ The FFI system revealed a dependency chain that requires foundational features:
 4. **Standard Library Expansion**: Add missing common functions
 
 ### **Advanced Features (Lower Priority)**
-1. **Unknown Type & Type Refinement**: Pattern matching on dynamically typed values with `forget` operation
-2. **Monadic Operators**: `|?` operator for Option/Result chaining (requires traits)
-3. **FFI System**: Foreign function interface with platform adapters (requires Unknown type)
-4. **Optional Accessors**: `@field?` syntax for safe field access returning Options
-5. **Record Type Annotations**: Support `{@name String, @age Number}` syntax
-6. **Module System**: Code organization across files
+1. **Destructuring Assignment**: Pattern-based assignment for ergonomic variable binding
+2. **Unknown Type & Type Refinement**: Pattern matching on dynamically typed values with `forget` operation
+3. **Monadic Operators**: Enhanced `|?` operator for Option/Result chaining
+4. **FFI System**: Foreign function interface with platform adapters (requires Unknown type)
+5. **Optional Accessors**: `@field?` syntax for safe field access returning Options
+6. **Record Type Annotations**: Support `{@name String, @age Number}` syntax
 7. **VSCode Integration**: Language Server Protocol (LSP) for intellisense and hover types
 
 ## 🎯 Language Design Principles
