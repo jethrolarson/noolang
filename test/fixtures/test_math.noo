@@ -1,6 +1,6 @@
-# Test math module with simple functions
+# Test module with simple functions
 { 
-  @add fn x y => 42, 
-  @multiply fn x y => 24, 
-  @square fn x => 100 
+  @first fn x y => x, 
+  @second fn x y => y, 
+  @identity fn x => x 
 }
