@@ -487,4 +487,70 @@ test('Algebraic Data Types (ADTs) - Generic Constructors - should handle partial
 	});
 });
 
+// New Recursive ADT Tests
+test('Recursive ADT - Binary Tree construction and pattern matching', () => {
+	const result = runNoolang(`
+		type Tree a = Node a (Tree a) (Tree a) | Leaf;
+
+		tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
+
+		getValue = fn t => match t with (
+			Node value left right => value;
+			Leaf => 0
+		);
+
+		getValue tree
+	`);
+
+	assert.equal(result.finalValue, { tag: 'number', value: 5 });
+});
+
+test('Recursive ADT - LinkedList with pattern matching', () => {
+	const result = runNoolang(`
+		type LinkedList a = Cons a (LinkedList a) | Nil;
+
+		sum = fn lst => match lst with (
+			Cons h t => h + (sum t);
+			Nil => 0
+		);
+
+		myList = Cons 1 (Cons 2 (Cons 3 Nil));
+		sum myList
+	`);
+
+	assert.equal(result.finalValue, { tag: 'number', value: 6 });
+});
+
+test('Recursive ADT - List operations with proper recursion', () => {
+	const result = runNoolang(`
+		type MyList a = Cons a (MyList a) | Nil;
+
+		length = fn lst => match lst with (
+			Cons h t => 1 + (length t);
+			Nil => 0
+		);
+
+		lst = Cons "a" (Cons "b" (Cons "c" Nil));
+		length lst
+	`);
+
+	assert.equal(result.finalValue, { tag: 'number', value: 3 });
+});
+
+test('Recursive ADT - Nested pattern matching', () => {
+	const result = runNoolang(`
+		type Tree a = Node a (Tree a) (Tree a) | Leaf;
+
+		sumTree = fn t => match t with (
+			Node value left right => value + (sumTree left) + (sumTree right);
+			Leaf => 0
+		);
+
+		tree = Node 1 (Node 2 Leaf Leaf) (Node 3 Leaf Leaf);
+		sumTree tree
+	`);
+
+	assert.equal(result.finalValue, { tag: 'number', value: 6 });
+});
+
 test.run();

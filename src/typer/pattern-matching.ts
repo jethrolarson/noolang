@@ -28,75 +28,128 @@ export const typeTypeDefinition = (
 	expr: TypeDefinitionExpression,
 	state: TypeState
 ): TypeResult => {
-	// Register the ADT in the registry first to enable recursive references
+	const { name, typeParams, constructors } = expr;
+
+	// Create stable type variables for the ADT's type parameters
+	const typeVarMap = new Map<string, Type>();
+	for (const param of typeParams) {
+		typeVarMap.set(param, typeVariable(param));
+	}
+
+	// Create the ADT type using the stable type variables
+	const adtType: Type = {
+		kind: 'variant',
+		name,
+		args: typeParams.map(param => typeVarMap.get(param)!)
+	};
+
+	// Add the ADT type itself to the environment first (for mutual recursion)
+	const envWithType = new Map(state.environment);
+	envWithType.set(name, {
+		type: adtType,
+		quantifiedVars: typeParams,
+	});
+	
+	// Process constructors and add to environment first (for mutual recursion)
+	let currentState = { ...state, environment: envWithType };
 	const constructorMap = new Map<string, Type[]>();
 
-	// Pre-register the ADT so recursive references work
-	const newRegistry = new Map(state.adtRegistry);
-	newRegistry.set(expr.name, {
-		typeParams: expr.typeParams,
-		constructors: constructorMap, // Will be filled
-	});
-
-	// Create consistent type variables for the ADT type parameters
-	const adtTypeVars = expr.typeParams.map(param => typeVariable(param));
-	
-	// Also add the ADT type constructor to the environment
-	const adtType = {
-		kind: 'variant' as const,
-		name: expr.name,
-		args: adtTypeVars,
-	};
-	const envWithType = new Map(state.environment);
-	envWithType.set(expr.name, {
-		type: adtType,
-		quantifiedVars: expr.typeParams,
-	});
-
-	state = { ...state, adtRegistry: newRegistry, environment: envWithType };
-
-	// Process each constructor
-	for (const _constructor of expr.constructors) {
-		constructorMap.set(_constructor.name, _constructor.args);
-
-		// Add constructor to environment as a function
-		// Constructor type: arg1 -> arg2 -> ... -> ADTType typeParams
-		const adtType: Type = {
-			kind: 'variant',
-			name: expr.name,
-			args: adtTypeVars, // Use the same type variable instances
-		};
-
+	for (const constructor of constructors) {
+		const constructorTypes: Type[] = [];
+		
+		for (const argType of constructor.args) {
+			// Substitute type parameters with our stable variables and handle recursive references
+			const processedType = substituteTypeParameters(argType, typeVarMap, name, adtType);
+			constructorTypes.push(processedType);
+		}
+		
+		constructorMap.set(constructor.name, constructorTypes);
+		
+		// Add constructor to environment as a function with proper quantification
 		let constructorType: Type;
-		if (_constructor.args.length === 0) {
+		if (constructorTypes.length === 0) {
 			// Nullary constructor: just the ADT type
 			constructorType = adtType;
 		} else {
 			// N-ary constructor: function from args to ADT type
-			constructorType = functionType(_constructor.args, adtType);
+			constructorType = functionType(constructorTypes, adtType);
 		}
 
-		// Add constructor to environment
-		const newEnv = new Map(state.environment);
-		newEnv.set(_constructor.name, {
+		// Add constructor to environment with proper quantification
+		const newEnv = new Map(currentState.environment);
+		newEnv.set(constructor.name, {
 			type: constructorType,
-			quantifiedVars: expr.typeParams,
+			quantifiedVars: typeParams,
 		});
-		state = { ...state, environment: newEnv };
+		currentState = { ...currentState, environment: newEnv };
 	}
 
-	// Update ADT registry with completed constructor map
-	const finalRegistry = new Map(state.adtRegistry);
-	finalRegistry.set(expr.name, {
-		typeParams: expr.typeParams,
-		constructors: constructorMap,
+	// Update the ADT registry with complete constructor information
+	const finalRegistry = new Map(currentState.adtRegistry);
+	finalRegistry.set(name, {
+		typeParams,
+		constructors: constructorMap
 	});
 
-	// Type definitions return unit and update state
-	return createPureTypeResult(unitType(), {
-		...state,
-		adtRegistry: finalRegistry,
-	});
+	currentState = { ...currentState, adtRegistry: finalRegistry };
+
+	// Type definitions have unit type
+	return createPureTypeResult(unitType(), currentState);
+};
+
+// Helper function to substitute type parameters and handle recursive references
+const substituteTypeParameters = (
+	type: Type,
+	typeVarMap: Map<string, Type>,
+	recursiveName: string,
+	recursiveType: Type
+): Type => {
+	switch (type.kind) {
+		case 'variable':
+			// Replace type parameters with their mapped variables
+			const mappedVar = typeVarMap.get(type.name);
+			return mappedVar || type;
+			
+		case 'variant':
+			// Handle recursive references to the type being defined
+			if (type.name === recursiveName) {
+				return recursiveType;
+			}
+			// Recursively process type arguments
+			return {
+				...type,
+				args: type.args.map(arg => substituteTypeParameters(arg, typeVarMap, recursiveName, recursiveType))
+			};
+			
+		case 'function':
+			return {
+				...type,
+				params: type.params.map(param => substituteTypeParameters(param, typeVarMap, recursiveName, recursiveType)),
+				return: substituteTypeParameters(type.return, typeVarMap, recursiveName, recursiveType)
+			};
+			
+		case 'list':
+			return {
+				...type,
+				element: substituteTypeParameters(type.element, typeVarMap, recursiveName, recursiveType)
+			};
+			
+		case 'record':
+			const newFields: { [key: string]: Type } = {};
+			for (const [key, fieldType] of Object.entries(type.fields)) {
+				newFields[key] = substituteTypeParameters(fieldType, typeVarMap, recursiveName, recursiveType);
+			}
+			return { ...type, fields: newFields };
+			
+		case 'tuple':
+			return {
+				...type,
+				elements: type.elements.map(elem => substituteTypeParameters(elem, typeVarMap, recursiveName, recursiveType))
+			};
+			
+		default:
+			return type;
+	}
 };
 
 // Type inference for match expressions

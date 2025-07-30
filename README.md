@@ -13,7 +13,7 @@ An functional, expression-based, LLM-friendly programming language designed for 
 - **REPL** for interactive development with comprehensive debugging tools
 - **Explicit effects**: Effects are tracked in the type system and visible in function types
 - **Explicit Mutation**: mutable variables require special handling and can only be mutated lexically to increase safety.
-- **Algebraic Data Types (ADTs)**: Complete implementation with type definitions, constructors, pattern matching, and built-in Option/Result types
+- **Algebraic Data Types (ADTs)**: Complete implementation with type definitions, constructors, pattern matching, built-in Option/Result types, and full support for recursive data structures
 
 
 ## Installation
@@ -41,7 +41,7 @@ npm start
 
 ### Examples
 
-**Note**: Some examples in the `examples/` directory have known issues due to current type system limitations. See `docs/LANGUAGE_WEAKNESSES.md` for details. Working examples include `basic.noo`, `adt_demo.noo`, `safe_thrush_demo.noo`, `simple_adt.noo`, and `math_functions.noo`.
+**Note**: Some examples in the `examples/` directory have known issues due to current type system limitations. See `docs/LANGUAGE_WEAKNESSES.md` for details. Working examples include `basic.noo`, `adt_demo.noo`, `recursive_adts.noo`, `safe_thrush_demo.noo`, `simple_adt.noo`, and `math_functions.noo`.
 
 ```noolang
 # Function definition
@@ -110,6 +110,15 @@ result = match (Some 42) with (Some x => x; None => 0)
 type Point = Point Float Float;
 point = Point 10 20;
 x = match point with (Point x y => x)
+
+# Recursive ADTs (Binary Tree)
+type Tree a = Node a (Tree a) (Tree a) | Leaf;
+tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
+sum = fn t => match t with (
+    Node value left right => value + (sum left) + (sum right);
+    Leaf => 0
+);
+tree_sum = sum tree  # => 15
 
 # Tuple pattern matching
 coordinates = {10, 20, 30};
@@ -724,11 +733,163 @@ match user_result with (
 - ✅ **Integration**: Works with all existing language features
 - ✅ **Literal patterns**: Support for matching on numbers and strings (e.g., `Code 404`)
 - ✅ **Nested patterns**: Support for complex nested constructor patterns (e.g., `Wrap (Value n)`)
-- ✅ **Recursive types**: Full support for recursive ADT definitions
+- ✅ **Recursive types**: Full support for recursive ADT definitions with pattern matching
 - ✅ **Complex patterns**: Complete pattern matching with all pattern types
 - ✅ **Tuple patterns**: Full destructuring with literal/variable mixing
 - ✅ **Record patterns**: Partial field matching with nested support
 - ✅ **Mixed patterns**: Constructor + tuple/record pattern combinations
+
+### Recursive ADTs
+
+**New Feature**: Noolang now supports **recursive algebraic data types**, enabling the definition of self-referential data structures like trees, linked lists, and other recursive patterns.
+
+#### Defining Recursive Types
+
+Recursive ADTs can reference themselves in their constructor definitions:
+
+```noolang
+# Binary Tree
+type Tree a = Node a (Tree a) (Tree a) | Leaf;
+
+# Linked List  
+type LinkedList a = Cons a (LinkedList a) | Nil;
+
+# JSON-like data structure
+type JsonValue = 
+    JsonObject (List {String, JsonValue}) |
+    JsonArray (List JsonValue) |
+    JsonString String |
+    JsonNumber Float |
+    JsonBool Bool |
+    JsonNull;
+```
+
+#### Working with Recursive ADTs
+
+**Tree Construction and Traversal:**
+
+```noolang
+# Create a binary tree
+tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
+
+# Tree traversal with pattern matching
+getValue = fn t => match t with (
+    Node value left right => value;
+    Leaf => 0
+);
+
+# Recursive tree operations
+sumTree = fn t => match t with (
+    Node value left right => value + (sumTree left) + (sumTree right);
+    Leaf => 0
+);
+
+# Tree depth calculation
+depth = fn t => match t with (
+    Node _ left right => 1 + max (depth left) (depth right);
+    Leaf => 0
+);
+
+getValue tree;  # => 5
+sumTree tree;   # => 15 (5+3+7)
+```
+
+**Linked List Operations:**
+
+```noolang
+# Create a linked list
+myList = Cons 1 (Cons 2 (Cons 3 Nil));
+
+# Recursive sum function
+sum = fn lst => match lst with (
+    Cons head tail => head + (sum tail);
+    Nil => 0
+);
+
+# List length calculation  
+length = fn lst => match lst with (
+    Cons _ tail => 1 + (length tail);
+    Nil => 0
+);
+
+# List map function
+listMap = fn f lst => match lst with (
+    Cons head tail => Cons (f head) (listMap f tail);
+    Nil => Nil
+);
+
+sum myList;           # => 6
+length myList;        # => 3
+listMap (add 1) myList; # => Cons 2 (Cons 3 (Cons 4 Nil))
+```
+
+**Complex Recursive Structures:**
+
+```noolang
+# Expression tree for a simple calculator
+type Expr = 
+    Add Expr Expr |
+    Multiply Expr Expr |
+    Number Float;
+
+# Evaluate expression tree
+eval = fn expr => match expr with (
+    Add left right => (eval left) + (eval right);
+    Multiply left right => (eval left) * (eval right);
+    Number n => n
+);
+
+# Example: (2 + 3) * 4
+calculation = Multiply (Add (Number 2) (Number 3)) (Number 4);
+eval calculation;  # => 20
+```
+
+#### Pattern Matching with Recursive Types
+
+Recursive ADTs work seamlessly with Noolang's pattern matching:
+
+```noolang
+# Find element in tree
+contains = fn target tree => match tree with (
+    Node value left right => 
+        if value == target 
+        then True 
+        else (contains target left) || (contains target right);
+    Leaf => False
+);
+
+# Transform tree values
+mapTree = fn f tree => match tree with (
+    Node value left right => 
+        Node (f value) (mapTree f left) (mapTree f right);
+    Leaf => Leaf
+);
+
+# Create tree: Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf)
+tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
+
+contains 3 tree;     # => True
+contains 10 tree;    # => False
+mapTree (multiply 2) tree;  # Double all values in tree
+```
+
+#### Type Safety with Recursion
+
+Recursive ADTs maintain full type safety:
+
+```noolang
+# Type inference works correctly
+numberTree = Node 42 Leaf Leaf;          # Tree Float
+stringTree = Node "hello" Leaf Leaf;     # Tree String
+
+# Pattern matching ensures exhaustiveness
+safeTail = fn lst => match lst with (
+    Cons _ tail => Some tail;
+    Nil => None
+);
+```
+
+**Note**: Recursive ADTs support all existing Noolang features including higher-order functions, pipeline operators, and integration with the constraint system.
 
 ## Duck-Typed Records and Accessors
 
@@ -1166,6 +1327,8 @@ Effects are explicit and fully tracked in the type system:
 - **Show constraints**: Add `Show` constraint to `print` function for type safety
 
 ## Contributing
+**Latest Update**: Noolang now features complete recursive algebraic data type support! Define self-referential data structures like binary trees, linked lists, and complex recursive patterns with full type safety and pattern matching. See `examples/recursive_adts.noo` for comprehensive examples.
+
 Feel free to fork, experiment, and contribute!
 
 ## License

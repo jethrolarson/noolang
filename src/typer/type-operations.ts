@@ -139,6 +139,7 @@ export const instantiate = (
 	return [instantiatedType, finalState];
 };
 
+
 // Replace type variables with fresh ones, threading state
 export const freshenTypeVariables = (
 	type: Type,
