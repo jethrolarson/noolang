@@ -1107,18 +1107,18 @@ export const typeImport = (
 			return createTypeResult(cached.type, totalEffects, state);
 		}
 		
-		// TODO: In a complete implementation, we would:
-		// 1. Load and parse the module file
-		// 2. Type-check the module in a clean environment
-		// 3. Cache the result type and effects
-		// 4. Return the module type with !read effect
+		// TODO: Implement actual module loading and type inference
+		// For now, this is a placeholder that should be replaced with:
+		// 1. fs.readFileSync(filePath)
+		// 2. lex and parse the module
+		// 3. type-check in clean environment  
+		// 4. extract final type and effects
 		
-		// For now, we need to determine the module type through other means
-		// The evaluator will handle the actual module loading
-		
-		// Special handling for known modules
-		const moduleType = inferModuleType(expr.path);
-		const moduleEffects = inferModuleEffects(expr.path);
+		// Temporary fallback - return empty record
+		// This will cause accessor tests to fail, which is correct behavior
+		// until we implement proper module type inference
+		const moduleType = recordType({});
+		const moduleEffects = new Set<Effect>();
 		
 		// Cache the result
 		moduleTypeCache.set(filePath, { type: moduleType, effects: moduleEffects });
@@ -1135,83 +1135,7 @@ export const typeImport = (
 	}
 };
 
-// Helper to infer module type based on path
-// This is a temporary solution until we have full module type inference
-function inferModuleType(path: string): Type {
-	// Handle known example modules
-	if (path === 'examples/math_functions' || path === 'math_functions' || path === 'test/fixtures/test_math') {
-		return recordType({
-			add: functionType(
-				[primitiveType('Float'), primitiveType('Float')],
-				primitiveType('Float'),
-				new Set()
-			),
-			multiply: functionType(
-				[primitiveType('Float'), primitiveType('Float')],
-				primitiveType('Float'),
-				new Set()
-			),
-			square: functionType(
-				[primitiveType('Float')],
-				primitiveType('Float'),
-				new Set()
-			)
-		});
-	}
-	
-	// Handle pure_math module
-	if (path === 'pure_math' || path === 'test/fixtures/test_pure_math') {
-		return recordType({
-			double: functionType(
-				[primitiveType('Float')],
-				primitiveType('Float'),
-				new Set()
-			),
-			triple: functionType(
-				[primitiveType('Float')],
-				primitiveType('Float'),
-				new Set()
-			)
-		});
-	}
-	
-	// Handle logger module
-	if (path === 'logger' || path === 'test/fixtures/test_logger') {
-		return recordType({
-			info: functionType(
-				[primitiveType('String')],
-				primitiveType('String'),
-				new Set(['log'])
-			),
-			error: functionType(
-				[primitiveType('String')],
-				primitiveType('String'),
-				new Set(['log'])
-			)
-		});
-	}
-	
-	// Default to empty record for unknown modules
-	// In a complete implementation, this would parse and type-check the module
-	return recordType({});
-}
 
-// Helper to infer module effects based on path
-// This is a temporary solution until we have full effect analysis
-function inferModuleEffects(path: string): Set<Effect> {
-	// Most math modules are pure (no external effects)
-	if (path.includes('math')) {
-		return new Set<Effect>();
-	}
-	
-	// Logger modules likely have log effects
-	if (path.includes('log')) {
-		return new Set<Effect>(['log']);
-	}
-	
-	// Default to no effects for unknown modules
-	return new Set<Effect>();
-}
 
 // Type inference for records
 export const typeRecord = (
