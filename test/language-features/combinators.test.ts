@@ -46,8 +46,8 @@ test('Parser Combinators - token - should fail on wrong token type', () => {
 
 	expect(result.success).toEqual(false);
 	if (!result.success) {
-		expect(expect(result.error.includes('Expected IDENTIFIER')).toBeTruthy());
-		expect(expect(result.error.includes('but got NUMBER')).toBeTruthy());
+		expect(result.error.includes('Expected IDENTIFIER').toBeTruthy();
+		expect(result.error.includes('but got NUMBER').toBeTruthy();
 	}
 });
 
@@ -57,8 +57,8 @@ test('Parser Combinators - token - should fail on wrong token value', () => {
 
 	expect(result.success).toEqual(false);
 	if (!result.success) {
-		expect(expect(result.error.includes("Expected NUMBER '43'")).toBeTruthy());
-		expect(expect(result.error.includes("but got NUMBER '42'")).toBeTruthy());
+		expect(result.error.includes("Expected NUMBER '43'").toBeTruthy();
+		expect(result.error.includes("but got NUMBER '42'").toBeTruthy();
 	}
 });
 
@@ -67,8 +67,8 @@ test('Parser Combinators - token - should fail on empty input', () => {
 
 	expect(result.success).toEqual(false);
 	if (!result.success) {
-		expect(expect(result.error.includes('Expected NUMBER')).toBeTruthy());
-		expect(expect(result.error.includes('but got end of input')).toBeTruthy());
+		expect(result.error.includes('Expected NUMBER').toBeTruthy();
+		expect(result.error.includes('but got end of input').toBeTruthy();
 	}
 });
 
@@ -241,7 +241,7 @@ test('Parser Combinators - optional - should match when parser succeeds', () => 
 
 	expect(result.success).toEqual(true);
 	if (result.success) {
-		expect(expect(result.value !== null)).toBeTruthy();
+		expect(expect(result.value !== null).toBeTruthy();
 		if (result.value !== null) {
 			expect(result.value.value).toEqual('42');
 		}
@@ -506,7 +506,7 @@ test('Parser Combinators - complex combinations - should handle optional with fa
 	if (result.success) {
 		expect(result.value.length).toEqual(3);
 		expect(result.value[0].value).toEqual('hello');
-		expect(expect(result.value[1] !== null)).toBeTruthy();
+		expect(expect(result.value[1] !== null).toBeTruthy();
 		expect(result.value[2]).toEqual(null);
 	}
 });
@@ -517,8 +517,8 @@ test('Parser Combinators - error handling - should provide meaningful error mess
 
 	expect(result.success).toEqual(false);
 	if (!result.success) {
-		expect(expect(result.error.includes('Expected STRING')).toBeTruthy());
-		expect(expect(result.error.includes('but got NUMBER')).toBeTruthy());
+		expect(result.error.includes('Expected STRING').toBeTruthy();
+		expect(result.error.includes('but got NUMBER').toBeTruthy();
 	}
 });
 
@@ -532,7 +532,7 @@ test('Parser Combinators - error handling - should track position for error repo
 
 	expect(result.success).toEqual(false);
 	if (!result.success) {
-		expect(expect(result.error.includes('Expected STRING')).toBeTruthy());
+		expect(result.error.includes('Expected STRING').toBeTruthy();
 	}
 });
 

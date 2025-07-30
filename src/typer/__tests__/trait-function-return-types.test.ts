@@ -73,7 +73,7 @@ test('variables and boolean operations complete without exponential unification'
     const endTime = Date.now();
     
     // Should complete quickly - this was slow before our fixes
-    expect(expect(endTime - startTime < 500, `Type checking took ${endTime - startTime}ms, expected < 500ms`)).toBeTruthy();
+    expect(expect(endTime - startTime < 500, `Type checking took ${endTime - startTime}ms, expected < 500ms`).toBeTruthy();
     
     // Should return List Bool
     expect(result.type.kind).toEqual('list');

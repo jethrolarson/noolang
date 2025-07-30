@@ -131,7 +131,7 @@ test.skip('should demonstrate that the type unification issue is now fixed - TOD
 	// The issue was in the type system when it tried to unify
 	// type variables that had been associated with different ADT types
 	// This is now fixed with proper let-polymorphism for list_map
-	expect(expect(()).toBeTruthy() =>
+	expect(expect(().toBeTruthy() =>
 		runNoolang(`
         type Color = Red | Green | Blue;
         type Shape a = Circle a | Rectangle a a | Triangle a a a;

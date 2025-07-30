@@ -43,10 +43,10 @@ function runCode(code: string) {
 function expectError(code: string, errorPattern?: string) {
     try {
         runCode(code);
-        assert.unreachable('Expected error but code succeeded');
+        throw new Error('Expected error but code succeeded');
     } catch (error) {
         if (errorPattern) {
-            assert.match(error.message, new RegExp(errorPattern, 'i'));
+            expect(error.message).toMatch(new RegExp(errorPattern, 'i'));
         }
     }
 }

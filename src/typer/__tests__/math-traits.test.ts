@@ -85,7 +85,7 @@ test('Unified Math Trait System (Float-only) - Numeric Trait (supports Float for
         const program = parse(tokens);
         
         // Type checking should pass (constraint resolution allows it)
-        expect(().not.toThrow() => typeAndDecorate(program));
+        expect(() => typeAndDecorate(program).not.toThrow());
     });
 });
 
@@ -159,7 +159,7 @@ test('Unified Math Trait System (Float-only) - Type Safety - should allow string
     operations.forEach(code => {
         const tokens = new Lexer(code).tokenize();
         const program = parse(tokens);
-        expect(().not.toThrow() => typeAndDecorate(program));
+        expect(() => typeAndDecorate(program).not.toThrow());
     });
 });
 

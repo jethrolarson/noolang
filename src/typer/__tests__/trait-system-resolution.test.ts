@@ -58,14 +58,14 @@ test('Trait System Phase 3: Constraint Resolution - Constraint Collapse - should
 		if (typeof testCase.expectedType === 'string') {
 			expect(typeString).toBe(testCase.expectedType);
 		} else {
-			assert.match(typeString, testCase.expectedType);
+			expect(typeString).toMatch(testCase.expectedType);
 		}
 		
 		// Check constraint collapse behavior
 		if (testCase.shouldCollapse) {
 			assert.not.match(typeString, /implements|given|α\d+/);
 		} else {
-			assert.match(typeString, /implements|given|α\d+/);
+			expect(typeString).toMatch(/implements|given|α\d+/);
 		}
 	}
 });
@@ -86,8 +86,8 @@ test('Trait System Phase 3: Constraint Resolution - Complex Constraint Resolutio
 	// but Show constraint from within the mapped function is preserved
 	expect(typeResult.type.kind).toBe('list');
 	const typeString = typeToString(typeResult.type);
-	assert.match(typeString, /List String/);
-	assert.match(typeString, /implements Show/); // Show constraint preserved for now
+	expect(typeString).toMatch(/List String/);
+	expect(typeString).toMatch(/implements Show/); // Show constraint preserved for now
 });
 
 test('Trait System Phase 3: Constraint Resolution - Advanced Edge Cases - should handle polymorphic functions with constraints', () => {

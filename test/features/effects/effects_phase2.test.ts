@@ -93,11 +93,11 @@ test('pure pattern matching has no effects', () => {
 // Test suite: Type System Returns TypeResult with Effects
 test('typeProgram returns TypeResult with type and effects', () => {
 	const result = runNoolang('42');
-	expect(expect(result.hasOwnProperty('type')).toBeTruthy());
-	expect(expect(result.hasOwnProperty('effects')).toBeTruthy());
-	expect(expect(result.hasOwnProperty('state')).toBeTruthy());
+	expect(result.hasOwnProperty('type').toBeTruthy();
+	expect(result.hasOwnProperty('effects').toBeTruthy();
+	expect(result.hasOwnProperty('state').toBeTruthy();
 	expect(result.type.kind).toBe('primitive');
-	expect(expect(result.effects instanceof Set)).toBeTruthy();
+	expect(expect(result.effects instanceof Set).toBeTruthy();
 });
 
 test('complex expressions return proper TypeResult structure', () => {
@@ -277,17 +277,17 @@ test('TypeResult structure is consistent across all expression types', () => {
 
 	for (const { code, expectedKind } of expressions) {
 		const result = runNoolang(code);
-		expect(expect(result.hasOwnProperty('type')).toBeTruthy());
-		expect(expect(result.hasOwnProperty('effects')).toBeTruthy());
-		expect(expect(result.hasOwnProperty('state')).toBeTruthy());
+		expect(result.hasOwnProperty('type').toBeTruthy();
+		expect(result.hasOwnProperty('effects').toBeTruthy();
+		expect(result.hasOwnProperty('state').toBeTruthy();
 		expect(result.type.kind).toBe(expectedKind);
-		expect(expect(result.effects instanceof Set)).toBeTruthy();
+		expect(expect(result.effects instanceof Set).toBeTruthy();
 	}
 });
 
 test('effects are properly typed as Set<Effect>', () => {
 	const result = runNoolang('42');
-	expect(expect(result.effects instanceof Set)).toBeTruthy();
+	expect(expect(result.effects instanceof Set).toBeTruthy();
 	// Verify we can use Set methods
 	expect(typeof result.effects.has).toBe('function');
 	expect(typeof result.effects.add).toBe('function');

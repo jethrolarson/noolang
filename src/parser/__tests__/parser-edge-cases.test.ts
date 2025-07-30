@@ -64,7 +64,7 @@ test('Edge Cases and Error Conditions - should handle empty input for type expre
 	const tokens: any[] = [];
 	const result = parseTypeExpression(tokens);
 	assertParseError(result);
-	expect(expect(result.error.includes('Expected type expression')).toBeTruthy());
+	expect(result.error.includes('Expected type expression').toBeTruthy();
 });
 
 test('Edge Cases and Error Conditions - should handle invalid tokens for type expressions', () => {
@@ -72,7 +72,7 @@ test('Edge Cases and Error Conditions - should handle invalid tokens for type ex
 	const tokens = lexer.tokenize();
 	const result = parseTypeExpression(tokens);
 	assertParseError(result);
-	expect(expect(result.error.includes('Expected type expression')).toBeTruthy());
+	expect(result.error.includes('Expected type expression').toBeTruthy();
 });
 
 test('Edge Cases and Error Conditions - should parse Unit type correctly', () => {
@@ -104,7 +104,7 @@ test('Edge Cases and Error Conditions - should handle invalid effect name', () =
 	const tokens = lexer.tokenize();
 	const result = parseTypeExpression(tokens);
 	assertParseError(result);
-	expect(expect(result.error.includes('Invalid effect: invalideffect')).toBeTruthy());
+	expect(result.error.includes('Invalid effect: invalideffect').toBeTruthy();
 });
 
 test('Edge Cases and Error Conditions - should handle missing effect name after exclamation', () => {
@@ -112,7 +112,7 @@ test('Edge Cases and Error Conditions - should handle missing effect name after 
 	const tokens = lexer.tokenize();
 	const result = parseTypeExpression(tokens);
 	assertParseError(result);
-	expect(expect(result.error.includes('Expected effect name after !')).toBeTruthy());
+	expect(result.error.includes('Expected effect name after !').toBeTruthy();
 });
 
 test('Edge Cases and Error Conditions - should handle generic List type', () => {
@@ -199,7 +199,7 @@ test('Edge Cases and Error Conditions - should handle record type edge case', ()
 	const result = parseTypeExpression(tokens);
 	assertParseSuccess(result);
 	assertRecordType(result.value);
-	expect(expect(result.value.fields.hasOwnProperty('name')).toBeTruthy());
+	expect(result.value.fields.hasOwnProperty('name').toBeTruthy();
 });
 
 test('Edge Cases and Error Conditions - should handle tuple type edge case', () => {

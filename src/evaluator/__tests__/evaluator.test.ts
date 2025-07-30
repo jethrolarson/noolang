@@ -250,8 +250,8 @@ test('Evaluator - should handle undefined variables', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 
-	expect(().toThrow() => {
-		evaluator.evaluateProgram(program);
+	expect(() => {
+		evaluator.evaluateProgram(program).toThrow();
 	}, /Undefined variable: undefined_var/);
 });
 
@@ -261,8 +261,8 @@ test('Evaluator - should handle type errors in arithmetic', () => {
 	const program = parse(tokens);
 	const evaluator = new Evaluator();
 
-	expect(().toThrow() => {
-		evaluator.evaluateProgram(program);
+	expect(() => {
+		evaluator.evaluateProgram(program).toThrow();
 	}, /Cannot add string and number/);
 });
 
@@ -557,8 +557,8 @@ test('Evaluator - Top-level sequence evaluation - multiple definitions and final
 	const evaluator = new Evaluator();
 	const result = evaluator.evaluateProgram(program);
 	const mathRecord = unwrapValue(result.finalResult) as any;
-	expect(expect(mathRecord.add)).toBeTruthy();
-	expect(expect(mathRecord.sub)).toBeTruthy();
+	expect(expect(mathRecord.add).toBeTruthy();
+	expect(expect(mathRecord.sub).toBeTruthy();
 	expect(mathRecord.add.tag).toBe('function');
 	expect(mathRecord.sub.tag).toBe('function');
 });
@@ -725,13 +725,12 @@ test('Evaluator - Additional Coverage - should handle constructor pattern matchi
 });
 
 test('Evaluator - Additional Coverage - should throw error when no pattern matches', () => {
-	expect(().toThrow() =>
-		runCode(`
+	expect(() => runCode(`
         type Color = Red | Blue;
         value = Red;
         match value with (
           Blue => "blue"
-        )
+        ).toThrow();
       `), /No pattern matched in match expression/);
 });
 
@@ -844,8 +843,8 @@ test('Evaluator - Additional Coverage - should handle randomRange function', () 
 	const result = runCode('randomRange 1 10');
 	expect(result.finalResult.tag).toBe('number');
 	if (result.finalResult.tag === 'number') {
-		expect(expect(result.finalResult.value >= 1)).toBeTruthy();
-		expect(expect(result.finalResult.value <= 10)).toBeTruthy();
+		expect(expect(result.finalResult.value >= 1).toBeTruthy();
+		expect(expect(result.finalResult.value <= 10).toBeTruthy();
 	}
 });
 

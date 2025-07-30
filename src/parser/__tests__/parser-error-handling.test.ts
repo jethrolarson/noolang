@@ -38,8 +38,8 @@ test('Error Conditions - should handle only semicolons', () => {
 });
 
 test('Error Conditions - should handle mixed named and positional fields error', () => {
-	expect(().toThrow() => {
-		const lexer = new Lexer('{ @name "Alice", 30 }'); // mixed named and positional
+	expect(() => {
+		const lexer = new Lexer('{ @name "Alice", 30 }').toThrow(); // mixed named and positional
 		const tokens = lexer.tokenize();
 		parse(tokens);
 	}, /Parse error/);
@@ -49,14 +49,14 @@ test('Error Conditions - should handle invalid field after comma in record', () 
 	// should handle trailing comma gracefully
 	const lexer = new Lexer('{ @name "Alice", }'); // trailing comma with no field
 	const tokens = lexer.tokenize();
-	expect(().not.toThrow() => parse(tokens));
+	expect(() => parse(tokens).not.toThrow());
 });
 
 test('Error Conditions - should handle invalid element after comma in list', () => {
 	// should handle trailing comma gracefully
 	const lexer = new Lexer('[1, 2, ]'); // trailing comma with no element
 	const tokens = lexer.tokenize();
-	expect(().not.toThrow() => parse(tokens));
+	expect(() => parse(tokens).not.toThrow());
 });
 
 test('Operator Precedence - should parse operators with correct precedence', () => {

@@ -25,8 +25,8 @@ test('LSP Regression Tests - should reproduce the exact LSP --types-file code pa
   // This is where the error occurs - typeAndDecorate calls loadStdlib
   const { program: decoratedProgram, state } = typeAndDecorate(program);
   
-  expect(expect(decoratedProgram)).toBeTruthy();
-  expect(expect(state)).toBeTruthy();
+  expect(expect(decoratedProgram).toBeTruthy();
+  expect(expect(state).toBeTruthy();
 });
 
 test('LSP Regression Tests - should handle multiple calls to typeAndDecorate', () => {
@@ -47,7 +47,7 @@ test('LSP Regression Tests - should handle multiple calls to typeAndDecorate', (
     const tokens = lexer.tokenize();
     const program = parse(tokens);
     const { program: decoratedProgram } = typeAndDecorate(program);
-    expect(expect(decoratedProgram)).toBeTruthy();
+    expect(expect(decoratedProgram).toBeTruthy();
   }
 });
 
@@ -73,8 +73,8 @@ test('LSP Regression Tests - should handle concurrent typeAndDecorate calls', as
   const results = await Promise.all(promises);
   expect(results.length).toBe(5);
   expect(results.forEach(result => {
-    expect(result.program)).toBeTruthy();
-    expect(expect(result.state)).toBeTruthy();
+    expect(result.program).toBeTruthy();
+    expect(expect(result.state).toBeTruthy();
   });
 });
 
@@ -96,7 +96,7 @@ test('LSP Regression Tests - should handle typeAndDecorate with empty initial st
   
   // Call with undefined initial state (forces stdlib loading)
   const { program: decoratedProgram } = typeAndDecorate(program, undefined);
-  expect(expect(decoratedProgram)).toBeTruthy();
+  expect(expect(decoratedProgram).toBeTruthy();
 });
 
 test('LSP Regression Tests - should isolate stdlib loading error with specific line tracking', () => {
@@ -119,7 +119,7 @@ test('LSP Regression Tests - should isolate stdlib loading error with specific l
     // This should trigger the stdlib loading and potential error
     const { program: decoratedProgram } = typeAndDecorate(program);
     
-    expect(expect(decoratedProgram)).toBeTruthy();
+    expect(expect(decoratedProgram).toBeTruthy();
   } catch (error) {
     // If there IS an error, let's analyze it
     const errorMessage = (error as Error).message;

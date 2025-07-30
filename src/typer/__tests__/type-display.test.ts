@@ -37,10 +37,10 @@ test('Type Display (typeToString) - Record Type Display - should display record 
 
 	const result = typeToString(multiFieldRecord);
 	// Note: Object.entries() order should be consistent in modern JS
-	assert.match(result, /^{ @\w+ \w+(?:, @\w+ \w+)* }$/);
-	expect(expect(result.includes('@name String')).toBeTruthy());
-	expect(expect(result.includes('@age Float')).toBeTruthy());
-	expect(expect(result.includes('@active Bool')).toBeTruthy());
+	expect(result).toMatch(/^{ @\w+ \w+(?:, @\w+ \w+)* }$/);
+	expect(result.includes('@name String').toBeTruthy();
+	expect(result.includes('@age Float').toBeTruthy();
+	expect(result.includes('@active Bool').toBeTruthy();
 });
 
 test('Type Display (typeToString) - Record Type Display - should display nested record types correctly', () => {
@@ -62,7 +62,7 @@ test('Type Display (typeToString) - Record Type Display Consistency - should use
 	});
 
 	const result = typeToString(recordTypeWithFields);
-	expect(expect(result.includes(', ')).toBeTruthy());
+	expect(result.includes(', ').toBeTruthy();
 });
 
 test('Type Display (typeToString) - Record Type Display Consistency - should not use colons in field definitions', () => {
@@ -72,7 +72,7 @@ test('Type Display (typeToString) - Record Type Display Consistency - should not
 	});
 
 	const result = typeToString(recordTypeWithFields);
-	expect(expect(!result.includes(':')).toBeTruthy());
+	expect(!result.includes(':').toBeTruthy();
 });
 
 test('Type Display (typeToString) - Record Type Display Consistency - should use @ prefix for all field names', () => {
@@ -85,9 +85,9 @@ test('Type Display (typeToString) - Record Type Display Consistency - should use
 	const result = typeToString(recordTypeWithFields);
 	const fields = result.match(/@\w+/g);
 	expect(fields?.length).toBe(3);
-	expect(expect(fields?.includes('@name')).toBeTruthy());
-	expect(expect(fields?.includes('@age')).toBeTruthy());
-	expect(expect(fields?.includes('@active')).toBeTruthy());
+	expect(fields?.includes('@name').toBeTruthy();
+	expect(fields?.includes('@age').toBeTruthy();
+	expect(fields?.includes('@active').toBeTruthy();
 });
 
 test('Type Display (typeToString) - Record Type Display Consistency - should match input syntax format', () => {
@@ -100,6 +100,6 @@ test('Type Display (typeToString) - Record Type Display Consistency - should mat
 	const result = typeToString(recordTypeWithFields);
 
 	// Should match the format: { @field Type, @field Type }
-	assert.match(result, /^{ @\w+ \w+(?:, @\w+ \w+)* }$/);
+	expect(result).toMatch(/^{ @\w+ \w+(?:, @\w+ \w+)* }$/);
 });
 

@@ -17,8 +17,8 @@ test('parses named record', () => {
 		expect(record.fields[0].name).toBe('a');
 		expect(record.fields[1].name).toBe('b');
 		// Skip checking exact value structure - just verify they exist
-		expect(expect(record.fields[0].value)).toBeTruthy();
-		expect(expect(record.fields[1].value)).toBeTruthy();
+		expect(expect(record.fields[0].value).toBeTruthy();
+		expect(expect(record.fields[1].value).toBeTruthy();
 	}
 });
 
@@ -28,8 +28,8 @@ test('parses tuple (nameless record)', () => {
 	expect(tuple.kind).toBe('tuple');
 	if (tuple.kind === 'tuple') {
 		expect(tuple.elements.length).toBe(2);
-		expect(expect(tuple.elements[0])).toBeTruthy();
-		expect(expect(tuple.elements[1])).toBeTruthy();
+		expect(expect(tuple.elements[0]).toBeTruthy();
+		expect(expect(tuple.elements[1]).toBeTruthy();
 	}
 });
 

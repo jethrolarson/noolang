@@ -23,7 +23,7 @@ implement Show (Option a) given a implements Show (
   const lexer = new Lexer(problematicCode);
   const tokens = lexer.tokenize();
   const program = parse(tokens);
-  expect(expect(program.statements)).toBeTruthy();
+  expect(expect(program.statements).toBeTruthy();
 });
 
 test('Stdlib Parsing Regression Tests - should handle another complex implement statement', () => {
@@ -41,7 +41,7 @@ implement Functor List (
   const lexer = new Lexer(complexCode);
   const tokens = lexer.tokenize();
   const program = parse(tokens);
-  expect(expect(program.statements)).toBeTruthy();
+  expect(expect(program.statements).toBeTruthy();
   expect(program.statements.length).toBe(1);
 });
 
@@ -53,7 +53,7 @@ type Option a = Some a | None;
   const lexer = new Lexer(simpleCode);
   const tokens = lexer.tokenize();
   const program = parse(tokens);
-  expect(expect(program.statements)).toBeTruthy();
+  expect(expect(program.statements).toBeTruthy();
   expect(program.statements.length).toBe(1);
 });
 
@@ -70,10 +70,10 @@ test('Stdlib Parsing Regression Tests - should parse stdlib without errors', () 
     const lexer = new Lexer(stdlibContent);
     const tokens = lexer.tokenize();
     const program = parse(tokens);
-    expect(expect(program.statements)).toBeTruthy();
+    expect(expect(program.statements).toBeTruthy();
     
     // Should have multiple statements
-    expect(expect(program.statements.length > 0)).toBeTruthy();
+    expect(expect(program.statements.length > 0).toBeTruthy();
   } catch (error) {
     if (!stdlibExists) {
       // Skip this test if stdlib doesn't exist
@@ -89,7 +89,7 @@ test('Stdlib Parsing Regression Tests - should handle type state initialization'
   initializeBuiltins(typeState);
   
   // Should have initialized type state
-  expect(expect(typeState)).toBeTruthy();
-  expect(expect(typeState.substitution !== undefined)).toBeTruthy();
+  expect(expect(typeState).toBeTruthy();
+  expect(expect(typeState.substitution !== undefined).toBeTruthy();
 });
 

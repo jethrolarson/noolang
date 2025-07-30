@@ -131,8 +131,8 @@ test('Type annotation parsing - parses record type annotation', () => {
 	assertParseSuccess(result);
 	assertRecordType(result.value);
 	expect(result.value.kind).toBe('record');
-	expect(expect(result.value.fields.hasOwnProperty('name')).toBeTruthy());
-	expect(expect(result.value.fields.hasOwnProperty('age')).toBeTruthy());
+	expect(result.value.fields.hasOwnProperty('name').toBeTruthy();
+	expect(result.value.fields.hasOwnProperty('age').toBeTruthy();
 	expect(result.value.fields.name.kind).toBe('primitive');
 	expect(result.value.fields.age.kind).toBe('primitive');
 });
@@ -280,7 +280,7 @@ test('Effect parsing - should reject invalid effect names', () => {
 	const result = parseTypeExpression(tokens);
 
 	assertParseError(result);
-	expect(expect(result.error.includes('Invalid effect: invalid')).toBeTruthy());
+	expect(result.error.includes('Invalid effect: invalid').toBeTruthy();
 });
 
 test('Effect parsing - should require effect name after exclamation mark', () => {
@@ -289,7 +289,7 @@ test('Effect parsing - should require effect name after exclamation mark', () =>
 	const result = parseTypeExpression(tokens);
 
 	assertParseError(result);
-	expect(expect(result.error.includes('Expected effect name after !')).toBeTruthy());
+	expect(result.error.includes('Expected effect name after !').toBeTruthy();
 });
 
 test('Top-level definitions with type annotations - parses definition with function type annotation', () => {

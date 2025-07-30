@@ -184,7 +184,7 @@ test('should infer Option type for result', () => {
         add_ten = fn x => x + 10;
         Some 5 |? add_ten
       `);
-	assert.match(type, /Option/);
+	expect(type).toMatch(/Option/);
 });
 
 test('should handle None type correctly', () => {
@@ -193,14 +193,14 @@ test('should handle None type correctly', () => {
         add_ten = fn x => x + 10;
         None |? add_ten
       `);
-	assert.match(type, /Option/);
+	expect(type).toMatch(/Option/);
 });
 
 // Test suite: Error Cases
 test('should require right operand to be a function', () => {
 	setup();
-	expect(().toThrow() => {
-		evalExpression(`Some 5 |? 10`);
+	expect(() => {
+		evalExpression(`Some 5 |? 10`).toThrow();
 	});
 });
 

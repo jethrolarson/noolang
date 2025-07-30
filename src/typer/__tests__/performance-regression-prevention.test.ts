@@ -27,11 +27,11 @@ test('arithmetic operations complete quickly', () => {
     const stats = getUnificationStats();
     
     // Should complete quickly
-    expect(expect(endTime - startTime < 500, `Type checking took ${endTime - startTime}ms, expected < 500ms`)).toBeTruthy();
+    expect(expect(endTime - startTime < 500, `Type checking took ${endTime - startTime}ms, expected < 500ms`).toBeTruthy();
     
     // Should not have excessive unification calls
     if (stats) {
-        expect(expect(stats.calls < 1000, `Used ${stats.calls} unification calls, expected < 1000`)).toBeTruthy();
+        expect(expect(stats.calls < 1000, `Used ${stats.calls} unification calls, expected < 1000`).toBeTruthy();
     }
     
     // Should return List Float
@@ -55,11 +55,11 @@ test('equality operations remain performant', () => {
     const stats = getUnificationStats();
     
     // Should complete quickly
-    expect(expect(endTime - startTime < 800, `Type checking took ${endTime - startTime}ms, expected < 800ms`)).toBeTruthy();
+    expect(expect(endTime - startTime < 800, `Type checking took ${endTime - startTime}ms, expected < 800ms`).toBeTruthy();
     
     // Should not have excessive unification calls
     if (stats) {
-        expect(expect(stats.calls < 1500, `Used ${stats.calls} unification calls, expected < 1500`)).toBeTruthy();
+        expect(expect(stats.calls < 1500, `Used ${stats.calls} unification calls, expected < 1500`).toBeTruthy();
     }
     
     // Should return List Bool
@@ -84,11 +84,11 @@ test('nested function application performs well', () => {
     const stats = getUnificationStats();
     
     // Should complete quickly
-    expect(expect(endTime - startTime < 600, `Type checking took ${endTime - startTime}ms, expected < 600ms`)).toBeTruthy();
+    expect(expect(endTime - startTime < 600, `Type checking took ${endTime - startTime}ms, expected < 600ms`).toBeTruthy();
     
     // Should not have excessive unification calls
     if (stats) {
-        expect(expect(stats.calls < 1200, `Used ${stats.calls} unification calls, expected < 1200`)).toBeTruthy();
+        expect(expect(stats.calls < 1200, `Used ${stats.calls} unification calls, expected < 1200`).toBeTruthy();
     }
     
     // Should return Float
@@ -107,7 +107,7 @@ test('stdlib loading does not cause performance regression', () => {
     const stats = getUnificationStats();
     
     // Should complete in reasonable time even with stdlib loading
-    expect(expect(endTime - startTime < 2000, `Type checking took ${endTime - startTime}ms, expected < 2000ms`)).toBeTruthy();
+    expect(expect(endTime - startTime < 2000, `Type checking took ${endTime - startTime}ms, expected < 2000ms`).toBeTruthy();
     
     // Should return List Float
     expect(result.type.kind).toEqual('list');

@@ -218,7 +218,7 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Type Sy
 	// Should create a constrained type since no implementation exists yet
 	expect(typeResult.type.kind).toBe('constrained');
 	const typeString = typeToString(typeResult.type);
-	assert.match(typeString, /implements CustomTrait/);
+	expect(typeString).toMatch(/implements CustomTrait/);
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Type System Integration - should not break existing functionality', () => {
@@ -244,7 +244,7 @@ test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Type Sy
 	
 	expect(typeResult.type.kind).toBe('constrained');
 	const typeString = typeToString(typeResult.type);
-	assert.match(typeString, /implements TestFunctor/);
+	expect(typeString).toMatch(/implements TestFunctor/);
 });
 
 test('Trait System - Consolidated Tests - Phase 1: Core Infrastructure - Type System Integration - should work with existing ADT system', () => {
@@ -341,7 +341,7 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Basic
 	// Should succeed and return a constrained type
 	expect(typeResult.type.kind).toBe('constrained');
 	const typeString = typeToString(typeResult.type);
-	assert.match(typeString, /implements Monad/);
+	expect(typeString).toMatch(/implements Monad/);
 });
 
 test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Constraint Resolution Failures - should fail when no trait implementation exists', () => {
@@ -371,8 +371,8 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Compl
 	}
 	
 	const typeString = typeToString(typeResult.type);
-	assert.match(typeString, /implements Functor/);
-	assert.match(typeString, /-> .* Float/); // Should be a function returning constrained Float
+	expect(typeString).toMatch(/implements Functor/);
+	expect(typeString).toMatch(/-> .* Float/); // Should be a function returning constrained Float
 });
 
 test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Complex Constraint Resolution - should handle nested function applications', () => {
@@ -406,8 +406,8 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Compl
 	// but Show constraint from within the mapped function is preserved
 	expect(typeResult.type.kind).toBe('list');
 	const typeString = typeToString(typeResult.type);
-	assert.match(typeString, /List String/);
-	assert.match(typeString, /implements Show/); // Show constraint preserved
+	expect(typeString).toMatch(/List String/);
+	expect(typeString).toMatch(/implements Show/); // Show constraint preserved
 });
 
 test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Integration with Existing System - should not break existing type inference', () => {
@@ -454,7 +454,7 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Integ
 	// CONSTRAINT COLLAPSE: Should handle complex integration and resolve to concrete List String
 	expect(typeResult.type.kind).toBe('list');
 	const typeString = typeToString(typeResult.type);
-	assert.match(typeString, /List String/);
+	expect(typeString).toMatch(/List String/);
 });
 
 test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Error Message Quality - should provide helpful error for missing trait implementation', () => {
@@ -464,13 +464,13 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Error
 	
 	try {
 		typeProgram(program);
-		assert.unreachable('Expected error for missing trait implementation');
+		throw new Error('Expected error for missing trait implementation');
 	} catch (error) {
 		const message = (error as Error).message;
-		assert.match(message, /Functor/);
-		assert.match(message, /Float/);
+		expect(message).toMatch(/Functor/);
+		expect(message).toMatch(/Float/);
 		// Should suggest how to fix it
-		assert.match(message, /implement/);
+		expect(message).toMatch(/implement/);
 	}
 });
 
@@ -481,11 +481,11 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Error
 	
 	try {
 		typeProgram(program);
-		assert.unreachable('Expected error for missing trait implementation');
+		throw new Error('Expected error for missing trait implementation');
 	} catch (error) {
 		const message = (error as Error).message;
 		// Should include location information
-		assert.match(message, /line 1/);
+		expect(message).toMatch(/line 1/);
 	}
 });
 

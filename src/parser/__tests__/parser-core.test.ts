@@ -283,7 +283,7 @@ test('Parser - should parse lists', () => {
 	expect(program.statements.length).toBe(1);
 	expect(program.statements[0].kind).toBe('list');
 	const elements = (program.statements[0] as any).elements;
-	expect(expect(Array.isArray(elements)).toBeTruthy());
+	expect(Array.isArray(elements).toBeTruthy();
 	expect(elements.length).toBe(3);
 	expect(elements[0].kind).toBe('literal');
 	expect(elements[0].value).toBe(1);

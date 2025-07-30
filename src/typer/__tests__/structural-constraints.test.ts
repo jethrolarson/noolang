@@ -18,11 +18,11 @@ test('Structural Constraints with `has` keyword - Basic Structural Constraints -
 			: a -> String given a has {@name String}
 	`);
 	const result = typeProgram(program);
-	expect(expect(result)).toBeTruthy();
+	expect(expect(result).toBeTruthy();
 	
 	// Function should have constraint in its type
 	const typeStr = typeToString(result.type, result.state.substitution);
-	expect(expect(typeStr.includes('String')).toBeTruthy());
+	expect(typeStr.includes('String').toBeTruthy();
 });
 
 test('Structural Constraints with `has` keyword - Basic Structural Constraints - should support has constraint with multiple fields', () => {
@@ -31,7 +31,7 @@ test('Structural Constraints with `has` keyword - Basic Structural Constraints -
 			: a -> String given a has {@firstName String, @lastName String}
 	`);
 	const result = typeProgram(program);
-	expect(expect(result)).toBeTruthy();
+	expect(expect(result).toBeTruthy();
 });
 
 test('Structural Constraints with `has` keyword - Basic Structural Constraints - should work with record that has extra fields (duck typing)', () => {
@@ -79,7 +79,7 @@ test('Structural Constraints with `has` keyword - Working Examples - should work
 			: a -> List b given a has {@items List b}
 	`);
 	const result = typeProgram(program);
-	expect(expect(result)).toBeTruthy();
+	expect(expect(result).toBeTruthy();
 });
 
 test('Structural Constraints with `has` keyword - Accessor Constraints (Automatic has constraints) - should automatically add has constraints to accessors', () => {
@@ -88,7 +88,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		result = getName {@name "Alice", @age 30}
 	`);
 	const result = typeProgram(program);
-	expect(expect(result)).toBeTruthy();
+	expect(expect(result).toBeTruthy();
 	// The accessor should work with records that have the required field
 });
 
@@ -107,7 +107,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		result = getAge {@age 30}
 	`);
 	const result = typeProgram(program);
-	expect(expect(result)).toBeTruthy();
+	expect(expect(result).toBeTruthy();
 	// The accessor should work with any field type
 });
 
@@ -120,7 +120,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		age = getAge person
 	`);
 	const result = typeProgram(program);
-	expect(expect(result)).toBeTruthy();
+	expect(expect(result).toBeTruthy();
 });
 
 test('Structural Constraints with `has` keyword - Accessor Constraints (Automatic has constraints) - should work with accessor composition', () => {
@@ -131,7 +131,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		result = getFullAddress {@address {@street "123 Main St", @city "NYC"}, @name "Alice"}
 	`);
 	const result = typeProgram(program);
-	expect(expect(result)).toBeTruthy();
+	expect(expect(result).toBeTruthy();
 	// Accessor composition should work correctly
 });
 
@@ -141,7 +141,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		result = greet {@name "Alice", @occupation "Engineer"}
 	`);
 	const result = typeProgram(program);
-	expect(expect(result)).toBeTruthy();
+	expect(expect(result).toBeTruthy();
 	// Accessors in function bodies should work correctly
 });
 
@@ -152,7 +152,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		result = getNames people
 	`);
 	const result = typeProgram(program);
-	expect(expect(result)).toBeTruthy();
+	expect(expect(result).toBeTruthy();
 	// Mapping accessors over lists should work
 });
 
@@ -162,7 +162,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		stringValue = getValue {@value "hello"}
 	`);
 	const result = typeProgram(program);
-	expect(expect(result)).toBeTruthy();
+	expect(expect(result).toBeTruthy();
 	// Accessor should work with polymorphic field types
 });
 
@@ -186,7 +186,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		}
 	`);
 	const result = typeProgram(program);
-	expect(expect(result)).toBeTruthy();
+	expect(expect(result).toBeTruthy();
 	// Nested accessor chains should work
 });
 
@@ -198,7 +198,7 @@ test('Structural Constraints with `has` keyword - Accessor Constraints (Automati
 		result = mapGetName people
 	`);
 	const result = typeProgram(program);
-	expect(expect(result)).toBeTruthy();
+	expect(expect(result).toBeTruthy();
 	// Partial application of accessors should work
 });
 

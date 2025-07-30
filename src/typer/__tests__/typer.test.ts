@@ -211,7 +211,7 @@ test('Functional Type Inference - Mutation Types - should reject mutation of non
 	// This should be caught at runtime, not type time
 	// The type system allows it but the evaluator will throw
 	const result = typeProgram(program);
-	expect(expect(result)).toBeTruthy();
+	expect(expect(result).toBeTruthy();
 });
 
 test('Functional Type Inference - Mutation Types - should handle mutation in sequences', () => {
@@ -300,7 +300,7 @@ test('Constraint Propagation (Functional Typer) - should throw a type error when
     `);
 	// This should work now since head is safe and returns Option
 	const result = typeProgram(program);
-	expect(expect(result)).toBeTruthy();
+	expect(expect(result).toBeTruthy();
 });
 
 test('Constraint Propagation (Functional Typer) - should allow composition when constraints are satisfied (functional typer)', () => {

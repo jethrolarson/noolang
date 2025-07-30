@@ -132,19 +132,19 @@ test('Dollar Operator ($) - Precedence with Other Operators - $ works with compl
 test('Dollar Operator ($) - Type Checking - $ with built-in functions type checks correctly', () => {
 	evaluator = new Evaluator();
 	// Just verify it doesn't throw type errors
-	expect(().not.toThrow() => {
+	expect(() => {
 		runCode(
 			'sum = fn x y => x + y; result = list_map $ sum 1; result [1, 2, 3]'
-		);
+		).not.toThrow();
 	});
 });
 
 test('Dollar Operator ($) - Type Checking - $ with user-defined functions type checks correctly', () => {
 	evaluator = new Evaluator();
-	expect(().not.toThrow() => {
+	expect(() => {
 		runCode(
 			'sum = fn x y => x + y; mylist_map = fn f list => list_map f list; result = mylist_map $ sum 1; result [1, 2, 3]'
-		);
+		).not.toThrow();
 	});
 });
 
@@ -213,16 +213,16 @@ test('Dollar Operator ($) - Complex Chaining - $ in complex data flow', () => {
 
 test('Dollar Operator ($) - Error Handling - $ with non-function should error', () => {
 	evaluator = new Evaluator();
-	expect(().toThrow() => {
-		runCode('5 $ 3');
+	expect(() => {
+		runCode('5 $ 3').toThrow();
 	});
 });
 
 test('Dollar Operator ($) - Error Handling - $ with wrong arity should error appropriately', () => {
 	evaluator = new Evaluator();
 	// This should work - partial application
-	expect(().not.toThrow() => {
-		const result = runCode('sum = fn x y => x + y; sum $ 1');
+	expect(() => {
+		const result = runCode('sum = fn x y => x + y; sum $ 1').not.toThrow();
 		// This should return a function, not throw
 	});
 });

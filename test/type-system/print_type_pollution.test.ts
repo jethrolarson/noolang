@@ -19,7 +19,7 @@ import { describe, test, expect } from 'bun:test';
 		state = result1.state;
 
 		// Print should work with Float - check if this succeeds
-		expect(().not.toThrow() => result1);
+		expect(() => result1).not.toThrow();
 
 		// Now use print with string - this should also work
 		const lexer2 = new Lexer('print "hello"');
@@ -27,8 +27,8 @@ import { describe, test, expect } from 'bun:test';
 		const program2 = parse(tokens2);
 
 		// This should not throw - print should be polymorphic
-		expect(().not.toThrow() => {
-			const result2 = typeAndDecorate(program2, state);
+		expect(() => {
+			const result2 = typeAndDecorate(program2, state).not.toThrow();
 		});
 	});
 
@@ -50,8 +50,8 @@ test('simulate REPL behavior - alternating print types', () => {
 		const program2 = parse(tokens2);
 
 		// This is where the bug manifests - print gets "stuck" on Float type
-		expect(().not.toThrow() => {
-			const result2 = typeAndDecorate(program2, state);
+		expect(() => {
+			const result2 = typeAndDecorate(program2, state).not.toThrow();
 			state = result2.state;
 		});
 
@@ -60,8 +60,8 @@ test('simulate REPL behavior - alternating print types', () => {
 		const tokens3 = lexer3.tokenize();
 		const program3 = parse(tokens3);
 
-		expect(().not.toThrow() => {
-			const result3 = typeAndDecorate(program3, state);
+		expect(() => {
+			const result3 = typeAndDecorate(program3, state).not.toThrow();
 		});
 	});
 
@@ -73,26 +73,26 @@ test('other polymorphic functions should not have type pollution', () => {
 		const eq1 = typeAndDecorate(parse(new Lexer('1 == 1').tokenize()), state);
 		state = eq1.state;
 
-		expect(().not.toThrow() => {
+		expect(() => {
 			const eq2 = typeAndDecorate(
-				parse(new Lexer('"a" == "b"').tokenize()),
+				parse(new Lexer('"a" == "b"').not.toThrow().tokenize()),
 				state
 			);
 			state = eq2.state;
 		});
 
 		// Test toString with different types
-		expect(().not.toThrow() => {
+		expect(() => {
 			const toString1 = typeAndDecorate(
-				parse(new Lexer('toString 42').tokenize()),
+				parse(new Lexer('toString 42').not.toThrow().tokenize()),
 				state
 			);
 			state = toString1.state;
 		});
 
-		expect(().not.toThrow() => {
+		expect(() => {
 			const toString2 = typeAndDecorate(
-				parse(new Lexer('toString "hello"').tokenize()),
+				parse(new Lexer('toString "hello"').not.toThrow().tokenize()),
 				state
 			);
 		});
@@ -110,9 +110,9 @@ test('list functions should remain polymorphic', () => {
 		state = list1.state;
 
 		// Test toString with different input again - should work
-		expect(().not.toThrow() => {
+		expect(() => {
 			const toString3 = typeAndDecorate(
-				parse(new Lexer('toString 100').tokenize()),
+				parse(new Lexer('toString 100').not.toThrow().tokenize()),
 				state
 			);
 		});

@@ -229,7 +229,7 @@ test('Trait System Phase 1 Infrastructure - Trait Function Type Inference Integr
 		result = show2 42
 	`);
 
-	expect(().not.toThrow() => typeProgram(program));
+	expect(() => typeProgram(program).not.toThrow());
 });
 
 test('Trait System Phase 1 Infrastructure - Conditional Implementations (Given Constraints) - should parse implement statements with given constraints', () => {
@@ -251,7 +251,7 @@ test('Trait System Phase 1 Infrastructure - Conditional Implementations (Given C
 	expect(implementStmt.kind).toBe('implement-definition');
 	
 	expect(implementStmt.constraintName).toBe('Show');
-	expect(expect(implementStmt.givenConstraints)).toBeTruthy();
+	expect(expect(implementStmt.givenConstraints).toBeTruthy();
 	expect(implementStmt.givenConstraints.kind).toBe('implements');
 	expect(implementStmt.givenConstraints.typeVar).toBe('a');
 	expect(implementStmt.givenConstraints.interfaceName).toBe('Show');
@@ -285,7 +285,7 @@ test('Trait System Phase 1 Infrastructure - Conditional Implementations (Given C
 
 	// TODO: This should eventually check that the given constraint is satisfied
 	// For now, just test that it doesn't crash
-	expect(().not.toThrow() => addTraitImplementation(registry, 'Show', conditionalImpl));
+	expect(() => addTraitImplementation(registry, 'Show', conditionalImpl).not.toThrow());
 });
 
 test('Trait System Phase 1 Infrastructure - Conditional Implementations (Given Constraints) - should accept conditional implementations when constraints are satisfied', () => {
