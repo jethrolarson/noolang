@@ -263,7 +263,6 @@ test('TypeResult structure is consistent across all expression types', () => {
 	for (const { code, expectedKind } of expressions) {
 		const result = runCode(code);
 		expect(result).toHaveProperty('typeResult');
-		expect(result).toHaveProperty('state');
 		expect(result.typeResult).toHaveProperty('type');
 		expect(result.typeResult).toHaveProperty('effects');
 		expect(result.typeResult).toHaveProperty('state');

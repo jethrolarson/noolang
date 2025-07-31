@@ -293,8 +293,32 @@ export class Lexer {
 			return this.readString();
 		}
 
-		if (/[a-zA-Z_]/.test(char)) {
+		if (/[a-zA-Z]/.test(char)) {
 			return this.readIdentifier();
+		}
+
+		// Handle underscore - if followed by letter/digit, it's an identifier
+		// if by itself, it's punctuation
+		if (char === '_') {
+			if (!this.isEOF() && /[a-zA-Z0-9]/.test(this.peekNext())) {
+				return this.readIdentifier();
+			} else {
+				// Check if this is in a function parameter context
+				// Look ahead to see if we have "fn _ =>" pattern
+				const lookAhead = this.input.slice(this.position);
+				if (lookAhead.match(/^_\s*=>/)) {
+					// Check if preceded by "fn " (function parameter)
+					let precedingStart = Math.max(0, this.position - 10); // Look back further
+					const preceding = this.input.slice(precedingStart, this.position);
+					// Check for function context patterns
+					if (preceding.match(/fn\s*$/)) {
+						// This is a function parameter, treat as identifier
+						return this.readIdentifier();
+					}
+				}
+				// Default: treat as wildcard pattern punctuation
+				return this.readPunctuation();
+			}
 		}
 
 		if (/\d/.test(char)) {
@@ -305,7 +329,7 @@ export class Lexer {
 			return this.readOperator();
 		}
 
-		if (/[(),;:[\]{}]/.test(char)) {
+		if (/[(),;:[\]{}_]/.test(char)) {
 			return this.readPunctuation();
 		}
 

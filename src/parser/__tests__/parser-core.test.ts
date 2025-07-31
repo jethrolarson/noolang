@@ -125,8 +125,8 @@ test('Parser - should parse if expressions', () => {
 	expect(program.statements.length).toBe(1);
 	const ifExpr = program.statements[0];
 	assertIfExpression(ifExpr);
-	assertLiteralExpression(ifExpr.condition);
-	expect(ifExpr.condition.value).toBe(true);
+	assertVariableExpression(ifExpr.condition);
+	expect(ifExpr.condition.name).toBe('True');
 	assertLiteralExpression(ifExpr.then);
 	expect(ifExpr.then.value).toBe(1);
 	assertLiteralExpression(ifExpr.else);

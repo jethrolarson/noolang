@@ -3,11 +3,11 @@ import {
 	type PipelineExpression,
 	type Type,
 	type Constraint,
-	type TraitConstraint,
 	functionType,
 	isConstraint,
 	type ConstrainedType,
 	type FunctionType,
+	implementsConstraint,
 } from '../ast';
 import {
 	functionApplicationError,
@@ -40,60 +40,92 @@ import {
 // CONSTRAINT COLLAPSE FIX: Function to try resolving constraints using argument types
 export function tryResolveConstraints(
 	returnType: Type,
-	functionConstraints: Map<string, TraitConstraint[]>,
+	functionConstraints: Constraint[],
 	argTypes: Type[],
 	state: TypeState
 ): Type | null {
 	// For each constraint, check if any of the argument types can satisfy it
-	for (const [varName, constraints] of functionConstraints.entries()) {
-		for (const constraint of constraints) {
-			if (constraint.kind === 'implements') {
-				const traitName = constraint.trait;
+	for (const constraint of functionConstraints) {
+		if (constraint.kind === 'implements') {
+			const traitName = constraint.interfaceName;
+			const varName = constraint.typeVar;
 
 				// Check each argument type to see if it implements the required trait
-				for (const argType of argTypes) {
-					const argTypeName = getTypeName(argType);
+			for (const argType of argTypes) {
+				const argTypeName = getTypeName(argType);
 
-					// Check if we have an implementation of this trait for this argument type
-					let hasImplementation = false;
+				// Check if we have an implementation of this trait for this argument type
+				let hasImplementation = false;
 
-					// Built-in implementations for traits to avoid circular dependency
-					if (
-						traitName === 'Add' &&
-						(argTypeName === 'Float' || argTypeName === 'String')
-					) {
-						hasImplementation = true;
-					} else if (traitName === 'Numeric' && argTypeName === 'Float') {
-						hasImplementation = true;
+				// Built-in implementations for traits to avoid circular dependency
+				if (
+					traitName === 'Add' &&
+					(argTypeName === 'Float' || argTypeName === 'String')
+				) {
+					hasImplementation = true;
+				} else if (traitName === 'Numeric' && argTypeName === 'Float') {
+					hasImplementation = true;
+				} else {
+					// Check trait registry for user-defined implementations
+					const traitRegistry = state.traitRegistry;
+					if (traitRegistry) {
+						const traitImpls = traitRegistry.implementations.get(traitName);
+						hasImplementation = !!traitImpls && traitImpls.has(argTypeName);
+					}
+				}
+
+				if (hasImplementation) {
+					// This argument type satisfies the constraint!
+					// Create a substitution and apply it to the return type
+					const substitution = new Map(state.substitution);
+
+					if (argType.kind === 'list') {
+						// For List types, substitute the type constructor
+						substitution.set(varName, { kind: 'primitive', name: 'List' });
+					} else if (argType.kind === 'variant') {
+						// For variant types, substitute with the constructor
+						substitution.set(varName, {
+							kind: 'variant',
+							name: argType.name,
+							args: [], // Just the constructor
+						});
 					} else {
-						// Check trait registry for user-defined implementations
-						const traitRegistry = state.traitRegistry;
-						if (traitRegistry) {
-							const traitImpls = traitRegistry.implementations.get(traitName);
-							hasImplementation = !!traitImpls && traitImpls.has(argTypeName);
-						}
+						// For other types, substitute directly
+						substitution.set(varName, argType);
 					}
 
-					if (hasImplementation) {
-						// This argument type satisfies the constraint!
-						// Create a substitution and apply it to the return type
-						const substitution = new Map(state.substitution);
-
-						if (argType.kind === 'list') {
-							// For List types, substitute the type constructor
-							substitution.set(varName, { kind: 'primitive', name: 'List' });
-						} else if (argType.kind === 'variant') {
-							// For variant types, substitute with the constructor
-							substitution.set(varName, {
-								kind: 'variant',
-								name: argType.name,
-								args: [], // Just the constructor
-							});
-						} else {
-							// For other types, substitute directly
-							substitution.set(varName, argType);
+					// Apply substitution to return type
+					const resolvedType = substitute(returnType, substitution);
+					return resolvedType;
+				}
+			}
+		} else if (constraint.kind === 'has') {
+			// Handle structural constraints (accessors)
+			const varName = constraint.typeVar;
+			const requiredStructure = constraint.structure;
+			
+			// Check each argument type to see if it has the required structure
+			for (const argType of argTypes) {
+				if (argType.kind === 'record') {
+					// Check if the record type has all required fields
+					let hasAllFields = true;
+					const substitution = new Map(state.substitution);
+					
+					for (const [fieldName, fieldType] of Object.entries(requiredStructure.fields)) {
+						// Normalize field names - remove @ prefix if it exists
+						const normalizedFieldName = fieldName.startsWith('@') ? fieldName.slice(1) : fieldName;
+						if (!(normalizedFieldName in argType.fields)) {
+							hasAllFields = false;
+							break;
 						}
-
+						// The actual field type in the record satisfies the constraint
+						const actualFieldType = argType.fields[normalizedFieldName];
+						// For now, assume any type is acceptable for structural matching
+					}
+					
+					if (hasAllFields) {
+						// Structural constraint satisfied! Substitute the type variable
+						substitution.set(varName, argType);
 						// Apply substitution to return type
 						const resolvedType = substitute(returnType, substitution);
 						return resolvedType;
@@ -309,12 +341,33 @@ export const typeApplication = (
 
 	// Handle function application by checking if funcType is a function or constrained function
 	let actualFuncType = funcType;
-	let functionConstraints: Map<string, TraitConstraint[]> | undefined;
+	let functionConstraints: Constraint[] | undefined;
 
-	// If it's a constrained type, extract the base type and constraints
+	// If it's a constrained type, extract the base type and constraints (legacy system)
 	if (funcType.kind === 'constrained') {
 		actualFuncType = funcType.baseType;
-		functionConstraints = funcType.constraints;
+		// Convert legacy TraitConstraint system to modern Constraint system  
+		functionConstraints = [];
+		for (const [typeVar, traitConstraints] of funcType.constraints.entries()) {
+			for (const traitConstraint of traitConstraints) {
+				if (traitConstraint.kind === 'implements') {
+					// Convert legacy trait constraint to modern constraint
+					const traitName = (traitConstraint as any).trait; // Legacy format
+					functionConstraints.push(implementsConstraint(typeVar, traitName));
+				} else if (traitConstraint.kind === 'hasField') {
+					// Convert hasField trait constraint to modern hasField constraint
+					functionConstraints.push({
+						kind: 'hasField',
+						typeVar,
+						field: traitConstraint.field,
+						fieldType: traitConstraint.fieldType
+					});
+				}
+			}
+		}
+	} else if (actualFuncType.kind === 'function' && actualFuncType.constraints) {
+		// Use modern constraint system directly
+		functionConstraints = actualFuncType.constraints;
 	}
 
 	if (actualFuncType.kind === 'function') {
@@ -334,7 +387,7 @@ export const typeApplication = (
 
 		// Unify each argument with the corresponding parameter type
 		for (let i = 0; i < argTypes.length; i++) {
-			// PHASE 3: Pass constraint context to unification if we have function constraints
+			// Pass constraint context to unification if we have function constraints
 
 			const unificationContext = {
 				reason: 'function_application' as const,
@@ -377,7 +430,7 @@ export const typeApplication = (
 			// CONSTRAINT COLLAPSE FIX: Instead of blindly preserving constraints,
 			// try to resolve them using the actual argument types
 			let finalReturnType = returnType;
-			if (functionConstraints && functionConstraints.size > 0) {
+			if (functionConstraints && functionConstraints.length > 0) {
 				// Try to resolve constraints using argument types
 				const resolvedType = tryResolveConstraints(
 					returnType,
@@ -390,12 +443,17 @@ export const typeApplication = (
 					// Constraints were successfully resolved to a concrete type
 					finalReturnType = resolvedType;
 				} else {
-					// Could not resolve constraints, preserve them
-					finalReturnType = {
-						kind: 'constrained',
-						baseType: returnType,
-						constraints: functionConstraints,
-					};
+					// Could not resolve constraints, preserve them on the return type if it's a function
+					if (returnType.kind === 'function') {
+						finalReturnType = {
+							...returnType,
+							constraints: (returnType.constraints || []).concat(functionConstraints)
+						};
+					} else {
+						// For non-function types, we might need to create a constrained type (keeping legacy for now)
+						// This should be rare - most constraint resolution happens on function types
+						finalReturnType = returnType;
+					}
 				}
 			}
 
@@ -518,13 +576,11 @@ export const typeApplication = (
 			);
 
 			// If the original function had constraints, preserve them in the partial function
-			let finalPartialType: ConstrainedType | FunctionType =
-				partialFunctionType;
-			if (functionConstraints && functionConstraints.size > 0) {
+			let finalPartialType: FunctionType = partialFunctionType;
+			if (functionConstraints && functionConstraints.length > 0) {
 				finalPartialType = {
-					kind: 'constrained',
-					baseType: partialFunctionType,
-					constraints: functionConstraints,
+					...partialFunctionType,
+					constraints: (partialFunctionType.constraints || []).concat(functionConstraints)
 				};
 			}
 

@@ -120,25 +120,12 @@ export type UnknownType = {
 	kind: 'unknown';
 };
 
-export type ImplementsTraitConstraint = {
-	kind: 'implements';
-	trait: string;
-};
-
-export type HasFieldTraitConstraint = {
-	kind: 'hasField';
-	field: string;
-	fieldType: Type;
-};
-
-export type TraitConstraint =
-	| ImplementsTraitConstraint
-	| HasFieldTraitConstraint;
+// Legacy TraitConstraint types removed - use modern Constraint system instead
 
 export type ConstrainedType = {
 	kind: 'constrained';
 	baseType: Type;
-	constraints: Map<string, TraitConstraint[]>; // variable name -> constraints
+	constraints: Map<string, Constraint[]>; // variable name -> constraints (legacy format)
 };
 
 export type Type =

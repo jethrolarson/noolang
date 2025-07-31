@@ -5,6 +5,7 @@ import {
 	type Expression,
 	typeVariable,
 	type VariableType,
+	type Constraint,
 } from '../ast';
 import { parse } from '../parser/parser';
 import { Lexer } from '../lexer/lexer';
@@ -38,7 +39,7 @@ export const freshTypeVariable = (
 // Helper function to create ConstrainedType instances
 export const createConstrainedType = (
 	baseType: Type,
-	constraints: Map<string, Array<{ kind: 'implements'; trait: string } | { kind: 'hasField'; field: string; fieldType: Type }>>
+	constraints: Map<string, Constraint[]> // Use modern constraint format>
 ): Type => ({
 	kind: 'constrained',
 	baseType,
@@ -49,7 +50,7 @@ export const createConstrainedType = (
 export const addConstraintToType = (
 	baseType: Type,
 	varName: string,
-	constraint: { kind: 'implements'; trait: string } | { kind: 'hasField'; field: string; fieldType: Type }
+	constraint: Constraint
 ): Type => {
 	const constraints = new Map();
 	constraints.set(varName, [constraint]);

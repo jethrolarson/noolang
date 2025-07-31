@@ -1,4 +1,4 @@
-import { Type, TraitConstraint, Constraint } from '../ast';
+import { Type, Constraint } from '../ast';
 import { substitute } from './substitute';
 import { TypeState } from './types';
 import { isTypeKind, typesEqual, constraintsEqual } from './helpers';
@@ -113,7 +113,7 @@ const unifyInternal = (
 		reason?: string;
 		operation?: string;
 		hint?: string;
-		constraintContext?: Map<string, TraitConstraint[]>;
+		constraintContext?: Constraint[];
 	}
 ): TypeState => {
 	// Add null check for state
@@ -235,7 +235,7 @@ export const unify = (
 		reason?: string;
 		operation?: string;
 		hint?: string;
-		constraintContext?: Map<string, TraitConstraint[]>;
+		constraintContext?: Constraint[];
 	}
 ): TypeState => {
 	const start = Date.now();
@@ -685,7 +685,7 @@ function tryUnifyConstrainedVariant(
 		reason?: string;
 		operation?: string;
 		hint?: string;
-		constraintContext?: Map<string, TraitConstraint[]>;
+		constraintContext?: Constraint[];
 	}
 ): TypeState | null {
 	// Only proceed if we have constraint context
@@ -708,10 +708,19 @@ function tryUnifyConstrainedVariant(
 		const s2Name = s2.name;
 
 		// Check if s1 is a constrained type variable
-		if (context.constraintContext.has(s1Name)) {
+		const s1HasConstraints = context.constraintContext.some(c => 
+			(c.kind === 'implements' || c.kind === 'hasField' || c.kind === 'is' || c.kind === 'custom' || c.kind === 'has') && 
+			c.typeVar === s1Name
+		);
+		const s2HasConstraints = context.constraintContext.some(c => 
+			(c.kind === 'implements' || c.kind === 'hasField' || c.kind === 'is' || c.kind === 'custom' || c.kind === 'has') && 
+			c.typeVar === s2Name
+		);
+		
+		if (s1HasConstraints) {
 			variantType = s1;
 			concreteType = s2;
-		} else if (context.constraintContext.has(s2Name)) {
+		} else if (s2HasConstraints) {
 			variantType = s2;
 			concreteType = s1;
 		} else {
@@ -722,8 +731,11 @@ function tryUnifyConstrainedVariant(
 	}
 
 	// Check if this variant type variable has constraints
-	const constraints = context.constraintContext.get(variantType.name);
-	if (!constraints) {
+	const constraints = context.constraintContext.filter(c => 
+		(c.kind === 'implements' || c.kind === 'hasField' || c.kind === 'is' || c.kind === 'custom' || c.kind === 'has') && 
+		c.typeVar === variantType.name
+	);
+	if (constraints.length === 0) {
 		return null; // No constraints on this type variable
 	}
 
@@ -749,7 +761,7 @@ function tryUnifyConstrainedVariant(
 	// Check if any constraint can be satisfied by the concrete type
 	for (const constraint of constraints) {
 		if (constraint.kind === 'implements') {
-			const traitName = constraint.trait;
+			const traitName = constraint.interfaceName;
 			const traitImpls = traitRegistry.implementations.get(traitName);
 
 			if (traitImpls && traitImpls.has(concreteTypeName)) {
@@ -873,7 +885,8 @@ function unifyConstrainedWithConcrete(
 	for (const [varName, constraints] of constrainedType.constraints) {
 		for (const constraint of constraints) {
 			if (constraint.kind === 'implements') {
-				const traitName = constraint.trait;
+				// Handle both legacy and modern constraint formats
+			const traitName = (constraint as any).trait || constraint.interfaceName;
 
 				// Check if we have an implementation of this trait for the concrete type
 				const traitRegistry = state.traitRegistry;

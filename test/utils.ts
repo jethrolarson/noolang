@@ -39,6 +39,7 @@ import type {
 	RecordPattern,
 	ConstrainedExpression,
 	ConstraintExpr,
+	Constraint,
 	ImplementsConstraint,
 	OrConstraintExpr,
 	AndConstraintExpr,
@@ -54,9 +55,6 @@ import type {
 	MutationExpression,
 	MutableDefinitionExpression,
 	UnitType,
-	ImplementsTraitConstraint,
-	HasFieldTraitConstraint,
-	TraitConstraint,
 } from '../src/ast';
 import type {
 	ProgramResult,
@@ -573,23 +571,27 @@ export function assertRecordPattern(
 	}
 }
 
-// ===== Trait Constraint Assertions =====
-export function assertImplementsTraitConstraint(
-	constraint: TraitConstraint
-): asserts constraint is ImplementsTraitConstraint {
+// ===== Type System Constraint Assertions =====
+export function assertImplementsTypeConstraint(
+	constraint: Constraint
+): asserts constraint is ImplementsConstraint {
 	if (constraint.kind !== 'implements') {
 		throw new Error(
-			`Expected implements trait constraint, got ${constraint.kind}`
+			`Expected implements constraint, got ${constraint.kind}`
 		);
 	}
 }
 
-export function assertHasFieldTraitConstraint(
-	constraint: TraitConstraint
-): asserts constraint is HasFieldTraitConstraint {
+export function assertHasFieldTypeConstraint(
+	constraint: Constraint
+): asserts constraint is HasFieldConstraint {
 	if (constraint.kind !== 'hasField') {
 		throw new Error(
-			`Expected has field trait constraint, got ${constraint.kind}`
+			`Expected has field constraint, got ${constraint.kind}`
 		);
 	}
 }
+
+// Legacy function names for backward compatibility
+export const assertImplementsTraitConstraint = assertImplementsTypeConstraint;
+export const assertHasFieldTraitConstraint = assertHasFieldTypeConstraint;
