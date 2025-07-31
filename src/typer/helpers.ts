@@ -453,7 +453,7 @@ export const typeToString = (
 			case 'list':
 				return `List ${norm(t.element)}`;
 			case 'tuple':
-				return `{${t.elements.map(norm).join(' ')}}`;
+				return `{${t.elements.map(norm).join(', ')}}`;
 			case 'record': {
 				const fields = Object.entries(t.fields)
 					.map(([name, fieldType]) => `@${name} ${norm(fieldType)}`)

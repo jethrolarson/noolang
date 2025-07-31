@@ -73,6 +73,7 @@ test('Constraint Expressions - should parse simple constraint expression', () =>
 	expect(program.statements.length).toBe(1);
 	const constrained = program.statements[0];
 	assertConstrainedExpression(constrained);
+  console.log(constrained);
 	assertVariableExpression(constrained.expression);
 	assertPrimitiveType(constrained.type);
 	assertIsConstraint(constrained.constraint);

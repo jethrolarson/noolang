@@ -120,10 +120,20 @@ export type UnknownType = {
 	kind: 'unknown';
 };
 
-// New trait constraint types for Phase 1
+export type ImplementsTraitConstraint = {
+	kind: 'implements';
+	trait: string;
+};
+
+export type HasFieldTraitConstraint = {
+	kind: 'hasField';
+	field: string;
+	fieldType: Type;
+};
+
 export type TraitConstraint =
-	| { kind: 'implements'; trait: string }
-	| { kind: 'hasField'; field: string; fieldType: Type };
+	| ImplementsTraitConstraint
+	| HasFieldTraitConstraint;
 
 export type ConstrainedType = {
 	kind: 'constrained';

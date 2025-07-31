@@ -422,56 +422,6 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 
 	const newState = { ...state, environment: newEnv };
 
-	// Register basic trait implementations to avoid loading order issues
-
-	// Add the Add trait definition if not already present
-	if (!newState.traitRegistry.definitions.has('Add')) {
-		addTraitDefinition(newState.traitRegistry, {
-			name: 'Add',
-			typeParam: 'a',
-			functions: new Map([
-				[
-					'add',
-					functionType(
-						[typeVariable('a'), typeVariable('a')],
-						typeVariable('a')
-					),
-				],
-			]),
-		});
-	}
-
-	// Add the Numeric trait definition if not already present
-	if (!newState.traitRegistry.definitions.has('Numeric')) {
-		addTraitDefinition(newState.traitRegistry, {
-			name: 'Numeric',
-			typeParam: 'a',
-			functions: new Map([
-				[
-					'subtract',
-					functionType(
-						[typeVariable('a'), typeVariable('a')],
-						typeVariable('a')
-					),
-				],
-				[
-					'multiply',
-					functionType(
-						[typeVariable('a'), typeVariable('a')],
-						typeVariable('a')
-					),
-				],
-				[
-					'divide',
-					functionType(
-						[typeVariable('a'), typeVariable('a')],
-						optionType(floatType())
-					),
-				],
-			]),
-		});
-	}
-
 	// Built-in trait implementations are handled directly in the evaluator's
 	// getBuiltinTraitImplementation method to avoid circular dependencies
 	// and duplication with constraint checking in function-application.ts

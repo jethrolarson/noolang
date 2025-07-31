@@ -54,6 +54,9 @@ import type {
 	MutationExpression,
 	MutableDefinitionExpression,
 	UnitType,
+	ImplementsTraitConstraint,
+	HasFieldTraitConstraint,
+	TraitConstraint,
 } from '../src/ast';
 import type {
 	ProgramResult,
@@ -567,5 +570,26 @@ export function assertRecordPattern(
 ): asserts pattern is RecordPattern {
 	if (pattern.kind !== 'record') {
 		throw new Error(`Expected record pattern, got ${pattern.kind}`);
+	}
+}
+
+// ===== Trait Constraint Assertions =====
+export function assertImplementsTraitConstraint(
+	constraint: TraitConstraint
+): asserts constraint is ImplementsTraitConstraint {
+	if (constraint.kind !== 'implements') {
+		throw new Error(
+			`Expected implements trait constraint, got ${constraint.kind}`
+		);
+	}
+}
+
+export function assertHasFieldTraitConstraint(
+	constraint: TraitConstraint
+): asserts constraint is HasFieldTraitConstraint {
+	if (constraint.kind !== 'hasField') {
+		throw new Error(
+			`Expected has field trait constraint, got ${constraint.kind}`
+		);
 	}
 }

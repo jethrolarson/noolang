@@ -79,9 +79,9 @@ test('pure pattern matching has no effects', () => {
 // Test suite: Type System Returns TypeResult with Effects
 test('typeProgram returns TypeResult with type and effects', () => {
 	const result = runCode('42');
-	expect(result).toHaveProperty('type');
-	expect(result).toHaveProperty('effects');
-	expect(result).toHaveProperty('state');
+	expect(result.typeResult).toHaveProperty('type');
+	expect(result.typeResult).toHaveProperty('effects');
+	expect(result.typeResult).toHaveProperty('state');
 	assertPrimitiveType(result.typeResult.type);
 	expect(result.typeResult.type.kind).toBe('primitive');
 	expect(result.typeResult.effects instanceof Set).toBeTruthy();
@@ -262,9 +262,11 @@ test('TypeResult structure is consistent across all expression types', () => {
 
 	for (const { code, expectedKind } of expressions) {
 		const result = runCode(code);
-		expect(result).toHaveProperty('type');
-		expect(result).toHaveProperty('effects');
+		expect(result).toHaveProperty('typeResult');
 		expect(result).toHaveProperty('state');
+		expect(result.typeResult).toHaveProperty('type');
+		expect(result.typeResult).toHaveProperty('effects');
+		expect(result.typeResult).toHaveProperty('state');
 		expect(result.typeResult.type.kind).toBe(expectedKind);
 		expect(result.typeResult.effects instanceof Set).toBeTruthy();
 	}

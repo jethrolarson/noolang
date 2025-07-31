@@ -30,7 +30,12 @@ import { substitute } from './substitute';
 import { unify } from './unify';
 import { typeExpression } from './expression-dispatcher';
 import { freshTypeVariable } from './type-operations';
-import { getTypeName, resolveTraitFunction } from './trait-system';
+import {
+	getTypeName,
+	resolveTraitFunction,
+	isTraitFunction,
+	getTraitFunctionInfo,
+} from './trait-system';
 
 // CONSTRAINT COLLAPSE FIX: Function to try resolving constraints using argument types
 export function tryResolveConstraints(
@@ -102,6 +107,45 @@ export function tryResolveConstraints(
 	return null;
 }
 
+// Utility: check if a type is fully concrete (no variables anywhere)
+function isFullyConcrete(type: Type): boolean {
+	if (type.kind === 'primitive' || type.kind === 'unit') return true;
+	if (type.kind === 'variable') return false;
+	if (type.kind === 'variant') {
+		return (type.args ?? []).every(isFullyConcrete);
+	}
+	if (type.kind === 'list') {
+		return isFullyConcrete(type.element);
+	}
+	if (type.kind === 'constrained') {
+		return isFullyConcrete(type.baseType);
+	}
+	if (type.kind === 'function') {
+		return type.params.every(isFullyConcrete) && isFullyConcrete(type.return);
+	}
+	return false;
+}
+
+// Utility: check if a type has any type variables (is polymorphic)
+function hasTypeVariables(type: Type): boolean {
+	if (type.kind === 'variable') return true;
+	if (type.kind === 'primitive' || type.kind === 'unit') return false;
+	if (type.kind === 'variant') {
+		return (type.args ?? []).some(hasTypeVariables);
+	}
+	if (type.kind === 'list') {
+		return hasTypeVariables(type.element);
+	}
+	if (type.kind === 'constrained') {
+		return hasTypeVariables(type.baseType);
+	}
+	if (type.kind === 'function') {
+		return type.params.some(hasTypeVariables) || hasTypeVariables(type.return);
+	}
+	return false;
+}
+
+// TODO break this up into smaller functions
 // Update typeApplication to thread state through freshenTypeVariables
 export const typeApplication = (
 	expr: ApplicationExpression,
@@ -117,7 +161,7 @@ export const typeApplication = (
 	// Type each argument and collect effects
 	const argTypes: Type[] = [];
 	let allEffects = funcResult.effects;
-	
+
 	for (const arg of expr.args) {
 		const argResult = typeExpression(arg, currentState);
 		currentState = argResult.state;
@@ -128,18 +172,21 @@ export const typeApplication = (
 	// NEW: Try trait function resolution if we have arguments
 	if (argTypes.length > 0) {
 		// Check if this could be a trait function call
-		if (expr.func.kind === 'variable') {
+		if (
+			expr.func.kind === 'variable' &&
+			isTraitFunction(currentState.traitRegistry, expr.func.name)
+		) {
 			const resolution = resolveTraitFunction(
 				currentState.traitRegistry,
 				expr.func.name,
 				argTypes
 			);
-			
+
 			if (resolution.found && resolution.impl) {
 				// We found a trait implementation - evaluate it with the arguments
 				// The trait implementation is an expression we need to type
 				const traitImplType = typeExpression(resolution.impl, currentState);
-				
+
 				// Apply the trait implementation to the arguments
 				if (traitImplType.type.kind === 'function') {
 					// FIXED: Use direct function application logic instead of recursive typeApplication
@@ -195,7 +242,10 @@ export const typeApplication = (
 					}
 
 					// Return the function's return type with effects
-					const resultType = funcType.return; // Fixed: should be 'return', not 'returnType'
+					const resultType = substitute(
+						funcType.return,
+						resultState.substitution
+					);
 
 					const resultEffects = unionEffects(
 						traitImplType.effects,
@@ -216,6 +266,43 @@ export const typeApplication = (
 						getExprLocation(expr)
 					);
 				}
+			} else if (resolution.found === false) {
+				// No trait implementation found - check if this is polymorphic
+				const funcName =
+					expr.func.kind === 'variable' ? expr.func.name : 'unknown';
+
+				// Get the trait function signature to check if it's polymorphic
+				const traitInfo = getTraitFunctionInfo(
+					currentState.traitRegistry,
+					funcName
+				);
+				if (traitInfo && traitInfo.functionType.kind === 'function') {
+					// Check if the trait function return type has unresolved type variables
+					const hasUnresolvedVariables = hasTypeVariables(
+						traitInfo.functionType.return
+					);
+
+					if (!hasUnresolvedVariables && isFullyConcrete(argTypes[0])) {
+						// Concrete function with concrete argument: error
+						const argTypeNames = argTypes
+							.map(t => getTypeName(t))
+							.filter(Boolean);
+						const typeStr =
+							argTypeNames.length > 0
+								? argTypeNames.join(', ')
+								: 'unknown type';
+						throwTypeError(
+							location => ({
+								type: 'TypeError' as const,
+								kind: 'general',
+								message: `No implementation of trait function '${funcName}' for ${typeStr}`,
+								location,
+							}),
+							getExprLocation(expr)
+						);
+					}
+					// Otherwise, allow constraint to be created (polymorphic or type variable arguments)
+				}
 			}
 		}
 	}
@@ -223,13 +310,13 @@ export const typeApplication = (
 	// Handle function application by checking if funcType is a function or constrained function
 	let actualFuncType = funcType;
 	let functionConstraints: Map<string, TraitConstraint[]> | undefined;
-	
+
 	// If it's a constrained type, extract the base type and constraints
 	if (funcType.kind === 'constrained') {
 		actualFuncType = funcType.baseType;
 		functionConstraints = funcType.constraints;
 	}
-	
+
 	if (actualFuncType.kind === 'function') {
 		if (argTypes.length > actualFuncType.params.length) {
 			throwTypeError(
@@ -249,7 +336,6 @@ export const typeApplication = (
 		for (let i = 0; i < argTypes.length; i++) {
 			// PHASE 3: Pass constraint context to unification if we have function constraints
 
-			
 			const unificationContext = {
 				reason: 'function_application' as const,
 				operation: `applying argument ${i + 1}`,
@@ -261,9 +347,9 @@ export const typeApplication = (
 					currentState.substitution
 				)}.`,
 				// Pass constraint information if available
-				...(functionConstraints && { constraintContext: functionConstraints })
+				...(functionConstraints && { constraintContext: functionConstraints }),
 			};
-			
+
 			currentState = unify(
 				actualFuncType.params[i],
 				argTypes[i],
@@ -274,7 +360,10 @@ export const typeApplication = (
 		}
 
 		// Apply substitution to get the return type
-		const returnType = substitute(actualFuncType.return, currentState.substitution);
+		const returnType = substitute(
+			actualFuncType.return,
+			currentState.substitution
+		);
 
 		// NOTE: Return type constraint validation removed - will be handled by new trait system
 
@@ -284,7 +373,7 @@ export const typeApplication = (
 
 		if (argTypes.length === actualFuncType.params.length) {
 			// Full application - return the return type
-			
+
 			// CONSTRAINT COLLAPSE FIX: Instead of blindly preserving constraints,
 			// try to resolve them using the actual argument types
 			let finalReturnType = returnType;
@@ -296,7 +385,7 @@ export const typeApplication = (
 					argTypes,
 					currentState
 				);
-				
+
 				if (resolvedType) {
 					// Constraints were successfully resolved to a concrete type
 					finalReturnType = resolvedType;
@@ -305,7 +394,7 @@ export const typeApplication = (
 					finalReturnType = {
 						kind: 'constrained',
 						baseType: returnType,
-						constraints: functionConstraints
+						constraints: functionConstraints,
 					};
 				}
 			}
@@ -427,14 +516,15 @@ export const typeApplication = (
 				returnType,
 				actualFuncType.effects
 			);
-			
+
 			// If the original function had constraints, preserve them in the partial function
-			let finalPartialType: ConstrainedType | FunctionType = partialFunctionType;
+			let finalPartialType: ConstrainedType | FunctionType =
+				partialFunctionType;
 			if (functionConstraints && functionConstraints.size > 0) {
 				finalPartialType = {
 					kind: 'constrained',
 					baseType: partialFunctionType,
-					constraints: functionConstraints
+					constraints: functionConstraints,
 				};
 			}
 
