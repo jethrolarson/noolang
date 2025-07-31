@@ -1,42 +1,5 @@
-import { Evaluator, Value } from '../../src/evaluator/evaluator';
-import { parse } from '../../src/parser/parser';
-import { Lexer } from '../../src/lexer/lexer';
-import { describe, test, expect } from 'bun:test';
-
-function unwrapValue(val: Value): any {
-	if (val === null) return null;
-	if (typeof val !== 'object') return val;
-	switch (val.tag) {
-		case 'number':
-			return val.value;
-		case 'string':
-			return val.value;
-		case 'constructor':
-			if (val.name === 'True') return true;
-			if (val.name === 'False') return false;
-			return val;
-		case 'list':
-			return val.values.map(unwrapValue);
-		case 'tuple':
-			return val.values.map(unwrapValue);
-		case 'record': {
-			const obj: any = {};
-			for (const k in val.fields) obj[k] = unwrapValue(val.fields[k]);
-			return obj;
-		}
-		default:
-			return val;
-	}
-}
-
-// Test suite: Closure behavior
-function evalNoo(src: string) {
-	const lexer = new Lexer(src);
-	const tokens = lexer.tokenize();
-	const program = parse(tokens);
-	const evaluator = new Evaluator();
-	return evaluator.evaluateProgram(program).finalResult;
-}
+import { test, expect } from 'bun:test';
+import { runCode } from '../utils';
 
 test('simple closure: makeAdder', () => {
 	const src = `
@@ -45,7 +8,7 @@ test('simple closure: makeAdder', () => {
       result = add5 10;
       result
     `;
-	expect(unwrapValue(evalNoo(src))).toBe(15);
+	expect(runCode(src).finalValue).toBe(15);
 });
 
 test('closure in a record', () => {
@@ -55,13 +18,8 @@ test('closure in a record', () => {
       result = (@value counter);
       result
     `;
-	const lexer = new Lexer(code);
-	const tokens = lexer.tokenize();
-	const program = parse(tokens);
-	const evaluator = new Evaluator();
-	const result = evaluator.evaluateProgram(program);
 
-	expect(unwrapValue(result.finalResult)).toBe(10);
+	expect(runCode(code).finalValue).toBe(10);
 });
 
 test('closure with function in record', () => {
@@ -73,12 +31,6 @@ test('closure with function in record', () => {
       result2 = (@value counter2);
       result1 + result2
     `;
-	const lexer = new Lexer(code);
-	const tokens = lexer.tokenize();
-	const program = parse(tokens);
-	const evaluator = new Evaluator();
-	const result = evaluator.evaluateProgram(program);
 
-	expect(unwrapValue(result.finalResult)).toBe(30);
+	expect(runCode(code).finalValue).toBe(30);
 });
-

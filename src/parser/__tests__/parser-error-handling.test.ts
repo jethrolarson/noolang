@@ -1,15 +1,11 @@
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../parser';
-import type { BinaryExpression } from '../../ast';
-import { describe, test, expect } from 'bun:test';
-
-// Helper function for type-safe testing
-function assertBinaryExpression(expr: any): BinaryExpression {
-	if (expr.kind !== 'binary') {
-		throw new Error(`Expected binary expression, got ${expr.kind}`);
-	}
-	return expr;
-}
+import { test, expect } from 'bun:test';
+import {
+	assertBinaryExpression,
+	assertPipelineExpression,
+	assertVariableExpression,
+} from '../../../test/utils';
 
 test('Error Conditions - should throw error for unexpected token after expression', () => {
 	const lexer = new Lexer('1 + +'); // Invalid double operator
@@ -64,12 +60,13 @@ test('Operator Precedence - should parse operators with correct precedence', () 
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const expr = assertBinaryExpression(program.statements[0]);
+	const expr = program.statements[0];
+	assertBinaryExpression(expr);
 	expect(expr.operator).toBe('+');
-	expect(expr.left.kind).toBe('variable');
-	expect(expr.right.kind).toBe('binary');
-	const rightExpr = assertBinaryExpression(expr.right);
-	expect(rightExpr.operator).toBe('*');
+	assertVariableExpression(expr.left);
+	assertBinaryExpression(expr.right);
+	assertBinaryExpression(expr.right);
+	expect(expr.right.operator).toBe('*');
 });
 
 test('Operator Precedence - should parse comparison operators', () => {
@@ -78,7 +75,8 @@ test('Operator Precedence - should parse comparison operators', () => {
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
 	// Due to left associativity, this parses as (((a < b) == c) > d)
-	const expr = assertBinaryExpression(program.statements[0]);
+	const expr = program.statements[0];
+	assertBinaryExpression(expr);
 	expect(expr.operator).toBe('>');
 });
 
@@ -87,8 +85,8 @@ test('Operator Precedence - should parse composition operators', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const pipeline = program.statements[0] as any;
-	expect(pipeline.kind).toBe('pipeline');
+	const pipeline = program.statements[0];
+	assertPipelineExpression(pipeline);
 	expect(pipeline.steps.length).toBe(3);
 });
 
@@ -97,7 +95,8 @@ test('Operator Precedence - should parse dollar operator', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const expr = assertBinaryExpression(program.statements[0]);
+	const expr = program.statements[0];
+	assertBinaryExpression(expr);
 	expect(expr.operator).toBe('$');
 });
 

@@ -1,24 +1,15 @@
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../parser';
-import type { TypeDefinitionExpression } from '../../ast';
-import { describe, test, expect } from 'bun:test';
-
-// Helper function for type-safe testing
-function assertTypeDefinitionExpression(
-	expr: any
-): TypeDefinitionExpression {
-	if (expr.kind !== 'type-definition') {
-		throw new Error(`Expected type definition expression, got ${expr.kind}`);
-	}
-	return expr;
-}
+import { test, expect } from 'bun:test';
+import { assertTypeDefinitionExpression } from '../../../test/utils';
 
 test('Type Definitions (ADTs) - should parse simple type definition', () => {
 	const lexer = new Lexer('type Bool = True | False');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const typeDef = assertTypeDefinitionExpression(program.statements[0]);
+	const typeDef = program.statements[0];
+	assertTypeDefinitionExpression(typeDef);
 	expect(typeDef.name).toBe('Bool');
 	expect(typeDef.typeParams).toEqual([]);
 	expect(typeDef.constructors.length).toBe(2);
@@ -33,7 +24,8 @@ test('Type Definitions (ADTs) - should parse type definition with parameters', (
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const typeDef = assertTypeDefinitionExpression(program.statements[0]);
+	const typeDef = program.statements[0];
+	assertTypeDefinitionExpression(typeDef);
 	expect(typeDef.name).toBe('Option');
 	expect(typeDef.typeParams).toEqual(['a']);
 	expect(typeDef.constructors.length).toBe(2);
@@ -48,7 +40,8 @@ test('Type Definitions (ADTs) - should parse type definition with complex constr
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const typeDef = assertTypeDefinitionExpression(program.statements[0]);
+	const typeDef = program.statements[0];
+	assertTypeDefinitionExpression(typeDef);
 	expect(typeDef.name).toBe('Either');
 	expect(typeDef.typeParams).toEqual(['a', 'b']);
 	expect(typeDef.constructors.length).toBe(2);
@@ -61,7 +54,8 @@ test('Type Definitions (ADTs) - should parse type definition with multiple const
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const typeDef = assertTypeDefinitionExpression(program.statements[0]);
+	const typeDef = program.statements[0];
+	assertTypeDefinitionExpression(typeDef);
 	expect(typeDef.name).toBe('Person');
 	expect(typeDef.constructors.length).toBe(1);
 	expect(typeDef.constructors[0].name).toBe('Person');

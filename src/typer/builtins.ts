@@ -1,12 +1,11 @@
 import { TypeState } from './types';
-import { addTraitDefinition, addTraitImplementation } from './trait-system';
+import { addTraitDefinition } from './trait-system';
 import {
 	functionType,
 	floatType,
 	boolType,
 	stringType,
 	recordType,
-	tupleType,
 	listTypeWithElement,
 	typeVariable,
 	unitType,
@@ -32,7 +31,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 
 	// Addition operator - uses Add trait (supports strings)
 	const addOpType = functionType(
-		[typeVariable('a'), typeVariable('a')], 
+		[typeVariable('a'), typeVariable('a')],
 		typeVariable('a'),
 		new Set()
 	);
@@ -44,7 +43,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 
 	// Numeric operators - use Numeric trait (numbers only)
 	const subtractOpType = functionType(
-		[typeVariable('a'), typeVariable('a')], 
+		[typeVariable('a'), typeVariable('a')],
 		typeVariable('a'),
 		new Set()
 	);
@@ -55,7 +54,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	});
 
 	const multiplyOpType = functionType(
-		[typeVariable('a'), typeVariable('a')], 
+		[typeVariable('a'), typeVariable('a')],
 		typeVariable('a'),
 		new Set()
 	);
@@ -67,7 +66,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 
 	// Division operator - returns Option Float for safety
 	const divideOpType = functionType(
-		[typeVariable('a'), typeVariable('a')], 
+		[typeVariable('a'), typeVariable('a')],
 		optionType(floatType()),
 		new Set()
 	);
@@ -210,7 +209,11 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	});
 
 	newEnv.set('randomRange', {
-		type: functionType([floatType(), floatType()], floatType(), new Set(['rand'])),
+		type: functionType(
+			[floatType(), floatType()],
+			floatType(),
+			new Set(['rand'])
+		),
 		quantifiedVars: [],
 	});
 
@@ -268,12 +271,11 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		),
 		quantifiedVars: ['a', 'b'],
 	});
-	const lengthType = createUnaryFunctionType(
-		listTypeWithElement(typeVariable('a')),
-		floatType()
-	);
 	newEnv.set('length', {
-		type: lengthType,
+		type: createUnaryFunctionType(
+			listTypeWithElement(typeVariable('a')),
+			floatType()
+		),
 		quantifiedVars: ['a'],
 	});
 	newEnv.set('isEmpty', {
@@ -315,7 +317,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		type: createUnaryFunctionType(typeVariable('a'), stringType()),
 		quantifiedVars: ['a'],
 	});
-	
+
 	// Primitive comparison functions (pure)
 	newEnv.set('primitive_float_eq', {
 		type: createBinaryFunctionType(floatType(), floatType(), boolType()),
@@ -356,14 +358,22 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 
 	// Primitive Divide trait implementations for type checking
 	newEnv.set('primitive_float_divide', {
-		type: createBinaryFunctionType(floatType(), floatType(), optionType(floatType())),
+		type: createBinaryFunctionType(
+			floatType(),
+			floatType(),
+			optionType(floatType())
+		),
 		quantifiedVars: [],
 	});
 
 	// Record utilities
 	newEnv.set('hasKey', {
-		type: createBinaryFunctionType(recordType({}), stringType(), boolType()),
-		quantifiedVars: [],
+		type: createBinaryFunctionType(
+			typeVariable('record'),
+			stringType(),
+			boolType()
+		),
+		quantifiedVars: ['record'],
 	});
 	newEnv.set('hasValue', {
 		type: createBinaryFunctionType(
@@ -388,14 +398,18 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	// Tuple operations - only keep sound ones
 	newEnv.set(
 		'tupleLength',
-		{ type: functionType([tupleType([])], floatType()), quantifiedVars: [] } // Any tuple -> Float
+		{
+			type: functionType([typeVariable('tuple')], floatType()),
+			quantifiedVars: ['tuple'],
+		} // Any tuple -> Float
 	);
 	newEnv.set(
 		'tupleIsEmpty',
-		{ type: functionType([tupleType([])], boolType()), quantifiedVars: [] } // Any tuple -> Bool
+		{
+			type: functionType([typeVariable('tuple')], boolType()),
+			quantifiedVars: ['tuple'],
+		} // Any tuple -> Bool
 	);
-
-	// head function is now self-hosted in stdlib.noo
 
 	// Minimal built-in for self-hosted functions - now returns Option for safety
 	newEnv.set('list_get', {
@@ -407,15 +421,23 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	});
 
 	const newState = { ...state, environment: newEnv };
-	
+
 	// Register basic trait implementations to avoid loading order issues
-	
+
 	// Add the Add trait definition if not already present
 	if (!newState.traitRegistry.definitions.has('Add')) {
 		addTraitDefinition(newState.traitRegistry, {
 			name: 'Add',
 			typeParam: 'a',
-			functions: new Map([['add', functionType([typeVariable('a'), typeVariable('a')], typeVariable('a'))]])
+			functions: new Map([
+				[
+					'add',
+					functionType(
+						[typeVariable('a'), typeVariable('a')],
+						typeVariable('a')
+					),
+				],
+			]),
 		});
 	}
 
@@ -425,16 +447,34 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 			name: 'Numeric',
 			typeParam: 'a',
 			functions: new Map([
-				['subtract', functionType([typeVariable('a'), typeVariable('a')], typeVariable('a'))],
-				['multiply', functionType([typeVariable('a'), typeVariable('a')], typeVariable('a'))],
-				['divide', functionType([typeVariable('a'), typeVariable('a')], optionType(floatType()))]
-			])
+				[
+					'subtract',
+					functionType(
+						[typeVariable('a'), typeVariable('a')],
+						typeVariable('a')
+					),
+				],
+				[
+					'multiply',
+					functionType(
+						[typeVariable('a'), typeVariable('a')],
+						typeVariable('a')
+					),
+				],
+				[
+					'divide',
+					functionType(
+						[typeVariable('a'), typeVariable('a')],
+						optionType(floatType())
+					),
+				],
+			]),
 		});
 	}
-	
+
 	// Built-in trait implementations are handled directly in the evaluator's
 	// getBuiltinTraitImplementation method to avoid circular dependencies
 	// and duplication with constraint checking in function-application.ts
-	
+
 	return newState;
 };

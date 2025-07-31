@@ -1,5 +1,5 @@
 import { Lexer } from '../../lexer/lexer';
-import { describe, test, expect } from 'bun:test';
+import { test, expect } from 'bun:test';
 
 // Helper function to create lexer and get all tokens
 const tokenize = (input: string) => new Lexer(input).tokenize();

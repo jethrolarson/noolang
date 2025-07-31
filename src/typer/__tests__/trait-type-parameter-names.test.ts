@@ -1,18 +1,14 @@
-import { typeProgram } from '../index';
-import { Lexer } from '../../lexer/lexer';
-import { parse } from '../../parser/parser';
-import { describe, test, expect } from 'bun:test';
-
-// Helper function to parse and type check a string
-const typeString = (input: string) => {
-    const lexer = new Lexer(input);
-    const tokens = lexer.tokenize();
-    const ast = parse(tokens);
-    return typeProgram(ast);
-};
+import { test, expect } from 'bun:test';
+import {
+	assertConstrainedType,
+	assertListType,
+	assertPrimitiveType,
+	assertVariantType,
+	parseAndType,
+} from '../../../test/utils';
 
 test('trait functions work with descriptive type parameter names', () => {
-    const program = `
+	const program = `
         constraint Serializable dataType (
             serialize : dataType -> String;
             deserialize : String -> dataType
@@ -26,16 +22,14 @@ test('trait functions work with descriptive type parameter names', () => {
         # Should work with descriptive parameter name
         serialize 123.45
     `;
-    
-    const result = typeString(program);
-    
-    // Should return String
-    expect(result.type.kind).toEqual('primitive');
-    expect(result.type.name).toEqual('String');
+
+	const result = parseAndType(program);
+	assertPrimitiveType(result.type);
+	expect(result.type.name).toBe('String');
 });
 
 test('trait functions work with uppercase type parameter names', () => {
-    const program = `
+	const program = `
         constraint Container ContainerType (
             empty : ContainerType a;
             insert : a -> ContainerType a -> ContainerType a
@@ -49,16 +43,16 @@ test('trait functions work with uppercase type parameter names', () => {
         # Should work with uppercase parameter name
         empty
     `;
-    
-    const result = typeString(program);
-    
-    // Should return a constrained type with variant baseType (ContainerType a)
-    expect(result.type.kind).toEqual('constrained');
-    expect(result.type.baseType.kind).toEqual('variant');
+
+	const result = parseAndType(program);
+
+	// Should return a constrained type with variant baseType (ContainerType a)
+	assertConstrainedType(result.type);
+	assertVariantType(result.type.baseType);
 });
 
 test('trait functions work with creative type parameter names', () => {
-    const program = `
+	const program = `
         constraint Mashable tuberType (
             mash : tuberType -> String
         );
@@ -70,16 +64,16 @@ test('trait functions work with creative type parameter names', () => {
         # Should work with creative parameter name
         mash "potato"
     `;
-    
-    const result = typeString(program);
-    
-    // Should return String
-    expect(result.type.kind).toEqual('primitive');
-    expect(result.type.name).toEqual('String');
+
+	const result = parseAndType(program);
+
+	// Should return String
+	assertPrimitiveType(result.type);
+	expect(result.type.name).toBe('String');
 });
 
 test('trait functions work with single uppercase letter (breaking the convention)', () => {
-    const program = `
+	const program = `
         constraint Mappable M (
             map : (a -> b) -> M a -> M b
         );
@@ -91,17 +85,17 @@ test('trait functions work with single uppercase letter (breaking the convention
         # Should work even though we use uppercase M instead of lowercase f
         map (fn x => x + 1.0) [1.0, 2.0, 3.0]
     `;
-    
-    const result = typeString(program);
-    
-    // Should return List Float
-    expect(result.type.kind).toEqual('list');
-    expect(result.type.element.kind).toEqual('primitive');
-    expect(result.type.element.name).toEqual('Float');
+
+	const result = parseAndType(program);
+
+	// Should return List Float
+	assertListType(result.type);
+	assertPrimitiveType(result.type.element);
+	expect(result.type.element.name).toBe('Float');
 });
 
 test('trait functions work with multi-word type parameter names', () => {
-    const program = `
+	const program = `
         constraint Displayable itemType (
             display : itemType -> String
         );
@@ -113,16 +107,16 @@ test('trait functions work with multi-word type parameter names', () => {
         # Should work with multi-word parameter name
         display 42.5
     `;
-    
-    const result = typeString(program);
-    
-    // Should return String
-    expect(result.type.kind).toEqual('primitive');
-    expect(result.type.name).toEqual('String');
+
+	const result = parseAndType(program);
+
+	// Should return String
+	assertPrimitiveType(result.type);
+	expect(result.type.name).toBe('String');
 });
 
 test('concrete variant types are never treated as type parameters', () => {
-    const program = `
+	const program = `
         constraint Testable a (
             test : a -> Bool
         );
@@ -134,11 +128,10 @@ test('concrete variant types are never treated as type parameters', () => {
         # Bool should remain Bool, not be treated as a type parameter
         test 5.0
     `;
-    
-    const result = typeString(program);
-    
-    // Should return Bool (variant type), not some freshened type variable
-    expect(result.type.kind).toEqual('variant');
-    expect(result.type.name).toEqual('Bool');
-});
 
+	const result = parseAndType(program);
+
+	// Should return Bool (variant type), not some freshened type variable
+	assertVariantType(result.type);
+	expect(result.type.name).toBe('Bool');
+});

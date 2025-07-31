@@ -6,7 +6,6 @@ import {
 	type TraitConstraint,
 	functionType,
 	isConstraint,
-	type Effect,
 	type ConstrainedType,
 	type FunctionType,
 } from '../ast';
@@ -40,25 +39,27 @@ export function tryResolveConstraints(
 	argTypes: Type[],
 	state: TypeState
 ): Type | null {
-	
 	// For each constraint, check if any of the argument types can satisfy it
 	for (const [varName, constraints] of functionConstraints.entries()) {
 		for (const constraint of constraints) {
 			if (constraint.kind === 'implements') {
 				const traitName = constraint.trait;
-				
+
 				// Check each argument type to see if it implements the required trait
 				for (const argType of argTypes) {
 					const argTypeName = getTypeName(argType);
-					
+
 					// Check if we have an implementation of this trait for this argument type
 					let hasImplementation = false;
-					
-							// Built-in implementations for traits to avoid circular dependency
-		if (traitName === 'Add' && (argTypeName === 'Float' || argTypeName === 'String')) {
-			hasImplementation = true;
-		} else if (traitName === 'Numeric' && (argTypeName === 'Float')) {
-			hasImplementation = true;
+
+					// Built-in implementations for traits to avoid circular dependency
+					if (
+						traitName === 'Add' &&
+						(argTypeName === 'Float' || argTypeName === 'String')
+					) {
+						hasImplementation = true;
+					} else if (traitName === 'Numeric' && argTypeName === 'Float') {
+						hasImplementation = true;
 					} else {
 						// Check trait registry for user-defined implementations
 						const traitRegistry = state.traitRegistry;
@@ -67,12 +68,12 @@ export function tryResolveConstraints(
 							hasImplementation = !!traitImpls && traitImpls.has(argTypeName);
 						}
 					}
-					
+
 					if (hasImplementation) {
 						// This argument type satisfies the constraint!
 						// Create a substitution and apply it to the return type
 						const substitution = new Map(state.substitution);
-						
+
 						if (argType.kind === 'list') {
 							// For List types, substitute the type constructor
 							substitution.set(varName, { kind: 'primitive', name: 'List' });
@@ -81,13 +82,13 @@ export function tryResolveConstraints(
 							substitution.set(varName, {
 								kind: 'variant',
 								name: argType.name,
-								args: [] // Just the constructor
+								args: [], // Just the constructor
 							});
 						} else {
 							// For other types, substitute directly
 							substitution.set(varName, argType);
 						}
-						
+
 						// Apply substitution to return type
 						const resolvedType = substitute(returnType, substitution);
 						return resolvedType;
@@ -96,95 +97,10 @@ export function tryResolveConstraints(
 			}
 		}
 	}
-	
+
 	// Could not resolve any constraints
 	return null;
 }
-
-// Helper function to continue function application with a specialized constraint function
-function continueWithSpecializedFunction(
-	expr: ApplicationExpression,
-	specializedFuncType: Type,
-	argTypes: Type[],
-	allEffects: Set<Effect>,
-	state: TypeState
-): TypeResult {
-	let currentState = state;
-
-	if (specializedFuncType.kind !== 'function') {
-		throwTypeError(
-			location => nonFunctionApplicationError(specializedFuncType, location),
-			getExprLocation(expr)
-		);
-	}
-
-	const funcType = specializedFuncType;
-
-	// Check argument count
-	if (argTypes.length > funcType.params.length) {
-		throwTypeError(
-			location =>
-				functionApplicationError(
-					funcType.params[funcType.params.length - 1],
-					argTypes[funcType.params.length - 1],
-					funcType.params.length - 1,
-					undefined,
-					location
-				),
-			getExprLocation(expr)
-		);
-	}
-
-	// Unify each argument with the corresponding parameter type
-	for (let i = 0; i < argTypes.length; i++) {
-		currentState = unify(
-			funcType.params[i],
-			argTypes[i],
-			currentState,
-			getExprLocation(expr),
-			{
-				reason: 'constraint_function_application',
-				operation: `applying argument ${i + 1}`,
-				hint: `Argument ${i + 1} has type ${typeToString(
-					argTypes[i],
-					currentState.substitution
-				)} but the constraint function expects ${typeToString(
-					funcType.params[i],
-					currentState.substitution
-				)}.`,
-			}
-		);
-	}
-
-	// Determine the result type
-	let resultType = funcType.return;
-
-	// If not all arguments were provided, create a partial application
-	if (argTypes.length < funcType.params.length) {
-		const remainingParams = funcType.params.slice(argTypes.length);
-		resultType = functionType(
-			remainingParams,
-			funcType.return,
-			funcType.effects
-		);
-	}
-
-	// Merge effects from function type and arguments
-	const finalEffects = unionEffects(allEffects, funcType.effects);
-
-	return createTypeResult(resultType, finalEffects, currentState);
-}
-
-// LEGACY CONSTRAINT VALIDATION - REMOVED
-// Will be replaced with new trait system
-export const validateConstraints = (
-	_type: Type,
-	state: TypeState,
-	_location?: { line: number; column: number }
-): TypeState => {
-	// No-op: constraint validation removed
-	return state;
-};
 
 // Update typeApplication to thread state through freshenTypeVariables
 export const typeApplication = (
@@ -226,26 +142,20 @@ export const typeApplication = (
 				
 				// Apply the trait implementation to the arguments
 				if (traitImplType.type.kind === 'function') {
-					// Create a new application expression using the trait implementation
-					const traitApp: ApplicationExpression = {
-						kind: 'application',
-						func: resolution.impl,
-						args: expr.args,
-						location: expr.location
-					};
-					
 					// FIXED: Use direct function application logic instead of recursive typeApplication
 					// to avoid exponential blowup while maintaining compatibility
 					const funcType = traitImplType.type;
 					let resultState = traitImplType.state;
-					
+
 					// Type arguments first
-					const argResults = expr.args.map(arg => typeExpression(arg, resultState));
+					const argResults = expr.args.map(arg =>
+						typeExpression(arg, resultState)
+					);
 					for (const argResult of argResults) {
 						resultState = argResult.state;
 					}
 					const argTypes = argResults.map(result => result.type);
-					
+
 					// Apply normal function application logic (copied from main path)
 					if (argTypes.length > funcType.params.length) {
 						throwTypeError(
@@ -274,7 +184,7 @@ export const typeApplication = (
 								resultState.substitution
 							)}.`,
 						};
-						
+
 						resultState = unify(
 							funcType.params[i],
 							argTypes[i],
@@ -285,21 +195,23 @@ export const typeApplication = (
 					}
 
 					// Return the function's return type with effects
-					const resultType = funcType.return;  // Fixed: should be 'return', not 'returnType'
-					
+					const resultType = funcType.return; // Fixed: should be 'return', not 'returnType'
 
-					
-					const resultEffects = unionEffects(traitImplType.effects, ...argResults.map(r => r.effects));
+					const resultEffects = unionEffects(
+						traitImplType.effects,
+						...argResults.map(r => r.effects)
+					);
 					return createTypeResult(resultType, resultEffects, resultState);
 				} else {
 					// The trait implementation should be a function
-					const funcName = expr.func.kind === 'variable' ? expr.func.name : 'unknown';
+					const funcName =
+						expr.func.kind === 'variable' ? expr.func.name : 'unknown';
 					throwTypeError(
 						location => ({
 							type: 'TypeError' as const,
 							kind: 'general',
 							message: `Trait implementation for ${funcName} is not a function`,
-							location
+							location,
 						}),
 						getExprLocation(expr)
 					);
@@ -359,18 +271,6 @@ export const typeApplication = (
 				getExprLocation(expr),
 				unificationContext
 			);
-
-			// After unification, validate constraints on the parameter
-			const substitutedParam = substitute(
-				actualFuncType.params[i],
-				currentState.substitution
-			);
-
-			// LEGACY CONSTRAINT VALIDATION - COMMENTED OUT
-			// Will be replaced with new trait system
-			
-			// The old constraint validation logic has been removed
-			// New trait system will handle constraint checking differently
 		}
 
 		// Apply substitution to get the return type

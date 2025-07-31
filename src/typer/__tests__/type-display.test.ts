@@ -1,6 +1,6 @@
 import { typeToString } from '../helpers';
 import { recordType, stringType, floatType } from '../../ast';
-import { describe, test, expect } from 'bun:test';
+import { test, expect } from 'bun:test';
 
 test('Type Display (typeToString) - Record Type Display - should display record type with @field syntax', () => {
 	const recordTypeWithFields = recordType({

@@ -48,7 +48,7 @@ export function formatValue(value: Value): string {
 		return `<native:${value.name}>`;
 	}
 	if (isUnit(value)) {
-		return '()';
+		return '{}';
 	}
 	if (isConstructor(value)) {
 		if (value.args.length === 0) {

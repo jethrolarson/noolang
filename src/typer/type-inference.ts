@@ -36,9 +36,10 @@ import {
 	recordType,
 	variantType,
 	ApplicationExpression,
-	hasConstraint,
+	hasStructureConstraint,
 	implementsConstraint,
 	type VariableType,
+	Pattern,
 } from '../ast';
 import {
 	undefinedVariableError,
@@ -63,8 +64,8 @@ import {
 	createTypeResult,
 	unionEffects,
 	emptyEffects,
+	type TypeScheme,
 } from './types';
-// NOTE: validateConstraintName import removed - constraint validation disabled
 import {
 	freshTypeVariable,
 	generalize,
@@ -72,11 +73,15 @@ import {
 	freshenTypeVariables,
 	flattenStatements,
 	createConstrainedType,
-	addConstraintToType,
 } from './type-operations';
-// NOTE: Constraint resolution imports removed - trait system will replace
 import { typeApplication } from './function-application';
-import { isTraitFunction, getTraitFunctionInfo, addTraitDefinition, getTypeName, addTraitImplementation } from './trait-system';
+import {
+	isTraitFunction,
+	getTraitFunctionInfo,
+	addTraitDefinition,
+	getTypeName,
+	addTraitImplementation,
+} from './trait-system';
 
 // Note: Main typeExpression is now in expression-dispatcher.ts
 // This file only contains the individual type inference functions
@@ -98,6 +103,7 @@ export const typeLiteral = (
 	}
 };
 
+// TODO break this up
 // Type inference for variables
 export const typeVariableExpr = (
 	expr: VariableExpression,
@@ -366,7 +372,7 @@ const collectFreeVars = (
 					// Pattern variables are bound in the case body
 					const patternVars = new Set<string>();
 					// Extract pattern variables (simplified - should handle all pattern types)
-					const extractPatternVars = (pattern: any) => {
+					const extractPatternVars = (pattern: Pattern) => {
 						if (pattern && pattern.kind === 'variable') {
 							patternVars.add(pattern.name);
 						}
@@ -416,10 +422,11 @@ const collectFreeVars = (
 			case 'constrained':
 				walk(e.expression, bound);
 				break;
-			case 'mutable-definition':
+			case 'mutable-definition': {
 				const mutDefBound = new Set([...bound, e.name]);
 				walk(e.value, mutDefBound);
 				break;
+			}
 			case 'mutation':
 				walk(e.value, bound);
 				break;
@@ -459,7 +466,7 @@ export const typeFunction = (
 	const freeVars = collectFreeVars(expr.body, boundParams);
 
 	// Create a minimal environment with only what's needed
-	const functionEnv = new Map<string, any>();
+	const functionEnv = new Map<string, TypeScheme>();
 
 	// Always include built-ins and stdlib essentials
 	const essentials = [
@@ -552,7 +559,12 @@ export const typeFunction = (
 	currentState = { ...currentState, environment: state.environment };
 
 	// Collect implicit constraints from function body (e.g., from + operator)
-	const implicitConstraints = collectImplicitConstraints(bodyResult.type, paramTypes, currentState);
+	const implicitConstraints = collectImplicitConstraints(
+		bodyResult.type,
+		paramTypes,
+		currentState,
+		expr.body
+	);
 
 	// Special handling for constrained function bodies
 	let funcType: Type;
@@ -617,28 +629,93 @@ export const typeFunction = (
 
 // Helper function to collect implicit constraints from function bodies
 function collectImplicitConstraints(
-	bodyType: Type, 
-	paramTypes: Type[], 
-	state: TypeState
+	bodyType: Type,
+	paramTypes: Type[],
+	state: TypeState,
+	bodyExpr?: Expression // Add the actual function body expression
 ): Constraint[] {
 	const constraints: Constraint[] = [];
-	
+
 	const allTypeVars = new Set<string>();
 	for (const paramType of paramTypes) {
 		collectTypeVariables(paramType, allTypeVars);
 	}
 	collectTypeVariables(bodyType, allTypeVars);
-	
-	const typeVarList = Array.from(allTypeVars).sort();
-	
-	// Heuristic: if we have multiple type variables, this is likely a polymorphic function
-	// that uses operators like +, so add an Add constraint
-	if (typeVarList.length >= 2) {
-		const canonicalVar = typeVarList[0];
-		constraints.push(implementsConstraint(canonicalVar, 'Add'));
+
+	// Only add Add constraint if the function body actually uses the + operator
+	if (bodyExpr && usesAddOperator(bodyExpr)) {
+		const typeVarList = Array.from(allTypeVars).sort();
+		if (typeVarList.length > 0) {
+			const canonicalVar = typeVarList[0];
+			constraints.push(implementsConstraint(canonicalVar, 'Add'));
+		}
 	}
-	
+
 	return constraints;
+}
+
+// Helper function to check if an expression uses a specific operator
+function usesOperator(expr: Expression, targetOperator: string): boolean {
+	switch (expr.kind) {
+		case 'binary':
+			if (expr.operator === targetOperator) return true;
+			return (
+				usesOperator(expr.left, targetOperator) ||
+				usesOperator(expr.right, targetOperator)
+			);
+		case 'application':
+			return (
+				usesOperator(expr.func, targetOperator) ||
+				expr.args.some(arg => usesOperator(arg, targetOperator))
+			);
+		case 'function':
+			return usesOperator(expr.body, targetOperator);
+		case 'if':
+			return (
+				usesOperator(expr.condition, targetOperator) ||
+				usesOperator(expr.then, targetOperator) ||
+				usesOperator(expr.else, targetOperator)
+			);
+		case 'record':
+			return expr.fields.some(field =>
+				usesOperator(field.value, targetOperator)
+			);
+		case 'tuple':
+			return expr.elements.some(element =>
+				usesOperator(element, targetOperator)
+			);
+		case 'list':
+			return expr.elements.some(element =>
+				usesOperator(element, targetOperator)
+			);
+		case 'where':
+			return (
+				usesOperator(expr.main, targetOperator) ||
+				expr.definitions.some(def => {
+					if (def.kind === 'definition')
+						return usesOperator(def.value, targetOperator);
+					if (def.kind === 'tuple-destructuring')
+						return usesOperator(def.value, targetOperator);
+					if (def.kind === 'record-destructuring')
+						return usesOperator(def.value, targetOperator);
+					if (def.kind === 'mutable-definition')
+						return usesOperator(def.value, targetOperator);
+					return false;
+				})
+			);
+		case 'match':
+			return (
+				usesOperator(expr.expression, targetOperator) ||
+				expr.cases.some(case_ => usesOperator(case_.expression, targetOperator))
+			);
+		default:
+			return false;
+	}
+}
+
+// Helper function to check if an expression uses the + operator (for backward compatibility)
+function usesAddOperator(expr: Expression): boolean {
+	return usesOperator(expr, '+');
 }
 
 function collectTypeVariables(type: Type, vars: Set<string>): void {
@@ -1139,8 +1216,8 @@ export const typeAccessor = (
 	if (recordVar.kind === 'variable') {
 		// For validation: add to the type variable itself
 		recordVar.constraints = [
-			hasConstraint(recordVar.name, {
-				fields: { [fieldName]: fieldType }
+			hasStructureConstraint(recordVar.name, {
+				fields: { [fieldName]: fieldType },
 			}),
 		];
 		

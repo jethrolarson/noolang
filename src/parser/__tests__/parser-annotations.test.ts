@@ -1,20 +1,21 @@
 import { Lexer } from '../../lexer/lexer';
 import { parse, parseTypeExpression } from '../parser';
-import { describe, test, expect } from 'bun:test';
-import type { ParseResult, ParseSuccess, ParseError } from '../../parser/combinators';
-import type { BinaryExpression, DefinitionExpression, TypedExpression } from '../../ast';
-import { 
-	assertParseSuccess, 
-	assertParseError, 
-	assertRecordType, 
-	assertTupleType, 
-	assertListType, 
-	assertFunctionType, 
+import { test, expect } from 'bun:test';
+import {
+	assertParseSuccess,
+	assertParseError,
+	assertRecordType,
+	assertTupleType,
+	assertListType,
+	assertFunctionType,
 	assertVariableType,
-	assertBinaryExpression,
 	assertDefinitionExpression,
 	assertTypedExpression,
-	assertFunctionExpression
+	assertPrimitiveType,
+	assertVariantType,
+	assertFunctionExpression,
+	assertLiteralExpression,
+	assertListExpression,
 } from '../../../test/utils';
 
 // Helper functions for parsing
@@ -68,8 +69,8 @@ test('Type annotation parsing - parses record type annotation', () => {
 	assertParseSuccess(result);
 	assertRecordType(result.value);
 	expect(result.value.kind).toBe('record');
-	expect(result.value.fields.hasOwnProperty('name')).toBeTruthy();
-	expect(result.value.fields.hasOwnProperty('age')).toBeTruthy();
+	expect(result.value.fields).toHaveProperty('name');
+	expect(result.value.fields).toHaveProperty('age');
 	expect(result.value.fields.name.kind).toBe('primitive');
 	expect(result.value.fields.age.kind).toBe('primitive');
 });
@@ -78,15 +79,15 @@ test('Type annotation parsing - parses tuple type annotation', () => {
 	const result = parseType('{ Float, String }');
 	assertParseSuccess(result);
 	assertTupleType(result.value);
-	expect(result.value.elements[0].kind).toBe('primitive');
-	expect(result.value.elements[1].kind).toBe('primitive');
+	assertPrimitiveType(result.value.elements[0]);
+	assertPrimitiveType(result.value.elements[1]);
 });
 
 test('Type annotation parsing - parses list type annotation', () => {
 	const result = parseType('List Float');
 	assertParseSuccess(result);
 	assertListType(result.value);
-	expect(result.value.element.kind).toBe('primitive');
+	assertPrimitiveType(result.value.element);
 });
 
 test('Type annotation parsing - parses function type annotation', () => {
@@ -94,61 +95,58 @@ test('Type annotation parsing - parses function type annotation', () => {
 	assertParseSuccess(result);
 	assertFunctionType(result.value);
 	const funcType = result.value;
-	expect(funcType.params[0].kind).toBe('primitive');
-	expect(funcType.return.kind).toBe('primitive');
+	assertPrimitiveType(funcType.params[0]);
+	assertPrimitiveType(funcType.return);
 });
 
 test('Type annotation parsing - parses type variable', () => {
 	const result = parseType('a');
 	assertParseSuccess(result);
 	assertVariableType(result.value);
-	expect(result.value.kind).toBe('variable');
 	expect(result.value.name).toBe('a');
 });
 
 test('Type annotation parsing - parses simple type constructor application', () => {
 	const result = parseType('Option Float');
 	assertParseSuccess(result);
-	expect(result.value.kind).toBe('variant');
-	const variantType = result.value as any;
+	assertVariantType(result.value);
+	const variantType = result.value;
 	expect(variantType.name).toBe('Option');
-	expect(variantType.args.length).toBe(1);
-	expect(variantType.args[0].kind).toBe('primitive');
+	assertPrimitiveType(variantType.args[0]);
 	expect(variantType.args[0].name).toBe('Float');
 });
 
 test('Type annotation parsing - parses type constructor with type variable', () => {
 	const result = parseType('Option a');
 	assertParseSuccess(result);
-	expect(result.value.kind).toBe('variant');
-	const variantType = result.value as any;
+	assertVariantType(result.value);
+	const variantType = result.value;
 	expect(variantType.name).toBe('Option');
-	expect(variantType.args.length).toBe(1);
-	expect(variantType.args[0].kind).toBe('variable');
+	assertVariableType(variantType.args[0]);
 	expect(variantType.args[0].name).toBe('a');
 });
 
 test('Type annotation parsing - parses type constructor with multiple arguments', () => {
 	const result = parseType('Either String Float');
 	assertParseSuccess(result);
-	expect(result.value.kind).toBe('variant');
-	const variantType = result.value as any;
+	assertVariantType(result.value);
+	const variantType = result.value;
 	expect(variantType.name).toBe('Either');
 	expect(variantType.args.length).toBe(2);
-	expect(variantType.args[0].kind).toBe('primitive');
+	assertPrimitiveType(variantType.args[0]);
 	expect(variantType.args[0].name).toBe('String');
-	expect(variantType.args[1].kind).toBe('primitive');
+	assertPrimitiveType(variantType.args[1]);
 	expect(variantType.args[1].name).toBe('Float');
 });
 
 test('Type annotation parsing - parses nested type constructor application', () => {
 	const result = parseType('Option (Either String Float)');
 	assertParseSuccess(result);
-	expect(result.value.kind).toBe('variant');
-	const variantType = result.value as any;
+	assertVariantType(result.value);
+	const variantType = result.value;
 	expect(variantType.name).toBe('Option');
 	expect(variantType.args.length).toBe(1);
-	expect(variantType.args[0].kind).toBe('variant');
+	assertVariantType(variantType.args[0]);
 	expect(variantType.args[0].name).toBe('Either');
 	expect(variantType.args[0].args.length).toBe(2);
 });
@@ -234,32 +232,34 @@ test('Top-level definitions with type annotations - parses definition with funct
 		'sum = fn x y => x + y : Float -> Float -> Float;'
 	);
 	expect(result.statements.length).toBe(1);
-	expect(result.statements[0].kind).toBe('definition');
-	const def = assertDefinitionExpression(result.statements[0]);
+	const def = result.statements[0];
+	assertDefinitionExpression(def);
 	expect(def.name).toBe('sum');
-	expect(def.value.kind).toBe('function');
+	assertFunctionExpression(def.value);
 });
 
 test('Top-level definitions with type annotations - parses definition with primitive type annotation', () => {
 	const result = parseDefinition('answer = 42 : Float;');
 	expect(result.statements.length).toBe(1);
-	expect(result.statements[0].kind).toBe('definition');
-	const def = assertDefinitionExpression(result.statements[0]);
+	const def = result.statements[0];
+	assertDefinitionExpression(def);
 	expect(def.name).toBe('answer');
-	const typed = assertTypedExpression(def.value);
-	expect(typed.expression.kind).toBe('literal');
-	expect(typed.type.kind).toBe('primitive');
+	const typed = def.value;
+	assertTypedExpression(typed);
+	assertLiteralExpression(typed.expression);
+	assertPrimitiveType(typed.type);
 });
 
 test('Top-level definitions with type annotations - parses definition with list type annotation', () => {
 	const result = parseDefinition('numbers = [1, 2, 3] : List Float;');
 	expect(result.statements.length).toBe(1);
-	const def = assertDefinitionExpression(result.statements[0]);
+	const def = result.statements[0];
+	assertDefinitionExpression(def);
 	expect(def.name).toBe('numbers');
-	const typed = assertTypedExpression(def.value);
-	expect(typed.expression.kind).toBe('list');
-	expect(typed.type.kind).toBe('list'); // List types have kind "list"
-	expect((typed.type as any).element.kind).toBe('primitive'); // Float is a primitive type
-	expect((typed.type as any).element.name).toBe('Float');
+	const typed = def.value;
+	assertTypedExpression(typed);
+	assertListExpression(typed.expression);
+	assertPrimitiveType(typed.expression.type!);
+	expect(typed.expression.type.name).toBe('Float');
 });
 

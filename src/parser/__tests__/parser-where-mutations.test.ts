@@ -1,40 +1,33 @@
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../parser';
-import type { WhereExpression, MutableDefinitionExpression, MutationExpression } from '../../ast';
-import { describe, test, expect } from 'bun:test';
+import { test, expect } from 'bun:test';
+import {
+	assertWhereExpression,
+	assertMutableDefinitionExpression,
+	assertMutationExpression,
+	assertDefinitionExpression,
+	assertLiteralExpression,
+	assertFunctionExpression,
+	assertBinaryExpression,
+	assertIfExpression,
+	assertTupleExpression,
+	assertListExpression,
+	assertApplicationExpression,
+	assertMatchExpression,
+} from '../../../test/utils';
 
-// Helper functions for type-safe testing
-function assertWhereExpression(expr: any): WhereExpression {
-	if (expr.kind !== 'where') {
-		throw new Error(`Expected where expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
-function assertMutableDefinitionExpression(expr: any): MutableDefinitionExpression {
-	if (expr.kind !== 'mutable-definition') {
-		throw new Error(`Expected mutable definition expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
-function assertMutationExpression(expr: any): MutationExpression {
-	if (expr.kind !== 'mutation') {
-		throw new Error(`Expected mutation expression, got ${expr.kind}`);
-	}
-	return expr;
-}
 
 test('Where Expressions - should parse where expression with single definition', () => {
 	const lexer = new Lexer('x + y where ( x = 1 )');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const whereExpr = assertWhereExpression(program.statements[0]);
+	const whereExpr = program.statements[0];
+	assertWhereExpression(whereExpr);
 	expect(whereExpr.main.kind).toBe('binary');
 	expect(whereExpr.definitions.length).toBe(1);
-	expect(whereExpr.definitions[0].kind).toBe('definition');
-	expect((whereExpr.definitions[0] as any).name).toBe('x');
+	assertDefinitionExpression(whereExpr.definitions[0]);
+	expect(whereExpr.definitions[0].name).toBe('x');
 });
 
 test('Where Expressions - should parse where expression with multiple definitions', () => {
@@ -42,10 +35,13 @@ test('Where Expressions - should parse where expression with multiple definition
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const whereExpr = assertWhereExpression(program.statements[0]);
+	const whereExpr = program.statements[0];
+	assertWhereExpression(whereExpr);
 	expect(whereExpr.definitions.length).toBe(2);
-	expect((whereExpr.definitions[0] as any).name).toBe('x');
-	expect((whereExpr.definitions[1] as any).name).toBe('y');
+	assertDefinitionExpression(whereExpr.definitions[0]);
+	expect(whereExpr.definitions[0].name).toBe('x');
+	assertDefinitionExpression(whereExpr.definitions[1]);
+	expect(whereExpr.definitions[1].name).toBe('y');
 });
 
 test('Where Expressions - should parse where expression with mutable definition', () => {
@@ -53,10 +49,11 @@ test('Where Expressions - should parse where expression with mutable definition'
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const whereExpr = assertWhereExpression(program.statements[0]);
+	const whereExpr = program.statements[0];
+	assertWhereExpression(whereExpr);
 	expect(whereExpr.definitions.length).toBe(2);
-	expect(whereExpr.definitions[0].kind).toBe('mutable-definition');
-	expect(whereExpr.definitions[1].kind).toBe('definition');
+	assertMutableDefinitionExpression(whereExpr.definitions[0]);
+	assertDefinitionExpression(whereExpr.definitions[1]);
 });
 
 test('Mutable Definitions and Mutations - should parse mutable definition', () => {
@@ -64,10 +61,11 @@ test('Mutable Definitions and Mutations - should parse mutable definition', () =
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const mutDef = assertMutableDefinitionExpression(program.statements[0]);
+	const mutDef = program.statements[0];
+	assertMutableDefinitionExpression(mutDef);
 	expect(mutDef.name).toBe('x');
-	expect(mutDef.value.kind).toBe('literal');
-	expect((mutDef.value as any).value).toBe(42);
+	assertLiteralExpression(mutDef.value);
+	expect(mutDef.value.value).toBe(42);
 });
 
 test('Mutable Definitions and Mutations - should parse mutation', () => {
@@ -75,10 +73,11 @@ test('Mutable Definitions and Mutations - should parse mutation', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const mutation = assertMutationExpression(program.statements[0]);
+	const mutation = program.statements[0];
+	assertMutationExpression(mutation);
 	expect(mutation.target).toBe('x');
-	expect(mutation.value.kind).toBe('literal');
-	expect((mutation.value as any).value).toBe(100);
+	assertLiteralExpression(mutation.value);
+	expect(mutation.value.value).toBe(100);
 });
 
 test('Mutable Definitions and Mutations - should parse mutable definition with complex expression', () => {
@@ -86,9 +85,10 @@ test('Mutable Definitions and Mutations - should parse mutable definition with c
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const mutDef = assertMutableDefinitionExpression(program.statements[0]);
+	const mutDef = program.statements[0];
+	assertMutableDefinitionExpression(mutDef);
 	expect(mutDef.name).toBe('result');
-	expect(mutDef.value.kind).toBe('function');
+	assertFunctionExpression(mutDef.value);
 });
 
 test('Mutable Definitions and Mutations - should parse mutation with complex expression', () => {
@@ -105,9 +105,10 @@ test('Mutable Definitions and Mutations - should parse mutation expression synta
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const mutation = assertMutationExpression(program.statements[0]);
+	const mutation = program.statements[0];
+	assertMutationExpression(mutation);
 	expect(mutation.target).toBe('x');
-	expect(mutation.value.kind).toBe('function');
+	assertFunctionExpression(mutation.value);
 });
 
 test('Mutable Definitions and Mutations - should parse mutation with binary expression', () => {
@@ -115,9 +116,10 @@ test('Mutable Definitions and Mutations - should parse mutation with binary expr
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const mutation = assertMutationExpression(program.statements[0]);
+	const mutation = program.statements[0];
+	assertMutationExpression(mutation);
 	expect(mutation.target).toBe('x');
-	expect(mutation.value.kind).toBe('binary');
+	assertBinaryExpression(mutation.value);
 });
 
 test('Mutable Definitions and Mutations - should parse mutation with if expression', () => {
@@ -125,9 +127,10 @@ test('Mutable Definitions and Mutations - should parse mutation with if expressi
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const mutation = assertMutationExpression(program.statements[0]);
+	const mutation = program.statements[0];
+	assertMutationExpression(mutation);
 	expect(mutation.target).toBe('x');
-	expect(mutation.value.kind).toBe('if');
+	assertIfExpression(mutation.value);
 });
 
 test('Mutable Definitions and Mutations - should parse mutation with record expression', () => {
@@ -135,9 +138,10 @@ test('Mutable Definitions and Mutations - should parse mutation with record expr
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const mutation = assertMutationExpression(program.statements[0]);
+	const mutation = program.statements[0];
+	assertMutationExpression(mutation);
 	expect(mutation.target).toBe('point');
-	expect(mutation.value.kind).toBe('tuple');
+	assertTupleExpression(mutation.value);
 });
 
 test('Mutable Definitions and Mutations - should parse mutation with list expression', () => {
@@ -145,9 +149,10 @@ test('Mutable Definitions and Mutations - should parse mutation with list expres
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const mutation = assertMutationExpression(program.statements[0]);
+	const mutation = program.statements[0];
+	assertMutationExpression(mutation);
 	expect(mutation.target).toBe('items');
-	expect(mutation.value.kind).toBe('list');
+	assertListExpression(mutation.value);
 });
 
 test('Mutable Definitions and Mutations - should parse mutation with function application', () => {
@@ -155,9 +160,10 @@ test('Mutable Definitions and Mutations - should parse mutation with function ap
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const mutation = assertMutationExpression(program.statements[0]);
+	const mutation = program.statements[0];
+	assertMutationExpression(mutation);
 	expect(mutation.target).toBe('result');
-	expect(mutation.value.kind).toBe('application');
+	assertApplicationExpression(mutation.value);
 });
 
 test('Mutable Definitions and Mutations - should parse mutation with accessor expression', () => {
@@ -165,9 +171,10 @@ test('Mutable Definitions and Mutations - should parse mutation with accessor ex
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const mutation = assertMutationExpression(program.statements[0]);
+	const mutation = program.statements[0];
+	assertMutationExpression(mutation);
 	expect(mutation.target).toBe('name');
-	expect(mutation.value.kind).toBe('application');
+	assertApplicationExpression(mutation.value);
 });
 
 test('Mutable Definitions and Mutations - should parse mutation with match expression', () => {
@@ -177,9 +184,10 @@ test('Mutable Definitions and Mutations - should parse mutation with match expre
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const mutation = assertMutationExpression(program.statements[0]);
+	const mutation = program.statements[0];
+	assertMutationExpression(mutation);
 	expect(mutation.target).toBe('result');
-	expect(mutation.value.kind).toBe('match');
+	assertMatchExpression(mutation.value);
 });
 
 test('Mutable Definitions and Mutations - should parse mutation with where expression', () => {
@@ -189,9 +197,10 @@ test('Mutable Definitions and Mutations - should parse mutation with where expre
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const mutation = assertMutationExpression(program.statements[0]);
+	const mutation = program.statements[0];
+	assertMutationExpression(mutation);
 	expect(mutation.target).toBe('result');
-	expect(mutation.value.kind).toBe('where');
+	assertWhereExpression(mutation.value);
 });
 
 test('Mutable Definitions and Mutations - should parse multiple mutations in sequence', () => {
@@ -208,8 +217,9 @@ test('Mutable Definitions and Mutations - should parse mutation with complex nes
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const mutation = assertMutationExpression(program.statements[0]);
+	const mutation = program.statements[0];
+	assertMutationExpression(mutation);
 	expect(mutation.target).toBe('result');
-	expect(mutation.value.kind).toBe('if');
+	assertIfExpression(mutation.value);
 });
 

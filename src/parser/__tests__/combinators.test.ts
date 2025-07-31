@@ -1,6 +1,6 @@
-import { Lexer } from '../../src/lexer/lexer';
-import * as C from '../../src/parser/combinators';
-import { describe, test, expect } from 'bun:test';
+import { Lexer } from '../../lexer/lexer';
+import * as C from '../combinators';
+import { test, expect } from 'bun:test';
 
 // Helper function to create tokens for testing
 const createTokens = (input: string) => {
@@ -270,7 +270,9 @@ test('Parser Combinators - optional - should handle empty input', () => {
 
 test('Parser Combinators - map - should transform successful parse result', () => {
 	const tokens = createTokens('42');
-	const result = C.map(C.token('NUMBER'), (token) => parseInt(token.value))(tokens);
+	const result = C.map(C.token('NUMBER'), token => parseInt(token.value))(
+		tokens
+	);
 
 	expect(result.success).toEqual(true);
 	if (result.success) {
@@ -280,7 +282,9 @@ test('Parser Combinators - map - should transform successful parse result', () =
 
 test('Parser Combinators - map - should preserve failure', () => {
 	const tokens = createTokens('hello');
-	const result = C.map(C.token('NUMBER'), (token) => parseInt(token.value))(tokens);
+	const result = C.map(C.token('NUMBER'), token => parseInt(token.value))(
+		tokens
+	);
 
 	expect(result.success).toEqual(false);
 });
@@ -297,26 +301,30 @@ test('Parser Combinators - lazy - should defer parser creation', () => {
 
 test('Parser Combinators - lazy - should handle recursive parsers', () => {
 	const tokens = createTokens('( ( 42 ) )');
-	
-	const expr: () => C.Parser<any> = () => C.choice(
-		C.token('NUMBER'),
-		C.map(
-			C.seq(
-				C.token('PUNCTUATION', '('),
-				C.lazy(expr),
-				C.token('PUNCTUATION', ')')
-			),
-			([_, inner, __]) => inner
-		)
-	);
-	
+
+	const expr: () => C.Parser<any> = () =>
+		C.choice(
+			C.token('NUMBER'),
+			C.map(
+				C.seq(
+					C.token('PUNCTUATION', '('),
+					C.lazy(expr),
+					C.token('PUNCTUATION', ')')
+				),
+				([_, inner, __]) => inner
+			)
+		);
+
 	const result = expr()(tokens);
 	expect(result.success).toEqual(true);
 });
 
 test('Parser Combinators - sepBy - should parse elements separated by separator', () => {
 	const tokens = createTokens('42, 43, 44');
-	const result = C.sepBy(C.token('NUMBER'), C.token('PUNCTUATION', ','))(tokens);
+	const result = C.sepBy(
+		C.token('NUMBER'),
+		C.token('PUNCTUATION', ',')
+	)(tokens);
 
 	expect(result.success).toEqual(true);
 	if (result.success) {
@@ -329,7 +337,10 @@ test('Parser Combinators - sepBy - should parse elements separated by separator'
 
 test('Parser Combinators - sepBy - should parse single element', () => {
 	const tokens = createTokens('42');
-	const result = C.sepBy(C.token('NUMBER'), C.token('PUNCTUATION', ','))(tokens);
+	const result = C.sepBy(
+		C.token('NUMBER'),
+		C.token('PUNCTUATION', ',')
+	)(tokens);
 
 	expect(result.success).toEqual(true);
 	if (result.success) {
@@ -340,7 +351,10 @@ test('Parser Combinators - sepBy - should parse single element', () => {
 
 test('Parser Combinators - sepBy - should parse zero elements', () => {
 	const tokens = createTokens('hello');
-	const result = C.sepBy(C.token('NUMBER'), C.token('PUNCTUATION', ','))(tokens);
+	const result = C.sepBy(
+		C.token('NUMBER'),
+		C.token('PUNCTUATION', ',')
+	)(tokens);
 
 	expect(result.success).toEqual(true);
 	if (result.success) {
@@ -350,7 +364,10 @@ test('Parser Combinators - sepBy - should parse zero elements', () => {
 
 test('Parser Combinators - sepBy - should parse partial when separator is followed by invalid element', () => {
 	const tokens = createTokens('42, hello');
-	const result = C.sepBy(C.token('NUMBER'), C.token('PUNCTUATION', ','))(tokens);
+	const result = C.sepBy(
+		C.token('NUMBER'),
+		C.token('PUNCTUATION', ',')
+	)(tokens);
 
 	expect(result.success).toEqual(true);
 	if (result.success) {
@@ -524,15 +541,10 @@ test('Parser Combinators - error handling - should provide meaningful error mess
 
 test('Parser Combinators - error handling - should track position for error reporting', () => {
 	const tokens = createTokens('hello world 42');
-	const result = C.seq(
-		C.identifier(),
-		C.identifier(),
-		C.string()
-	)(tokens);
+	const result = C.seq(C.identifier(), C.identifier(), C.string())(tokens);
 
 	expect(result.success).toEqual(false);
 	if (!result.success) {
 		expect(result.error.includes('Expected STRING')).toBeTruthy();
 	}
 });
-

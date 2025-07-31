@@ -1,85 +1,34 @@
-import { Lexer } from '../../../src/lexer/lexer';
-import { parse } from '../../../src/parser/parser';
-import { typeAndDecorate } from '../../../src/typer';
-import { Evaluator, Value } from '../../../src/evaluator/evaluator';
-import { describe, test, expect } from 'bun:test';
-
-// Helper functions
-function unwrapValue(val: Value): any {
-    if (val === null) return null;
-    if (typeof val !== 'object') return val;
-    switch (val.tag) {
-        case 'number':
-            return val.value;
-        case 'string':
-            return val.value;
-        case 'constructor':
-            if (val.name === 'True') return true;
-            if (val.name === 'False') return false;
-            return val;
-        case 'list':
-            return val.values.map(unwrapValue);
-        case 'tuple':
-            return val.values.map(unwrapValue);
-        case 'record': {
-            const obj: any = {};
-            for (const k in val.fields) obj[k] = unwrapValue(val.fields[k]);
-            return obj;
-        }
-        default:
-            return val;
-    }
-}
-
-function runCode(code: string) {
-    const lexer = new Lexer(code);
-    const tokens = lexer.tokenize();
-    const ast = parse(tokens);
-    const decoratedResult = typeAndDecorate(ast);
-    const evaluator = new Evaluator({ traitRegistry: decoratedResult.state.traitRegistry });
-    return evaluator.evaluateProgram(decoratedResult.program);
-}
-
-function expectError(code: string, errorPattern?: string) {
-    try {
-        runCode(code);
-        throw new Error('Expected error but code succeeded');
-    } catch (error) {
-        if (errorPattern) {
-            expect(error.message).toMatch(new RegExp(errorPattern, 'i'));
-        }
-    }
-}
-
-function expectSuccess(code: string, expectedValue?: any) {
-    const result = runCode(code);
-    if (expectedValue !== undefined) {
-        expect(unwrapValue(result.finalResult)).toEqual(expectedValue);
-    }
-    return result;
-}
+import { test } from 'bun:test';
+import { expectError, expectSuccess } from '../../utils';
 
 // =============================================================================
 // WEAKNESS INVESTIGATION: | OPERATOR WITH CONSTRAINTS
 // =============================================================================
 
 test('| operator works with basic constraint functions', () => {
-    expectSuccess(`
+	expectSuccess(
+		`
         [1, 2, 3] | list_map (fn x => x * 2)
-    `, [2, 4, 6]);
+    `,
+		[2, 4, 6]
+	);
 });
 
 test('| operator with built-in constraint resolution', () => {
-    expectSuccess(`
+	expectSuccess(
+		`
         result = [1, 2, 3] | head;
         match result with (Some x => x; None => 0)
-    `, 1);
+    `,
+		1
+	);
 });
 
 // Test constraint propagation through | operator
 test.skip('| operator with constraint propagation (might fail)', () => {
-    // This tests if constraints properly propagate through the | operator
-    expectError(`
+	// This tests if constraints properly propagate through the | operator
+	expectError(
+		`
         constraint Show a ( show : a -> String );
         implement Show Float ( show = toString );
         
@@ -87,28 +36,36 @@ test.skip('| operator with constraint propagation (might fail)', () => {
         showList = fn list => list | list_map show | toString;
         result = showList [1, 2, 3];
         result
-    `, 'constraint');
+    `,
+		'constraint'
+	);
 });
 
 test('| operator with effectful functions', () => {
-    // Test that effects can propagate through | operator
-    expectSuccess(`
+	// Test that effects can propagate through | operator
+	expectSuccess(
+		`
         printAndReturn = fn x => (print x; x);
         result = 42 | printAndReturn;
         result
-    `, 42);
+    `,
+		42
+	);
 });
 
 test.skip('| operator with mixed effects and constraints (might fail)', () => {
-    // This tests a complex case with both effects and constraints
-    expectError(`
+	// This tests a complex case with both effects and constraints
+	expectError(
+		`
         constraint Show a ( show : a -> String );
         implement Show Float ( show = toString );
         
         printAndShow = fn x => (print (show x); x);
         result = [1, 2, 3] | list_map printAndShow;
         result
-    `, 'effect|constraint');
+    `,
+		'effect|constraint'
+	);
 });
 
 // =============================================================================
@@ -116,7 +73,8 @@ test.skip('| operator with mixed effects and constraints (might fail)', () => {
 // =============================================================================
 
 test.skip('nested constraint resolution with operators (might fail)', () => {
-    expectError(`
+	expectError(
+		`
         constraint Eq a ( equals : a -> a -> Bool );
         implement Eq Float ( equals = fn a b => a == b );
         
@@ -125,15 +83,20 @@ test.skip('nested constraint resolution with operators (might fail)', () => {
             
         result = findAndFilter 2 [1, 2, 3, 2];
         match result with (Some x => x; None => 0)
-    `, 'constraint|type');
+    `,
+		'constraint|type'
+	);
 });
 
 test('operator precedence with constraints', () => {
-    expectSuccess(`
+	expectSuccess(
+		`
         # Test that operator precedence works with constraint functions
         result = [1, 2, 3] | list_map (fn x => x + 1) | length;
         result
-    `, 3);
+    `,
+		3
+	);
 });
 
 // =============================================================================
@@ -141,23 +104,29 @@ test('operator precedence with constraints', () => {
 // =============================================================================
 
 test.skip('| operator with ADT pattern matching (might fail)', () => {
-    expectError(`
+	expectError(
+		`
         type Point a = Point a a;
         
         getX = fn point => match point with (Point x y => x);
         points = [Point 1 2, Point 3 4];
         result = points | list_map getX;
         result
-    `, 'pattern|constructor');
+    `,
+		'pattern|constructor'
+	);
 });
 
 test('| operator with built-in ADTs works', () => {
-    expectSuccess(`
+	expectSuccess(
+		`
         opts = [Some 1, None, Some 3];
         extract = fn opt => match opt with (Some x => x; None => 0);
         result = opts | list_map extract;
         result
-    `, [1, 0, 3]);
+    `,
+		[1, 0, 3]
+	);
 });
 
 // =============================================================================
@@ -165,17 +134,21 @@ test('| operator with built-in ADTs works', () => {
 // =============================================================================
 
 test('multiple | operators in chain', () => {
-    expectSuccess(`
+	expectSuccess(
+		`
         result = [1, 2, 3, 4, 5] 
             | filter (fn x => x > 2) 
             | list_map (fn x => x * 2) 
             | length;
         result
-    `, 3);
+    `,
+		3
+	);
 });
 
 test.skip('complex operator mixing (might fail)', () => {
-    expectError(`
+	expectError(
+		`
         # Test mixing |, $, and |> operators
         double = fn x => x * 2;
         isEven = fn x => (x % 2) == 0;
@@ -185,7 +158,9 @@ test.skip('complex operator mixing (might fail)', () => {
             | filter $ isEven 
             |> length;
         result
-    `, 'precedence|operator');
+    `,
+		'precedence|operator'
+	);
 });
 
 // =============================================================================
@@ -193,7 +168,8 @@ test.skip('complex operator mixing (might fail)', () => {
 // =============================================================================
 
 test.skip('polymorphic type inference with | operator (might fail)', () => {
-    expectError(`
+	expectError(
+		`
         # Test if type inference handles polymorphic functions correctly
         identity = fn x => x;
         
@@ -201,15 +177,20 @@ test.skip('polymorphic type inference with | operator (might fail)', () => {
         strs = ["a", "b", "c"] | list_map identity;
         
         [nums, strs]
-    `, 'type|inference');
+    `,
+		'type|inference'
+	);
 });
 
 test('type inference with monomorphic functions', () => {
-    expectSuccess(`
+	expectSuccess(
+		`
         double = fn x => x * 2;
         result = [1, 2, 3] | list_map double;
         result
-    `, [2, 4, 6]);
+    `,
+		[2, 4, 6]
+	);
 });
 
 // =============================================================================
@@ -217,11 +198,11 @@ test('type inference with monomorphic functions', () => {
 // =============================================================================
 
 test('| operator with non-function gives clear error', () => {
-    expectError(`5 | 3`, 'non-function|function');
+	expectError(`5 | 3`, 'non-function|function');
 });
 
 test('| operator with wrong argument type', () => {
-    expectError(`"hello" | length`, 'type|argument');
+	expectError(`"hello" | length`, 'type|argument');
 });
 
 // =============================================================================
@@ -229,7 +210,8 @@ test('| operator with wrong argument type', () => {
 // =============================================================================
 
 test.skip('| operator with trait functions (might fail)', () => {
-    expectError(`
+	expectError(
+		`
         constraint Show a ( show : a -> String );
         implement Show Float ( show = toString );
         implement Show String ( show = fn s => s );
@@ -238,14 +220,18 @@ test.skip('| operator with trait functions (might fail)', () => {
         values = [1, "hello", 3];
         result = values | list_map show;
         result
-    `, 'trait|dispatch');
+    `,
+		'trait|dispatch'
+	);
 });
 
 test('| operator with built-in functions', () => {
-    expectSuccess(`
+	expectSuccess(
+		`
         # This now works after fixing list_map to accept native functions
         result = [1, 2, 3] | list_map toString;
         result
-    `, ["1", "2", "3"]);
+    `,
+		['1', '2', '3']
+	);
 });
-

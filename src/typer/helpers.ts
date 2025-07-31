@@ -17,7 +17,7 @@ import {
 	HasFieldConstraint,
 	ImplementsConstraint,
 	CustomConstraint,
-	HasConstraint,
+	HasStructureConstraint,
 } from '../ast';
 import { formatTypeError } from './type-errors';
 import { NoolangError } from '../errors';
@@ -221,7 +221,10 @@ const typesEqualUncached = (t1: Type, t2: Type): boolean => {
 					if (c1.kind === 'implements' && c2.kind === 'implements') {
 						if (c1.trait !== c2.trait) return false;
 					} else if (c1.kind === 'hasField' && c2.kind === 'hasField') {
-						if (c1.field !== c2.field || !typesEqual(c1.fieldType, c2.fieldType)) {
+						if (
+							c1.field !== c2.field ||
+							!typesEqual(c1.fieldType, c2.fieldType)
+						) {
 							return false;
 						}
 					}
@@ -316,7 +319,7 @@ export const constraintsEqual = (c1: Constraint, c2: Constraint): boolean => {
 		case 'custom':
 			return c1.constraint === (c2 as CustomConstraint).constraint;
 		case 'has': {
-			const c2Has = c2 as HasConstraint;
+			const c2Has = c2 as HasStructureConstraint;
 			const fields1 = Object.keys(c1.structure.fields);
 			const fields2 = Object.keys(c2Has.structure.fields);
 			if (fields1.length !== fields2.length) return false;
@@ -409,15 +412,13 @@ export const typeToString = (
 	let next = 0;
 
 	function norm(t: Type): string {
-
-		
 		switch (t.kind) {
 			case 'primitive':
 				return t.name;
 			case 'function': {
 				const paramStr = t.params.map(norm).join(' ');
 				const effectStr = formatEffectsString(t.effects);
-				const baseType = `(${paramStr}) -> ${norm(t.return)}${effectStr}`;
+				const baseType = `${paramStr} -> ${norm(t.return)}${effectStr}`;
 
 				const constraintStr =
 					showConstraints && t.constraints && t.constraints.length > 0
@@ -433,7 +434,7 @@ export const typeToString = (
 			}
 			case 'variable': {
 				let varStr = '';
-				
+
 				if (!mapping.has(t.name)) {
 					// If the type variable name is a single letter, keep it as-is
 					// This preserves explicit type annotations like 'a -> a'
@@ -452,12 +453,13 @@ export const typeToString = (
 			case 'list':
 				return `List ${norm(t.element)}`;
 			case 'tuple':
-				return `(${t.elements.map(norm).join(' ')})`;
-			case 'record':
+				return `{${t.elements.map(norm).join(' ')}}`;
+			case 'record': {
 				const fields = Object.entries(t.fields)
 					.map(([name, fieldType]) => `@${name} ${norm(fieldType)}`)
 					.join(', ');
 				return fields.length > 0 ? `{ ${fields} }` : `{ }`;
+			}
 			case 'union':
 				return `(${t.types.map(norm).join(' | ')})`;
 			case 'variant':
@@ -467,7 +469,7 @@ export const typeToString = (
 					return `${t.name} ${t.args.map(norm).join(' ')}`;
 				}
 			case 'unit':
-				return 'unit';
+				return '{}';
 			case 'constrained': {
 				// Show base type with constraints
 				const constrainedType = t as ConstrainedType;
@@ -482,7 +484,9 @@ export const typeToString = (
 						if (constraint.kind === 'implements') {
 							constraintStrs.push(`${varName} implements ${constraint.trait}`);
 						} else if (constraint.kind === 'hasField') {
-							constraintStrs.push(`${varName} has ${constraint.field}: ${norm(constraint.fieldType)}`);
+							constraintStrs.push(
+								`${varName} has ${constraint.field}: ${norm(constraint.fieldType)}`
+							);
 						}
 					}
 				}
@@ -502,14 +506,17 @@ export const typeToString = (
 		if (mapped) {
 			return mapped;
 		}
-		
+
 		// If not in mapping, check if this looks like an internal variable name
 		for (const greekLetter of greek) {
-			if (typeVar.startsWith(greekLetter) && /^\d+$/.test(typeVar.slice(greekLetter.length))) {
+			if (
+				typeVar.startsWith(greekLetter) &&
+				/^\d+$/.test(typeVar.slice(greekLetter.length))
+			) {
 				return greekLetter;
 			}
 		}
-		
+
 		// Fallback to original name
 		return typeVar;
 	}
@@ -533,7 +540,10 @@ export const typeToString = (
 			case 'has': {
 				const normalizedVarName = normalizeConstraintVariable(c.typeVar);
 				const fieldDescs = Object.entries(c.structure.fields)
-					.map(([fieldName, fieldType]) => `@${fieldName} ${norm(fieldType as Type)}`)
+					.map(
+						([fieldName, fieldType]) =>
+							`@${fieldName} ${norm(fieldType as Type)}`
+					)
 					.join(', ');
 				return `${normalizedVarName} has {${fieldDescs}}`;
 			}

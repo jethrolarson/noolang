@@ -1,11 +1,11 @@
 import { Lexer } from '../../src/lexer/lexer';
 import { parse } from '../../src/parser/parser';
 import { Evaluator } from '../../src/evaluator/evaluator';
-import { describe, test, expect } from 'bun:test';
+import { test, expect } from 'bun:test';
 
 // Test suite: File-relative imports
 const mockFs = {
-	readFileSync: (filePath: unknown, encoding: string) => {
+	readFileSync: (filePath: unknown) => {
 		if (typeof filePath === 'string' && filePath.includes('stdlib.noo')) {
 			return '# Noolang Standard Library\n# This file defines the global default environment\n';
 		}

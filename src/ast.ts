@@ -23,24 +23,47 @@ export type Effect =
 
 // Type constraints for constrained polymorphism
 export type Constraint =
-	| { kind: 'is'; typeVar: string; constraint: string } // a is Collection
-	| { kind: 'hasField'; typeVar: string; field: string; fieldType: Type } // a has field "length" of type Float
-	| { kind: 'implements'; typeVar: string; interfaceName: string } // a implements Show
-	| { kind: 'custom'; typeVar: string; constraint: string; args: Type[] } // a satisfies MyConstraint T1 T2
-	| { kind: 'has'; typeVar: string; structure: RecordStructure }; // a has {@name String, @age Float}
+	| IsConstraint
+	| HasFieldConstraint
+	| ImplementsConstraint
+	| CustomConstraint
+	| HasStructureConstraint;
+
+export type HasStructureConstraint = {
+	kind: 'has';
+	typeVar: string;
+	structure: RecordStructure; // a has {@name String, @age Float}
+};
+
+export type AndConstraintExpr = {
+	kind: 'and';
+	left: ConstraintExpr;
+	right: ConstraintExpr;
+};
+
+export type OrConstraintExpr = {
+	kind: 'or';
+	left: ConstraintExpr;
+	right: ConstraintExpr;
+};
+
+export type ParenConstraintExpr = {
+	kind: 'paren';
+	expr: ConstraintExpr;
+};
 
 export type ConstraintExpr =
 	| Constraint
-	| { kind: 'and'; left: ConstraintExpr; right: ConstraintExpr }
-	| { kind: 'or'; left: ConstraintExpr; right: ConstraintExpr }
-	| { kind: 'paren'; expr: ConstraintExpr };
+	| AndConstraintExpr
+	| OrConstraintExpr
+	| ParenConstraintExpr;
 
 // Record structure for structural constraints
 export type RecordStructure = {
 	fields: { [fieldName: string]: StructureFieldType };
 };
 
-export type StructureFieldType = 
+export type StructureFieldType =
 	| Type
 	| { kind: 'nested'; structure: RecordStructure };
 
@@ -52,6 +75,7 @@ export type PrimitiveType = {
 
 export type FunctionType = {
 	kind: 'function';
+	// FIXME functions only have one param
 	params: Type[];
 	return: Type;
 	effects: Set<Effect>;
@@ -97,7 +121,7 @@ export type UnknownType = {
 };
 
 // New trait constraint types for Phase 1
-export type TraitConstraint = 
+export type TraitConstraint =
 	| { kind: 'implements'; trait: string }
 	| { kind: 'hasField'; field: string; fieldType: Type };
 
@@ -334,7 +358,12 @@ export interface ListExpression {
 export interface WhereExpression {
 	kind: 'where';
 	main: Expression;
-	definitions: (DefinitionExpression | TupleDestructuringExpression | RecordDestructuringExpression | MutableDefinitionExpression)[];
+	definitions: (
+		| DefinitionExpression
+		| TupleDestructuringExpression
+		| RecordDestructuringExpression
+		| MutableDefinitionExpression
+	)[];
 	type?: Type;
 	location: Location;
 }
@@ -358,16 +387,52 @@ export interface TypeDefinitionExpression {
 
 // Pattern in pattern matching
 export type Pattern =
-	| { kind: 'constructor'; name: string; args: Pattern[]; location: Location }
-	| { kind: 'variable'; name: string; location: Location }
-	| { kind: 'literal'; value: number | string | boolean; location: Location }
-	| { kind: 'wildcard'; location: Location }
-	| { kind: 'tuple'; elements: Pattern[]; location: Location }
-	| { kind: 'record'; fields: RecordPatternField[]; location: Location };
+	| ConstructorPattern
+	| VariablePattern
+	| LiteralPattern
+	| WildcardPattern
+	| TuplePattern
+	| RecordPattern;
+
+export interface ConstructorPattern {
+	kind: 'constructor';
+	name: string;
+	args: Pattern[];
+	location: Location;
+}
+
+export interface VariablePattern {
+	kind: 'variable';
+	name: string;
+	location: Location;
+}
+
+export interface LiteralPattern {
+	kind: 'literal';
+	value: number | string | boolean;
+	location: Location;
+}
+
+export interface WildcardPattern {
+	kind: 'wildcard';
+	location: Location;
+}
+
+export interface TuplePattern {
+	kind: 'tuple';
+	elements: Pattern[];
+	location: Location;
+}
+
+export interface RecordPattern {
+	kind: 'record';
+	fields: RecordPatternField[];
+	location: Location;
+}
 
 // Supporting type for record pattern fields
 export interface RecordPatternField {
-	fieldName: string;  // Without @ prefix
+	fieldName: string; // Without @ prefix
 	pattern: Pattern;
 	location: Location;
 }
@@ -385,16 +450,34 @@ export type RecordDestructuringPattern = {
 	location: Location;
 };
 
-export type DestructuringElement = 
+export type DestructuringElement =
 	| { kind: 'variable'; name: string; location: Location }
-	| { kind: 'nested-tuple'; pattern: TupleDestructuringPattern; location: Location }
-	| { kind: 'nested-record'; pattern: RecordDestructuringPattern; location: Location };
+	| {
+			kind: 'nested-tuple';
+			pattern: TupleDestructuringPattern;
+			location: Location;
+	  }
+	| {
+			kind: 'nested-record';
+			pattern: RecordDestructuringPattern;
+			location: Location;
+	  };
 
-export type RecordDestructuringField = 
-	| { kind: 'shorthand'; fieldName: string; location: Location }  // {@name} -> name
-	| { kind: 'rename'; fieldName: string; localName: string; location: Location }  // {@name userName} -> userName
-	| { kind: 'nested-tuple'; fieldName: string; pattern: TupleDestructuringPattern; location: Location }  // {@coords {x, y}}
-	| { kind: 'nested-record'; fieldName: string; pattern: RecordDestructuringPattern; location: Location }; // {@user {@name}}
+export type RecordDestructuringField =
+	| { kind: 'shorthand'; fieldName: string; location: Location } // {@name} -> name
+	| { kind: 'rename'; fieldName: string; localName: string; location: Location } // {@name userName} -> userName
+	| {
+			kind: 'nested-tuple';
+			fieldName: string;
+			pattern: TupleDestructuringPattern;
+			location: Location;
+	  } // {@coords {x, y}}
+	| {
+			kind: 'nested-record';
+			fieldName: string;
+			pattern: RecordDestructuringPattern;
+			location: Location;
+	  }; // {@user {@name}}
 
 // Pattern matching case
 export interface MatchCase {
@@ -621,16 +704,10 @@ export const hasFieldConstraint = (
 	fieldType,
 });
 
-export type HasConstraint = {
-	kind: 'has';
-	typeVar: string;
-	structure: RecordStructure;
-};
-
-export const hasConstraint = (
+export const hasStructureConstraint = (
 	typeVar: string,
 	structure: RecordStructure
-): HasConstraint => ({
+): HasStructureConstraint => ({
 	kind: 'has',
 	typeVar,
 	structure,

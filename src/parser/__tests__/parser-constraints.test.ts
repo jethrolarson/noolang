@@ -1,16 +1,19 @@
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../parser';
 import { test, expect } from 'bun:test';
-import { assertConstraintDefinitionExpression, assertImplementDefinitionExpression } from '../../../test/utils';
+import {
+	assertConstraintDefinitionExpression,
+	assertImplementDefinitionExpression,
+	assertVariantType,
+} from '../../../test/utils';
 
 test('should parse constraint definition', () => {
 	const lexer = new Lexer('constraint Show a ( show : a -> String )');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const constraintDef = assertConstraintDefinitionExpression(
-		program.statements[0]
-	);
+	const constraintDef = program.statements[0];
+	assertConstraintDefinitionExpression(constraintDef);
 	expect(constraintDef.name).toBe('Show');
 	expect(constraintDef.typeParams).toEqual(['a']);
 	expect(constraintDef.functions.length).toBe(1);
@@ -24,10 +27,11 @@ test('should parse implement definition', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const implDef = assertImplementDefinitionExpression(program.statements[0]);
+	const implDef = program.statements[0];
+	assertImplementDefinitionExpression(implDef);
 	expect(implDef.constraintName).toBe('Monad');
-	expect(implDef.typeExpr.kind).toBe('variant');
-	expect((implDef.typeExpr as any).name).toBe('Option');
+	assertVariantType(implDef.typeExpr);
+	expect(implDef.typeExpr.name).toBe('Option');
 	expect(implDef.implementations.length).toBe(2);
 	expect(implDef.implementations[0].name).toBe('return');
 	expect(implDef.implementations[1].name).toBe('bind');
@@ -38,9 +42,8 @@ test('should parse constraint with simple functions', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const constraintDef = assertConstraintDefinitionExpression(
-		program.statements[0]
-	);
+	const constraintDef = program.statements[0];
+	assertConstraintDefinitionExpression(constraintDef);
 	expect(constraintDef.name).toBe('Eq');
 	expect(constraintDef.typeParams).toEqual(['a']);
 	expect(constraintDef.functions.length).toBe(1);
@@ -54,9 +57,8 @@ test('should parse constraint definition with multiple type parameters', () => {
 	const program = parse(tokens);
 
 	expect(program.statements.length).toBe(1);
-	const constraintDef = assertConstraintDefinitionExpression(
-		program.statements[0]
-	);
+	const constraintDef = program.statements[0];
+	assertConstraintDefinitionExpression(constraintDef);
 	expect(constraintDef.name).toBe('Eq');
 	expect(constraintDef.typeParams).toEqual(['a', 'b']);
 	expect(constraintDef.functions.length).toBe(1);

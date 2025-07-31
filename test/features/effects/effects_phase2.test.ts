@@ -1,24 +1,10 @@
 // Phase 2 Effects System Tests
 // Testing separated effects in TypeResult and effect composition
 
-import { Lexer } from '../../../src/lexer/lexer';
-import { parse } from '../../../src/parser/parser';
-import {
-	typeProgram,
-	emptyEffects,
-	singleEffect,
-	unionEffects,
-} from '../../../src/typer';
+import { emptyEffects, singleEffect, unionEffects } from '../../../src/typer';
 import type { Effect } from '../../../src/ast';
-import { describe, test, expect } from 'bun:test';
-
-const runNoolang = (code: string) => {
-	const lexer = new Lexer(code);
-	const tokens = lexer.tokenize();
-	const program = parse(tokens);
-
-	return typeProgram(program);
-};
+import { test, expect } from 'bun:test';
+import { assertPrimitiveType, runCode } from '../../utils';
 
 // Test suite: Effects Phase 2: Separated Effects Architecture
 // Test suite: Effect Helper Functions
@@ -34,9 +20,9 @@ test('singleEffect creates single effect set', () => {
 });
 
 test('unionEffects combines multiple effect sets', () => {
-	const effects1 = singleEffect('read' as Effect);
-	const effects2 = singleEffect('log' as Effect);
-	const effects3 = new Set(['state', 'read'] as Effect[]); // includes duplicate 'read'
+	const effects1 = singleEffect('read');
+	const effects2 = singleEffect('log');
+	const effects3 = new Set<Effect>(['state', 'read']); // includes duplicate 'read'
 
 	const combined = unionEffects(effects1, effects2, effects3);
 	expect(combined.size).toBe(3);
@@ -47,174 +33,173 @@ test('unionEffects combines multiple effect sets', () => {
 
 // Test suite: Pure Expressions Return Empty Effects
 test('literals have no effects', () => {
-	const result = runNoolang('42');
-	expect(result.effects.size).toBe(0);
+	const result = runCode('42');
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 test('pure functions have no effects', () => {
-	const result = runNoolang('fn x => x + 1');
-	expect(result.effects.size).toBe(0);
+	const result = runCode('fn x => x + 1');
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 test('pure function application has no effects', () => {
-	const result = runNoolang('sum = fn x y => x + y; sum 2 3');
-	expect(result.effects.size).toBe(0);
+	const result = runCode('sum = fn x y => x + y; sum 2 3');
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 test('pure conditionals have no effects', () => {
-	const result = runNoolang('if True then 1 else 2');
-	expect(result.effects.size).toBe(0);
+	const result = runCode('if True then 1 else 2');
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 test('pure lists have no effects', () => {
-	const result = runNoolang('[1, 2, 3]');
-	expect(result.effects.size).toBe(0);
+	const result = runCode('[1, 2, 3]');
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 test('pure records have no effects', () => {
-	const result = runNoolang('{ @name "Alice", @age 30 }');
-	expect(result.effects.size).toBe(0);
+	const result = runCode('{ @name "Alice", @age 30 }');
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 test('pure tuples have no effects', () => {
-	const result = runNoolang('{1, 2, 3}');
-	expect(result.effects.size).toBe(0);
+	const result = runCode('{1, 2, 3}');
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 test('pure pattern matching has no effects', () => {
-	const result = runNoolang(`
+	const result = runCode(`
 				type Color = Red | Green | Blue;
 				color = Red;
 				match color with (Red => 1; Green => 2; Blue => 3)
 			`);
-	expect(result.effects.size).toBe(0);
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 // Test suite: Type System Returns TypeResult with Effects
 test('typeProgram returns TypeResult with type and effects', () => {
-	const result = runNoolang('42');
-	expect(result.hasOwnProperty('type')).toBeTruthy();
-	expect(result.hasOwnProperty('effects')).toBeTruthy();
-	expect(result.hasOwnProperty('state')).toBeTruthy();
-	expect(result.type.kind).toBe('primitive');
-	expect(result.effects instanceof Set).toBeTruthy();
+	const result = runCode('42');
+	expect(result).toHaveProperty('type');
+	expect(result).toHaveProperty('effects');
+	expect(result).toHaveProperty('state');
+	assertPrimitiveType(result.typeResult.type);
+	expect(result.typeResult.type.kind).toBe('primitive');
+	expect(result.typeResult.effects instanceof Set).toBeTruthy();
 });
 
 test('complex expressions return proper TypeResult structure', () => {
-	const result = runNoolang(`
+	const result = runCode(`
 				sum = fn x y => x + y;
 				mult = fn a b => a * b;
 				compute = fn x => sum (mult x 2) 3;
 				compute 5
 			`);
-	expect(result.type.kind).toBe('primitive');
-	if (result.type.kind === 'primitive') {
-		expect(result.type.name).toBe('Float');
-	}
-	expect(result.effects.size).toBe(0);
+	assertPrimitiveType(result.typeResult.type);
+	expect(result.typeResult.type.name).toBe('Float');
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 // Test suite: Effect Propagation in Sequences
 test('sequences collect effects from all statements', () => {
 	// Note: We don't have actual effectful built-ins yet, so this tests the infrastructure
-	const result = runNoolang('x = 1; y = 2; x + y');
-	expect(result.effects.size).toBe(0); // All pure operations
+	const result = runCode('x = 1; y = 2; x + y');
+	expect(result.typeResult.effects.size).toBe(0); // All pure operations
 });
 
 test('sequences with pure operations have no effects', () => {
-	const result = runNoolang(`
+	const result = runCode(`
 				a = 10;
 				b = 20;
 				c = 30;
 				a + b + c
 			`);
-	expect(result.effects.size).toBe(0);
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 // Test suite: Effect Propagation in Function Applications
 test('function application with pure function and pure arguments has no effects', () => {
-	const result = runNoolang(`
+	const result = runCode(`
 				sum = fn x y => x + y;
 				sum (1 + 2) (3 * 4)
 			`);
-	expect(result.effects.size).toBe(0);
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 test('curried function application propagates effects correctly', () => {
-	const result = runNoolang(`
+	const result = runCode(`
 				curry = fn f => fn x => fn y => f x y;
 				sum = fn x y => x + y;
 				curriedSum = curry sum;
 				curriedSum 1 2
 			`);
-	expect(result.effects.size).toBe(0);
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 // Test suite: Effect Propagation in Conditionals
 test('conditional with pure branches has no effects', () => {
-	const result = runNoolang(`
+	const result = runCode(`
 				condition = True;
 				if condition then 1 + 2 else 3 * 4
 			`);
-	expect(result.effects.size).toBe(0);
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 test('nested conditionals with pure expressions have no effects', () => {
-	const result = runNoolang(`
+	const result = runCode(`
 				x = 5;
 				if x > 0 then (if x > 10 then 100 else 50) else 0
 			`);
-	expect(result.effects.size).toBe(0);
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 // Test suite: Effect Propagation in Data Structures
 test('lists with pure elements have no effects', () => {
-	const result = runNoolang(`
+	const result = runCode(`
 				increment = fn x => x + 1;
 				[increment 1, increment 2, increment 3]
 			`);
-	expect(result.effects.size).toBe(0);
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 test('records with pure field values have no effects', () => {
-	const result = runNoolang(`
+	const result = runCode(`
 				compute = fn x => x * 2;
 				{ @a compute 5, @b compute 10 }
 			`);
-	expect(result.effects.size).toBe(0);
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 test('tuples with pure elements have no effects', () => {
-	const result = runNoolang(`
+	const result = runCode(`
 				double = fn x => x * 2;
 				{double 1, double 2, double 3}
 			`);
-	expect(result.effects.size).toBe(0);
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 // Test suite: Effect Propagation in Pipeline Operations
 test('pipeline with pure functions has no effects', () => {
-	const result = runNoolang(`
+	const result = runCode(`
 				double = fn x => x * 2;
 				add5 = fn x => x + 5;
 				compose = fn f => fn g => fn x => f (g x);
 				pipeline = compose add5 double;
 				pipeline 10
 			`);
-	expect(result.effects.size).toBe(0);
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 test('thrush operator with pure functions has no effects', () => {
-	const result = runNoolang(`
+	const result = runCode(`
 				double = fn x => x * 2;
 				10 | double
 			`);
-	expect(result.effects.size).toBe(0);
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 // Test suite: Effect Propagation in Pattern Matching
 test('pattern matching with pure cases has no effects', () => {
-	const result = runNoolang(`
+	const result = runCode(`
 				type Option a = Some a | None;
 				opt = Some 42;
 				match opt with (
@@ -222,11 +207,11 @@ test('pattern matching with pure cases has no effects', () => {
 					None => 0
 				)
 			`);
-	expect(result.effects.size).toBe(0);
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 test('nested pattern matching with pure expressions has no effects', () => {
-	const result = runNoolang(`
+	const result = runCode(`
 				type Result a b = Ok a | Err b;
 				type Option a = Some a | None;
 				
@@ -236,28 +221,28 @@ test('nested pattern matching with pure expressions has no effects', () => {
 					Err e => -1
 				)
 			`);
-	expect(result.effects.size).toBe(0);
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 // Test suite: Functions Inherit Effects from Body
 test('function with pure body has no effects', () => {
-	const result = runNoolang('fn x => x + 1');
-	expect(result.effects.size).toBe(0);
+	const result = runCode('fn x => x + 1');
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 test('function with complex pure body has no effects', () => {
-	const result = runNoolang(`
+	const result = runCode(`
 				fn x => if x > 0 then x * 2 else x + 1
 			`);
-	expect(result.effects.size).toBe(0);
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 test('function with pure function calls in body has no effects', () => {
-	const result = runNoolang(`
+	const result = runCode(`
 				helper = fn y => y * 3;
 				fn x => helper (x + 1)
 			`);
-	expect(result.effects.size).toBe(0);
+	expect(result.typeResult.effects.size).toBe(0);
 });
 
 // Test suite: Type System Architecture Validation
@@ -273,24 +258,24 @@ test('TypeResult structure is consistent across all expression types', () => {
 		{ code: 'if True then 1 else 2', expectedKind: 'primitive' },
 		{ code: '1 + 2', expectedKind: 'primitive' },
 		{ code: 'head [1, 2, 3]', expectedKind: 'variant' }, // Option type is variant
-	];
+	] as const;
 
 	for (const { code, expectedKind } of expressions) {
-		const result = runNoolang(code);
-		expect(result.hasOwnProperty('type')).toBeTruthy();
-		expect(result.hasOwnProperty('effects')).toBeTruthy();
-		expect(result.hasOwnProperty('state')).toBeTruthy();
-		expect(result.type.kind).toBe(expectedKind);
-		expect(result.effects instanceof Set).toBeTruthy();
+		const result = runCode(code);
+		expect(result).toHaveProperty('type');
+		expect(result).toHaveProperty('effects');
+		expect(result).toHaveProperty('state');
+		expect(result.typeResult.type.kind).toBe(expectedKind);
+		expect(result.typeResult.effects instanceof Set).toBeTruthy();
 	}
 });
 
 test('effects are properly typed as Set<Effect>', () => {
-	const result = runNoolang('42');
-	expect(result.effects instanceof Set).toBeTruthy();
+	const result = runCode('42');
+	expect(result.typeResult.effects instanceof Set).toBeTruthy();
 	// Verify we can use Set methods
-	expect(typeof result.effects.has).toBe('function');
-	expect(typeof result.effects.add).toBe('function');
-	expect(result.effects.size).toBe(0);
+	expect(typeof result.typeResult.effects.has).toBe('function');
+	expect(typeof result.typeResult.effects.add).toBe('function');
+	expect(result.typeResult.effects.size).toBe(0);
 });
 

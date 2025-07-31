@@ -109,12 +109,6 @@ filter = fn predicate lst => match lst with (
     Nil => Nil
 );
 
-# Fold (reduce) list from left
-foldLeft = fn f acc lst => match lst with (
-    Cons head tail => foldLeft f (f acc head) tail;
-    Nil => acc
-);
-
 # Append two lists
 append = fn list1 list2 => match list1 with (
     Cons head tail => Cons head (append tail list2);

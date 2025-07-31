@@ -1,19 +1,26 @@
 import { Lexer } from '../../lexer/lexer';
 import { parse, parseTypeExpression } from '../parser';
-import type { ConstrainedExpression, } from '../../ast';
-import {assertListType, assertFunctionType} from '../../../test/utils';
+import {
+	assertListType,
+	assertFunctionType,
+	assertConstrainedExpression,
+	assertImplementsConstraint,
+	assertOrConstraint,
+	assertTupleType,
+	assertVariableType,
+	assertVariantType,
+	assertVariableExpression,
+	assertPrimitiveType,
+	assertIsConstraint,
+	assertAndConstraint,
+	assertParenConstraint,
+} from '../../../test/utils';
 import type { ParseResult, ParseSuccess } from '../../parser/combinators';
 import { test, expect } from 'bun:test';
 
-// Helper functions for type-safe testing
-function assertConstrainedExpression(expr: any): ConstrainedExpression {
-	if (expr.kind !== 'constrained') {
-		throw new Error(`Expected constrained expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
-function assertParseSuccess<T>(result: ParseResult<T>): asserts result is ParseSuccess<T> {
+function assertParseSuccess<T>(
+	result: ParseResult<T>
+): asserts result is ParseSuccess<T> {
 	if (!result.success) {
 		throw new Error(`Expected parse success, got ${result.error}`);
 	}
@@ -24,8 +31,8 @@ test('Advanced Type Expressions - should parse Tuple type constructor', () => {
 	const tokens = lexer.tokenize();
 	const result = parseTypeExpression(tokens);
 	assertParseSuccess(result);
-	expect(result.value.kind).toBe('tuple');
-	const tupleConstructor = result.value as any;
+	assertTupleType(result.value);
+	const tupleConstructor = result.value;
 	expect(tupleConstructor.elements.length).toBe(3);
 });
 
@@ -44,8 +51,8 @@ test('Advanced Type Expressions - should parse List type with generic parameter'
 	assertParseSuccess(result);
 	assertListType(result.value);
 	const listType = result.value;
-	expect(listType.element.kind).toBe('variable');
-	expect((listType.element as any).name).toBe('a');
+	assertVariableType(listType.element);
+	expect(listType.element.name).toBe('a');
 });
 
 test('Advanced Type Expressions - should parse variant type with args', () => {
@@ -53,10 +60,10 @@ test('Advanced Type Expressions - should parse variant type with args', () => {
 	const tokens = lexer.tokenize();
 	const result = parseTypeExpression(tokens);
 	assertParseSuccess(result);
-	expect(result.value.kind).toBe('variant');
-	const variantType = result.value as any;
+	assertVariantType(result.value);
+	const variantType = result.value;
 	expect(variantType.name).toBe('Maybe');
-	expect(variantType.args.length).toBe(1);
+	assertVariableType(variantType.args[0]);
 });
 
 test('Constraint Expressions - should parse simple constraint expression', () => {
@@ -64,12 +71,13 @@ test('Constraint Expressions - should parse simple constraint expression', () =>
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const constrained = assertConstrainedExpression(program.statements[0]);
-	expect(constrained.expression.kind).toBe('variable');
-	expect(constrained.type.kind).toBe('primitive');
-	expect(constrained.constraint.kind).toBe('is');
-	expect((constrained.constraint as any).typeVar).toBe('a');
-	expect((constrained.constraint as any).constraint).toBe('Eq');
+	const constrained = program.statements[0];
+	assertConstrainedExpression(constrained);
+	assertVariableExpression(constrained.expression);
+	assertPrimitiveType(constrained.type);
+	assertIsConstraint(constrained.constraint);
+	expect(constrained.constraint.typeVar).toBe('a');
+	expect(constrained.constraint.constraint).toBe('Eq');
 });
 
 test('Constraint Expressions - should parse constraint with and operator', () => {
@@ -77,11 +85,12 @@ test('Constraint Expressions - should parse constraint with and operator', () =>
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const constrained = assertConstrainedExpression(program.statements[0]);
-	expect(constrained.constraint.kind).toBe('and');
-	const andConstraint = constrained.constraint as any;
-	expect(andConstraint.left.kind).toBe('is');
-	expect(andConstraint.right.kind).toBe('is');
+	const constrained = program.statements[0];
+	assertConstrainedExpression(constrained);
+	assertAndConstraint(constrained.constraint);
+	const andConstraint = constrained.constraint;
+	assertIsConstraint(andConstraint.left);
+	assertIsConstraint(andConstraint.right);
 });
 
 test('Constraint Expressions - should parse constraint with or operator', () => {
@@ -89,8 +98,9 @@ test('Constraint Expressions - should parse constraint with or operator', () => 
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const constrained = assertConstrainedExpression(program.statements[0]);
-	expect(constrained.constraint.kind).toBe('or');
+	const constrained = program.statements[0];
+	assertConstrainedExpression(constrained);
+	assertOrConstraint(constrained.constraint);
 });
 
 test('Constraint Expressions - should parse constraint with implements', () => {
@@ -98,9 +108,10 @@ test('Constraint Expressions - should parse constraint with implements', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const constrained = assertConstrainedExpression(program.statements[0]);
-	expect(constrained.constraint.kind).toBe('implements');
-	const implementsConstraint = constrained.constraint as any;
+	const constrained = program.statements[0];
+	assertConstrainedExpression(constrained);
+	assertImplementsConstraint(constrained.constraint);
+	const implementsConstraint = constrained.constraint;
 	expect(implementsConstraint.typeVar).toBe('a');
 	expect(implementsConstraint.interfaceName).toBe('Iterable');
 });
@@ -110,10 +121,11 @@ test('Constraint Expressions - should parse parenthesized constraint', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const constrained = assertConstrainedExpression(program.statements[0]);
-	expect(constrained.constraint.kind).toBe('or');
-	const orConstraint = constrained.constraint as any;
-	expect(orConstraint.left.kind).toBe('paren');
-	expect(orConstraint.right.kind).toBe('is');
+	const constrained = program.statements[0];
+	assertConstrainedExpression(constrained);
+	assertOrConstraint(constrained.constraint);
+	const orConstraint = constrained.constraint;
+	assertParenConstraint(orConstraint.left);
+	assertIsConstraint(orConstraint.right);
 });
 

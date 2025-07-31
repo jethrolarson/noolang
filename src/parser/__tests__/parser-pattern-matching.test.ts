@@ -1,28 +1,29 @@
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../parser';
-import type { MatchExpression } from '../../ast';
-import { describe, test, expect } from 'bun:test';
-
-// Helper function for type-safe testing
-function assertMatchExpression(expr: any): MatchExpression {
-	if (expr.kind !== 'match') {
-		throw new Error(`Expected match expression, got ${expr.kind}`);
-	}
-	return expr;
-}
+import { test, expect } from 'bun:test';
+import {
+	assertConstructorPattern,
+	assertLiteralExpression,
+	assertLiteralPattern,
+	assertMatchExpression,
+	assertVariableExpression,
+	assertVariablePattern,
+	assertWildcardPattern,
+} from '../../../test/utils';
 
 test('Pattern Matching - should parse simple match expression', () => {
 	const lexer = new Lexer('match x with ( True => 1; False => 0 )');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const matchExpr = assertMatchExpression(program.statements[0]);
-	expect(matchExpr.expression.kind).toBe('variable');
+	const matchExpr = program.statements[0];
+	assertMatchExpression(matchExpr);
+	assertVariableExpression(matchExpr.expression);
 	expect(matchExpr.cases.length).toBe(2);
-	expect(matchExpr.cases[0].pattern.kind).toBe('constructor');
-	expect((matchExpr.cases[0].pattern as any).name).toBe('True');
-	expect(matchExpr.cases[0].expression.kind).toBe('literal');
-	expect((matchExpr.cases[0].expression as any).value).toBe(1);
+	assertConstructorPattern(matchExpr.cases[0].pattern);
+	expect(matchExpr.cases[0].pattern.name).toBe('True');
+	assertLiteralExpression(matchExpr.cases[0].expression);
+	expect(matchExpr.cases[0].expression.value).toBe(1);
 });
 
 test('Pattern Matching - should parse match with variable patterns', () => {
@@ -30,12 +31,13 @@ test('Pattern Matching - should parse match with variable patterns', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const matchExpr = assertMatchExpression(program.statements[0]);
+	const matchExpr = program.statements[0];
+	assertMatchExpression(matchExpr);
 	expect(matchExpr.cases.length).toBe(2);
-	expect(matchExpr.cases[0].pattern.kind).toBe('constructor');
-	expect((matchExpr.cases[0].pattern as any).name).toBe('Some');
-	expect((matchExpr.cases[0].pattern as any).args.length).toBe(1);
-	expect((matchExpr.cases[0].pattern as any).args[0].kind).toBe('variable');
+	const case0 = matchExpr.cases[0];
+	assertConstructorPattern(case0.pattern);
+	expect(case0.pattern.name).toBe('Some');
+	assertVariablePattern(case0.pattern.args[0]);
 });
 
 test('Pattern Matching - should parse match with wildcard patterns', () => {
@@ -43,12 +45,13 @@ test('Pattern Matching - should parse match with wildcard patterns', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const matchExpr = assertMatchExpression(program.statements[0]);
+	const matchExpr = program.statements[0];
+	assertMatchExpression(matchExpr);
 	expect(matchExpr.cases.length).toBe(2);
-	expect(matchExpr.cases[0].pattern.kind).toBe('constructor');
-	// Note: _ is parsed as a variable pattern because it's an identifier in the lexer
-	expect(matchExpr.cases[1].pattern.kind).toBe('variable');
-	expect((matchExpr.cases[1].pattern as any).name).toBe('_');
+	const case0 = matchExpr.cases[0];
+	assertConstructorPattern(case0.pattern);
+	expect(case0.pattern.name).toBe('Some');
+	assertWildcardPattern(case0.pattern.args[0]);
 });
 
 test('Pattern Matching - should parse match with literal patterns', () => {
@@ -58,12 +61,13 @@ test('Pattern Matching - should parse match with literal patterns', () => {
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const matchExpr = assertMatchExpression(program.statements[0]);
+	const matchExpr = program.statements[0];
+	assertMatchExpression(matchExpr);
 	expect(matchExpr.cases.length).toBe(3);
-	expect(matchExpr.cases[0].pattern.kind).toBe('literal');
-	expect((matchExpr.cases[0].pattern as any).value).toBe(1);
-	expect(matchExpr.cases[1].pattern.kind).toBe('literal');
-	expect((matchExpr.cases[1].pattern as any).value).toBe('hello');
+	assertLiteralPattern(matchExpr.cases[0].pattern);
+	expect(matchExpr.cases[0].pattern.value).toBe(1);
+	assertLiteralPattern(matchExpr.cases[1].pattern);
+	expect(matchExpr.cases[1].pattern.value).toBe('hello');
 });
 
 test('Pattern Matching - should parse match with nested constructor patterns', () => {
@@ -71,13 +75,12 @@ test('Pattern Matching - should parse match with nested constructor patterns', (
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
-	const matchExpr = assertMatchExpression(program.statements[0]);
+	const matchExpr = program.statements[0];
+	assertMatchExpression(matchExpr);
 	expect(matchExpr.cases.length).toBe(2);
-	expect(matchExpr.cases[0].pattern.kind).toBe('constructor');
-	expect((matchExpr.cases[0].pattern as any).name).toBe('Wrap');
-	expect((matchExpr.cases[0].pattern as any).args.length).toBe(1);
-	const nestedPattern = (matchExpr.cases[0].pattern as any).args[0];
-	expect(nestedPattern.kind).toBe('constructor');
-	expect(nestedPattern.name).toBe('Value');
+	assertConstructorPattern(matchExpr.cases[0].pattern);
+	expect(matchExpr.cases[0].pattern.name).toBe('Wrap');
+	assertConstructorPattern(matchExpr.cases[0].pattern.args[0]);
+	expect(matchExpr.cases[0].pattern.args[0].name).toBe('Value');
 });
 

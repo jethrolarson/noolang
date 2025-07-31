@@ -15,10 +15,18 @@ constraint Add a (
   add : a -> a -> a
 );
 
-# Constraint for numeric operations (numbers only)
-constraint Numeric a (
-  subtract : a -> a -> a;
-  multiply : a -> a -> a;
+# Constraint for subtraction operation
+constraint Sub a (
+  subtract : a -> a -> a
+);
+
+# Constraint for multiplication operation
+constraint Mul a (
+  multiply : a -> a -> a
+);
+
+# Constraint for division operation (returns Option for safety)
+constraint Div a (
   divide : a -> a -> Option Float
 );
 
@@ -40,9 +48,16 @@ implement Add String (
   add = primitive_string_concat
 );
 
-implement Numeric Float (
-  subtract = primitive_float_subtract;
-  multiply = primitive_float_multiply;
+# Numeric operation implementations for Float
+implement Sub Float (
+  subtract = primitive_float_subtract
+);
+
+implement Mul Float (
+  multiply = primitive_float_multiply
+);
+
+implement Div Float (
   divide = primitive_float_divide
 );
 
@@ -248,11 +263,5 @@ implement Add List (
 # Constraint implementations for basic types
 # ========================================
 
-# Eq-like functions for basic types
-implement Eq Float (
-  equals = primitive_float_eq
-);
-
-implement Eq String (
-  equals = primitive_string_eq
-);
+# Note: Eq implementations are handled by built-in primitive functions
+# No need to duplicate them here

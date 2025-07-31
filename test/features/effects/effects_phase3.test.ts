@@ -3,16 +3,13 @@
 
 import { Lexer } from '../../../src/lexer/lexer';
 import { parse } from '../../../src/parser/parser';
-import { typeProgram } from '../../../src/typer';
+import { typeAndDecorate } from '../../../src/typer';
 import type { Effect } from '../../../src/ast';
-import { describe, test, expect } from 'bun:test';
+import { test, expect } from 'bun:test';
 
 const runNoolang = (code: string) => {
 	const lexer = new Lexer(code);
-	const tokens = lexer.tokenize();
-	const program = parse(tokens);
-
-	return typeProgram(program);
+	return typeAndDecorate(parse(lexer.tokenize()));
 };
 
 const expectEffects = (code: string, expectedEffects: Effect[]) => {
@@ -348,18 +345,18 @@ test('Effects Phase 3 - Effect System Architecture Validation - function returni
 
 test('Effects Phase 3 - Effect Type System Integration - TypeResult includes effects field for effectful expressions', () => {
 	const result = runNoolang('print 42');
-	expect(result.hasOwnProperty('type')).toBeTruthy();
-	expect(result.hasOwnProperty('effects')).toBeTruthy();
-	expect(result.hasOwnProperty('state')).toBeTruthy();
+	expect(result).toHaveProperty('type');
+	expect(result).toHaveProperty('effects');
+	expect(result).toHaveProperty('state');
 	expect(result.effects instanceof Set).toBeTruthy();
 	expect(result.effects.has('write')).toBeTruthy();
 });
 
 test('Effects Phase 3 - Effect Type System Integration - TypeResult includes effects field for pure expressions', () => {
 	const result = runNoolang('42');
-	expect(result.hasOwnProperty('type')).toBeTruthy();
-	expect(result.hasOwnProperty('effects')).toBeTruthy();
-	expect(result.hasOwnProperty('state')).toBeTruthy();
+	expect(result).toHaveProperty('type');
+	expect(result).toHaveProperty('effects');
+	expect(result).toHaveProperty('state');
 	expect(result.effects instanceof Set).toBeTruthy();
 	expect(result.effects.size).toEqual(0);
 });
