@@ -1,10 +1,8 @@
 import { Lexer } from '../../lexer/lexer';
 import { parse, parseTypeExpression } from '../parser';
-import { describe, test, expect } from 'bun:test';
+import { test, expect } from 'bun:test';
+import type { ParseResult, ParseSuccess, ParseError } from '../../parser/combinators';
 import type { 
-	ParseResult, 
-	ParseSuccess, 
-	ParseError,
 	BinaryExpression,
 	DefinitionExpression,
 	TypedExpression

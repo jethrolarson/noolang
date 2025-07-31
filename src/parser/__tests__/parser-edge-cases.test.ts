@@ -1,6 +1,7 @@
 import { Lexer } from '../../lexer/lexer';
 import { parse, parseTypeExpression } from '../parser';
-import type { ParseResult, ParseSuccess, ParseError, UnitExpression, ConstrainedExpression } from '../../ast';
+import type { ParseResult, ParseSuccess, ParseError } from '../../parser/combinators';
+import type { UnitExpression, ConstrainedExpression } from '../../ast';
 import { describe, test, expect } from 'bun:test';
 
 // Helper functions for type-safe testing
