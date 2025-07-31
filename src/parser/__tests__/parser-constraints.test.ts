@@ -1,24 +1,9 @@
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../parser';
-import type { ConstraintDefinitionExpression, ImplementDefinitionExpression } from '../../ast';
-import { describe, test, expect } from 'bun:test';
+import { test, expect } from 'bun:test';
+import { assertConstraintDefinitionExpression, assertImplementDefinitionExpression } from '../../../test/utils';
 
-// Helper functions for type-safe testing
-function assertConstraintDefinitionExpression(expr: any): ConstraintDefinitionExpression {
-	if (expr.kind !== 'constraint-definition') {
-		throw new Error(`Expected constraint definition expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
-function assertImplementDefinitionExpression(expr: any): ImplementDefinitionExpression {
-	if (expr.kind !== 'implement-definition') {
-		throw new Error(`Expected implement definition expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
-test('Constraint Definitions and Implementations - should parse constraint definition', () => {
+test('should parse constraint definition', () => {
 	const lexer = new Lexer('constraint Show a ( show : a -> String )');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
@@ -32,7 +17,7 @@ test('Constraint Definitions and Implementations - should parse constraint defin
 	expect(constraintDef.functions[0].name).toBe('show');
 });
 
-test('Constraint Definitions and Implementations - should parse implement definition', () => {
+test('should parse implement definition', () => {
 	const lexer = new Lexer(
 		'implement Monad Option ( return = Some; bind = fn opt f => match opt with ( Some x => f x; None => None ) )'
 	);
@@ -48,7 +33,7 @@ test('Constraint Definitions and Implementations - should parse implement defini
 	expect(implDef.implementations[1].name).toBe('bind');
 });
 
-test('Constraint Definitions and Implementations - should parse constraint with simple functions', () => {
+test('should parse constraint with simple functions', () => {
 	const lexer = new Lexer('constraint Eq a ( eq a : a -> a -> Bool )');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
@@ -63,7 +48,7 @@ test('Constraint Definitions and Implementations - should parse constraint with 
 	expect(constraintDef.functions[0].typeParams).toEqual(['a']);
 });
 
-test('Constraint Definitions and Implementations - should parse constraint definition with multiple type parameters', () => {
+test('should parse constraint definition with multiple type parameters', () => {
 	const lexer = new Lexer('constraint Eq a b ( eq : a -> b -> Bool )');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);

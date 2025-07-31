@@ -1,84 +1,23 @@
 import { Lexer } from '../../lexer/lexer';
 import { parse, parseTypeExpression } from '../parser';
-import { test, expect } from 'bun:test';
+import { describe, test, expect } from 'bun:test';
 import type { ParseResult, ParseSuccess, ParseError } from '../../parser/combinators';
-import type { 
-	BinaryExpression,
-	DefinitionExpression,
-	TypedExpression
-} from '../../ast';
+import type { BinaryExpression, DefinitionExpression, TypedExpression } from '../../ast';
+import { 
+	assertParseSuccess, 
+	assertParseError, 
+	assertRecordType, 
+	assertTupleType, 
+	assertListType, 
+	assertFunctionType, 
+	assertVariableType,
+	assertBinaryExpression,
+	assertDefinitionExpression,
+	assertTypedExpression,
+	assertFunctionExpression
+} from '../../../test/utils';
 
-// Helper functions for type-safe testing
-function assertParseSuccess<T>(result: ParseResult<T>): asserts result is ParseSuccess<T> {
-	if (!result.success) {
-		throw new Error(`Expected parse success, got ${result.error}`);
-	}
-}
-
-function assertParseError<T>(result: ParseResult<T>): asserts result is ParseError {
-	if (result.success) {
-		throw new Error(`Expected parse error, got success: (${JSON.stringify(result)})`);
-	}
-}
-
-function assertRecordType(type: any): void {
-	if (type.kind !== 'record') {
-		throw new Error(`Expected record type, got ${type.kind}`);
-	}
-}
-
-function assertTupleType(type: any): void {
-	if (type.kind !== 'tuple') {
-		throw new Error(`Expected tuple type, got ${type.kind}`);
-	}
-}
-
-function assertListType(type: any): void {
-	if (type.kind !== 'list') {
-		throw new Error(`Expected list type, got ${type.kind}`);
-	}
-}
-
-function assertFunctionType(type: any): void {
-	if (type.kind !== 'function') {
-		throw new Error(`Expected function type, got ${type.kind}`);
-	}
-}
-
-function assertVariableType(type: any): void {
-	if (type.kind !== 'variable') {
-		throw new Error(`Expected variable type, got ${type.kind}`);
-	}
-}
-
-function assertBinaryExpression(expr: any): BinaryExpression {
-	if (expr.kind !== 'binary') {
-		throw new Error(`Expected binary expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
-function assertDefinitionExpression(expr: any): DefinitionExpression {
-	if (expr.kind !== 'definition') {
-		throw new Error(`Expected definition expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
-function assertTypedExpression(expr: any): TypedExpression {
-	if (expr.kind !== 'typed') {
-		throw new Error(`Expected typed expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
-function assertFunctionExpression(expr: any): any {
-	if (expr.kind !== 'function') {
-		throw new Error(`Expected function expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
+// Helper functions for parsing
 function parseType(typeSrc: string) {
 	const lexer = new Lexer(typeSrc);
 	const tokens = lexer.tokenize();
