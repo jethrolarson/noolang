@@ -21,6 +21,7 @@ import type {
 	PrimitiveType,
 	VariantType,
 	Type,
+	Expression,
 } from '../src/ast';
 import type { Value } from '../src/evaluator/evaluator';
 import type {
@@ -29,50 +30,74 @@ import type {
 	ParseSuccess,
 } from '../src/parser/combinators';
 
-export const assertKind =
-	<T extends { kind: string }, K extends T['kind']>(expectedKind: K) =>
-	(value: T): asserts value is Extract<T, { kind: K }> => {
-		if (value.kind !== expectedKind) {
-			throw new Error(`Expected kind '${expectedKind}', got '${value.kind}'`);
-		}
-	};
 
-export const assertLiteralExpression = assertKind<LiteralExpression, 'literal'>(
-	'literal'
-);
-export const assertVariableExpression = assertKind<
-	VariableExpression,
-	'variable'
->('variable');
-export const assertFunctionExpression = assertKind<
-	FunctionExpression,
-	'function'
->('function');
-export const assertApplicationExpression = assertKind<
-	ApplicationExpression,
-	'application'
->('application');
-export const assertBinaryExpression = assertKind<BinaryExpression, 'binary'>(
-	'binary'
-);
-export const assertIfExpression = assertKind<IfExpression, 'if'>('if');
-export const assertRecordExpression = assertKind<RecordExpression, 'record'>(
-	'record'
-);
-export const assertAccessorExpression = assertKind<
-	AccessorExpression,
-	'accessor'
->('accessor');
 
-export const assertRecordType = assertKind<RecordType, 'record'>('record');
-export const assertTupleType = assertKind<TupleType, 'tuple'>('tuple');
-export const assertListType = assertKind<ListType, 'list'>('list');
-export const assertFunctionType = assertKind<FunctionType, 'function'>(
-	'function'
-);
-export const assertVariableType = assertKind<VariableType, 'variable'>(
-	'variable'
-);
+export function assertLiteralExpression(expression: Expression): asserts expression is LiteralExpression {
+	if (expression.kind !== 'literal') {
+		throw new Error(`Expected literal expression, got ${expression.kind}`);
+	}
+}
+export function assertVariableExpression(expression: Expression): asserts expression is VariableExpression {
+	if (expression.kind !== 'variable') {
+		throw new Error(`Expected variable expression, got ${expression.kind}`);
+	}
+}
+export function assertFunctionExpression(expression: Expression): asserts expression is FunctionExpression {
+	if (expression.kind !== 'function') {
+		throw new Error(`Expected function expression, got ${expression.kind}`);
+	}
+}
+export function assertApplicationExpression(expression: Expression): asserts expression is ApplicationExpression {
+	if (expression.kind !== 'application') {
+		throw new Error(`Expected application expression, got ${expression.kind}`);
+	}
+}
+export function assertBinaryExpression(expression: Expression): asserts expression is BinaryExpression {
+	if (expression.kind !== 'binary') {
+		throw new Error(`Expected binary expression, got ${expression.kind}`);
+	}
+}
+export function assertIfExpression(expression: Expression): asserts expression is IfExpression {
+	if (expression.kind !== 'if') {
+		throw new Error(`Expected if expression, got ${expression.kind}`);
+	}
+}
+export function assertRecordExpression(expression: Expression): asserts expression is RecordExpression {
+	if (expression.kind !== 'record') {
+		throw new Error(`Expected record expression, got ${expression.kind}`);
+	}
+}
+export function assertAccessorExpression(expression: Expression): asserts expression is AccessorExpression {
+	if (expression.kind !== 'accessor') {
+		throw new Error(`Expected accessor expression, got ${expression.kind}`);
+	}
+}
+
+export function assertRecordType(type: Type): asserts type is RecordType {
+	if (type.kind !== 'record') {
+		throw new Error(`Expected record type, got ${type.kind}`);
+	}
+}
+export function assertTupleType(type: Type): asserts type is TupleType {
+	if (type.kind !== 'tuple') {
+		throw new Error(`Expected tuple type, got ${type.kind}`);
+	}
+}
+export function assertListType(type: Type): asserts type is ListType {
+	if (type.kind !== 'list') {
+		throw new Error(`Expected list type, got ${type.kind}`);
+	}
+}
+export function assertFunctionType(type: Type): asserts type is FunctionType {
+	if (type.kind !== 'function') {
+		throw new Error(`Expected function type, got ${type.kind}`);
+	}
+}
+export function assertVariableType(type: Type): asserts type is VariableType {
+	if (type.kind !== 'variable') {
+		throw new Error(`Expected variable type, got ${type.kind}`);
+	}
+}
 export function assertConstrainedType(type: Type): asserts type is ConstrainedType {
 	if (type.kind !== "constrained") {
 		throw new Error(`Expected kind 'constrained', got '${type.kind}'`);
@@ -91,26 +116,31 @@ export function assertVariantType(type: Type): asserts type is VariantType {
 	}
 }
 
-export const assertDefinitionExpression = assertKind<
-	DefinitionExpression,
-	'definition'
->('definition');
-export const assertTypedExpression = assertKind<TypedExpression, 'typed'>(
-	'typed'
-);
-export const assertMatchExpression = assertKind<MatchExpression, 'match'>(
-	'match'
-);
-
-// Trait system expressions
-export const assertConstraintDefinitionExpression = assertKind<
-	ConstraintDefinitionExpression,
-	'constraint-definition'
->('constraint-definition');
-export const assertImplementDefinitionExpression = assertKind<
-	ImplementDefinitionExpression,
-	'implement-definition'
->('implement-definition');
+export function assertDefinitionExpression(expression: Expression): asserts expression is DefinitionExpression {
+	if (expression.kind !== 'definition') {
+		throw new Error(`Expected definition expression, got ${expression.kind}`);
+	}
+}
+export function assertTypedExpression(expression: Expression): asserts expression is TypedExpression {
+	if (expression.kind !== 'typed') {
+		throw new Error(`Expected typed expression, got ${expression.kind}`);
+	}
+}
+export function assertMatchExpression(expression: Expression): asserts expression is MatchExpression {
+	if (expression.kind !== 'match') {
+		throw new Error(`Expected match expression, got ${expression.kind}`);
+	}
+}
+export function assertConstraintDefinitionExpression(expression: Expression): asserts expression is ConstraintDefinitionExpression {
+	if (expression.kind !== 'constraint-definition') {
+		throw new Error(`Expected constraint definition expression, got ${expression.kind}`);
+	}
+}
+export function assertImplementDefinitionExpression(expression: Expression): asserts expression is ImplementDefinitionExpression {
+	if (expression.kind !== 'implement-definition') {
+		throw new Error(`Expected implement definition expression, got ${expression.kind}`);
+	}
+}
 
 // Other expressions - these would be added when the types exist in AST
 // export const assertTypeAliasExpression = assertKind<TypeAliasExpression, 'type-alias'>('type-alias');

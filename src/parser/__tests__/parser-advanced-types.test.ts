@@ -1,7 +1,9 @@
 import { Lexer } from '../../lexer/lexer';
 import { parse, parseTypeExpression } from '../parser';
-import type { ConstrainedExpression, ParseResult, ParseSuccess } from '../../ast';
-import { describe, test, expect } from 'bun:test';
+import type { ConstrainedExpression, } from '../../ast';
+import {assertListType, assertFunctionType} from '../../../test/utils';
+import type { ParseResult, ParseSuccess } from '../../parser/combinators';
+import { test, expect } from 'bun:test';
 
 // Helper functions for type-safe testing
 function assertConstrainedExpression(expr: any): ConstrainedExpression {
@@ -14,18 +16,6 @@ function assertConstrainedExpression(expr: any): ConstrainedExpression {
 function assertParseSuccess<T>(result: ParseResult<T>): asserts result is ParseSuccess<T> {
 	if (!result.success) {
 		throw new Error(`Expected parse success, got ${result.error}`);
-	}
-}
-
-function assertFunctionType(type: any): void {
-	if (type.kind !== 'function') {
-		throw new Error(`Expected function type, got ${type.kind}`);
-	}
-}
-
-function assertListType(type: any): void {
-	if (type.kind !== 'list') {
-		throw new Error(`Expected list type, got ${type.kind}`);
 	}
 }
 
