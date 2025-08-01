@@ -39,7 +39,6 @@ import type {
 	RecordPattern,
 	ConstrainedExpression,
 	ConstraintExpr,
-	Constraint,
 	ImplementsConstraint,
 	OrConstraintExpr,
 	AndConstraintExpr,
@@ -510,7 +509,9 @@ export function expectError(code: string, errorPattern?: RegExp | string) {
 		throw new Error('Expected error but code succeeded');
 	} catch (error) {
 		if (errorPattern) {
-			expect(error.message).toMatch(new RegExp(errorPattern, 'i'));
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
+			expect(errorMessage).toMatch(new RegExp(errorPattern, 'i'));
 		}
 	}
 }
@@ -570,28 +571,3 @@ export function assertRecordPattern(
 		throw new Error(`Expected record pattern, got ${pattern.kind}`);
 	}
 }
-
-// ===== Type System Constraint Assertions =====
-export function assertImplementsTypeConstraint(
-	constraint: Constraint
-): asserts constraint is ImplementsConstraint {
-	if (constraint.kind !== 'implements') {
-		throw new Error(
-			`Expected implements constraint, got ${constraint.kind}`
-		);
-	}
-}
-
-export function assertHasFieldTypeConstraint(
-	constraint: Constraint
-): asserts constraint is HasFieldConstraint {
-	if (constraint.kind !== 'hasField') {
-		throw new Error(
-			`Expected has field constraint, got ${constraint.kind}`
-		);
-	}
-}
-
-// Legacy function names for backward compatibility
-export const assertImplementsTraitConstraint = assertImplementsTypeConstraint;
-export const assertHasFieldTraitConstraint = assertHasFieldTypeConstraint;

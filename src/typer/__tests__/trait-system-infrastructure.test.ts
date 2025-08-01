@@ -3,7 +3,7 @@ import {
 	assertBinaryExpression,
 	assertFunctionType,
 	assertImplementDefinitionExpression,
-	assertImplementsTypeConstraint,
+	assertImplementsConstraint,
 	assertPrimitiveType,
 	parseAndType,
 } from '../../../test/utils';
@@ -371,9 +371,9 @@ test('Trait System Phase 1 Infrastructure - Conditional Implementations (Given C
 	assertImplementDefinitionExpression(implementStmt);
 	expect(implementStmt.constraintName).toBe('Show2');
 	expect(implementStmt.givenConstraints).toBeTruthy();
-	assertImplementsTypeConstraint(implementStmt.givenConstraints!);
-	expect(implementStmt.givenConstraints.typeVar).toBe('a');
-	expect(implementStmt.givenConstraints.interfaceName).toBe('Show2');
+	assertImplementsConstraint(implementStmt.givenConstraints!);
+	expect(implementStmt.givenConstraints!.typeVar).toBe('a');
+	expect(implementStmt.givenConstraints!.interfaceName).toBe('Show2');
 });
 
 test('Trait System Phase 1 Infrastructure - Conditional Implementations (Given Constraints) - should validate given constraints are satisfied during implementation', () => {

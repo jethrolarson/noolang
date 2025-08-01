@@ -6,7 +6,7 @@ import {
 	assertVariantType,
 	parseAndType,
 	assertConstrainedType,
-	assertImplementsTraitConstraint,
+	assertImplementsConstraint,
 } from '../../../test/utils';
 
 test('built-in equality operator returns Bool type', () => {
@@ -76,15 +76,15 @@ test.skip('should infer Eq constraint for equality operator usage', () => {
 
 	// Should create a constrained type with Eq constraint
 	assertConstrainedType(typeResult.type);
-	assertImplementsTraitConstraint(typeResult.type.constraints.get('Eq')![0]);
+	assertImplementsConstraint(typeResult.type.constraints.get('Eq')![0]);
 
 	// Check that the constraint is for Eq trait
 	const constraintEntries = Array.from(typeResult.type.constraints.entries());
 	expect(constraintEntries.length).toBeGreaterThan(0);
 
 	const constraint = constraintEntries[0][1][0];
-	assertImplementsTraitConstraint(constraint);
-	expect(constraint.trait).toBe('Eq');
+	assertImplementsConstraint(constraint);
+	expect(constraint.interfaceName).toBe('Eq');
 });
 
 test.skip('should infer Add constraint for addition operator usage', () => {
@@ -98,8 +98,8 @@ test.skip('should infer Add constraint for addition operator usage', () => {
 	expect(constraintEntries.length).toBeGreaterThan(0);
 
 	const constraint = constraintEntries[0][1][0];
-	assertImplementsTraitConstraint(constraint);
-	expect(constraint.trait).toBe('Add');
+	assertImplementsConstraint(constraint);
+	expect(constraint.interfaceName).toBe('Add');
 });
 
 test('should not infer constraints when no operators are used', () => {
@@ -123,8 +123,8 @@ test.skip('should infer constraints in if expressions', () => {
 
 	const constraints = constraintEntries[0][1];
 	const traitNames = constraints.map(c => {
-		assertImplementsTraitConstraint(c);
-		return c.trait;
+		assertImplementsConstraint(c);
+		return c.interfaceName;
 	});
 	expect(traitNames).toContain('Eq');
 	expect(traitNames).toContain('Add');
@@ -147,8 +147,8 @@ test.skip('should infer constraints in where expressions', () => {
 
 	const constraints = constraintEntries[0][1];
 	const traitNames = constraints.map(c => {
-		assertImplementsTraitConstraint(c);
-		return c.trait;
+		assertImplementsConstraint(c);
+		return c.interfaceName;
 	});
 	expect(traitNames).toContain('Add');
 	expect(traitNames).toContain('Eq');
@@ -166,8 +166,8 @@ test.skip('should infer constraints for arithmetic operators', () => {
 
 	const constraints = constraintEntries[0][1];
 	const traitNames = constraints.map(c => {
-		assertImplementsTraitConstraint(c);
-		return c.trait;
+		assertImplementsConstraint(c);
+		return c.interfaceName;
 	});
 	expect(traitNames).toContain('Sub');
 	expect(traitNames).toContain('Mul');
@@ -209,8 +209,8 @@ test.skip('should handle complex nested expressions', () => {
 
 	const constraints = constraintEntries[0][1];
 	const traitNames = constraints.map(c => {
-		assertImplementsTraitConstraint(c);
-		return c.trait;
+		assertImplementsConstraint(c);
+		return c.interfaceName;
 	});
 	expect(traitNames).toContain('Add');
 	expect(traitNames).toContain('Eq');

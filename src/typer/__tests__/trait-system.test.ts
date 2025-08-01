@@ -27,7 +27,7 @@ import {
 	assertUnitType,
 	assertListType,
 	runCode,
-	assertImplementsTraitConstraint,
+	assertImplementsConstraint,
 } from '../../../test/utils';
 import { createNumber } from '../../evaluator/evaluator';
 // ================================================================
@@ -424,8 +424,8 @@ test.skip('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - 
 	const typeResult = parseAndType(code);
 	assertConstrainedType(typeResult.type);
 	const constraint = Array.from(typeResult.type.constraints.values())[0][0];
-	assertImplementsTraitConstraint(constraint);
-	expect(constraint.trait).toBe('Functor');
+	assertImplementsConstraint(constraint);
+	expect(constraint.interfaceName).toBe('Functor');
 	assertFunctionType(typeResult.type.baseType);
 	assertPrimitiveType(typeResult.type.baseType.return);
 	expect(typeResult.type.baseType.return.name).toBe('Float');

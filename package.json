@@ -12,6 +12,7 @@
     "test:watch": "bun test --watch",
     "test:bail": "CLAUDECODE=1 bun test --bail",
     "typecheck": "tsc --noEmit",
+    "typecheck:test": "tsc --noEmit --project tsconfig.test.json",
     "typecheck:all": "npm run typecheck",
     "lint": "npx eslint src/**/*.ts",
     "lint:fix": "npx eslint src/**/*.ts --fix",
