@@ -120,12 +120,12 @@ export type UnknownType = {
 	kind: 'unknown';
 };
 
-// Legacy TraitConstraint types removed - use modern Constraint system instead
+// ConstrainedType uses the modern Constraint system
 
 export type ConstrainedType = {
 	kind: 'constrained';
 	baseType: Type;
-	constraints: Map<string, Constraint[]>; // variable name -> constraints (legacy format)
+	constraints: Map<string, Constraint[]>; // variable name -> constraints
 };
 
 export type Type =

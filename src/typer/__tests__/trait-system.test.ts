@@ -403,8 +403,8 @@ test('Trait System - Consolidated Tests - Phase 3: Constraint Resolution - Basic
 		assertConstrainedType(typeResult.type);
 		expect(typeResult.type.constraints.size).toBe(1);
 		const constraint = Array.from(typeResult.type.constraints.values())[0][0];
-		expect(constraint.kind).toBe('implements');
-		expect((constraint as any).trait).toBe('Monad');
+		assertImplementsConstraint(constraint);
+		expect(constraint.interfaceName).toBe('Monad');
 	} else {
 		// Modern constraint system - no constraints on this specific call
 		// since 'pure 42' resolves to a concrete variant type

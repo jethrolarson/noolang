@@ -111,16 +111,13 @@ export function tryResolveConstraints(
 					let hasAllFields = true;
 					const substitution = new Map(state.substitution);
 					
-					for (const [fieldName, fieldType] of Object.entries(requiredStructure.fields)) {
+					for (const fieldName of Object.keys(requiredStructure.fields)) {
 						// Normalize field names - remove @ prefix if it exists
 						const normalizedFieldName = fieldName.startsWith('@') ? fieldName.slice(1) : fieldName;
 						if (!(normalizedFieldName in argType.fields)) {
 							hasAllFields = false;
 							break;
 						}
-						// The actual field type in the record satisfies the constraint
-						const actualFieldType = argType.fields[normalizedFieldName];
-						// For now, assume any type is acceptable for structural matching
 					}
 					
 					if (hasAllFields) {
@@ -343,17 +340,15 @@ export const typeApplication = (
 	let actualFuncType = funcType;
 	let functionConstraints: Constraint[] | undefined;
 
-	// If it's a constrained type, extract the base type and constraints (legacy system)
+	// If it's a constrained type, extract the base type and constraints
 	if (funcType.kind === 'constrained') {
 		actualFuncType = funcType.baseType;
-		// Convert legacy TraitConstraint system to modern Constraint system  
+		// Extract constraints from ConstrainedType  
 		functionConstraints = [];
 		for (const [typeVar, traitConstraints] of funcType.constraints.entries()) {
 			for (const traitConstraint of traitConstraints) {
 				if (traitConstraint.kind === 'implements') {
-					// Convert legacy trait constraint to modern constraint
-					const traitName = (traitConstraint as any).trait; // Legacy format
-					functionConstraints.push(implementsConstraint(typeVar, traitName));
+					functionConstraints.push(implementsConstraint(typeVar, traitConstraint.interfaceName));
 				} else if (traitConstraint.kind === 'hasField') {
 					// Convert hasField trait constraint to modern hasField constraint
 					functionConstraints.push({
@@ -450,8 +445,8 @@ export const typeApplication = (
 							constraints: (returnType.constraints || []).concat(functionConstraints)
 						};
 					} else {
-						// For non-function types, we might need to create a constrained type (keeping legacy for now)
-						// This should be rare - most constraint resolution happens on function types
+						// For non-function types, just return the type as-is
+						// Constraint resolution for non-function return types is handled elsewhere
 						finalReturnType = returnType;
 					}
 				}

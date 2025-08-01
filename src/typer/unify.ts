@@ -885,8 +885,7 @@ function unifyConstrainedWithConcrete(
 	for (const [varName, constraints] of constrainedType.constraints) {
 		for (const constraint of constraints) {
 			if (constraint.kind === 'implements') {
-				// Handle both legacy and modern constraint formats
-			const traitName = (constraint as any).trait || constraint.interfaceName;
+			const traitName = constraint.interfaceName;
 
 				// Check if we have an implementation of this trait for the concrete type
 				const traitRegistry = state.traitRegistry;

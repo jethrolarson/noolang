@@ -103,7 +103,6 @@ export const typeLiteral = (
 	}
 };
 
-// TODO break this up
 // Type inference for variables
 export const typeVariableExpr = (
 	expr: VariableExpression,
@@ -457,14 +456,11 @@ const collectFreeVars = (
 	return freeVars;
 };
 
-// Update typeFunction to use closure culling
-export const typeFunction = (
+// Helper: Create function environment with closure culling
+function createFunctionEnvironment(
 	expr: FunctionExpression,
 	state: TypeState
-): TypeResult => {
-	const originalBody = expr.body;
-	let currentState = state;
-
+): Map<string, TypeScheme> {
 	// Collect free variables used in the function body
 	const boundParams = new Set(expr.params);
 	const freeVars = collectFreeVars(expr.body, boundParams);
@@ -474,61 +470,18 @@ export const typeFunction = (
 
 	// Always include built-ins and stdlib essentials
 	const essentials = [
-		'+',
-		'-',
-		'*',
-		'/',
-		'==',
-		'!=',
-		'<',
-		'>',
-		'<=',
-		'>=',
-		'|',
-		'|>',
-		'<|',
-		';',
-		'$',
-		'if',
-		'length',
-		'head',
-		'tail',
-		'map',
-		'filter',
-		'reduce',
-		'isEmpty',
-		'append',
-		'concat',
-		'toString',
-		'abs',
-		'max',
-		'min',
-		'print',
-		'println',
-		'readFile',
-		'writeFile',
-		'log',
-		'random',
-		'randomRange',
-		'mutSet',
-		'mutGet',
-		'hasKey',
-		'hasValue',
-		'set',
-		'tupleLength',
-		'tupleIsEmpty',
-		'list_get',
-		'True',
-		'False',
-		'None',
-		'Some',
-		'Ok',
-		'Err',
-		'Bool',
-		'Option',
-		'Result',
-		'not', // Add not to essentials for Bool operations
+		'+', '-', '*', '/', '==', '!=', '<', '>', '<=', '>=',
+		'|', '|>', '<|', ';', '$', 'if',
+		'length', 'head', 'tail', 'map', 'filter', 'reduce',
+		'isEmpty', 'append', 'concat', 'toString',
+		'abs', 'max', 'min', 'print', 'println',
+		'readFile', 'writeFile', 'log', 'random', 'randomRange',
+		'mutSet', 'mutGet', 'hasKey', 'hasValue', 'set',
+		'tupleLength', 'tupleIsEmpty', 'list_get',
+		'True', 'False', 'None', 'Some', 'Ok', 'Err',
+		'Bool', 'Option', 'Result', 'not'
 	];
+
 	for (const essential of essentials) {
 		if (state.environment.has(essential)) {
 			functionEnv.set(essential, state.environment.get(essential)!);
@@ -542,9 +495,19 @@ export const typeFunction = (
 		}
 	}
 
-	currentState = { ...currentState, environment: functionEnv };
+	return functionEnv;
+}
 
+// Helper: Create parameter types and type function body
+function createParameterTypesAndTypeBody(
+	expr: FunctionExpression,
+	functionEnv: Map<string, TypeScheme>,
+	state: TypeState
+): { paramTypes: Type[]; bodyResult: TypeResult; currentState: TypeState } {
+	let currentState = { ...state, environment: functionEnv };
 	const paramTypes: Type[] = [];
+
+	// Create parameter types
 	for (const param of expr.params) {
 		const [paramType, nextState] = freshTypeVariable(currentState);
 		functionEnv.set(param, { type: paramType, quantifiedVars: [] });
@@ -559,80 +522,125 @@ export const typeFunction = (
 	// Restore the original environment for the outer scope
 	currentState = { ...currentState, environment: state.environment };
 
-	// Collect implicit constraints from the original function body (not the typed one!)
-	const implicitConstraints = collectImplicitConstraints(
-		bodyResult.type,
-		paramTypes,
-		currentState,
-		originalBody, // <-- Use original AST here
-		expr.params // Pass the parameter names
-	);
+	return { paramTypes, bodyResult, currentState };
+}
 
-	// Special handling for constrained function bodies
+// Helper: Handle constrained function bodies
+function handleConstrainedFunctionBody(
+	expr: FunctionExpression,
+	paramTypes: Type[],
+	bodyResult: TypeResult,
+	implicitConstraints: Constraint[]
+): Type {
+	const constrainedBody = expr.body;
+	if (constrainedBody.kind !== 'constrained') {
+		throw new Error('handleConstrainedFunctionBody called with non-constrained body');
+	}
+
+	const constraints = flattenConstraintExpr(constrainedBody.constraint);
 	let funcType: Type;
 
-	if (expr.body.kind === 'constrained') {
-		const constrainedBody = expr.body;
-		const constraints = flattenConstraintExpr(constrainedBody.constraint);
+	// If the constrained body has an explicit function type, use it as the innermost type
+	if (constrainedBody.type.kind === 'function') {
+		funcType = constrainedBody.type;
 
-		// If the constrained body has an explicit function type, use it as the innermost type
-		if (constrainedBody.type.kind === 'function') {
-			funcType = constrainedBody.type;
+		// Apply constraints to this function type
+		if (constraints.length > 0) {
+			funcType.constraints = constraints;
+			// Store the original constraint expression for display purposes
+			funcType.originalConstraint = constrainedBody.constraint;
 
-			// Apply constraints to this function type
-			if (constraints.length > 0) {
-				funcType.constraints = constraints;
-				// Store the original constraint expression for display purposes
-				funcType.originalConstraint = constrainedBody.constraint;
-
-				// CRITICAL: Also propagate constraints to type variables in parameters
-				// This ensures constraint validation works during function application
-				for (const constraint of constraints) {
-					if (constraint.kind === 'is') {
-						propagateConstraintToTypeVariable(funcType, constraint);
-					}
+			// CRITICAL: Also propagate constraints to type variables in parameters
+			// This ensures constraint validation works during function application
+			for (const constraint of constraints) {
+				if (constraint.kind === 'is') {
+					propagateConstraintToTypeVariable(funcType, constraint);
 				}
 			}
+		}
 
-			// If we have more parameters than the explicit type accounts for, wrap it
-			const explicitParamCount = countFunctionParams(constrainedBody.type);
-			const actualParamCount = paramTypes.length;
-			if (actualParamCount > explicitParamCount) {
-				// Wrap the explicit function type with additional parameter layers
-				for (let i = actualParamCount - explicitParamCount - 1; i >= 0; i--) {
-					funcType = functionType([paramTypes[i]], funcType);
-				}
-			}
-		} else {
-			// Build function type normally and apply constraints
-			funcType = bodyResult.type;
-			for (let i = paramTypes.length - 1; i >= 0; i--) {
+		// If we have more parameters than the explicit type accounts for, wrap it
+		const explicitParamCount = countFunctionParams(constrainedBody.type);
+		const actualParamCount = paramTypes.length;
+		if (actualParamCount > explicitParamCount) {
+			// Wrap the explicit function type with additional parameter layers
+			for (let i = actualParamCount - explicitParamCount - 1; i >= 0; i--) {
 				funcType = functionType([paramTypes[i]], funcType);
-			}
-			const allConstraints = [...constraints, ...implicitConstraints];
-			if (allConstraints.length > 0 && funcType.kind === 'function') {
-				funcType.constraints = allConstraints;
 			}
 		}
 	} else {
-		// Build the function type normally
+		// Build function type normally and apply constraints
 		funcType = bodyResult.type;
 		for (let i = paramTypes.length - 1; i >= 0; i--) {
 			funcType = functionType([paramTypes[i]], funcType);
 		}
-		// Apply implicit constraints even when there are no explicit constraints
-		if (implicitConstraints.length > 0 && funcType.kind === 'function') {
-			// Only apply constraints if the function has type variables (is polymorphic)
-			const hasTypeVariables = paramTypes.some(
-				paramType => paramType.kind === 'variable'
-			);
-
-			if (hasTypeVariables) {
-				// Attach constraints directly to the function type
-				funcType.constraints = implicitConstraints;
-			}
+		const allConstraints = [...constraints, ...implicitConstraints];
+		if (allConstraints.length > 0 && funcType.kind === 'function') {
+			funcType.constraints = allConstraints;
 		}
 	}
+
+	return funcType;
+}
+
+// Helper: Build normal function type
+function buildNormalFunctionType(
+	paramTypes: Type[],
+	bodyResult: TypeResult,
+	implicitConstraints: Constraint[]
+): Type {
+	// Build the function type normally
+	let funcType = bodyResult.type;
+	for (let i = paramTypes.length - 1; i >= 0; i--) {
+		funcType = functionType([paramTypes[i]], funcType);
+	}
+
+	// Apply implicit constraints even when there are no explicit constraints
+	if (implicitConstraints.length > 0 && funcType.kind === 'function') {
+		// Only apply constraints if the function has type variables (is polymorphic)
+		const hasTypeVariables = paramTypes.some(
+			paramType => paramType.kind === 'variable'
+		);
+
+		if (hasTypeVariables) {
+			// Attach constraints directly to the function type
+			funcType.constraints = implicitConstraints;
+		}
+	}
+
+	return funcType;
+}
+
+// Main function type inference (now much more focused)
+export const typeFunction = (
+	expr: FunctionExpression,
+	state: TypeState
+): TypeResult => {
+	const originalBody = expr.body;
+
+	// 1. Create function environment with closure culling
+	const functionEnv = createFunctionEnvironment(expr, state);
+
+	// 2. Create parameter types and type the body
+	const { paramTypes, bodyResult, currentState } = createParameterTypesAndTypeBody(
+		expr,
+		functionEnv,
+		state
+	);
+
+	// 3. Collect implicit constraints from the original function body
+	const implicitConstraints = collectImplicitConstraints(
+		bodyResult.type,
+		paramTypes,
+		currentState,
+		originalBody,
+		expr.params
+	);
+
+	// 4. Build function type based on whether body is constrained
+	const funcType = expr.body.kind === 'constrained'
+		? handleConstrainedFunctionBody(expr, paramTypes, bodyResult, implicitConstraints)
+		: buildNormalFunctionType(paramTypes, bodyResult, implicitConstraints);
 
 	return createTypeResult(funcType, bodyResult.effects, currentState);
 };

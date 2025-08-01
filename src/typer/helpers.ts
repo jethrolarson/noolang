@@ -219,10 +219,7 @@ const typesEqualUncached = (t1: Type, t2: Type): boolean => {
 					const c2 = constraints2[i];
 					if (c1.kind !== c2.kind) return false;
 					if (c1.kind === 'implements' && c2.kind === 'implements') {
-						// Compare interface names in modern constraint format
-					const trait1 = (c1 as any).trait || c1.interfaceName;
-					const trait2 = (c2 as any).trait || c2.interfaceName;
-					if (trait1 !== trait2) return false;
+						if (c1.interfaceName !== c2.interfaceName) return false;
 					} else if (c1.kind === 'hasField' && c2.kind === 'hasField') {
 						if (
 							c1.field !== c2.field ||
@@ -475,7 +472,7 @@ export const typeToString = (
 				return '{}';
 			case 'constrained': {
 				// Show base type with constraints
-				const constrainedType = t as ConstrainedType;
+				const constrainedType: ConstrainedType = t;
 
 				const baseStr = norm(constrainedType.baseType);
 				if (constrainedType.constraints.size === 0) {
@@ -485,9 +482,9 @@ export const typeToString = (
 				for (const [varName, constraints] of constrainedType.constraints) {
 					for (const constraint of constraints) {
 						if (constraint.kind === 'implements') {
-							// Handle both legacy and modern constraint formats
-						const traitName = (constraint as any).trait || (constraint as any).interfaceName;
-						constraintStrs.push(`${varName} implements ${traitName}`);
+							constraintStrs.push(
+								`${varName} implements ${constraint.interfaceName}`
+							);
 						} else if (constraint.kind === 'hasField') {
 							constraintStrs.push(
 								`${varName} has ${constraint.field}: ${norm(constraint.fieldType)}`
@@ -628,14 +625,17 @@ export const occursIn = (varName: string, type: Type): boolean => {
 		case 'variant':
 			return type.args.some(arg => occursIn(varName, arg));
 		case 'constrained': {
-			const constrainedType = type as ConstrainedType;
-			return occursIn(varName, constrainedType.baseType) ||
-				Array.from(constrainedType.constraints.values()).flat().some(constraint => {
-					if (constraint.kind === 'hasField') {
-						return occursIn(varName, constraint.fieldType);
-					}
-					return false;
-				});
+			return (
+				occursIn(varName, type.baseType) ||
+				Array.from(type.constraints.values())
+					.flat()
+					.some(constraint => {
+						if (constraint.kind === 'hasField') {
+							return occursIn(varName, constraint.fieldType);
+						}
+						return false;
+					})
+			);
 		}
 		default:
 			return false;
