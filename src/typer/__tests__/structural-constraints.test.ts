@@ -278,11 +278,6 @@ test('Structural Constraints with `has` keyword - Nested Structure Fields - shou
 			: a -> String given a has {@user {@name String, @age Float}}
 	`);
 
-	console.log(
-		'DEBUG: Nested structure test result:',
-		JSON.stringify(result.type, null, 2)
-	);
-
 	assertFunctionType(result.type);
 	const functionType = result.type;
 

@@ -11,7 +11,6 @@ import {
 	type ConstrainedType,
 	type UnionType,
 	type VariantType,
-	ConstraintExpr,
 	Constraint,
 	IsConstraint,
 	HasFieldConstraint,
@@ -382,31 +381,33 @@ export const typeToString = (
 	substitution: Map<string, Type> = new Map(),
 	showConstraints: boolean = true
 ): string => {
-	const greek = [
-		'α',
-		'β',
-		'γ',
-		'δ',
-		'ε',
-		'ζ',
-		'η',
-		'θ',
-		'ι',
-		'κ',
-		'λ',
-		'μ',
-		'ν',
-		'ξ',
-		'ο',
-		'π',
-		'ρ',
-		'σ',
-		'τ',
-		'υ',
-		'φ',
-		'χ',
-		'ψ',
-		'ω',
+	const latin = [
+		'a',
+		'b',
+		'c',
+		'd',
+		'e',
+		'f',
+		'g',
+		'h',
+		'i',
+		'j',
+		'k',
+		'l',
+		'm',
+		'n',
+		'o',
+		'p',
+		'q',
+		'r',
+		's',
+		't',
+		'u',
+		'v',
+		'w',
+		'x',
+		'y',
+		'z',
 	];
 	const mapping = new Map<string, string>();
 	let next = 0;
@@ -473,7 +474,7 @@ export const typeToString = (
 					if (t.name.length === 1 && /^[a-z]$/.test(t.name)) {
 						mapping.set(t.name, t.name);
 					} else {
-						mapping.set(t.name, greek[next] || `t${next}`);
+						mapping.set(t.name, latin[next] || `t${next}`);
 						next++;
 					}
 				}
@@ -553,7 +554,7 @@ export const typeToString = (
 			if (typeVar.length === 1 && /^[a-z]$/.test(typeVar)) {
 				mapping.set(typeVar, typeVar);
 			} else {
-				mapping.set(typeVar, greek[next] || `t${next}`);
+				mapping.set(typeVar, latin[next] || `t${next}`);
 				next++;
 			}
 		}
@@ -611,29 +612,6 @@ export const typeToString = (
 					.map(norm)
 					.join(' ')}`;
 			}
-			default:
-				return 'unknown constraint';
-		}
-	}
-
-	function formatConstraintExpr(expr: ConstraintExpr): string {
-		switch (expr.kind) {
-			case 'is':
-			case 'hasField':
-			case 'implements':
-			case 'custom':
-			case 'has':
-				return formatConstraint(expr);
-			case 'and':
-				return `${formatConstraintExpr(expr.left)} and ${formatConstraintExpr(
-					expr.right
-				)}`;
-			case 'or':
-				return `${formatConstraintExpr(expr.left)} or ${formatConstraintExpr(
-					expr.right
-				)}`;
-			case 'paren':
-				return `(${formatConstraintExpr(expr.expr)})`;
 			default:
 				return 'unknown constraint';
 		}

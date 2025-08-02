@@ -36,6 +36,50 @@ import {
 	isTraitFunction,
 	getTraitFunctionInfo,
 } from './trait-system';
+import type { RecordStructure } from '../ast';
+
+// Helper function to resolve nested structure constraints recursively
+function resolveNestedStructure(
+	actualRecord: Type & { kind: 'record' },
+	nestedStructure: RecordStructure,
+	currentSubstitution: Map<string, Type>
+): Map<string, Type> | null {
+	const result = new Map(currentSubstitution);
+	
+	// Resolve each field in the nested structure
+	for (const [fieldName, fieldType] of Object.entries(nestedStructure.fields)) {
+		const normalizedFieldName = fieldName.startsWith('@') ? fieldName.slice(1) : fieldName;
+		
+		if (!(normalizedFieldName in actualRecord.fields)) {
+			// Required field not found
+			return null;
+		}
+		
+		const actualFieldType = actualRecord.fields[normalizedFieldName];
+		
+		if (fieldType.kind === 'variable') {
+			// Simple field - substitute the variable with the actual field type
+			result.set(fieldType.name, actualFieldType);
+		} else if (fieldType.kind === 'nested') {
+			// Nested structure - recurse
+			if (actualFieldType.kind === 'record') {
+				const nestedResult = resolveNestedStructure(actualFieldType, fieldType.structure, result);
+				if (!nestedResult) {
+					return null; // Nested resolution failed
+				}
+				// Merge nested results
+				for (const [varName, varType] of nestedResult.entries()) {
+					result.set(varName, varType);
+				}
+			} else {
+				// Expected nested record but got something else
+				return null;
+			}
+		}
+	}
+	
+	return result;
+}
 
 // CONSTRAINT COLLAPSE FIX: Function to try resolving constraints using argument types
 export function tryResolveConstraints(
@@ -154,6 +198,23 @@ export function tryResolveConstraints(
 							if (actualFieldType && constraintFieldType.kind === 'variable') {
 								// Substitute the field type variable with the actual field type from the record
 								substitution.set(constraintFieldType.name, actualFieldType);
+							} else if (actualFieldType && constraintFieldType.kind === 'nested') {
+								// Handle nested structure constraints
+								const nestedStructure = constraintFieldType.structure;
+								if (actualFieldType.kind === 'record') {
+									// Resolve nested field access recursively
+									const nestedResult = resolveNestedStructure(
+										actualFieldType,
+										nestedStructure,
+										substitution
+									);
+									if (nestedResult) {
+										// Apply any additional substitutions from nested resolution
+										for (const [varName, varType] of nestedResult.entries()) {
+											substitution.set(varName, varType);
+										}
+									}
+								}
 							}
 						}
 						// Apply substitution to return type

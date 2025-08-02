@@ -1,5 +1,4 @@
 import { TypeState } from './types';
-import { addTraitDefinition } from './trait-system';
 import {
 	functionType,
 	floatType,

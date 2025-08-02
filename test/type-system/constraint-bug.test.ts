@@ -1,8 +1,9 @@
 import { describe, test, expect } from 'bun:test';
+import assert from 'node:assert';
 import { Lexer } from '../../src/lexer/lexer';
 import { parse } from '../../src/parser/parser';
 import { typeAndDecorate } from '../../src/typer/decoration';
-import { assertFunctionType } from '../utils';
+import { assertFunctionType, assertImplementsConstraint } from '../utils';
 
 describe('Constraint inference bug tests', () => {
 	test('constraint inference should be based on actual operator usage, not parameter count - FIXED', () => {
@@ -16,12 +17,10 @@ describe('Constraint inference bug tests', () => {
 		const identityProgram = parse(identityTokens);
 		const identityTyped = typeAndDecorate(identityProgram);
 
-		// Should be: (α) -> α  (no constraints)
+		// Should be: (a) -> a  (no constraints)
 		const identityType = identityTyped.type;
-		expect(identityType.kind).toBe('function');
-		if (identityType.kind === 'function') {
-			expect(identityType.constraints?.length || 0).toBe(0); // 'Identity function should have no constraints'
-		}
+		assertFunctionType(identityType);
+		expect(identityType.constraints).toBeUndefined(); // 'Identity function should have no constraints'
 
 		// Case 2: First function - no arithmetic
 		const firstCode = 'f = fn x y => x';
@@ -30,12 +29,10 @@ describe('Constraint inference bug tests', () => {
 		const firstProgram = parse(firstTokens);
 		const firstTyped = typeAndDecorate(firstProgram);
 
-		// Should be: (α) -> (β) -> α  (no constraints)
+		// Should be: (a) -> (b) -> a  (no constraints)
 		const firstType = firstTyped.type;
-		expect(firstType.kind).toBe('function');
-		if (firstType.kind === 'function') {
-			expect(firstType.constraints?.length || 0).toBe(0); // 'First function should have no constraints - it does not use +'
-		}
+		assertFunctionType(firstType);
+		expect(firstType.constraints).toBeUndefined(); // 'First function should have no constraints - it does not use +'
 
 		// Case 3: Record constructor - no arithmetic
 		const recordCode = 'f = fn name age => {@name name, @age age}';
@@ -47,7 +44,7 @@ describe('Constraint inference bug tests', () => {
 		// Should have no Add constraints
 		const recordType = recordTyped.type;
 		assertFunctionType(recordType);
-		expect(recordType.constraints?.length || 0).toBe(0); // 'Record constructor should have no constraints - it does not use +'
+		expect(recordType.constraints).toBeUndefined(); // 'Record constructor should have no constraints - it does not use +'
 	});
 
 	test('constraint inference should add Add constraint only when + is actually used - SKIPPED: exposes bad heuristic', () => {
@@ -63,36 +60,22 @@ describe('Constraint inference bug tests', () => {
 		const addProgram = parse(addTokens);
 		const addTyped = typeAndDecorate(addProgram);
 
-		// Should be: (α) -> (α) -> α given α implements Add
+		// Should be: (a) -> (a) -> a given a implements Add
 		const addType = addTyped.type;
 		assertFunctionType(addType);
-		expect(addType.constraints && addType.constraints.length > 0).toBeTruthy(); // 'Add function should have Add constraint'
-		// Check that it has an Add constraint
-		const hasAddConstraint = addType.constraints?.some(
-			c => c.kind === 'implements' && c.interfaceName === 'Add'
-		);
-		expect(hasAddConstraint).toBeTruthy(); // 'Function using + should have Add constraint'
+		assert(addType.constraints?.[0]);
+		assertImplementsConstraint(addType.constraints[0]);
+		expect(addType.constraints[0].interfaceName).toBe('Add');
 	});
 
-	test('the broken heuristic incorrectly adds Add constraints based on parameter count - NOW FIXED', () => {
-		// This test verifies the FIXED behavior
-		// Functions that do NOT use + should NOT get Add constraints
-
-		const wrongCode = 'f = fn x y => x'; // Does NOT use +
+	test('free type variables should not have constraints', () => {
+		const wrongCode = 'f = fn x y => x';
 		const wrongLexer = new Lexer(wrongCode);
 		const wrongTokens = wrongLexer.tokenize();
 		const wrongProgram = parse(wrongTokens);
 		const wrongTyped = typeAndDecorate(wrongProgram);
-
 		const wrongType = wrongTyped.type;
 		assertFunctionType(wrongType);
-
-		// FIXED: No longer gets Add constraint since it doesn't use +
-		const hasAddConstraint = wrongType.constraints?.some(
-			c => c.kind === 'implements' && c.interfaceName === 'Add'
-		);
-
-		// This assertion verifies the FIX - it should be false and now is false
-		expect(hasAddConstraint).toBeFalsy(); // 'Function not using + should not have Add constraint'
+		expect(wrongType.constraints).toBeUndefined();
 	});
-}); // Close describe block
+});

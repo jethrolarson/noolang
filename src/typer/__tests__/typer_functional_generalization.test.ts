@@ -4,7 +4,7 @@ import { test, expect } from 'bun:test';
 
 test('Functional Typer - Let-Polymorphism - Core Let-Polymorphism - should generalize polymorphic identity function', () => {
 	const result = parseAndType('id = fn x => x');
-	expect(typeToString(result.type, result.state.substitution)).toBe('α -> α');
+	expect(typeToString(result.type, result.state.substitution)).toBe('a -> a');
 });
 
 test('Functional Typer - Let-Polymorphism - Core Let-Polymorphism - should allow polymorphic function to be used with different types', () => {
@@ -36,7 +36,7 @@ test('Functional Typer - Let-Polymorphism - Let-Polymorphism Edge Cases - should
         )
       `);
 	// This should work with proper generalization
-	expect(typeToString(result.type, result.state.substitution)).toBe('α -> α');
+	expect(typeToString(result.type, result.state.substitution)).toBe('a -> a');
 });
 
 test('Functional Typer - Let-Polymorphism - Let-Polymorphism Edge Cases - should handle curried polymorphic functions', () => {

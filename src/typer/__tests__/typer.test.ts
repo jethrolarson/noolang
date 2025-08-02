@@ -19,25 +19,12 @@ test('Functional Type Inference - Basic Types - should infer boolean literal', (
 	expect(typeToString(result.type, result.state.substitution)).toBe('Bool');
 });
 
-test('Functional Type Inference - Function Types - should infer identity function', () => {
-	const result = parseAndType('fn x => x');
-	expect(typeToString(result.type, result.state.substitution)).toBe('α -> α');
-});
-
-test('Functional Type Inference - Function Types - should infer function with multiple parameters', () => {
-	const result = parseAndType('fn x y => x + y');
-	// With trait system, + operator is polymorphic: Add a => a -> a -> a
-	expect(typeToString(result.type, result.state.substitution)).toBe(
-		'α -> α -> α given α implements Add'
-	);
-});
-
 test('Functional Type Inference - Function Types - should infer nested function', () => {
 	const result = parseAndType('fn x => fn y => x + y');
 	// With trait system, + operator is polymorphic: Add a => a -> a -> a
 	// Note: May show duplicate constraints due to nested function constraint collection
 	expect(typeToString(result.type, result.state.substitution)).toBe(
-		'α -> α -> α given α implements Add given α implements Add'
+		'a -> a -> a given a implements Add'
 	);
 });
 

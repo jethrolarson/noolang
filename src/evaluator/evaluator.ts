@@ -237,17 +237,17 @@ export class Evaluator {
 	private currentFileDir?: string; // Track the directory of the current file being evaluated
 	private fs: typeof defaultFs;
 	private path: typeof defaultPath;
-	private traitRegistry?: TraitRegistry;
+	private traitRegistry: TraitRegistry;
 
-	constructor(opts?: {
+	constructor(opts: {
 		fs?: typeof defaultFs;
 		path?: typeof defaultPath;
-		traitRegistry?: TraitRegistry;
+		traitRegistry: TraitRegistry;
 		skipStdlib?: boolean;
 	}) {
 		this.fs = opts?.fs ?? defaultFs;
 		this.path = opts?.path ?? defaultPath;
-		this.traitRegistry = opts?.traitRegistry;
+		this.traitRegistry = opts.traitRegistry;
 		this.environment = new Map();
 		this.environmentStack = [];
 		this.initializeBuiltins();
@@ -1228,7 +1228,7 @@ export class Evaluator {
 		const value = this.environment.get(expr.name);
 		if (value === undefined) {
 			// NEW: Check if this is a trait function before throwing error
-			if (this.traitRegistry && this.isTraitFunction(expr.name)) {
+			if (this.isTraitFunction(expr.name)) {
 				// Return a special trait function value that will be resolved during application
 				return {
 					tag: 'trait-function',
@@ -1496,7 +1496,7 @@ export class Evaluator {
 			}
 
 			// Try to resolve bind as a trait function
-			if (this.traitRegistry && this.isTraitFunction('bind')) {
+			if (this.isTraitFunction('bind')) {
 				try {
 					// Use trait function resolution for bind
 					const result = this.resolveTraitFunctionWithArgs(
@@ -1512,28 +1512,6 @@ export class Evaluator {
 				}
 			}
 
-			// If trait resolution failed, try to implement a simple bind for Option types
-			if (isConstructor(left)) {
-				if (left.name === 'None') {
-					return left; // Short-circuit for None
-				} else if (left.name === 'Some' && left.args.length === 1) {
-					// Apply the function to the value inside Some
-					const value = left.args[0];
-					const result = isFunction(right) ? right.fn(value) : right.fn(value);
-
-					// If the result is already an Option, return it as-is
-					if (
-						isConstructor(result) &&
-						(result.name === 'Some' || result.name === 'None')
-					) {
-						return result;
-					}
-
-					// Otherwise wrap it in Some
-					return createConstructor('Some', [result]);
-				}
-			}
-
 			throw new Error(
 				'Safe thrush operator (|?) failed: no bind function available'
 			);
@@ -1542,9 +1520,7 @@ export class Evaluator {
 			const left = this.evaluateExpression(expr.left);
 			const right = this.evaluateExpression(expr.right);
 
-			if (isFunction(left)) {
-				return left.fn(right);
-			} else if (isNativeFunction(left)) {
+			if (isFunction(left) || isNativeFunction(left)) {
 				return left.fn(right);
 			} else {
 				throw new Error(
@@ -1552,47 +1528,27 @@ export class Evaluator {
 				);
 			}
 		} else if (expr.operator === '|>') {
-			// Handle pipeline operator (left-to-right composition)
+			// Left-to-right composition: evaluate left first, then right
 			const left = this.evaluateExpression(expr.left);
+			const leftVal = isCell(left) ? left.value : left;
 			const right = this.evaluateExpression(expr.right);
+			const rightVal = isCell(right) ? right.value : right;
 
-			if (isFunction(left) && isFunction(right)) {
-				// Left-to-right composition: g(f(x))
-				return createFunction((x: Value) => right.fn(left.fn(x)));
-			} else if (isNativeFunction(left) && isNativeFunction(right)) {
-				// Left-to-right composition: g(f(x))
-				return createFunction((x: Value) => right.fn(left.fn(x)));
-			} else if (isFunction(left) && isNativeFunction(right)) {
-				// Left-to-right composition: g(f(x))
-				return createFunction((x: Value) => right.fn(left.fn(x)));
-			} else if (isNativeFunction(left) && isFunction(right)) {
-				// Left-to-right composition: g(f(x))
-				return createFunction((x: Value) => right.fn(left.fn(x)));
-			} else {
-				throw new Error(
-					`Cannot compose non-functions in pipeline: ${valueToString(
-						left
-					)} and ${valueToString(right)}`
-				);
-			}
+			// Left-to-right: g(f(x))
+			return createFunction((x: Value) =>
+				applyValueFunction(rightVal, applyValueFunction(leftVal, x))
+			);
 		} else if (expr.operator === '<|') {
-			// Handle right-to-left composition operator
-			const left = this.evaluateExpression(expr.left);
+			// Right-to-left composition: evaluate right first, then left
 			const right = this.evaluateExpression(expr.right);
+			const rightVal = isCell(right) ? right.value : right;
+			const left = this.evaluateExpression(expr.left);
+			const leftVal = isCell(left) ? left.value : left;
 
-			if (isFunction(left) && isFunction(right)) {
-				// Right-to-left: f(g(x))
-				return createFunction((x: Value) => left.fn(right.fn(x)));
-			} else if (isNativeFunction(left) && isNativeFunction(right)) {
-				// Right-to-left: f(g(x))
-				return createFunction((x: Value) => left.fn(right.fn(x)));
-			} else {
-				throw new Error(
-					`Cannot compose non-functions: ${valueToString(
-						left
-					)} and ${valueToString(right)}`
-				);
-			}
+			// Right-to-left: f(g(x)) - for 'left <| right'
+			return createFunction((x: Value) =>
+				applyValueFunction(leftVal, applyValueFunction(rightVal, x))
+			);
 		} else {
 			// Handle other binary operators (arithmetic, comparison, etc.)
 			const left = this.evaluateExpression(expr.left);
@@ -1609,7 +1565,7 @@ export class Evaluator {
 					return createString(leftVal.value + rightVal.value);
 				}
 				// For complex types, try trait resolution
-				if (this.traitRegistry && this.isTraitFunction('add')) {
+				if (this.isTraitFunction('add')) {
 					try {
 						const result = this.resolveTraitFunctionWithArgs(
 							'add',
@@ -1631,7 +1587,7 @@ export class Evaluator {
 					return createNumber(leftVal.value - rightVal.value);
 				}
 				// For complex types, try trait resolution
-				if (this.traitRegistry && this.isTraitFunction('subtract')) {
+				if (this.isTraitFunction('subtract')) {
 					try {
 						const result = this.resolveTraitFunctionWithArgs(
 							'subtract',
@@ -1653,7 +1609,7 @@ export class Evaluator {
 					return createNumber(leftVal.value * rightVal.value);
 				}
 				// For complex types, try trait resolution
-				if (this.traitRegistry && this.isTraitFunction('multiply')) {
+				if (this.isTraitFunction('multiply')) {
 					try {
 						const result = this.resolveTraitFunctionWithArgs(
 							'multiply',
@@ -1680,7 +1636,7 @@ export class Evaluator {
 					]); // Some(result)
 				}
 				// For complex types, try trait resolution
-				if (this.traitRegistry && this.isTraitFunction('divide')) {
+				if (this.isTraitFunction('divide')) {
 					try {
 						const result = this.resolveTraitFunctionWithArgs(
 							'divide',
@@ -1759,7 +1715,11 @@ export class Evaluator {
 			const lexer = new Lexer(content);
 			const tokens = lexer.tokenize();
 			const program = parse(tokens);
-			const tempEvaluator = new Evaluator({ fs: this.fs, path: this.path });
+			const tempEvaluator = new Evaluator({
+				fs: this.fs,
+				path: this.path,
+				traitRegistry: this.traitRegistry,
+			});
 			const result = tempEvaluator.evaluateProgram(program, fullPath);
 			return result.finalResult;
 		} catch (error) {
@@ -1827,7 +1787,12 @@ export class Evaluator {
 		return createNativeFunction(`@${expr.field}`, (record: Value): Value => {
 			if (isRecord(record)) {
 				const field = expr.field;
-				if (field in record.fields) {
+				const fieldWithAt = `@${field}`;
+
+				// Try field with @ prefix first (new format), then without (legacy format)
+				if (fieldWithAt in record.fields) {
+					return record.fields[fieldWithAt];
+				} else if (field in record.fields) {
 					return record.fields[field];
 				}
 			}
@@ -2089,7 +2054,7 @@ export class Evaluator {
 							const implExpr = impl.functions.get(functionName)!;
 
 							// Apply the implementation to all accumulated arguments
-							let result: any = this.evaluateExpression(implExpr);
+							let result = this.evaluateExpression(implExpr);
 							for (const argValue of argValues) {
 								if (isFunction(result)) {
 									result = result.fn(argValue);

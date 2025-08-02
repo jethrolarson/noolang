@@ -84,6 +84,12 @@ import {
 	addTraitImplementation,
 } from './trait-system';
 
+import {
+	composeStructuralConstraints,
+	extractResultTypeVar,
+	isSimpleFieldConstraint,
+} from './constraint-composition';
+
 // Note: Main typeExpression is now in expression-dispatcher.ts
 // This file only contains the individual type inference functions
 
@@ -909,6 +915,81 @@ function collectAccessorConstraints(
 												},
 											})
 										);
+									}
+								}
+							}
+						}
+					}
+				}
+
+				// Case 3: Composed accessor patterns like "getStreet (getAddress person)"
+				if (func.kind === 'variable' && args.length === 1 && args[0].kind === 'application') {
+					const outerAccessorName = func.name;
+					const innerApplication = args[0];
+
+					// Check if inner application is also an accessor
+					if (
+						innerApplication.func.kind === 'variable' &&
+						innerApplication.args.length === 1 &&
+						innerApplication.args[0].kind === 'variable' &&
+						paramTypeVars.has(innerApplication.args[0].name)
+					) {
+						const innerAccessorName = innerApplication.func.name;
+						const paramName = innerApplication.args[0].name;
+						const paramTypeVar = paramTypeVars.get(paramName)!;
+
+						// Get both accessor types from environment
+						const outerScheme = state.environment.get(outerAccessorName);
+						const innerScheme = state.environment.get(innerAccessorName);
+
+						if (outerScheme && innerScheme) {
+							const outerType = substitute(outerScheme.type, state.substitution);
+							const innerType = substitute(innerScheme.type, state.substitution);
+
+							// Check if both are accessor types with simple constraints
+							if (isAccessorType(outerType) && isAccessorType(innerType)) {
+								const outerConstraint = (outerType as FunctionType).constraints?.find(
+									(c: Constraint) => c.kind === 'has'
+								);
+								const innerConstraint = (innerType as FunctionType).constraints?.find(
+									(c: Constraint) => c.kind === 'has'
+								);
+
+								if (
+									outerConstraint &&
+									innerConstraint &&
+									outerConstraint.kind === 'has' &&
+									innerConstraint.kind === 'has' &&
+									isSimpleFieldConstraint(outerConstraint) &&
+									isSimpleFieldConstraint(innerConstraint)
+								) {
+									// Extract field names
+									const outerField = getAccessorField(outerConstraint);
+									const innerField = getAccessorField(innerConstraint);
+
+									if (outerField && innerField) {
+										// Create constraint variables for composition
+										const intermediateVar = `α${Math.random().toString(36).substr(2, 9)}`;
+										const finalVar = `α${Math.random().toString(36).substr(2, 9)}`;
+
+										// Create the inner constraint: paramTypeVar has {innerField: intermediateVar}
+										const innerComposedConstraint = hasStructureConstraint(paramTypeVar, {
+											fields: {
+												[innerField]: { kind: 'variable', name: intermediateVar },
+											},
+										});
+
+										// Create the outer constraint: intermediateVar has {outerField: finalVar}
+										const outerComposedConstraint = hasStructureConstraint(intermediateVar, {
+											fields: {
+												[outerField]: { kind: 'variable', name: finalVar },
+											},
+										});
+
+										// For composed accessor patterns, use separate constraints that can be resolved by existing logic
+										// This creates the logical relationship between constraints while working with the current resolution system
+										constraints.push(innerComposedConstraint);
+										constraints.push(outerComposedConstraint);
 									}
 								}
 							}

@@ -6,66 +6,52 @@ import {
 	parseAndType,
 } from '../../../test/utils';
 
-test('Trait System Phase 3: Constraint Resolution - Constraint Collapse - should handle constraint collapse for various concrete types', () => {
-	const testCases = [
-		{
-			name: 'List with integers',
-			code: 'map (fn x => x + 1) [1, 2, 3]',
-			expectedKind: 'list',
-			expectedType: 'List Float',
-			shouldCollapse: true,
-		},
-		{
-			name: 'Option with integer',
-			code: 'map (fn x => x + 1) (Some 42)',
-			expectedKind: 'variant',
-			expectedType: 'Option Float',
-			shouldCollapse: true,
-		},
-		{
-			name: 'Nested map operations',
-			code: 'map (fn x => x * 2) (map (fn x => x + 1) [1, 2, 3])',
-			expectedKind: 'list',
-			expectedType: 'List Float',
-			shouldCollapse: true,
-		},
-		{
-			name: 'Partial application (no concrete type)',
-			code: 'map (fn x => x + 1)',
-			expectedKind: 'function', // Modern constraint system puts constraints on function directly
-			expectedType: /implements Functor/,
-			shouldCollapse: false,
-		},
-		{
-			name: 'Pure function (preserves constraint)',
-			code: 'pure 1',
-			expectedKind: 'variant', // Modern constraint system returns variant type
-			expectedType: /α\d+/, // Should have type variable for the monad
-			shouldCollapse: false,
-		},
-	] as const;
+test('Constraint Collapse - List with integers should collapse to concrete type', () => {
+	const typeResult = parseAndType('map (fn x => x + 1) [1, 2, 3]');
+	const typeString = typeToString(typeResult.type);
 
-	for (const testCase of testCases) {
-		const typeResult = parseAndType(testCase.code);
-		const typeString = typeToString(typeResult.type);
+	expect(typeResult.type.kind).toBe('list');
+	expect(typeString).toBe('List Float');
+});
 
-		// Check type kind
-		expect(typeResult.type.kind).toBe(testCase.expectedKind);
+test('Constraint Collapse - partially applied trait function should collapse to concrete type', () => {
+	const typeResult = parseAndType('map (add 1) [1, 2, 3]');
+	const typeString = typeToString(typeResult.type);
 
-		// Check type string
-		if (typeof testCase.expectedType === 'string') {
-			expect(typeString).toBe(testCase.expectedType);
-		} else {
-			expect(typeString).toMatch(testCase.expectedType);
-		}
+	expect(typeResult.type.kind).toBe('list');
+	expect(typeString).toBe('List Float');
+});
 
-		// Check constraint collapse behavior
-		if (testCase.shouldCollapse) {
-			expect(typeString).not.toMatch(/implements|given|α\d+/);
-		} else {
-			expect(typeString).toMatch(/implements|given|α\d+/);
-		}
-	}
+test('Constraint Collapse - Option with integer should collapse to concrete type', () => {
+	const typeResult = parseAndType('map (fn x => x + 1) (Some 42)');
+	const typeString = typeToString(typeResult.type);
+
+	expect(typeResult.type.kind).toBe('variant');
+	expect(typeString).toBe('Option Float');
+});
+
+test('Constraint Collapse - Nested map operations should collapse to concrete type', () => {
+	const typeResult = parseAndType('map show (map (fn x => x + 1) [1, 2, 3])');
+	const typeString = typeToString(typeResult.type);
+
+	expect(typeResult.type.kind).toBe('list');
+	expect(typeString).toBe('List String');
+});
+
+test('Constraint Collapse - Partial application should preserve constraints', () => {
+	const typeResult = parseAndType('map (fn x => x + 1)');
+	const typeString = typeToString(typeResult.type);
+
+	expect(typeResult.type.kind).toBe('function');
+	expect(typeString).toBe('a Float -> a Float given a implements Functor');
+});
+
+test('Constraint Collapse - Pure function should preserve constraints', () => {
+	const typeResult = parseAndType('pure 1');
+	const typeString = typeToString(typeResult.type);
+
+	expect(typeResult.type.kind).toBe('variant');
+	expect(typeString).toBe('a Float given a implements Monad');
 });
 
 test('Trait System Phase 3: Constraint Resolution - Complex Constraint Resolution - should handle multiple different constraints with partial collapse', () => {
