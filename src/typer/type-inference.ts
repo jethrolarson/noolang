@@ -759,15 +759,14 @@ function collectImplicitConstraints(
 		}
 	}
 
-	// NEW: Collect structural constraints from accessor expressions
+	// DEPTH-FIRST: Generate structural constraints inline with unified variables
 	if (bodyExpr && paramNames) {
-		const accessorConstraints = collectAccessorConstraints(
+		const structuralConstraints = generateDepthFirstConstraints(
 			bodyExpr,
 			paramNames,
-			paramTypes,
-			state
+			paramTypes
 		);
-		constraints.push(...accessorConstraints);
+		constraints.push(...structuralConstraints);
 	}
 
 	return constraints;
@@ -1968,3 +1967,80 @@ export const typeRecordDestructuring = (
 	// Return the record type and effects
 	return createTypeResult(expectedRecordType, valueResult.effects, currentState);
 };
+
+// DEPTH-FIRST constraint generation - replaces collectAccessorConstraints
+function generateDepthFirstConstraints(
+	expr: Expression,
+	paramNames: string[],
+	paramTypes: Type[]
+): Constraint[] {
+	const constraints: Constraint[] = [];
+	
+	// Create mapping from parameter names to their type variables
+	const paramTypeVars = new Map<string, string>();
+	for (let i = 0; i < paramNames.length && i < paramTypes.length; i++) {
+		const paramType = paramTypes[i];
+		if (paramType.kind === 'variable') {
+			paramTypeVars.set(paramNames[i], paramType.name);
+		}
+	}
+	
+	// Analyze expression for accessor composition patterns
+	function analyzeExpression(e: Expression): void {
+		if (!e) return;
+		
+		if (e.kind === 'application' && e.func.kind === 'accessor' && e.args.length === 1) {
+			const outerField = e.func.field;
+			const innerArg = e.args[0];
+			
+			// Check for composition: @outer (@inner param)
+			if (innerArg.kind === 'application' && 
+				innerArg.func.kind === 'accessor' &&
+				innerArg.args.length === 1 &&
+				innerArg.args[0].kind === 'variable' &&
+				paramTypeVars.has(innerArg.args[0].name)) {
+				
+				const innerField = innerArg.func.field;
+				const paramName = innerArg.args[0].name;
+				const paramTypeVar = paramTypeVars.get(paramName)!;
+				
+				// Generate multiplicative constraint directly
+				const resultVar = `α${Math.random().toString(36).substr(2, 9)}`;
+				const composedConstraint = hasStructureConstraint(paramTypeVar, {
+					fields: {
+						[innerField]: {
+							kind: 'nested',
+							structure: {
+								fields: {
+									[outerField]: { kind: 'variable', name: resultVar }
+								}
+							}
+						}
+					}
+				});
+				
+				constraints.push(composedConstraint);
+				console.log(`[DEPTH-FIRST] Generated: ${paramName} has {${innerField}: {${outerField}: ${resultVar}}}`);
+				console.log(`[DEPTH-FIRST] Full constraint:`, JSON.stringify(composedConstraint, null, 2));
+				return; // Don't recurse - we handled the composition
+			}
+		}
+		
+		// Recurse into sub-expressions for other cases
+		if (e.kind === 'application') {
+			analyzeExpression(e.func);
+			e.args.forEach(analyzeExpression);
+		} else if (e.kind === 'binary') {
+			analyzeExpression(e.left);
+			analyzeExpression(e.right);
+		} else if (e.kind === 'conditional') {
+			analyzeExpression(e.condition);
+			analyzeExpression(e.then);
+			analyzeExpression(e.else);
+		}
+		// Add other cases as needed
+	}
+	
+	analyzeExpression(expr);
+	return constraints;
+}

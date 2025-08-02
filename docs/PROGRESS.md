@@ -258,3 +258,4 @@ noolang/
 - we're using both camelCase and snake. Everything should be snake.
 - print should be : a -> a given a is Show (maybe log too, or can we just leave that with dumb encoding inferred in host language?)
 - <https://llmstxt.org> may be a model for how to document the language. e.g. https://bun.sh/llms.txt
+- `match {1, False} with ({a} => a)` should be valid
