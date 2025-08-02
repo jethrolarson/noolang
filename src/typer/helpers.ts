@@ -411,6 +411,49 @@ export const typeToString = (
 	const mapping = new Map<string, string>();
 	let next = 0;
 
+	// NEW: Collect all constraints from the entire type structure
+	const allConstraints: Constraint[] = [];
+	function collectConstraints(t: Type): void {
+		switch (t.kind) {
+			case 'variable':
+				if (t.constraints) {
+					allConstraints.push(...t.constraints);
+				}
+				break;
+			case 'function':
+				t.params.forEach(collectConstraints);
+				// Only collect from return type if it's not a function to avoid duplicate constraints in curried functions
+				if (t.return.kind !== 'function') {
+					collectConstraints(t.return);
+				}
+				if (t.constraints) {
+					allConstraints.push(...t.constraints);
+				}
+				break;
+			case 'list':
+				collectConstraints(t.element);
+				break;
+			case 'tuple':
+				t.elements.forEach(collectConstraints);
+				break;
+			case 'record':
+				Object.values(t.fields).forEach(collectConstraints);
+				break;
+			case 'variant':
+				t.args.forEach(collectConstraints);
+				break;
+			case 'union':
+				t.types.forEach(collectConstraints);
+				break;
+			case 'constrained':
+				collectConstraints(t.baseType);
+				for (const constraints of t.constraints.values()) {
+					allConstraints.push(...constraints);
+				}
+				break;
+		}
+	}
+
 	function norm(t: Type): string {
 		switch (t.kind) {
 			case 'primitive':
@@ -419,18 +462,7 @@ export const typeToString = (
 				const paramStr = t.params.map(norm).join(' ');
 				const effectStr = formatEffectsString(t.effects);
 				const baseType = `${paramStr} -> ${norm(t.return)}${effectStr}`;
-
-				const constraintStr =
-					showConstraints && t.constraints && t.constraints.length > 0
-						? ` given ${
-								t.originalConstraint
-									? formatConstraintExpr(t.originalConstraint)
-									: deduplicateConstraints(t.constraints)
-											.map(formatConstraint)
-											.join(' ')
-							}`
-						: '';
-				return constraintStr ? `${baseType}${constraintStr}` : baseType;
+				return baseType;
 			}
 			case 'variable': {
 				let varStr = '';
@@ -462,12 +494,17 @@ export const typeToString = (
 			}
 			case 'union':
 				return `(${t.types.map(norm).join(' | ')})`;
-			case 'variant':
+			case 'variant': {
+				// If variant name looks like a type variable, normalize it
+				const variantName = /^α\d+$/.test(t.name)
+					? normalizeConstraintVariable(t.name)
+					: t.name;
 				if (t.args.length === 0) {
-					return t.name;
+					return variantName;
 				} else {
-					return `${t.name} ${t.args.map(norm).join(' ')}`;
+					return `${variantName} ${t.args.map(norm).join(' ')}`;
 				}
+			}
 			case 'unit':
 				return '{}';
 			case 'constrained': {
@@ -509,18 +546,19 @@ export const typeToString = (
 			return mapped;
 		}
 
-		// If not in mapping, check if this looks like an internal variable name
-		for (const greekLetter of greek) {
-			if (
-				typeVar.startsWith(greekLetter) &&
-				/^\d+$/.test(typeVar.slice(greekLetter.length))
-			) {
-				return greekLetter;
+		// If not in mapping, add it using the same logic as norm()
+		if (!mapping.has(typeVar)) {
+			// If the type variable name is a single letter, keep it as-is
+			// This preserves explicit type annotations like 'a -> a'
+			if (typeVar.length === 1 && /^[a-z]$/.test(typeVar)) {
+				mapping.set(typeVar, typeVar);
+			} else {
+				mapping.set(typeVar, greek[next] || `t${next}`);
+				next++;
 			}
 		}
 
-		// Fallback to original name
-		return typeVar;
+		return mapping.get(typeVar) || typeVar;
 	}
 
 	function formatConstraint(c: Constraint): string {
@@ -542,10 +580,28 @@ export const typeToString = (
 			case 'has': {
 				const normalizedVarName = normalizeConstraintVariable(c.typeVar);
 				const fieldDescs = Object.entries(c.structure.fields)
-					.map(
-						([fieldName, fieldType]) =>
-							`@${fieldName} ${norm(fieldType as Type)}`
-					)
+					.map(([fieldName, fieldType]) => {
+						const fieldTypeStr = norm(fieldType as Type);
+						// Check if the field type has nested constraints
+						if (fieldType.kind === 'variable' && fieldType.constraints) {
+							const nestedConstraints = fieldType.constraints
+								.map(c => {
+									if (c.kind === 'has') {
+										const nestedFieldDescs = Object.entries(c.structure.fields)
+											.map(
+												([nestedFieldName, nestedFieldType]) =>
+													`@${nestedFieldName} ${norm(nestedFieldType as Type)}`
+											)
+											.join(', ');
+										return `${normalizeConstraintVariable(c.typeVar)} has {${nestedFieldDescs}}`;
+									}
+									return 'unknown constraint';
+								})
+								.join(' and ');
+							return `@${fieldName} ${fieldTypeStr} given ${nestedConstraints}`;
+						}
+						return `@${fieldName} ${fieldTypeStr}`;
+					})
 					.join(', ');
 				return `${normalizedVarName} has {${fieldDescs}}`;
 			}
@@ -599,7 +655,43 @@ export const typeToString = (
 
 	// Apply substitution to the type before normalizing
 	const substitutedType = substitute(type, substitution);
-	return norm(substitutedType);
+
+	// Collect constraints AFTER variable mapping is initialized by first calling norm()
+	const baseTypeStr = norm(substitutedType);
+
+	// Now collect constraints with the correct variable mapping
+	if (showConstraints) {
+		collectConstraints(substitutedType);
+	}
+
+	// If we have constraints, we need to rebuild the string with constraints
+	if (
+		showConstraints &&
+		allConstraints.length > 0 &&
+		substitutedType.kind === 'function'
+	) {
+		const paramStr = substitutedType.params.map(norm).join(' ');
+		const effectStr = formatEffectsString(substitutedType.effects);
+		const baseType = `${paramStr} -> ${norm(substitutedType.return)}${effectStr}`;
+
+		const constraintStr = ` given ${deduplicateConstraints(allConstraints)
+			.sort((a, b) => {
+				const order: Record<string, number> = {
+					implements: 0,
+					has: 1,
+					hasField: 2,
+					is: 3,
+					custom: 4,
+				};
+				return (order[a.kind] || 5) - (order[b.kind] || 5);
+			})
+			.map(formatConstraint)
+			.join(' and ')}`;
+
+		return `${baseType}${constraintStr}`;
+	}
+
+	return baseTypeStr;
 };
 
 // Check if a type variable occurs in a type (for occurs check)

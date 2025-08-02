@@ -259,5 +259,7 @@ test('Top-level definitions with type annotations - parses definition with list 
 	const typed = def.value;
 	assertTypedExpression(typed);
 	assertListExpression(typed.expression);
+	assertPrimitiveType(typed.expression.type!);
+	expect(typed.expression.type.name).toBe('Float');
 });
 

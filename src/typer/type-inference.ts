@@ -22,6 +22,7 @@ import {
 	type ConstraintDefinitionExpression,
 	type ImplementDefinitionExpression,
 	type Type,
+	type FunctionType,
 	type Constraint,
 	floatType,
 	stringType,
@@ -246,8 +247,13 @@ export const typeVariableExpr = (
 				if (traitTypeParamVar && traitTypeParamVar.kind === 'variable') {
 					// Use modern constraint system - put constraints directly on function type
 					if (freshenedType.kind === 'function') {
-						const modernConstraint = implementsConstraint(traitTypeParamVar.name, traitInfo.traitName);
-						freshenedType.constraints = (freshenedType.constraints || []).concat([modernConstraint]);
+						const modernConstraint = implementsConstraint(
+							traitTypeParamVar.name,
+							traitInfo.traitName
+						);
+						freshenedType.constraints = (
+							freshenedType.constraints || []
+						).concat([modernConstraint]);
 						return createPureTypeResult(freshenedType, state1);
 					} else {
 						// For non-function types, create ConstrainedType with modern format
@@ -470,16 +476,60 @@ function createFunctionEnvironment(
 
 	// Always include built-ins and stdlib essentials
 	const essentials = [
-		'+', '-', '*', '/', '==', '!=', '<', '>', '<=', '>=',
-		'|', '|>', '<|', ';', '$', 'if',
-		'length', 'head', 'tail', 'map', 'filter', 'reduce',
-		'isEmpty', 'append', 'concat', 'toString',
-		'abs', 'max', 'min', 'print', 'println',
-		'readFile', 'writeFile', 'log', 'random', 'randomRange',
-		'mutSet', 'mutGet', 'hasKey', 'hasValue', 'set',
-		'tupleLength', 'tupleIsEmpty', 'list_get',
-		'True', 'False', 'None', 'Some', 'Ok', 'Err',
-		'Bool', 'Option', 'Result', 'not'
+		'+',
+		'-',
+		'*',
+		'/',
+		'==',
+		'!=',
+		'<',
+		'>',
+		'<=',
+		'>=',
+		'|',
+		'|>',
+		'<|',
+		';',
+		'$',
+		'if',
+		'length',
+		'head',
+		'tail',
+		'map',
+		'filter',
+		'reduce',
+		'isEmpty',
+		'append',
+		'concat',
+		'toString',
+		'abs',
+		'max',
+		'min',
+		'print',
+		'println',
+		'readFile',
+		'writeFile',
+		'log',
+		'random',
+		'randomRange',
+		'mutSet',
+		'mutGet',
+		'hasKey',
+		'hasValue',
+		'set',
+		'tupleLength',
+		'tupleIsEmpty',
+		'list_get',
+		'True',
+		'False',
+		'None',
+		'Some',
+		'Ok',
+		'Err',
+		'Bool',
+		'Option',
+		'Result',
+		'not',
 	];
 
 	for (const essential of essentials) {
@@ -534,7 +584,9 @@ function handleConstrainedFunctionBody(
 ): Type {
 	const constrainedBody = expr.body;
 	if (constrainedBody.kind !== 'constrained') {
-		throw new Error('handleConstrainedFunctionBody called with non-constrained body');
+		throw new Error(
+			'handleConstrainedFunctionBody called with non-constrained body'
+		);
 	}
 
 	const constraints = flattenConstraintExpr(constrainedBody.constraint);
@@ -622,11 +674,8 @@ export const typeFunction = (
 	const functionEnv = createFunctionEnvironment(expr, state);
 
 	// 2. Create parameter types and type the body
-	const { paramTypes, bodyResult, currentState } = createParameterTypesAndTypeBody(
-		expr,
-		functionEnv,
-		state
-	);
+	const { paramTypes, bodyResult, currentState } =
+		createParameterTypesAndTypeBody(expr, functionEnv, state);
 
 	// 3. Collect implicit constraints from the original function body
 	const implicitConstraints = collectImplicitConstraints(
@@ -638,9 +687,15 @@ export const typeFunction = (
 	);
 
 	// 4. Build function type based on whether body is constrained
-	const funcType = expr.body.kind === 'constrained'
-		? handleConstrainedFunctionBody(expr, paramTypes, bodyResult, implicitConstraints)
-		: buildNormalFunctionType(paramTypes, bodyResult, implicitConstraints);
+	const funcType =
+		expr.body.kind === 'constrained'
+			? handleConstrainedFunctionBody(
+					expr,
+					paramTypes,
+					bodyResult,
+					implicitConstraints
+				)
+			: buildNormalFunctionType(paramTypes, bodyResult, implicitConstraints);
 
 	return createTypeResult(funcType, bodyResult.effects, currentState);
 };
@@ -661,13 +716,24 @@ function collectImplicitConstraints(
 	}
 	collectTypeVariables(_bodyType, allTypeVars);
 
-	// Only add Add constraint if the function body actually uses the + operator
+	// Collect trait constraints (existing functionality)
 	if (_bodyExpr && usesAddOperator(_bodyExpr)) {
 		const typeVarList = Array.from(allTypeVars).sort();
 		if (typeVarList.length > 0) {
 			const canonicalVar = typeVarList[0];
 			constraints.push(implementsConstraint(canonicalVar, 'Add'));
 		}
+	}
+
+	// NEW: Collect structural constraints from accessor expressions
+	if (_bodyExpr && _paramNames) {
+		const accessorConstraints = collectAccessorConstraints(
+			_bodyExpr,
+			_paramNames,
+			_paramTypes,
+			_state
+		);
+		constraints.push(...accessorConstraints);
 	}
 
 	return constraints;
@@ -735,6 +801,182 @@ function usesOperator(expr: Expression, targetOperator: string): boolean {
 // Helper function to check if an expression uses the + operator (for backward compatibility)
 function usesAddOperator(expr: Expression): boolean {
 	return usesOperator(expr, '+');
+}
+
+// Helper function to collect structural constraints from accessor expressions in function bodies
+function collectAccessorConstraints(
+	expr: Expression,
+	paramNames: string[],
+	paramTypes: Type[],
+	state: TypeState
+): Constraint[] {
+	const constraints: Constraint[] = [];
+
+	// Create a mapping from parameter names to their type variables
+	const paramTypeVars = new Map<string, string>();
+	for (let i = 0; i < paramNames.length && i < paramTypes.length; i++) {
+		const paramType = paramTypes[i];
+		if (paramType.kind === 'variable') {
+			paramTypeVars.set(paramNames[i], paramType.name);
+		}
+	}
+
+	// Helper function to check if a type is an accessor type
+	function isAccessorType(type: Type): boolean {
+		return (
+			type.kind === 'function' &&
+			!!type.constraints &&
+			type.constraints.some((c: Constraint) => c.kind === 'has')
+		);
+	}
+
+	// Helper function to extract field name from accessor constraint
+	function getAccessorField(constraint: Constraint): string | null {
+		if (
+			constraint.kind === 'has' &&
+			constraint.structure &&
+			constraint.structure.fields
+		) {
+			const fieldNames = Object.keys(constraint.structure.fields);
+			return fieldNames.length === 1 ? fieldNames[0] : null;
+		}
+		return null;
+	}
+
+	// Recursively collect accessor constraints from the expression
+	function collectFromExpression(e: Expression): void {
+		if (!e) return;
+
+		switch (e.kind) {
+			case 'application': {
+				const func = e.func;
+				const args = e.args;
+
+				// Case 1: Direct accessor applications like "@name obj"
+				if (func.kind === 'accessor' && args.length === 1) {
+					const accessorField = func.field;
+					const arg = args[0];
+
+					// Check if the argument is one of our parameters
+					if (arg.kind === 'variable' && paramTypeVars.has(arg.name)) {
+						const paramTypeVar = paramTypeVars.get(arg.name)!;
+
+						// Create a fresh type variable for the field type
+						const fieldTypeVar = `α${Math.random().toString(36).substr(2, 9)}`;
+
+						// Create the structural constraint: paramTypeVar has {accessorField: fieldTypeVar}
+						constraints.push(
+							hasStructureConstraint(paramTypeVar, {
+								fields: {
+									[accessorField]: { kind: 'variable', name: fieldTypeVar },
+								},
+							})
+						);
+					}
+				}
+
+				// Case 2: Variable references that are accessors (like "getAddress obj")
+				if (func.kind === 'variable' && args.length === 1) {
+					const varName = func.name;
+					const arg = args[0];
+
+					// Check if the argument is one of our parameters
+					if (arg.kind === 'variable' && paramTypeVars.has(arg.name)) {
+						const paramTypeVar = paramTypeVars.get(arg.name)!;
+
+						// Check if the variable is an accessor by looking it up in the environment
+						const scheme = state.environment.get(varName);
+						if (scheme) {
+							// Apply substitution to get the actual type
+							const actualType = substitute(scheme.type, state.substitution);
+
+							if (isAccessorType(actualType)) {
+								// Extract the field name from the accessor's constraints
+								const accessorConstraint = (
+									actualType as FunctionType
+								).constraints?.find((c: Constraint) => c.kind === 'has');
+								if (accessorConstraint) {
+									const fieldName = getAccessorField(accessorConstraint);
+									if (fieldName) {
+										// Create a fresh type variable for the field type
+										const fieldTypeVar = `α${Math.random().toString(36).substr(2, 9)}`;
+
+										// Create the structural constraint: paramTypeVar has {fieldName: fieldTypeVar}
+										constraints.push(
+											hasStructureConstraint(paramTypeVar, {
+												fields: {
+													[fieldName]: { kind: 'variable', name: fieldTypeVar },
+												},
+											})
+										);
+									}
+								}
+							}
+						}
+					}
+				}
+
+				// Recursively check function and arguments
+				collectFromExpression(func);
+				args.forEach(collectFromExpression);
+				break;
+			}
+
+			case 'function':
+				collectFromExpression(e.body);
+				break;
+
+			case 'binary':
+				collectFromExpression(e.left);
+				collectFromExpression(e.right);
+				break;
+
+			case 'if':
+				collectFromExpression(e.condition);
+				collectFromExpression(e.then);
+				collectFromExpression(e.else);
+				break;
+
+			case 'record':
+				e.fields.forEach(field => collectFromExpression(field.value));
+				break;
+
+			case 'tuple':
+				e.elements.forEach(collectFromExpression);
+				break;
+
+			case 'list':
+				e.elements.forEach(collectFromExpression);
+				break;
+
+			case 'where':
+				collectFromExpression(e.main);
+				e.definitions.forEach(def => {
+					if (def.kind === 'definition') {
+						collectFromExpression(def.value);
+					} else if (def.kind === 'tuple-destructuring') {
+						collectFromExpression(def.value);
+					} else if (def.kind === 'record-destructuring') {
+						collectFromExpression(def.value);
+					} else if (def.kind === 'mutable-definition') {
+						collectFromExpression(def.value);
+					}
+				});
+				break;
+
+			case 'match':
+				collectFromExpression(e.expression);
+				e.cases.forEach(case_ => collectFromExpression(case_.expression));
+				break;
+
+			default:
+				// No nested expressions to check
+				break;
+		}
+	}
+
+	collectFromExpression(expr);
+	return constraints;
 }
 
 function collectTypeVariables(type: Type, vars: Set<string>): void {

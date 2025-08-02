@@ -63,9 +63,11 @@ export type RecordStructure = {
 	fields: { [fieldName: string]: StructureFieldType };
 };
 
-export type StructureFieldType =
-	| Type
-	| { kind: 'nested'; structure: RecordStructure };
+export type NestedStructureFieldType = {
+	kind: 'nested';
+	structure: RecordStructure;
+};
+export type StructureFieldType = Type | NestedStructureFieldType;
 
 // Extracted type definitions
 export type PrimitiveType = {
@@ -205,6 +207,7 @@ export interface ApplicationExpression {
 export interface PipelineExpression {
 	kind: 'pipeline';
 	steps: Expression[];
+	operators: ('|>' | '<|')[]; // Track the operators between steps
 	type?: Type;
 	location: Location;
 }

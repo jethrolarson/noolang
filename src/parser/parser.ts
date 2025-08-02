@@ -1276,7 +1276,9 @@ const parseCompose: C.Parser<Expression> = tokens => {
 		([left, rest]) => {
 			// Build steps array for pipeline expression
 			const steps = [left];
-			for (const [_op, right] of rest) {
+			const operators: ('|>' | '<|')[] = [];
+			for (const [op, right] of rest) {
+				operators.push(op.value as '|>' | '<|');
 				steps.push(right);
 			}
 
@@ -1285,6 +1287,7 @@ const parseCompose: C.Parser<Expression> = tokens => {
 				const result: PipelineExpression = {
 					kind: 'pipeline',
 					steps,
+					operators,
 					location: left.location,
 				};
 				return result;

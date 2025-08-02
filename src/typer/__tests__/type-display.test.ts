@@ -1,105 +1,100 @@
-import { typeToString } from '../helpers';
-import { recordType, stringType, floatType } from '../../ast';
 import { test, expect } from 'bun:test';
+import { parseAndType } from '../../../test/utils';
+import { typeToString } from '../helpers';
 
-test('Type Display (typeToString) - Record Type Display - should display record type with @field syntax', () => {
-	const recordTypeWithFields = recordType({
-		name: stringType(),
-		age: floatType(),
-	});
+test('Type Display - Constraint display functionality', () => {
+	// Test trait constraints
+	const traitResult = parseAndType('fn x y => x + y');
+	const traitStr = typeToString(
+		traitResult.type,
+		traitResult.state.substitution
+	);
+	expect(traitStr).toMatch(
+		/^[α-ω] -> [α-ω] -> [α-ω] given [α-ω] implements Add$/
+	);
 
-	const result = typeToString(recordTypeWithFields);
-	expect(result).toBe('{ @name String, @age Float }');
+	// Test structural constraints
+	const structResult = parseAndType('fn obj => @name obj');
+	const structStr = typeToString(
+		structResult.type,
+		structResult.state.substitution
+	);
+	expect(structStr).toContain('given');
+	expect(structStr).toContain('has');
+	expect(structStr).toContain('@name');
+
+	// Test complex constraints (functor + structural)
+	const complexResult = parseAndType('map @name');
+	const complexStr = typeToString(
+		complexResult.type,
+		complexResult.state.substitution
+	);
+	expect(complexStr).toContain('implements Functor');
+	expect(complexStr).toContain('has {@name');
+	expect(complexStr).toContain('and');
+
+	// Test no duplicate constraints
+	expect(complexStr).not.toMatch(/given.*given/); // Should not have "given" twice
+	expect(traitStr).not.toMatch(/Add.*Add/); // Should not have duplicate "Add"
 });
 
-test('Type Display (typeToString) - Record Type Display - should display single field record type', () => {
-	const singleFieldRecord = recordType({
-		name: stringType(),
-	});
+test('Type Display - Variable name consistency', () => {
+	const result = parseAndType('map @name');
+	const typeStr = typeToString(result.type, result.state.substitution);
 
-	const result = typeToString(singleFieldRecord);
-	expect(result).toBe('{ @name String }');
+	// Parse the type string to check variable consistency
+	// Expected format: "α β -> α γ given β has {@name γ} and α implements Functor"
+	const match = typeStr.match(
+		/^([α-ω]+) ([α-ω]+) -> \1 ([α-ω]+) given \2 has \{@name \3\} and \1 implements Functor$/
+	);
+	expect(match).toBeTruthy();
+
+	if (match) {
+		const [, functorVar, elementVar, fieldVar] = match;
+		// All three variables should be different
+		expect(functorVar).not.toBe(elementVar);
+		expect(functorVar).not.toBe(fieldVar);
+		expect(elementVar).not.toBe(fieldVar);
+	}
 });
 
-test('Type Display (typeToString) - Record Type Display - should display empty record type', () => {
-	const emptyRecord = recordType({});
+test('Type Display - Constraint ordering', () => {
+	const result = parseAndType('map @name');
+	const typeStr = typeToString(result.type, result.state.substitution);
 
-	const result = typeToString(emptyRecord);
-	expect(result).toBe('{ }');
+	// Current behavior: has comes before implements
+	const implementsIndex = typeStr.indexOf('implements');
+	const hasIndex = typeStr.indexOf('has');
+	expect(hasIndex).toBeLessThan(implementsIndex);
 });
 
-test('Type Display (typeToString) - Record Type Display - should display record type with multiple fields in consistent order', () => {
-	const multiFieldRecord = recordType({
-		name: stringType(),
-		age: floatType(),
-		active: { kind: 'primitive', name: 'Bool' } as const,
-	});
+test('Type Display - Simple types without constraints', () => {
+	// Test that simple types work correctly
+	const simpleResult = parseAndType('42');
+	const simpleStr = typeToString(
+		simpleResult.type,
+		simpleResult.state.substitution
+	);
+	expect(simpleStr).toBe('Float');
 
-	const result = typeToString(multiFieldRecord);
-	// Note: Object.entries() order should be consistent in modern JS
-	expect(result).toMatch(/^{ @\w+ \w+(?:, @\w+ \w+)* }$/);
-	expect(result.includes('@name String')).toBeTruthy();
-	expect(result.includes('@age Float')).toBeTruthy();
-	expect(result.includes('@active Bool')).toBeTruthy();
+	const identityResult = parseAndType('fn x => x');
+	const identityStr = typeToString(
+		identityResult.type,
+		identityResult.state.substitution
+	);
+	expect(identityStr).toMatch(/^[α-ω] -> [α-ω]$/);
+	expect(identityStr).not.toContain('given'); // Should not have constraints
 });
 
-test('Type Display (typeToString) - Record Type Display - should display nested record types correctly', () => {
-	const nestedRecord = recordType({
-		person: recordType({
-			name: stringType(),
-			age: floatType(),
-		}),
-	});
+test('Type Display - Variant type variable normalization', () => {
+	// Test that variant type variables are consistently normalized
+	const result = parseAndType('map id');
+	const typeStr = typeToString(result.type, result.state.substitution);
 
-	const result = typeToString(nestedRecord);
-	expect(result).toBe('{ @person { @name String, @age Float } }');
+	// Expected format: "α β -> α β given α implements Functor"
+	const match = typeStr.match(
+		/^([α-ω]+) ([α-ω]+) -> \1 \2 given \1 implements Functor$/
+	);
+	expect(match).toBeTruthy();
+	expect(typeStr).toContain('implements Functor');
 });
-
-test('Type Display (typeToString) - Record Type Display Consistency - should use commas between fields', () => {
-	const recordTypeWithFields = recordType({
-		name: stringType(),
-		age: floatType(),
-	});
-
-	const result = typeToString(recordTypeWithFields);
-	expect(result.includes(', ')).toBeTruthy();
-});
-
-test('Type Display (typeToString) - Record Type Display Consistency - should not use colons in field definitions', () => {
-	const recordTypeWithFields = recordType({
-		name: stringType(),
-		age: floatType(),
-	});
-
-	const result = typeToString(recordTypeWithFields);
-	expect(!result.includes(':')).toBeTruthy();
-});
-
-test('Type Display (typeToString) - Record Type Display Consistency - should use @ prefix for all field names', () => {
-	const recordTypeWithFields = recordType({
-		name: stringType(),
-		age: floatType(),
-		active: { kind: 'primitive', name: 'Bool' } as const,
-	});
-
-	const result = typeToString(recordTypeWithFields);
-	const fields = result.match(/@\w+/g);
-	expect(fields?.length).toBe(3);
-	expect(fields?.includes('@name')).toBeTruthy();
-	expect(fields?.includes('@age')).toBeTruthy();
-	expect(fields?.includes('@active')).toBeTruthy();
-});
-
-test('Type Display (typeToString) - Record Type Display Consistency - should match input syntax format', () => {
-	// This test ensures the display format matches what users type
-	const recordTypeWithFields = recordType({
-		name: stringType(),
-		age: floatType(),
-	});
-
-	const result = typeToString(recordTypeWithFields);
-
-	// Should match the format: { @field Type, @field Type }
-	expect(result).toMatch(/^{ @\w+ \w+(?:, @\w+ \w+)* }$/);
-});
-

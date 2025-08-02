@@ -54,6 +54,8 @@ import type {
 	MutationExpression,
 	MutableDefinitionExpression,
 	UnitType,
+	StructureFieldType,
+	NestedStructureFieldType,
 } from '../src/ast';
 import type {
 	ProgramResult,
@@ -247,6 +249,22 @@ export function assertPrimitiveType(type: Type): asserts type is PrimitiveType {
 export function assertVariantType(type: Type): asserts type is VariantType {
 	if (type.kind !== 'variant') {
 		throw new Error(`Expected kind 'variant', got '${type.kind}'`);
+	}
+}
+
+export function assertNestedStructureFieldType(
+	field: StructureFieldType
+): asserts field is NestedStructureFieldType {
+	if (field.kind === 'nested') {
+		throw new Error(`Expected nested structure field, got ${field.kind}`);
+	}
+}
+
+export function assertStructureFieldType(
+	field: StructureFieldType
+): asserts field is Type {
+	if (field.kind !== 'nested') {
+		throw new Error(`Expected simple field type, got nested structure`);
 	}
 }
 

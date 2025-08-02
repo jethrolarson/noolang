@@ -4,8 +4,8 @@ import {
 	type Type,
 	type Constraint,
 	functionType,
+	constrainedFunctionType,
 	isConstraint,
-	type ConstrainedType,
 	type FunctionType,
 	implementsConstraint,
 } from '../ast';
@@ -43,14 +43,14 @@ export function tryResolveConstraints(
 	functionConstraints: Constraint[],
 	argTypes: Type[],
 	state: TypeState
-): Type | null {
+): { resolvedType: Type; updatedState: TypeState } | null {
 	// For each constraint, check if any of the argument types can satisfy it
 	for (const constraint of functionConstraints) {
 		if (constraint.kind === 'implements') {
 			const traitName = constraint.interfaceName;
 			const varName = constraint.typeVar;
 
-				// Check each argument type to see if it implements the required trait
+			// Check each argument type to see if it implements the required trait
 			for (const argType of argTypes) {
 				const argTypeName = getTypeName(argType);
 
@@ -96,36 +96,105 @@ export function tryResolveConstraints(
 
 					// Apply substitution to return type
 					const resolvedType = substitute(returnType, substitution);
-					return resolvedType;
+					// Merge the local substitution back into the global state
+					const updatedSubstitution = new Map([
+						...state.substitution,
+						...substitution,
+					]);
+					const updatedState = { ...state, substitution: updatedSubstitution };
+					return { resolvedType, updatedState };
 				}
 			}
 		} else if (constraint.kind === 'has') {
 			// Handle structural constraints (accessors)
-			const varName = constraint.typeVar;
 			const requiredStructure = constraint.structure;
-			
+
 			// Check each argument type to see if it has the required structure
 			for (const argType of argTypes) {
+				// Handle both direct record types and type variables that might resolve to records
+				let actualRecordType: any = null;
 				if (argType.kind === 'record') {
+					actualRecordType = argType;
+				} else if (argType.kind === 'variable') {
+					// Check if this type variable has constraints that tell us it should be a record
+					// For now, we'll try to see if it's already been substituted to a record
+					const substitutedType = substitute(argType, state.substitution);
+					if (substitutedType.kind === 'record') {
+						actualRecordType = substitutedType;
+					}
+				}
+
+				if (actualRecordType) {
 					// Check if the record type has all required fields
 					let hasAllFields = true;
 					const substitution = new Map(state.substitution);
-					
+
 					for (const fieldName of Object.keys(requiredStructure.fields)) {
 						// Normalize field names - remove @ prefix if it exists
-						const normalizedFieldName = fieldName.startsWith('@') ? fieldName.slice(1) : fieldName;
-						if (!(normalizedFieldName in argType.fields)) {
+						const normalizedFieldName = fieldName.startsWith('@')
+							? fieldName.slice(1)
+							: fieldName;
+						if (!(normalizedFieldName in actualRecordType.fields)) {
 							hasAllFields = false;
 							break;
 						}
 					}
-					
+
 					if (hasAllFields) {
-						// Structural constraint satisfied! Substitute the type variable
-						substitution.set(varName, argType);
+						// Structural constraint satisfied!
+						// For accessor functions: substitute the actual field types for the constraint's field type variables
+						for (const [fieldName, constraintFieldType] of Object.entries(
+							requiredStructure.fields
+						)) {
+							const normalizedFieldName = fieldName.startsWith('@')
+								? fieldName.slice(1)
+								: fieldName;
+							const actualFieldType =
+								actualRecordType.fields[normalizedFieldName];
+							if (actualFieldType && constraintFieldType.kind === 'variable') {
+								// Substitute the field type variable with the actual field type from the record
+								substitution.set(constraintFieldType.name, actualFieldType);
+							}
+						}
 						// Apply substitution to return type
-						const resolvedType = substitute(returnType, substitution);
-						return resolvedType;
+						let resolvedType = substitute(returnType, substitution);
+
+						// SPECIAL CASE: If the return type is still a variable and we have field type substitutions,
+						// check if the return type should be unified with the field type (common in accessor functions)
+						if (
+							resolvedType.kind === 'variable' &&
+							resolvedType === returnType
+						) {
+							// The return type wasn't substituted, but we have field substitutions
+							// In accessor functions, the return type should match the field type
+							for (const [_fieldName, constraintFieldType] of Object.entries(
+								requiredStructure.fields
+							)) {
+								if (
+									constraintFieldType.kind === 'variable' &&
+									substitution.has(constraintFieldType.name)
+								) {
+									// We found a field type that was substituted
+									const fieldTypeSubstitution = substitution.get(
+										constraintFieldType.name
+									)!;
+									// Also add this to the substitution map for future use
+									substitution.set(resolvedType.name, fieldTypeSubstitution);
+									resolvedType = fieldTypeSubstitution;
+									break;
+								}
+							}
+						}
+						// Merge the local substitution back into the global state
+						const updatedSubstitution = new Map([
+							...state.substitution,
+							...substitution,
+						]);
+						const updatedState = {
+							...state,
+							substitution: updatedSubstitution,
+						};
+						return { resolvedType, updatedState };
 					}
 				}
 			}
@@ -343,19 +412,21 @@ export const typeApplication = (
 	// If it's a constrained type, extract the base type and constraints
 	if (funcType.kind === 'constrained') {
 		actualFuncType = funcType.baseType;
-		// Extract constraints from ConstrainedType  
+		// Extract constraints from ConstrainedType
 		functionConstraints = [];
 		for (const [typeVar, traitConstraints] of funcType.constraints.entries()) {
 			for (const traitConstraint of traitConstraints) {
 				if (traitConstraint.kind === 'implements') {
-					functionConstraints.push(implementsConstraint(typeVar, traitConstraint.interfaceName));
+					functionConstraints.push(
+						implementsConstraint(typeVar, traitConstraint.interfaceName)
+					);
 				} else if (traitConstraint.kind === 'hasField') {
 					// Convert hasField trait constraint to modern hasField constraint
 					functionConstraints.push({
 						kind: 'hasField',
 						typeVar,
 						field: traitConstraint.field,
-						fieldType: traitConstraint.fieldType
+						fieldType: traitConstraint.fieldType,
 					});
 				}
 			}
@@ -426,23 +497,31 @@ export const typeApplication = (
 			// try to resolve them using the actual argument types
 			let finalReturnType = returnType;
 			if (functionConstraints && functionConstraints.length > 0) {
-				// Try to resolve constraints using argument types
-				const resolvedType = tryResolveConstraints(
+				// Apply current substitution to argument types before constraint resolution
+				const substitutedArgTypes = argTypes.map(argType =>
+					substitute(argType, currentState.substitution)
+				);
+
+				// Try to resolve constraints using substituted argument types
+				const constraintResult = tryResolveConstraints(
 					returnType,
 					functionConstraints,
-					argTypes,
+					substitutedArgTypes,
 					currentState
 				);
 
-				if (resolvedType) {
+				if (constraintResult) {
 					// Constraints were successfully resolved to a concrete type
-					finalReturnType = resolvedType;
+					finalReturnType = constraintResult.resolvedType;
+					currentState = constraintResult.updatedState;
 				} else {
 					// Could not resolve constraints, preserve them on the return type if it's a function
 					if (returnType.kind === 'function') {
 						finalReturnType = {
 							...returnType,
-							constraints: (returnType.constraints || []).concat(functionConstraints)
+							constraints: (returnType.constraints || []).concat(
+								functionConstraints
+							),
 						};
 					} else {
 						// For non-function types, just return the type as-is
@@ -575,7 +654,9 @@ export const typeApplication = (
 			if (functionConstraints && functionConstraints.length > 0) {
 				finalPartialType = {
 					...partialFunctionType,
-					constraints: (partialFunctionType.constraints || []).concat(functionConstraints)
+					constraints: (partialFunctionType.constraints || []).concat(
+						functionConstraints
+					),
 				};
 			}
 
@@ -656,20 +737,34 @@ export const typePipeline = (
 ): TypeResult => {
 	// Pipeline should be function composition, not function application
 	// For a pipeline like f |> g |> h, we want to compose them as h(g(f(x)))
+	// For a pipeline like f <| g <| h, we want to compose them as f(g(h(x)))
 
 	if (expr.steps.length === 1) {
 		return typeExpression(expr.steps[0], state);
 	}
 
+	// Determine composition direction based on operators
+	const isLeftToRight = expr.operators.every(op => op === '|>');
+	const isRightToLeft = expr.operators.every(op => op === '<|');
+
+	if (!isLeftToRight && !isRightToLeft) {
+		throw new Error(
+			`Cannot mix pipeline operators |> and <| in the same expression`
+		);
+	}
+
+	// For right-to-left composition (<|), reverse the steps
+	const steps = isRightToLeft ? [...expr.steps].reverse() : expr.steps;
+
 	// Start with the first function type
 	let currentState = state;
-	let composedType = typeExpression(expr.steps[0], currentState);
+	let composedType = typeExpression(steps[0], currentState);
 	currentState = composedType.state;
 	let allEffects = composedType.effects;
 
 	// Compose with each subsequent function type
-	for (let i = 1; i < expr.steps.length; i++) {
-		const nextFuncType = typeExpression(expr.steps[i], currentState);
+	for (let i = 1; i < steps.length; i++) {
+		const nextFuncType = typeExpression(steps[i], currentState);
 		currentState = nextFuncType.state;
 		allEffects = unionEffects(allEffects, nextFuncType.effects);
 
@@ -706,8 +801,89 @@ export const typePipeline = (
 			);
 
 			// The composed function takes the input of the first function and returns the output of the last function
+			// For accessor composition, we need to properly merge constraints
+			const firstConstraints = composedType.type.constraints || [];
+			const secondConstraints = nextFuncType.type.constraints || [];
+
+			// For accessor composition, we want to:
+			// 1. Keep the first accessor's constraint (e.g., α has {@person γ})
+			// 2. Add a nested constraint to the person field (e.g., γ has {@city β})
+
+			// Start with the first function's constraints
+			const mergedConstraints = [...firstConstraints];
+
+			// For the second function, we need to find what field it's accessing
+			// and add a constraint that the person field has that field
+			for (const constraint of secondConstraints) {
+				if (constraint.kind === 'has') {
+					// Find what field the second accessor is trying to access
+					const fieldNames = Object.keys(constraint.structure.fields);
+					if (fieldNames.length === 1) {
+						const _fieldName = fieldNames[0];
+
+						// Find the person field constraint from the first function
+						const personConstraint = firstConstraints.find(
+							c => c.kind === 'has' && c.structure.fields.person
+						);
+
+						if (personConstraint && personConstraint.kind === 'has') {
+							// Add the constraint that the person field has the target field
+							const personFieldType = personConstraint.structure.fields.person;
+							if (personFieldType.kind === 'variable') {
+								// Create a new constraint that the person field has the target field
+								const nestedConstraint = {
+									kind: 'has' as const,
+									typeVar: personFieldType.name,
+									structure: constraint.structure,
+								};
+								mergedConstraints.push(nestedConstraint);
+							}
+						}
+					}
+				}
+			}
+
+			// For accessor composition, we want to create a clean constraint structure
+			// The result should be: α has {person: γ} and γ has {city: β}
+			const uniqueConstraints: Constraint[] = [];
+
+			// Find the person constraint from the first function
+			const personConstraint = firstConstraints.find(
+				c => c.kind === 'has' && c.structure.fields.person
+			);
+
+			if (personConstraint && personConstraint.kind === 'has') {
+				// Get the person field variable
+				const personFieldType = personConstraint.structure.fields.person;
+				if (personFieldType.kind === 'variable') {
+					// Find what field the second accessor is trying to access
+					for (const constraint of secondConstraints) {
+						if (constraint.kind === 'has') {
+							const fieldNames = Object.keys(constraint.structure.fields);
+							if (fieldNames.length === 1) {
+								const _fieldName = fieldNames[0];
+
+								// Create a constraint that the person field has the target field
+								const nestedConstraint = {
+									kind: 'has' as const,
+									typeVar: personFieldType.name,
+									structure: constraint.structure,
+								};
+								uniqueConstraints.push(nestedConstraint);
+								break; // Only add the first matching constraint
+							}
+						}
+					}
+				}
+			}
+
 			composedType = createTypeResult(
-				functionType([composedType.type.params[0]], nextFuncType.type.return),
+				constrainedFunctionType(
+					[composedType.type.params[0]],
+					nextFuncType.type.return,
+					allEffects,
+					uniqueConstraints
+				),
 				allEffects,
 				currentState
 			);

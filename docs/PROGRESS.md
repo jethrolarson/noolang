@@ -257,4 +257,4 @@ noolang/
 - Need module paths. Having to load everything via relative paths is troublesome
 - we're using both camelCase and snake. Everything should be snake.
 - print should be : a -> a given a is Show (maybe log too, or can we just leave that with dumb encoding inferred in host language?)
-- **FFI Dependency Chain**: Discovered that implementing FFI properly requires traits → monadic bind → |? operator → optional accessors → Unknown type. Prioritizing traits as foundational feature.
+- <https://llmstxt.org> may be a model for how to document the language. e.g. https://bun.sh/llms.txt

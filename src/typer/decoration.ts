@@ -3,6 +3,7 @@ import { type TypeState, unionEffects } from './types';
 import { createTypeState, loadStdlib } from './type-operations';
 import { initializeBuiltins } from './builtins';
 import { typeExpression } from './expression-dispatcher';
+import { substitute } from './substitute';
 
 // Decorate AST nodes with inferred types - now uses single-pass typing
 export const typeAndDecorate = (
@@ -35,10 +36,13 @@ export const typeAndDecorate = (
 		statement.type = result.type;
 	}
 
+	// Apply final substitution to the program type
+	const finalType = substitute(type, state.substitution);
+
 	return {
 		program,
 		state,
-		type,
+		type: finalType,
 		effects,
 	};
 };
