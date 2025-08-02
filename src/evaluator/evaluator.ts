@@ -245,8 +245,8 @@ export class Evaluator {
 		traitRegistry: TraitRegistry;
 		skipStdlib?: boolean;
 	}) {
-		this.fs = opts?.fs ?? defaultFs;
-		this.path = opts?.path ?? defaultPath;
+		this.fs = opts.fs ?? defaultFs;
+		this.path = opts.path ?? defaultPath;
 		this.traitRegistry = opts.traitRegistry;
 		this.environment = new Map();
 		this.environmentStack = [];

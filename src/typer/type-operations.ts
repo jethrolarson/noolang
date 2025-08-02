@@ -9,12 +9,7 @@ import {
 } from '../ast';
 import { parse } from '../parser/parser';
 import { Lexer } from '../lexer/lexer';
-import {
-	type TypeState,
-	type TypeEnvironment,
-	type TypeScheme,
-	createConstraintRegistry,
-} from './types';
+import { type TypeState, type TypeEnvironment, type TypeScheme } from './types';
 import { createTraitRegistry } from './trait-system';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
@@ -309,7 +304,6 @@ export const createTypeState = (): TypeState => ({
 	constraints: [],
 	adtRegistry: new Map(),
 	accessorCache: new Map(),
-	constraintRegistry: createConstraintRegistry(), // LEGACY
 	traitRegistry: createTraitRegistry(), // NEW: Simple trait system
 });
 

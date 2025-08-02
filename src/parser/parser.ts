@@ -606,6 +606,7 @@ export const parseTypeExpression: C.Parser<Type> = tokens => {
 		position: tokens[0]?.location.start.line || 0,
 	};
 };
+
 // --- Basic Parsers ---
 const parseIdentifier = C.map(
 	C.identifier(),
@@ -1855,12 +1856,14 @@ const parseConstraintFunction: C.Parser<ConstraintFunction> = C.map(
 		C.punctuation(':'),
 		C.lazy(() => parseTypeExpression)
 	),
-	([name, typeParams, colon, type]): ConstraintFunction => ({
-		name: name.value,
-		typeParams: typeParams.map(p => p.value),
-		type,
-		location: createLocation(name.location.start, colon.location.end),
-	})
+	([name, typeParams, colon, type]): ConstraintFunction => {
+		return {
+			name: name.value,
+			typeParams: typeParams.map(p => p.value),
+			type,
+			location: createLocation(name.location.start, colon.location.end),
+		};
+	}
 );
 
 // --- Constraint Definition ---

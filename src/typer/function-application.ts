@@ -8,6 +8,7 @@ import {
 	isConstraint,
 	type FunctionType,
 	implementsConstraint,
+	type RecordType,
 } from '../ast';
 import {
 	functionApplicationError,
@@ -45,25 +46,31 @@ function resolveNestedStructure(
 	currentSubstitution: Map<string, Type>
 ): Map<string, Type> | null {
 	const result = new Map(currentSubstitution);
-	
+
 	// Resolve each field in the nested structure
 	for (const [fieldName, fieldType] of Object.entries(nestedStructure.fields)) {
-		const normalizedFieldName = fieldName.startsWith('@') ? fieldName.slice(1) : fieldName;
-		
+		const normalizedFieldName = fieldName.startsWith('@')
+			? fieldName.slice(1)
+			: fieldName;
+
 		if (!(normalizedFieldName in actualRecord.fields)) {
 			// Required field not found
 			return null;
 		}
-		
+
 		const actualFieldType = actualRecord.fields[normalizedFieldName];
-		
+
 		if (fieldType.kind === 'variable') {
 			// Simple field - substitute the variable with the actual field type
 			result.set(fieldType.name, actualFieldType);
 		} else if (fieldType.kind === 'nested') {
 			// Nested structure - recurse
 			if (actualFieldType.kind === 'record') {
-				const nestedResult = resolveNestedStructure(actualFieldType, fieldType.structure, result);
+				const nestedResult = resolveNestedStructure(
+					actualFieldType,
+					fieldType.structure,
+					result
+				);
 				if (!nestedResult) {
 					return null; // Nested resolution failed
 				}
@@ -77,7 +84,7 @@ function resolveNestedStructure(
 			}
 		}
 	}
-	
+
 	return result;
 }
 
@@ -156,7 +163,7 @@ export function tryResolveConstraints(
 			// Check each argument type to see if it has the required structure
 			for (const argType of argTypes) {
 				// Handle both direct record types and type variables that might resolve to records
-				let actualRecordType: any = null;
+				let actualRecordType: RecordType | null = null;
 				if (argType.kind === 'record') {
 					actualRecordType = argType;
 				} else if (argType.kind === 'variable') {
@@ -198,7 +205,10 @@ export function tryResolveConstraints(
 							if (actualFieldType && constraintFieldType.kind === 'variable') {
 								// Substitute the field type variable with the actual field type from the record
 								substitution.set(constraintFieldType.name, actualFieldType);
-							} else if (actualFieldType && constraintFieldType.kind === 'nested') {
+							} else if (
+								actualFieldType &&
+								constraintFieldType.kind === 'nested'
+							) {
 								// Handle nested structure constraints
 								const nestedStructure = constraintFieldType.structure;
 								if (actualFieldType.kind === 'record') {
@@ -335,133 +345,209 @@ export const typeApplication = (
 			expr.func.kind === 'variable' &&
 			isTraitFunction(currentState.traitRegistry, expr.func.name)
 		) {
-			const resolution = resolveTraitFunction(
+			// Get the trait function signature to understand its arity
+			const traitInfo = getTraitFunctionInfo(
 				currentState.traitRegistry,
-				expr.func.name,
-				argTypes
+				expr.func.name
 			);
+			if (traitInfo && traitInfo.functionType.kind === 'function') {
+				const traitFuncType = traitInfo.functionType;
 
-			if (resolution.found && resolution.impl) {
-				// We found a trait implementation - evaluate it with the arguments
-				// The trait implementation is an expression we need to type
-				const traitImplType = typeExpression(resolution.impl, currentState);
+				// For trait functions, we need to check if we have enough arguments to fully apply the function
+				// A trait function like `add : a -> a -> a` needs 2 arguments to be fully applied
+				// We can determine this by checking if the return type is still a function type
+				const isFullyApplied = traitFuncType.return.kind !== 'function';
 
-				// Apply the trait implementation to the arguments
-				if (traitImplType.type.kind === 'function') {
-					// FIXED: Use direct function application logic instead of recursive typeApplication
-					// to avoid exponential blowup while maintaining compatibility
-					const funcType = traitImplType.type;
-					let resultState = traitImplType.state;
-
-					// Type arguments first
-					const argResults = expr.args.map(arg =>
-						typeExpression(arg, resultState)
-					);
-					for (const argResult of argResults) {
-						resultState = argResult.state;
-					}
-					const argTypes = argResults.map(result => result.type);
-
-					// Apply normal function application logic (copied from main path)
-					if (argTypes.length > funcType.params.length) {
-						throwTypeError(
-							location =>
-								functionApplicationError(
-									funcType.params[funcType.params.length - 1],
-									argTypes[funcType.params.length - 1],
-									funcType.params.length - 1,
-									undefined,
-									location
-								),
-							getExprLocation(expr)
-						);
-					}
-
-					// Unify each argument with the corresponding parameter type
+				if (!isFullyApplied) {
+					// Partial application: return a function type with remaining parameters and constraints
+					// Unify the supplied arguments with the corresponding parameters
+					let partialState = currentState;
 					for (let i = 0; i < argTypes.length; i++) {
-						const unificationContext = {
-							reason: 'function_application' as const,
-							operation: `applying argument ${i + 1}`,
-							hint: `Argument ${i + 1} has type ${typeToString(
-								argTypes[i],
-								resultState.substitution
-							)} but the function parameter expects ${typeToString(
-								funcType.params[i],
-								resultState.substitution
-							)}.`,
-						};
-
-						resultState = unify(
-							funcType.params[i],
+						partialState = unify(
+							traitFuncType.params[i],
 							argTypes[i],
-							resultState,
-							getExprLocation(expr),
-							unificationContext
-						);
-					}
-
-					// Return the function's return type with effects
-					const resultType = substitute(
-						funcType.return,
-						resultState.substitution
-					);
-
-					const resultEffects = unionEffects(
-						traitImplType.effects,
-						...argResults.map(r => r.effects)
-					);
-					return createTypeResult(resultType, resultEffects, resultState);
-				} else {
-					// The trait implementation should be a function
-					const funcName =
-						expr.func.kind === 'variable' ? expr.func.name : 'unknown';
-					throwTypeError(
-						location => ({
-							type: 'TypeError' as const,
-							kind: 'general',
-							message: `Trait implementation for ${funcName} is not a function`,
-							location,
-						}),
-						getExprLocation(expr)
-					);
-				}
-			} else if (resolution.found === false) {
-				// No trait implementation found - check if this is polymorphic
-				const funcName =
-					expr.func.kind === 'variable' ? expr.func.name : 'unknown';
-
-				// Get the trait function signature to check if it's polymorphic
-				const traitInfo = getTraitFunctionInfo(
-					currentState.traitRegistry,
-					funcName
-				);
-				if (traitInfo && traitInfo.functionType.kind === 'function') {
-					// Check if the trait function return type has unresolved type variables
-					const hasUnresolvedVariables = hasTypeVariables(
-						traitInfo.functionType.return
-					);
-
-					if (!hasUnresolvedVariables && isFullyConcrete(argTypes[0])) {
-						// Concrete function with concrete argument: error
-						const argTypeNames = argTypes
-							.map(t => getTypeName(t))
-							.filter(Boolean);
-						const typeStr =
-							argTypeNames.length > 0
-								? argTypeNames.join(', ')
-								: 'unknown type';
-						throwTypeError(
-							location => ({
-								type: 'TypeError' as const,
-								kind: 'general',
-								message: `No implementation of trait function '${funcName}' for ${typeStr}`,
-								location,
-							}),
+							partialState,
 							getExprLocation(expr)
 						);
 					}
-					// Otherwise, allow constraint to be created (polymorphic or type variable arguments)
+					// Build the remaining curried function type
+					// For curried functions, we need to handle the case where we've applied one argument
+					// and the return type is still a function
+					const resultType = substitute(
+						traitFuncType.return,
+						partialState.substitution
+					);
+					let curriedType: Type = resultType;
+					// Preserve constraints only if the result type is a function
+					if (
+						traitFuncType.constraints &&
+						traitFuncType.constraints.length > 0 &&
+						resultType.kind === 'function'
+					) {
+						// Apply substitution to the constraints to update variable names
+						const substitutedConstraints = traitFuncType.constraints.map(
+							constraint => {
+								if (constraint.kind === 'implements') {
+									const substitutedVar = substitute(
+										{ kind: 'variable', name: constraint.typeVar },
+										partialState.substitution
+									);
+
+									// If the substitution resulted in a variable, use its name
+									if (substitutedVar.kind === 'variable') {
+										return {
+											...constraint,
+											typeVar: substitutedVar.name,
+										};
+									}
+									// If it was substituted to a concrete type, the constraint is resolved
+									// and should not be preserved
+									return null;
+								}
+								return constraint;
+							}
+						);
+
+						curriedType = {
+							...resultType,
+							constraints: (resultType.constraints || []).concat(
+								substitutedConstraints.filter(c => c !== null)
+							),
+						};
+					}
+					return createTypeResult(
+						curriedType,
+						funcResult.effects,
+						partialState
+					);
 				}
+
+				// Only resolve trait functions when fully applied
+				if (isFullyApplied) {
+					const resolution = resolveTraitFunction(
+						currentState.traitRegistry,
+						expr.func.name,
+						argTypes
+					);
+
+					if (resolution.found && resolution.impl) {
+						// We found a trait implementation - evaluate it with the arguments
+						// The trait implementation is an expression we need to type
+						const traitImplType = typeExpression(resolution.impl, currentState);
+
+						// Apply the trait implementation to the arguments
+						if (traitImplType.type.kind === 'function') {
+							// FIXED: Use direct function application logic instead of recursive typeApplication
+							// to avoid exponential blowup while maintaining compatibility
+							const funcType = traitImplType.type;
+							let resultState = traitImplType.state;
+
+							// Type arguments first
+							const argResults = expr.args.map(arg =>
+								typeExpression(arg, resultState)
+							);
+							for (const argResult of argResults) {
+								resultState = argResult.state;
+							}
+							const argTypes = argResults.map(result => result.type);
+
+							// Apply normal function application logic (copied from main path)
+							if (argTypes.length > funcType.params.length) {
+								throwTypeError(
+									location =>
+										functionApplicationError(
+											funcType.params[funcType.params.length - 1],
+											argTypes[funcType.params.length - 1],
+											funcType.params.length - 1,
+											undefined,
+											location
+										),
+									getExprLocation(expr)
+								);
+							}
+
+							// Unify each argument with the corresponding parameter type
+							for (let i = 0; i < argTypes.length; i++) {
+								const unificationContext = {
+									reason: 'function_application' as const,
+									operation: `applying argument ${i + 1}`,
+									hint: `Argument ${i + 1} has type ${typeToString(
+										argTypes[i],
+										resultState.substitution
+									)} but the function parameter expects ${typeToString(
+										funcType.params[i],
+										resultState.substitution
+									)}.`,
+								};
+
+								resultState = unify(
+									funcType.params[i],
+									argTypes[i],
+									resultState,
+									getExprLocation(expr),
+									unificationContext
+								);
+							}
+
+							// Return the function's return type with effects
+							const resultType = substitute(
+								funcType.return,
+								resultState.substitution
+							);
+
+							const resultEffects = unionEffects(
+								traitImplType.effects,
+								...argResults.map(r => r.effects)
+							);
+							return createTypeResult(resultType, resultEffects, resultState);
+						} else {
+							// The trait implementation should be a function
+							const funcName =
+								expr.func.kind === 'variable' ? expr.func.name : 'unknown';
+							throwTypeError(
+								location => ({
+									type: 'TypeError' as const,
+									kind: 'general',
+									message: `Trait implementation for ${funcName} is not a function`,
+									location,
+								}),
+								getExprLocation(expr)
+							);
+						}
+					} else if (resolution.found === false) {
+						// No trait implementation found - check if this is polymorphic
+						const funcName =
+							expr.func.kind === 'variable' ? expr.func.name : 'unknown';
+
+						// Check if the trait function return type has unresolved type variables
+						const hasUnresolvedVariables = hasTypeVariables(
+							traitFuncType.return
+						);
+
+						if (!hasUnresolvedVariables && isFullyConcrete(argTypes[0])) {
+							// Concrete function with concrete argument: error
+							const argTypeNames = argTypes
+								.map(t => getTypeName(t))
+								.filter(Boolean);
+							const typeStr =
+								argTypeNames.length > 0
+									? argTypeNames.join(', ')
+									: 'unknown type';
+							throwTypeError(
+								location => ({
+									type: 'TypeError' as const,
+									kind: 'general',
+									message: `No implementation of trait function '${funcName}' for ${typeStr}`,
+									location,
+								}),
+								getExprLocation(expr)
+							);
+						}
+						// Otherwise, allow constraint to be created (polymorphic or type variable arguments)
+					}
+				}
+				// For partial applications, fall through to normal function application logic
+				// which will handle the trait function as a constrained function type
 			}
 		}
 	}
@@ -922,8 +1008,6 @@ export const typePipeline = (
 						if (constraint.kind === 'has') {
 							const fieldNames = Object.keys(constraint.structure.fields);
 							if (fieldNames.length === 1) {
-								const _fieldName = fieldNames[0];
-
 								// Create a constraint that the person field has the target field
 								const nestedConstraint = {
 									kind: 'has' as const,

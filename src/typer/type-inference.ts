@@ -84,11 +84,7 @@ import {
 	addTraitImplementation,
 } from './trait-system';
 
-import {
-	composeStructuralConstraints,
-	extractResultTypeVar,
-	isSimpleFieldConstraint,
-} from './constraint-composition';
+import { isSimpleFieldConstraint } from './constraint-composition';
 
 // Note: Main typeExpression is now in expression-dispatcher.ts
 // This file only contains the individual type inference functions
@@ -154,10 +150,42 @@ export const typeVariableExpr = (
 								type.return,
 								currentState2
 							);
-							return [
-								functionType(freshenedParams, freshenedReturn, type.effects),
-								finalState,
-							];
+
+							// Freshen constraints if they exist
+							let freshenedConstraints = type.constraints;
+							if (type.constraints && type.constraints.length > 0) {
+								freshenedConstraints = type.constraints.map(constraint => {
+									if ('typeVar' in constraint) {
+										// Always ensure the mapping exists for constraint.typeVar
+										let freshenedVar = typeVarMapping.get(constraint.typeVar);
+										if (!freshenedVar) {
+											const [newVar, newState] =
+												freshTypeVariable(currentState);
+											typeVarMapping.set(constraint.typeVar, newVar);
+											freshenedVar = newVar;
+											currentState = newState;
+										}
+										if (freshenedVar.kind === 'variable') {
+											return {
+												...constraint,
+												typeVar: freshenedVar.name,
+											};
+										}
+									}
+									return constraint;
+								});
+							}
+
+							const freshenedFunction = functionType(
+								freshenedParams,
+								freshenedReturn,
+								type.effects
+							);
+							if (freshenedConstraints) {
+								freshenedFunction.constraints = freshenedConstraints;
+							}
+
+							return [freshenedFunction, finalState];
 						}
 						case 'variant': {
 							// Check if this variant name is actually a type parameter from the trait constraint
@@ -708,22 +736,22 @@ export const typeFunction = (
 
 // Helper function to collect implicit constraints from function bodies
 function collectImplicitConstraints(
-	_bodyType: Type,
-	_paramTypes: Type[],
-	_state: TypeState,
-	_bodyExpr?: Expression,
-	_paramNames?: string[]
+	bodyType: Type,
+	paramTypes: Type[],
+	state: TypeState,
+	bodyExpr?: Expression,
+	paramNames?: string[]
 ): Constraint[] {
 	const constraints: Constraint[] = [];
 
 	const allTypeVars = new Set<string>();
-	for (const paramType of _paramTypes) {
+	for (const paramType of paramTypes) {
 		collectTypeVariables(paramType, allTypeVars);
 	}
-	collectTypeVariables(_bodyType, allTypeVars);
+	collectTypeVariables(bodyType, allTypeVars);
 
 	// Collect trait constraints (existing functionality)
-	if (_bodyExpr && usesAddOperator(_bodyExpr)) {
+	if (bodyExpr && usesAddOperator(bodyExpr)) {
 		const typeVarList = Array.from(allTypeVars).sort();
 		if (typeVarList.length > 0) {
 			const canonicalVar = typeVarList[0];
@@ -732,12 +760,12 @@ function collectImplicitConstraints(
 	}
 
 	// NEW: Collect structural constraints from accessor expressions
-	if (_bodyExpr && _paramNames) {
+	if (bodyExpr && paramNames) {
 		const accessorConstraints = collectAccessorConstraints(
-			_bodyExpr,
-			_paramNames,
-			_paramTypes,
-			_state
+			bodyExpr,
+			paramNames,
+			paramTypes,
+			state
 		);
 		constraints.push(...accessorConstraints);
 	}
@@ -923,7 +951,11 @@ function collectAccessorConstraints(
 				}
 
 				// Case 3: Composed accessor patterns like "getStreet (getAddress person)"
-				if (func.kind === 'variable' && args.length === 1 && args[0].kind === 'application') {
+				if (
+					func.kind === 'variable' &&
+					args.length === 1 &&
+					args[0].kind === 'application'
+				) {
 					const outerAccessorName = func.name;
 					const innerApplication = args[0];
 
@@ -943,17 +975,23 @@ function collectAccessorConstraints(
 						const innerScheme = state.environment.get(innerAccessorName);
 
 						if (outerScheme && innerScheme) {
-							const outerType = substitute(outerScheme.type, state.substitution);
-							const innerType = substitute(innerScheme.type, state.substitution);
+							const outerType = substitute(
+								outerScheme.type,
+								state.substitution
+							);
+							const innerType = substitute(
+								innerScheme.type,
+								state.substitution
+							);
 
 							// Check if both are accessor types with simple constraints
 							if (isAccessorType(outerType) && isAccessorType(innerType)) {
-								const outerConstraint = (outerType as FunctionType).constraints?.find(
-									(c: Constraint) => c.kind === 'has'
-								);
-								const innerConstraint = (innerType as FunctionType).constraints?.find(
-									(c: Constraint) => c.kind === 'has'
-								);
+								const outerConstraint = (
+									outerType as FunctionType
+								).constraints?.find((c: Constraint) => c.kind === 'has');
+								const innerConstraint = (
+									innerType as FunctionType
+								).constraints?.find((c: Constraint) => c.kind === 'has');
 
 								if (
 									outerConstraint &&
@@ -973,18 +1011,27 @@ function collectAccessorConstraints(
 										const finalVar = `α${Math.random().toString(36).substr(2, 9)}`;
 
 										// Create the inner constraint: paramTypeVar has {innerField: intermediateVar}
-										const innerComposedConstraint = hasStructureConstraint(paramTypeVar, {
-											fields: {
-												[innerField]: { kind: 'variable', name: intermediateVar },
-											},
-										});
+										const innerComposedConstraint = hasStructureConstraint(
+											paramTypeVar,
+											{
+												fields: {
+													[innerField]: {
+														kind: 'variable',
+														name: intermediateVar,
+													},
+												},
+											}
+										);
 
 										// Create the outer constraint: intermediateVar has {outerField: finalVar}
-										const outerComposedConstraint = hasStructureConstraint(intermediateVar, {
-											fields: {
-												[outerField]: { kind: 'variable', name: finalVar },
-											},
-										});
+										const outerComposedConstraint = hasStructureConstraint(
+											intermediateVar,
+											{
+												fields: {
+													[outerField]: { kind: 'variable', name: finalVar },
+												},
+											}
+										);
 
 										// For composed accessor patterns, use separate constraints that can be resolved by existing logic
 										// This creates the logical relationship between constraints while working with the current resolution system
@@ -1716,11 +1763,14 @@ export const typeConstraintDefinition = (
 	const { name, typeParams, functions } = expr;
 
 	// Create trait definition
-	const functionMap = new Map<string, Type>();
+	const functionMap = new Map<string, FunctionType>();
 
 	for (const func of functions) {
 		// Type the function signature, substituting the constraint type parameter
 		const funcType = func.type;
+		if (funcType.kind !== 'function') {
+			throw new Error(`Function '${func.name}' is not a function`);
+		}
 		functionMap.set(func.name, funcType);
 	}
 
@@ -1730,8 +1780,8 @@ export const typeConstraintDefinition = (
 		functions: functionMap,
 	};
 
-	   // Add to trait registry using the new trait system
-   addTraitDefinition(state.traitRegistry, traitDef);
+	// Add to trait registry using the new trait system
+	addTraitDefinition(state.traitRegistry, traitDef);
 
 	// Constraint definitions have unit type
 	return createPureTypeResult(unitType(), state);

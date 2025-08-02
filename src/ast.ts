@@ -77,7 +77,6 @@ export type PrimitiveType = {
 
 export type FunctionType = {
 	kind: 'function';
-	// FIXME functions only have one param
 	params: Type[];
 	return: Type;
 	effects: Set<Effect>;

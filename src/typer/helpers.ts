@@ -11,12 +11,13 @@ import {
 	type ConstrainedType,
 	type UnionType,
 	type VariantType,
-	Constraint,
-	IsConstraint,
-	HasFieldConstraint,
-	ImplementsConstraint,
-	CustomConstraint,
-	HasStructureConstraint,
+	type Constraint,
+	type IsConstraint,
+	type HasFieldConstraint,
+	type ImplementsConstraint,
+	type CustomConstraint,
+	type HasStructureConstraint,
+	type RecordStructure,
 } from '../ast';
 import { formatTypeError } from './type-errors';
 import { NoolangError } from '../errors';
@@ -455,33 +456,31 @@ export const typeToString = (
 		}
 	}
 
+	// Helper to assign/display variable names
 	function norm(t: Type): string {
 		switch (t.kind) {
 			case 'primitive':
 				return t.name;
 			case 'function': {
-				const paramStr = t.params.map(norm).join(' ');
+				const paramStr = t.params
+					.map(param => {
+						// Add parentheses around function type parameters
+						if (param.kind === 'function') {
+							return `(${norm(param)})`;
+						}
+						return norm(param);
+					})
+					.join(' ');
 				const effectStr = formatEffectsString(t.effects);
 				const baseType = `${paramStr} -> ${norm(t.return)}${effectStr}`;
 				return baseType;
 			}
 			case 'variable': {
-				let varStr = '';
-
 				if (!mapping.has(t.name)) {
-					// If the type variable name is a single letter, keep it as-is
-					// This preserves explicit type annotations like 'a -> a'
-					if (t.name.length === 1 && /^[a-z]$/.test(t.name)) {
-						mapping.set(t.name, t.name);
-					} else {
-						mapping.set(t.name, latin[next] || `t${next}`);
-						next++;
-					}
+					mapping.set(t.name, latin[next] || `t${next}`);
+					next++;
 				}
-				// biome-ignore lint/style/noNonNullAssertion: it's set if not defined above
-				varStr = mapping.get(t.name)!;
-
-				return varStr;
+				return mapping.get(t.name)!;
 			}
 			case 'list':
 				return `List ${norm(t.element)}`;
@@ -498,7 +497,13 @@ export const typeToString = (
 			case 'variant': {
 				// If variant name looks like a type variable, normalize it
 				const variantName = /^α\d+$/.test(t.name)
-					? normalizeConstraintVariable(t.name)
+					? mapping.has(t.name)
+						? mapping.get(t.name)!
+						: (() => {
+								mapping.set(t.name, latin[next] || `t${next}`);
+								next++;
+								return mapping.get(t.name)!;
+							})()
 					: t.name;
 				if (t.args.length === 0) {
 					return variantName;
@@ -539,18 +544,45 @@ export const typeToString = (
 		}
 	}
 
-	// Helper function to normalize constraint variable names
-	function normalizeConstraintVariable(typeVar: string): string {
-		// First try the mapping
-		const mapped = mapping.get(typeVar);
-		if (mapped) {
-			return mapped;
-		}
+	// Helper function to format structure constraints
+	function formatStructure(structure: RecordStructure): string {
+		const fieldDescs = Object.entries(structure.fields)
+			.map(([fieldName, fieldType]) => {
+				const fieldTypeStr = norm(fieldType as Type);
+				// Check if the field type has nested constraints
+				if (
+					fieldType.kind === 'variable' &&
+					fieldType.constraints &&
+					fieldType.constraints.length > 0
+				) {
+					const nestedConstraints = fieldType.constraints
+						.map(c => {
+							if (c.kind === 'has') {
+								const nestedFieldDescs = Object.entries(c.structure.fields)
+									.map(
+										([nestedFieldName, nestedFieldType]) =>
+											`@${nestedFieldName} ${norm(nestedFieldType as Type)}`
+									)
+									.join(', ');
+								return `${normalizeConstraintVariable(c.typeVar)} has {${nestedFieldDescs}}`;
+							}
+							return 'unknown constraint';
+						})
+						.join(' and ');
+					return `@${fieldName} ${fieldTypeStr} given ${nestedConstraints}`;
+				}
+				return `@${fieldName} ${fieldTypeStr}`;
+			})
+			.join(', ');
+		return `{${fieldDescs}}`;
+	}
 
-		// If not in mapping, add it using the same logic as norm()
+	// Helper function to normalize constraint variable names using existing mapping
+	function normalizeConstraintVariable(typeVar: string): string {
+		// Use the existing mapping established by norm() function
+		// This ensures constraint variables match the parameter/return type variables
 		if (!mapping.has(typeVar)) {
-			// If the type variable name is a single letter, keep it as-is
-			// This preserves explicit type annotations like 'a -> a'
+			// For single-letter variable names (like variant type names), preserve them
 			if (typeVar.length === 1 && /^[a-z]$/.test(typeVar)) {
 				mapping.set(typeVar, typeVar);
 			} else {
@@ -558,86 +590,50 @@ export const typeToString = (
 				next++;
 			}
 		}
-
-		return mapping.get(typeVar) || typeVar;
+		return mapping.get(typeVar)!;
 	}
 
 	function formatConstraint(c: Constraint): string {
+		// Apply substitution to get the final variable name, then normalize for display
+		const constraintVarType = substitute({ kind: 'variable', name: c.typeVar }, substitution);
+		const finalVarName = constraintVarType.kind === 'variable' ? constraintVarType.name : c.typeVar;
+		const normalizedVar = normalizeConstraintVariable(finalVarName);
+		
 		switch (c.kind) {
-			case 'is': {
-				const normalizedVarName = normalizeConstraintVariable(c.typeVar);
-				return `${normalizedVarName} is ${c.constraint}`;
+			case 'implements': {
+				return `${normalizedVar} implements ${c.interfaceName}`;
 			}
 			case 'hasField': {
-				const normalizedVarName2 = normalizeConstraintVariable(c.typeVar);
-				return `${normalizedVarName2} has field "${c.field}" of type ${norm(
-					c.fieldType
-				)}`;
-			}
-			case 'implements': {
-				const normalizedVarName3 = normalizeConstraintVariable(c.typeVar);
-				return `${normalizedVarName3} implements ${c.interfaceName}`;
+				return `${normalizedVar} has ${c.field}: ${norm(c.fieldType)}`;
 			}
 			case 'has': {
-				const normalizedVarName = normalizeConstraintVariable(c.typeVar);
-				const fieldDescs = Object.entries(c.structure.fields)
-					.map(([fieldName, fieldType]) => {
-						const fieldTypeStr = norm(fieldType as Type);
-						// Check if the field type has nested constraints
-						if (fieldType.kind === 'variable' && fieldType.constraints) {
-							const nestedConstraints = fieldType.constraints
-								.map(c => {
-									if (c.kind === 'has') {
-										const nestedFieldDescs = Object.entries(c.structure.fields)
-											.map(
-												([nestedFieldName, nestedFieldType]) =>
-													`@${nestedFieldName} ${norm(nestedFieldType as Type)}`
-											)
-											.join(', ');
-										return `${normalizeConstraintVariable(c.typeVar)} has {${nestedFieldDescs}}`;
-									}
-									return 'unknown constraint';
-								})
-								.join(' and ');
-							return `@${fieldName} ${fieldTypeStr} given ${nestedConstraints}`;
-						}
-						return `@${fieldName} ${fieldTypeStr}`;
-					})
-					.join(', ');
-				return `${normalizedVarName} has {${fieldDescs}}`;
+				const structureStr = formatStructure(c.structure);
+				return `${normalizedVar} has ${structureStr}`;
+			}
+			case 'is': {
+				return `${normalizedVar} is ${c.constraint}`;
 			}
 			case 'custom': {
-				const normalizedVarName4 = normalizeConstraintVariable(c.typeVar);
-				return `${normalizedVarName4} satisfies ${c.constraint} ${c.args
-					.map(norm)
-					.join(' ')}`;
+				const argsStr = c.args.map(norm).join(', ');
+				return `${normalizedVar} ${c.constraint}(${argsStr})`;
 			}
 			default:
 				return 'unknown constraint';
 		}
 	}
 
-	// Helper function to deduplicate constraints
-	function deduplicateConstraints(constraints: Constraint[]): Constraint[] {
-		const result: Constraint[] = [];
-
-		for (const constraint of constraints) {
-			const isDuplicate = result.some(c => constraintsEqual(c, constraint));
-			if (!isDuplicate) {
-				result.push(constraint);
-			}
-		}
-
-		return result;
-	}
-
 	// Apply substitution to the type before normalizing
 	const substitutedType = substitute(type, substitution);
 
-	// Collect constraints AFTER variable mapping is initialized by first calling norm()
-	const baseTypeStr = norm(substitutedType);
+	// If function type, traverse all params and return first to ensure variable mapping order
+	if (substitutedType.kind === 'function') {
+		substitutedType.params.forEach(param => norm(param));
+		norm(substitutedType.return);
+	}
 
 	// Now collect constraints with the correct variable mapping
+	const baseTypeStr = norm(substitutedType);
+
 	if (showConstraints) {
 		collectConstraints(substitutedType);
 	}
@@ -648,11 +644,19 @@ export const typeToString = (
 		allConstraints.length > 0 &&
 		substitutedType.kind === 'function'
 	) {
-		const paramStr = substitutedType.params.map(norm).join(' ');
+		const paramStr = substitutedType.params
+			.map(param => {
+				// Add parentheses around function type parameters
+				if (param.kind === 'function') {
+					return `(${norm(param)})`;
+				}
+				return norm(param);
+			})
+			.join(' ');
 		const effectStr = formatEffectsString(substitutedType.effects);
 		const baseType = `${paramStr} -> ${norm(substitutedType.return)}${effectStr}`;
 
-		const constraintStr = ` given ${deduplicateConstraints(allConstraints)
+		const constraintStr = ` given ${deduplicateConstraints(allConstraints, substitution)
 			.sort((a, b) => {
 				const order: Record<string, number> = {
 					implements: 0,
@@ -671,6 +675,56 @@ export const typeToString = (
 
 	return baseTypeStr;
 };
+
+// Helper function to deduplicate constraints
+function deduplicateConstraints(constraints: Constraint[], substitution: Map<string, Type>): Constraint[] {
+	const result: Constraint[] = [];
+
+	for (const constraint of constraints) {
+		// Apply substitution to both constraint and existing constraints before comparison
+		const substitutedConstraint = {
+			...constraint,
+			typeVar: (() => {
+				const varType = substitute({ kind: 'variable', name: constraint.typeVar }, substitution);
+				return varType.kind === 'variable' ? varType.name : constraint.typeVar;
+			})()
+		};
+		
+		// Special handling for structural constraints that might be semantically duplicate
+		// even if they have different field type variables
+		const isDuplicate = result.some(c => {
+			const substitutedC = {
+				...c,
+				typeVar: (() => {
+					const varType = substitute({ kind: 'variable', name: c.typeVar }, substitution);
+					return varType.kind === 'variable' ? varType.name : c.typeVar;
+				})()
+			};
+			
+			// If both are 'has' constraints with same typeVar and same field structure
+			if (substitutedC.kind === 'has' && substitutedConstraint.kind === 'has' && 
+				substitutedC.typeVar === substitutedConstraint.typeVar) {
+				
+				const fields1 = Object.keys(substitutedC.structure.fields);
+				const fields2 = Object.keys(substitutedConstraint.structure.fields);
+				
+				// If they have the same field names, consider them duplicate regardless of field types
+				if (fields1.length === fields2.length && 
+					fields1.every(field => fields2.includes(field))) {
+					return true;
+				}
+			}
+			
+			return constraintsEqual(substitutedC, substitutedConstraint);
+		});
+		
+		if (!isDuplicate) {
+			result.push(constraint);
+		}
+	}
+
+	return result;
+}
 
 // Check if a type variable occurs in a type (for occurs check)
 export const occursIn = (varName: string, type: Type): boolean => {

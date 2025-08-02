@@ -43,7 +43,7 @@ test('Constraint Collapse - Partial application should preserve constraints', ()
 	const typeString = typeToString(typeResult.type);
 
 	expect(typeResult.type.kind).toBe('function');
-	expect(typeString).toBe('a Float -> a Float given a implements Functor');
+	expect(typeString).toBe('f Float -> f Float given f implements Functor');
 });
 
 test('Constraint Collapse - Pure function should preserve constraints', () => {
