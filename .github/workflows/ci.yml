@@ -44,31 +44,31 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
       with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: 'package-lock.json'
+        bun-version: latest
     
-    - name: Cache TypeScript build
+    - name: Cache Bun dependencies
       uses: actions/cache@v4
       with:
-        path: dist/
-        key: ts-build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig.json', 'package-lock.json') }}
+        path: |
+          ~/.bun/install/cache
+          node_modules
+        key: bun-deps-${{ runner.os }}-${{ hashFiles('package.json', 'bun.lockb') }}
         restore-keys: |
-          ts-build-${{ runner.os }}-
+          bun-deps-${{ runner.os }}-
     
     - name: Install dependencies
-      run: npm ci
+      run: bun install
     
     - name: TypeScript check - source and test files
-      run: npm run typecheck
+      run: bun run typecheck
       
     - name: Report TypeScript status
       run: echo "✅ TypeScript checking passed for source and test files"
 
-  # Run core tests with uvu
+  # Run core tests with bun
   core-tests:
     runs-on: ubuntu-latest
     # Removed dependency on typescript-check to allow parallel execution
@@ -76,26 +76,26 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
       with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: 'package-lock.json'
+        bun-version: latest
     
-    - name: Cache TypeScript build
+    - name: Cache Bun dependencies
       uses: actions/cache@v4
       with:
-        path: dist/
-        key: ts-build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig.json', 'package-lock.json') }}
+        path: |
+          ~/.bun/install/cache
+          node_modules
+        key: bun-deps-${{ runner.os }}-${{ hashFiles('package.json', 'bun.lockb') }}
         restore-keys: |
-          ts-build-${{ runner.os }}-
+          bun-deps-${{ runner.os }}-
     
     - name: Install dependencies
-      run: npm ci
+      run: bun install
     
-    - name: Run tests (all migrated to uvu)
-      run: npm test
+    - name: Run tests (all migrated to bun)
+      run: bun test
 
   # Run REPL-specific tests separately  
   repl-tests:
@@ -105,29 +105,29 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
       with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: 'package-lock.json'
+        bun-version: latest
     
-    - name: Cache TypeScript build
+    - name: Cache Bun dependencies
       uses: actions/cache@v4
       with:
-        path: dist/
-        key: ts-build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig.json', 'package-lock.json') }}
+        path: |
+          ~/.bun/install/cache
+          node_modules
+        key: bun-deps-${{ runner.os }}-${{ hashFiles('package.json', 'bun.lockb') }}
         restore-keys: |
-          ts-build-${{ runner.os }}-
+          bun-deps-${{ runner.os }}-
     
     - name: Install dependencies
-      run: npm ci
+      run: bun install
     
     - name: Run simple REPL tests
-      run: npm run test:repl-simple
+      run: bun run test:repl-simple
     
     - name: Run REPL automation tests
-      run: npm run test:repl-automation
+      run: bun run test:repl-automation
       
     - name: Upload REPL test artifacts
       uses: actions/upload-artifact@v4
@@ -148,20 +148,20 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
       with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: 'package-lock.json'
+        bun-version: latest
     
-    - name: Cache TypeScript build
+    - name: Cache Bun dependencies
       uses: actions/cache@v4
       with:
-        path: dist/
-        key: ts-build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig.json', 'package-lock.json') }}
+        path: |
+          ~/.bun/install/cache
+          node_modules
+        key: bun-deps-${{ runner.os }}-${{ hashFiles('package.json', 'bun.lockb') }}
         restore-keys: |
-          ts-build-${{ runner.os }}-
+          bun-deps-${{ runner.os }}-
     
     - name: Setup Rust
       uses: actions-rs/toolchain@v1
@@ -181,10 +181,10 @@ jobs:
           rust-${{ runner.os }}-
     
     - name: Install dependencies
-      run: npm ci
+      run: bun install
     
     - name: Build TypeScript project
-      run: npm run build
+      run: bun run build
     
     - name: Build LSP server
       run: |
@@ -226,26 +226,26 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
       with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: 'package-lock.json'
+        bun-version: latest
     
-    - name: Cache TypeScript build
+    - name: Cache Bun dependencies
       uses: actions/cache@v4
       with:
-        path: dist/
-        key: ts-build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig.json', 'package-lock.json') }}
+        path: |
+          ~/.bun/install/cache
+          node_modules
+        key: bun-deps-${{ runner.os }}-${{ hashFiles('package.json', 'bun.lockb') }}
         restore-keys: |
-          ts-build-${{ runner.os }}-
+          bun-deps-${{ runner.os }}-
     
     - name: Install dependencies
-      run: npm ci
+      run: bun install
     
     - name: Build project
-      run: npm run build
+      run: bun run build
     
     - name: Test working examples
       run: |
@@ -265,7 +265,7 @@ jobs:
         
         for example in "${WORKING_EXAMPLES[@]}"; do
           echo "Testing examples/$example..."
-          if npm start "examples/$example"; then
+          if bun start "examples/$example"; then
             echo "✅ $example passed"
           else
             echo "❌ $example failed"
@@ -273,13 +273,13 @@ jobs:
           fi
         done
         
-                 if [ ${#FAILED_EXAMPLES[@]} -eq 0 ]; then
-           echo "✅ All working examples passed validation"
-         else
-           echo "⚠️ Failed examples: ${FAILED_EXAMPLES[*]}"
-           echo "::warning::Some examples that should work are failing - this indicates type system regressions"
-           # Don't exit 1 here since continue-on-error is set
-         fi
+        if [ ${#FAILED_EXAMPLES[@]} -eq 0 ]; then
+          echo "✅ All working examples passed validation"
+        else
+          echo "⚠️ Failed examples: ${FAILED_EXAMPLES[*]}"
+          echo "::warning::Some examples that should work are failing - this indicates type system regressions"
+          # Don't exit 1 here since continue-on-error is set
+        fi
     
     - name: Test known broken examples (should fail gracefully)
       run: |
@@ -297,7 +297,7 @@ jobs:
         
         for example in "${BROKEN_EXAMPLES[@]}"; do
           echo "Testing examples/$example (expecting failure)..."
-          if npm start "examples/$example" 2>/dev/null; then
+          if bun start "examples/$example" 2>/dev/null; then
             echo "⚠️ $example unexpectedly passed (this might be good news!)"
           else
             echo "✅ $example failed as expected"
@@ -347,27 +347,27 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
       with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: 'package-lock.json'
+        bun-version: latest
     
-    - name: Cache TypeScript build
+    - name: Cache Bun dependencies
       uses: actions/cache@v4
       with:
-        path: dist/
-        key: ts-build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig.json', 'package-lock.json') }}
+        path: |
+          ~/.bun/install/cache
+          node_modules
+        key: bun-deps-${{ runner.os }}-${{ hashFiles('package.json', 'bun.lockb') }}
         restore-keys: |
-          ts-build-${{ runner.os }}-
+          bun-deps-${{ runner.os }}-
     
     - name: Install dependencies
-      run: npm ci
+      run: bun install
     
     - name: Run core benchmarks
       run: |
-        npm run benchmark
+        bun run benchmark
         # Validate that benchmark results were generated
         if [ ! -d "benchmark-results" ] || [ -z "$(find benchmark-results -name '*.json' 2>/dev/null)" ]; then
           echo "::error::Core benchmarks failed to generate results"
@@ -378,7 +378,7 @@ jobs:
     - name: Run REPL benchmarks (allowed to fail)
       run: |
         set +e  # Don't exit on error for REPL benchmarks
-        npm run benchmark:repl
+        bun run benchmark:repl
         REPL_EXIT_CODE=$?
         
         if [ $REPL_EXIT_CODE -eq 0 ]; then
@@ -451,31 +451,31 @@ jobs:
       with:
         fetch-depth: 0
     
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
       with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: 'package-lock.json'
+        bun-version: latest
     
-    - name: Cache TypeScript build
+    - name: Cache Bun dependencies
       uses: actions/cache@v4
       with:
-        path: dist/
-        key: ts-build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig.json', 'package-lock.json') }}
+        path: |
+          ~/.bun/install/cache
+          node_modules
+        key: bun-deps-${{ runner.os }}-${{ hashFiles('package.json', 'bun.lockb') }}
         restore-keys: |
-          ts-build-${{ runner.os }}-
+          bun-deps-${{ runner.os }}-
     
     - name: Install dependencies
-      run: npm ci
+      run: bun install
       
 
     - name: Build and benchmark current branch
       run: |
         echo "Building and benchmarking current branch..."
-        if npm run build; then
+        if bun run build; then
           echo "✅ Current branch build successful"
-          if npm run benchmark:all; then
+          if bun run benchmark:all; then
             echo "✅ Current branch benchmarks successful"
             if [ -d "benchmark-results" ]; then
               mv benchmark-results benchmark-results-current
@@ -498,15 +498,15 @@ jobs:
         git checkout origin/main
         
         echo "Installing dependencies for main branch..."
-        if npm ci; then
+        if bun install; then
           echo "✅ Main branch dependencies installed"
           
           echo "Building main branch..."
-          if npm run build; then
+          if bun run build; then
             echo "✅ Main branch build successful"
             
             echo "Benchmarking main branch..."
-            if npm run benchmark:all; then
+            if bun run benchmark:all; then
               echo "✅ Main branch benchmarks successful"
               if [ -d "benchmark-results" ]; then
                 mv benchmark-results benchmark-results-main
