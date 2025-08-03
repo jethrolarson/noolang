@@ -20,9 +20,9 @@ import {
 	type ConstrainedExpression,
 	type ConstraintExpr,
 	type ConstraintDefinitionExpression,
-	type TraitConstraint,
 	type ImplementDefinitionExpression,
 	type Type,
+	type FunctionType,
 	type Constraint,
 	floatType,
 	stringType,
@@ -36,9 +36,9 @@ import {
 	recordType,
 	variantType,
 	ApplicationExpression,
-	hasConstraint,
+	hasStructureConstraint,
 	implementsConstraint,
-	type VariableType,
+	Pattern,
 } from '../ast';
 import {
 	undefinedVariableError,
@@ -55,7 +55,7 @@ import {
 import { unify } from './unify';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
-import { tryResolveConstraints } from './function-application';
+
 import {
 	type TypeState,
 	type TypeResult,
@@ -63,20 +63,24 @@ import {
 	createTypeResult,
 	unionEffects,
 	emptyEffects,
+	type TypeScheme,
 } from './types';
-// NOTE: validateConstraintName import removed - constraint validation disabled
 import {
 	freshTypeVariable,
 	generalize,
 	instantiate,
 	freshenTypeVariables,
 	flattenStatements,
-	createConstrainedType,
-	addConstraintToType,
 } from './type-operations';
-// NOTE: Constraint resolution imports removed - trait system will replace
 import { typeApplication } from './function-application';
-import { isTraitFunction, getTraitFunctionInfo, addTraitDefinition, getTypeName, addTraitImplementation } from './trait-system';
+
+import {
+	isTraitFunction,
+	getTraitFunctionInfo,
+	addTraitDefinition,
+	getTypeName,
+	addTraitImplementation,
+} from './trait-system';
 
 // Note: Main typeExpression is now in expression-dispatcher.ts
 // This file only contains the individual type inference functions
@@ -110,153 +114,23 @@ export const typeVariableExpr = (
 			// Get the trait function's type and constraint information
 			const traitInfo = getTraitFunctionInfo(state.traitRegistry, expr.name);
 			if (traitInfo) {
-				// Create fresh type variables for the trait function type
-				const typeVarMapping = new Map<string, VariableType>();
+				// Use standard type scheme instantiation instead of manual freshening
+				// First, collect all type variables from the trait function type
+				const typeVars = new Set<string>();
+				collectTypeVariables(traitInfo.functionType, typeVars);
 
-				// Helper function to recursively freshen type variables
-				const freshenType = (
-					type: Type,
-					currentState: TypeState
-				): [Type, TypeState] => {
-					switch (type.kind) {
-						case 'variable': {
-							if (!typeVarMapping.has(type.name)) {
-								const [freshVar, newState] = freshTypeVariable(currentState);
-								typeVarMapping.set(type.name, freshVar);
-								return [freshVar, newState];
-							}
-							return [typeVarMapping.get(type.name)!, currentState];
-						}
-						case 'function': {
-							let currentState2 = currentState;
-							const freshenedParams: Type[] = [];
-							for (const param of type.params) {
-								const [freshenedParam, nextState] = freshenType(
-									param,
-									currentState2
-								);
-								freshenedParams.push(freshenedParam);
-								currentState2 = nextState;
-							}
-							const [freshenedReturn, finalState] = freshenType(
-								type.return,
-								currentState2
-							);
-							return [
-								functionType(freshenedParams, freshenedReturn, type.effects),
-								finalState,
-							];
-						}
-						case 'variant': {
-							// Check if this variant name is actually a type parameter from the trait constraint
-							// For example, in "Functor f", the type parameter "f" appears as variant type in "f a"
-							if (type.name === traitInfo.typeParam) {
-								// This is a type parameter, treat it as a type variable that needs freshening
-								if (!typeVarMapping.has(type.name)) {
-									const [freshVar, newState] = freshTypeVariable(currentState);
-									typeVarMapping.set(type.name, freshVar);
+				// Add the trait type parameter if not already collected
+				typeVars.add(traitInfo.typeParam);
 
-									// Also freshen the args
-									let currentState2 = newState;
-									const freshenedArgs: Type[] = [];
-									for (const arg of type.args) {
-										const [freshenedArg, nextState] = freshenType(
-											arg,
-											currentState2
-										);
-										freshenedArgs.push(freshenedArg);
-										currentState2 = nextState;
-									}
-
-									return [
-										{
-											kind: 'variant',
-											name: freshVar.name, // Use the fresh variable name
-											args: freshenedArgs,
-										},
-										currentState2,
-									];
-								} else {
-									// Use existing mapping
-									const existingVar = typeVarMapping.get(type.name)!;
-									let currentState2 = currentState;
-									const freshenedArgs: Type[] = [];
-									for (const arg of type.args) {
-										const [freshenedArg, nextState] = freshenType(
-											arg,
-											currentState2
-										);
-										freshenedArgs.push(freshenedArg);
-										currentState2 = nextState;
-									}
-
-									return [
-										{
-											kind: 'variant',
-											name: existingVar.name,
-											args: freshenedArgs,
-										},
-										currentState2,
-									];
-								}
-							} else {
-								// This is a concrete variant type (Bool, Option, etc.)
-								// Freshen the type arguments but keep the variant name
-								let currentState2 = currentState;
-								const freshenedArgs: Type[] = [];
-								for (const arg of type.args) {
-									const [freshenedArg, nextState] = freshenType(
-										arg,
-										currentState2
-									);
-									freshenedArgs.push(freshenedArg);
-									currentState2 = nextState;
-								}
-								return [
-									{
-										kind: 'variant',
-										name: type.name, // Keep the original variant name
-										args: freshenedArgs,
-									},
-									currentState2,
-								];
-							}
-						}
-						default:
-							return [type, currentState];
-					}
+				// Create a type scheme and instantiate it properly
+				const scheme: TypeScheme = {
+					quantifiedVars: Array.from(typeVars),
+					type: traitInfo.functionType,
+					effects: emptyEffects(),
 				};
 
-				const [freshenedType, state1] = freshenType(
-					traitInfo.functionType,
-					state
-				);
-
-				// Create constraints for any type variables that correspond to the trait type parameter
-				// We need to find which freshened type variable corresponds to the original trait type parameter
-				const constraintsMap = new Map<
-					string,
-					Array<{ kind: 'implements'; trait: string }>
-				>();
-
-				// Find the freshened type variable that corresponds to the trait type parameter
-				const traitTypeParamVar = typeVarMapping.get(traitInfo.typeParam);
-				if (traitTypeParamVar && traitTypeParamVar.kind === 'variable') {
-					constraintsMap.set(traitTypeParamVar.name, [
-						{ kind: 'implements', trait: traitInfo.traitName },
-					]);
-				}
-
-				// If we have constraints, create a ConstrainedType
-				if (constraintsMap.size > 0) {
-					const constrainedType = createConstrainedType(
-						freshenedType,
-						constraintsMap
-					);
-					return createPureTypeResult(constrainedType, state1);
-				} else {
-					return createPureTypeResult(freshenedType, state1);
-				}
+				const [freshenedType, state1] = instantiate(scheme, state);
+				return createPureTypeResult(freshenedType, state1);
 			}
 
 			// Fallback: return a generic function type if trait info not found
@@ -366,7 +240,7 @@ const collectFreeVars = (
 					// Pattern variables are bound in the case body
 					const patternVars = new Set<string>();
 					// Extract pattern variables (simplified - should handle all pattern types)
-					const extractPatternVars = (pattern: any) => {
+					const extractPatternVars = (pattern: Pattern) => {
 						if (pattern && pattern.kind === 'variable') {
 							patternVars.add(pattern.name);
 						}
@@ -416,10 +290,11 @@ const collectFreeVars = (
 			case 'constrained':
 				walk(e.expression, bound);
 				break;
-			case 'mutable-definition':
+			case 'mutable-definition': {
 				const mutDefBound = new Set([...bound, e.name]);
 				walk(e.value, mutDefBound);
 				break;
+			}
 			case 'mutation':
 				walk(e.value, bound);
 				break;
@@ -449,17 +324,17 @@ const collectFreeVars = (
 	return freeVars;
 };
 
-// Update typeFunction to use closure culling
-export const typeFunction = (
+// Helper: Create function environment with closure culling
+function createFunctionEnvironment(
 	expr: FunctionExpression,
 	state: TypeState
-): TypeResult => {
+): Map<string, TypeScheme> {
 	// Collect free variables used in the function body
 	const boundParams = new Set(expr.params);
 	const freeVars = collectFreeVars(expr.body, boundParams);
 
 	// Create a minimal environment with only what's needed
-	const functionEnv = new Map<string, any>();
+	const functionEnv = new Map<string, TypeScheme>();
 
 	// Always include built-ins and stdlib essentials
 	const essentials = [
@@ -516,8 +391,9 @@ export const typeFunction = (
 		'Bool',
 		'Option',
 		'Result',
-		'not', // Add not to essentials for Bool operations
+		'not',
 	];
+
 	for (const essential of essentials) {
 		if (state.environment.has(essential)) {
 			functionEnv.set(essential, state.environment.get(essential)!);
@@ -531,9 +407,19 @@ export const typeFunction = (
 		}
 	}
 
-	let currentState = { ...state, environment: functionEnv };
+	return functionEnv;
+}
 
+// Helper: Create parameter types and type function body
+function createParameterTypesAndTypeBody(
+	expr: FunctionExpression,
+	functionEnv: Map<string, TypeScheme>,
+	state: TypeState
+): { paramTypes: Type[]; bodyResult: TypeResult; currentState: TypeState } {
+	let currentState = { ...state, environment: functionEnv };
 	const paramTypes: Type[] = [];
+
+	// Create parameter types
 	for (const param of expr.params) {
 		const [paramType, nextState] = freshTypeVariable(currentState);
 		functionEnv.set(param, { type: paramType, quantifiedVars: [] });
@@ -545,100 +431,261 @@ export const typeFunction = (
 	const bodyResult = typeExpression(expr.body, currentState);
 	currentState = bodyResult.state;
 
-	// Decorate the function body with its inferred type
-	expr.body.type = bodyResult.type;
-
 	// Restore the original environment for the outer scope
 	currentState = { ...currentState, environment: state.environment };
 
-	// Collect implicit constraints from function body (e.g., from + operator)
-	const implicitConstraints = collectImplicitConstraints(bodyResult.type, paramTypes, currentState);
+	return { paramTypes, bodyResult, currentState };
+}
 
-	// Special handling for constrained function bodies
+// Helper: Handle constrained function bodies
+function handleConstrainedFunctionBody(
+	expr: FunctionExpression,
+	paramTypes: Type[],
+	bodyResult: TypeResult,
+	implicitConstraints: Constraint[]
+): Type {
+	const constrainedBody = expr.body;
+	if (constrainedBody.kind !== 'constrained') {
+		throw new Error(
+			'handleConstrainedFunctionBody called with non-constrained body'
+		);
+	}
+
+	const constraints = flattenConstraintExpr(constrainedBody.constraint);
 	let funcType: Type;
 
-	if (expr.body.kind === 'constrained') {
-		const constrainedBody = expr.body as ConstrainedExpression;
-		const constraints = flattenConstraintExpr(constrainedBody.constraint);
+	// If the constrained body has an explicit function type, use it as the innermost type
+	if (constrainedBody.type.kind === 'function') {
+		funcType = constrainedBody.type;
 
-		// If the constrained body has an explicit function type, use it as the innermost type
-		if (constrainedBody.type.kind === 'function') {
-			funcType = constrainedBody.type;
+		// Apply constraints to this function type
+		if (constraints.length > 0) {
+			funcType.constraints = constraints;
+			// Store the original constraint expression for display purposes
+			funcType.originalConstraint = constrainedBody.constraint;
 
-			// Apply constraints to this function type
-			if (constraints.length > 0) {
-				funcType.constraints = constraints;
-				// Store the original constraint expression for display purposes
-				funcType.originalConstraint = constrainedBody.constraint;
-
-				// CRITICAL: Also propagate constraints to type variables in parameters
-				// This ensures constraint validation works during function application
-				for (const constraint of constraints) {
-					if (constraint.kind === 'is') {
-						propagateConstraintToTypeVariable(funcType, constraint);
-					}
+			// CRITICAL: Also propagate constraints to type variables in parameters
+			// This ensures constraint validation works during function application
+			for (const constraint of constraints) {
+				if (constraint.kind === 'is') {
+					propagateConstraintToTypeVariable(funcType, constraint);
 				}
 			}
+		}
 
-			// If we have more parameters than the explicit type accounts for, wrap it
-			const explicitParamCount = countFunctionParams(constrainedBody.type);
-			const actualParamCount = paramTypes.length;
-			if (actualParamCount > explicitParamCount) {
-				// Wrap the explicit function type with additional parameter layers
-				for (let i = actualParamCount - explicitParamCount - 1; i >= 0; i--) {
-					funcType = functionType([paramTypes[i]], funcType);
-				}
-			}
-		} else {
-			// Build function type normally and apply constraints
-			funcType = bodyResult.type;
-			for (let i = paramTypes.length - 1; i >= 0; i--) {
+		// If we have more parameters than the explicit type accounts for, wrap it
+		const explicitParamCount = countFunctionParams(constrainedBody.type);
+		const actualParamCount = paramTypes.length;
+		if (actualParamCount > explicitParamCount) {
+			// Wrap the explicit function type with additional parameter layers
+			for (let i = actualParamCount - explicitParamCount - 1; i >= 0; i--) {
 				funcType = functionType([paramTypes[i]], funcType);
-			}
-			const allConstraints = [...constraints, ...implicitConstraints];
-			if (allConstraints.length > 0 && funcType.kind === 'function') {
-				funcType.constraints = allConstraints;
 			}
 		}
 	} else {
-		// Build the function type normally
+		// Build function type normally and apply constraints
 		funcType = bodyResult.type;
 		for (let i = paramTypes.length - 1; i >= 0; i--) {
 			funcType = functionType([paramTypes[i]], funcType);
 		}
-		// Apply implicit constraints even when there are no explicit constraints
-		if (implicitConstraints.length > 0 && funcType.kind === 'function') {
-			funcType.constraints = implicitConstraints;
+		const allConstraints = [...constraints, ...implicitConstraints];
+		if (allConstraints.length > 0 && funcType.kind === 'function') {
+			funcType.constraints = allConstraints;
 		}
 	}
+
+	return funcType;
+}
+
+// Helper: Build normal function type
+function buildNormalFunctionType(
+	paramTypes: Type[],
+	bodyResult: TypeResult,
+	implicitConstraints: Constraint[]
+): Type {
+	// Extract constraints from the body result type if it's constrained
+	const bodyConstraints: Constraint[] = [];
+	let bodyType = bodyResult.type;
+	
+	if (bodyType.kind === 'constrained') {
+		// Extract constraints from constrained body type
+		for (const [typeVar, constraints] of bodyType.constraints.entries()) {
+			for (const constraint of constraints) {
+				if (constraint.kind === 'implements') {
+					bodyConstraints.push({
+						kind: 'implements',
+						typeVar,
+						interfaceName: constraint.interfaceName,
+					});
+				}
+			}
+		}
+		// Use the base type for function construction
+		bodyType = bodyType.baseType;
+	}
+
+	// Build the function type normally
+	let funcType = bodyType;
+	for (let i = paramTypes.length - 1; i >= 0; i--) {
+		funcType = functionType([paramTypes[i]], funcType);
+	}
+
+	// Combine implicit constraints with body constraints
+	const allConstraints = [...implicitConstraints, ...bodyConstraints];
+
+	// Apply constraints if we have any
+	if (allConstraints.length > 0 && funcType.kind === 'function') {
+		// Only apply constraints if the function has type variables (is polymorphic)
+		const hasTypeVariables = paramTypes.some(
+			paramType => paramType.kind === 'variable'
+		);
+
+		if (hasTypeVariables) {
+			// Attach constraints directly to the function type
+			funcType.constraints = allConstraints;
+		}
+	}
+
+	return funcType;
+}
+
+// Main function type inference (now much more focused)
+export const typeFunction = (
+	expr: FunctionExpression,
+	state: TypeState
+): TypeResult => {
+	const originalBody = expr.body;
+
+	// 1. Create function environment with closure culling
+	const functionEnv = createFunctionEnvironment(expr, state);
+
+	// 2. Create parameter types and type the body
+	const { paramTypes, bodyResult, currentState } =
+		createParameterTypesAndTypeBody(expr, functionEnv, state);
+
+	// 3. Collect implicit constraints from the original function body
+	const implicitConstraints = collectImplicitConstraints(
+		bodyResult.type,
+		paramTypes,
+		currentState,
+		originalBody,
+		expr.params
+	);
+
+	// 4. Build function type based on whether body is constrained
+	const funcType =
+		expr.body.kind === 'constrained'
+			? handleConstrainedFunctionBody(
+					expr,
+					paramTypes,
+					bodyResult,
+					implicitConstraints
+				)
+			: buildNormalFunctionType(paramTypes, bodyResult, implicitConstraints);
 
 	return createTypeResult(funcType, bodyResult.effects, currentState);
 };
 
 // Helper function to collect implicit constraints from function bodies
 function collectImplicitConstraints(
-	bodyType: Type, 
-	paramTypes: Type[], 
-	state: TypeState
+	bodyType: Type,
+	paramTypes: Type[],
+	state: TypeState,
+	bodyExpr?: Expression,
+	paramNames?: string[]
 ): Constraint[] {
 	const constraints: Constraint[] = [];
-	
+
 	const allTypeVars = new Set<string>();
 	for (const paramType of paramTypes) {
 		collectTypeVariables(paramType, allTypeVars);
 	}
 	collectTypeVariables(bodyType, allTypeVars);
-	
-	const typeVarList = Array.from(allTypeVars).sort();
-	
-	// Heuristic: if we have multiple type variables, this is likely a polymorphic function
-	// that uses operators like +, so add an Add constraint
-	if (typeVarList.length >= 2) {
-		const canonicalVar = typeVarList[0];
-		constraints.push(implementsConstraint(canonicalVar, 'Add'));
+
+	// Collect trait constraints (existing functionality)
+	if (bodyExpr && usesAddOperator(bodyExpr)) {
+		const typeVarList = Array.from(allTypeVars).sort();
+		if (typeVarList.length > 0) {
+			const canonicalVar = typeVarList[0];
+			constraints.push(implementsConstraint(canonicalVar, 'Add'));
+		}
 	}
-	
+
+	// DEPTH-FIRST: Generate structural constraints inline with unified variables
+	if (bodyExpr && paramNames) {
+		const structuralConstraints = generateDepthFirstConstraints(
+			bodyExpr,
+			paramNames,
+			paramTypes
+		);
+		constraints.push(...structuralConstraints);
+	}
+
 	return constraints;
+}
+
+// Helper function to check if an expression uses a specific operator
+function usesOperator(expr: Expression, targetOperator: string): boolean {
+	switch (expr.kind) {
+		case 'binary':
+			if (expr.operator === targetOperator) return true;
+			return (
+				usesOperator(expr.left, targetOperator) ||
+				usesOperator(expr.right, targetOperator)
+			);
+		case 'application':
+			return (
+				usesOperator(expr.func, targetOperator) ||
+				expr.args.some(arg => usesOperator(arg, targetOperator))
+			);
+		case 'function':
+			return usesOperator(expr.body, targetOperator);
+		case 'if':
+			return (
+				usesOperator(expr.condition, targetOperator) ||
+				usesOperator(expr.then, targetOperator) ||
+				usesOperator(expr.else, targetOperator)
+			);
+		case 'record':
+			return expr.fields.some(field =>
+				usesOperator(field.value, targetOperator)
+			);
+		case 'tuple':
+			return expr.elements.some(element =>
+				usesOperator(element, targetOperator)
+			);
+		case 'list':
+			return expr.elements.some(element =>
+				usesOperator(element, targetOperator)
+			);
+		case 'where':
+			return (
+				usesOperator(expr.main, targetOperator) ||
+				expr.definitions.some(def => {
+					if (def.kind === 'definition')
+						return usesOperator(def.value, targetOperator);
+					if (def.kind === 'tuple-destructuring')
+						return usesOperator(def.value, targetOperator);
+					if (def.kind === 'record-destructuring')
+						return usesOperator(def.value, targetOperator);
+					if (def.kind === 'mutable-definition')
+						return usesOperator(def.value, targetOperator);
+					return false;
+				})
+			);
+		case 'match':
+			return (
+				usesOperator(expr.expression, targetOperator) ||
+				expr.cases.some(case_ => usesOperator(case_.expression, targetOperator))
+			);
+		default:
+			return false;
+	}
+}
+
+// Helper function to check if an expression uses the + operator (for backward compatibility)
+function usesAddOperator(expr: Expression): boolean {
+	return usesOperator(expr, '+');
 }
 
 function collectTypeVariables(type: Type, vars: Set<string>): void {
@@ -707,10 +754,13 @@ export const typeDefinition = (
 	);
 
 	// Check if this variable would shadow a trait function
-	const traitFunctions = currentState.traitRegistry.functionTraits.get(expr.name);
+	const traitFunctions = currentState.traitRegistry.functionTraits.get(
+		expr.name
+	);
 	if (traitFunctions && traitFunctions.length > 0) {
 		throwTypeError(
-			location => traitFunctionShadowingError(expr.name, traitFunctions, location),
+			location =>
+				traitFunctionShadowingError(expr.name, traitFunctions, location),
 			getExprLocation(expr)
 		);
 	}
@@ -953,7 +1003,7 @@ export const typeBinary = (
 	// Get operator type from environment
 	const operatorScheme = currentState.environment.get(expr.operator);
 	if (!operatorScheme) {
-		throw new Error(`Unknown operator: ${expr.operator}`);
+		throw new Error(`Unknown operator inferred: ${expr.operator}`);
 	}
 
 	const [operatorType, newState] = instantiate(operatorScheme, currentState);
@@ -991,56 +1041,15 @@ export const typeBinary = (
 	);
 
 	// Apply substitution to get final result type
-	const [preliminaryResultType, finalResultState] = freshenTypeVariables(
+	const substitutedResultType = substitute(
 		resultType,
-		new Map(),
-		currentState
+		currentState.substitution
 	);
 
-	// CONSTRAINT RESOLUTION: Try to resolve constraints using argument types
-	// Only attempt resolution if we have concrete (non-variable) argument types
-	let finalResultType = preliminaryResultType;
-	if (operatorType.kind === 'function' && operatorType.constraints && operatorType.constraints.length > 0) {
-		// Only apply constraint resolution to specific operators that need it
-		if (expr.operator === '+' || expr.operator === '-' || expr.operator === '*' || expr.operator === '/') {
-			// Check if both arguments are concrete types (not variables)
-			const leftIsConcrete = leftResult.type.kind !== 'variable' && leftResult.type.kind !== 'constrained';
-			const rightIsConcrete = rightResult.type.kind !== 'variable' && rightResult.type.kind !== 'constrained';
-			
-			if (leftIsConcrete && rightIsConcrete) {
-				// Extract constraints from the operator type
-				const functionConstraints = new Map<string, TraitConstraint[]>();
-				for (const constraint of operatorType.constraints) {
-					if (constraint.kind === 'implements') {
-						const varName = constraint.typeVar;
-						const traitConstraint: TraitConstraint = { kind: 'implements', trait: constraint.interfaceName };
-						if (!functionConstraints.has(varName)) {
-							functionConstraints.set(varName, []);
-						}
-						functionConstraints.get(varName)!.push(traitConstraint);
-					}
-				}
-
-				// Try to resolve constraints using the actual argument types
-				const resolvedType = tryResolveConstraints(
-					preliminaryResultType,
-					functionConstraints,
-					[leftResult.type, rightResult.type],
-					finalResultState
-				);
-
-				if (resolvedType) {
-					// Constraints were successfully resolved to a concrete type
-					finalResultType = resolvedType;
-				}
-			}
-		}
-	}
-
 	return createTypeResult(
-		finalResultType,
+		substitutedResultType,
 		unionEffects(leftResult.effects, rightResult.effects),
-		finalResultState
+		currentState
 	);
 };
 
@@ -1134,24 +1143,21 @@ export const typeAccessor = (
 	const [recordVar, finalState] = freshTypeVariable(nextState);
 	// Create a function type with constraints attached to both places
 	const funcType = functionType([recordVar], fieldType);
-	// Add the constraint to both the parameter type variable (for validation) 
+	// Add the constraint to both the parameter type variable (for validation)
 	// and the function type (for display)
 	if (recordVar.kind === 'variable') {
 		// For validation: add to the type variable itself
 		recordVar.constraints = [
-			hasConstraint(recordVar.name, {
-				fields: { [fieldName]: fieldType }
+			hasStructureConstraint(recordVar.name, {
+				fields: { [fieldName]: fieldType },
 			}),
 		];
-		
+
 		// For display: add to the function type
 		funcType.constraints = [
-			{
-				kind: 'hasField',
-				typeVar: recordVar.name,
-				field: fieldName,
-				fieldType: fieldType
-			} as Constraint
+			hasStructureConstraint(recordVar.name, {
+				fields: { [fieldName]: fieldType },
+			}),
 		];
 	}
 
@@ -1316,13 +1322,18 @@ export const typeConstrained = (
 		}
 	);
 
-	// Special case: if this constrained expression is inside a function body,
-	// the constraint should apply to the function type, not to this expression
-	// For now, we'll just return the explicit type without applying constraints here
-	// The constraint will be handled at the function level
+	// Apply constraints to the explicit type
+	const constraints = flattenConstraintExpr(expr.constraint);
 
-	// Return the explicit type without constraints applied
-	return createTypeResult(explicitType, inferredResult.effects, currentState);
+	// Create a copy of the explicit type and apply constraints
+	let resultType = explicitType;
+	if (constraints.length > 0 && resultType.kind === 'function') {
+		resultType = { ...resultType };
+		resultType.constraints = constraints;
+		resultType.originalConstraint = expr.constraint;
+	}
+
+	return createTypeResult(resultType, inferredResult.effects, currentState);
 };
 
 // Type constraint definition
@@ -1333,12 +1344,13 @@ export const typeConstraintDefinition = (
 	const { name, typeParams, functions } = expr;
 
 	// Create trait definition
-	const functionMap = new Map<string, Type>();
+	const functionMap = new Map<string, FunctionType>();
 
-	for (const func of functions) {
+	for (const { type, name: funcName } of functions) {
 		// Type the function signature, substituting the constraint type parameter
-		const funcType = func.type;
-		functionMap.set(func.name, funcType);
+		if (type.kind == 'function') {
+			functionMap.set(funcName, type);
+		}
 	}
 
 	const traitDef = {
@@ -1347,8 +1359,8 @@ export const typeConstraintDefinition = (
 		functions: functionMap,
 	};
 
-	   // Add to trait registry using the new trait system
-   addTraitDefinition(state.traitRegistry, traitDef);
+	// Add to trait registry using the new trait system
+	addTraitDefinition(state.traitRegistry, traitDef);
 
 	// Constraint definitions have unit type
 	return createPureTypeResult(unitType(), state);
@@ -1535,3 +1547,74 @@ export const typeRecordDestructuring = (
 	// Return the record type and effects
 	return createTypeResult(expectedRecordType, valueResult.effects, currentState);
 };
+
+// DEPTH-FIRST constraint generation - replaces collectAccessorConstraints
+function generateDepthFirstConstraints(
+	expr: Expression,
+	paramNames: string[],
+	paramTypes: Type[]
+): Constraint[] {
+	const constraints: Constraint[] = [];
+	
+	// Create mapping from parameter names to their type variables
+	const paramTypeVars = new Map<string, string>();
+	for (let i = 0; i < paramNames.length && i < paramTypes.length; i++) {
+		const paramType = paramTypes[i];
+		if (paramType.kind === 'variable') {
+			paramTypeVars.set(paramNames[i], paramType.name);
+		}
+	}
+	
+	// Analyze expression for accessor composition patterns
+	function analyzeExpression(e: Expression): void {
+		if (!e) return;
+		
+		if (e.kind === 'application' && e.func.kind === 'accessor' && e.args.length === 1) {
+			const outerField = e.func.field;
+			const innerArg = e.args[0];
+			
+			// Check for composition: @outer (@inner param)
+			if (innerArg.kind === 'application' && 
+				innerArg.func.kind === 'accessor' &&
+				innerArg.args.length === 1 &&
+				innerArg.args[0].kind === 'variable' &&
+				paramTypeVars.has(innerArg.args[0].name)) {
+				
+				const innerField = innerArg.func.field;
+				const paramName = innerArg.args[0].name;
+				const paramTypeVar = paramTypeVars.get(paramName)!;
+				
+				// Generate multiplicative constraint directly
+				const resultVar = `α${Math.random().toString(36).substr(2, 9)}`;
+				const composedConstraint = hasStructureConstraint(paramTypeVar, {
+					fields: {
+						[innerField]: {
+							kind: 'nested',
+							structure: {
+								fields: {
+									[outerField]: { kind: 'variable', name: resultVar }
+								}
+							}
+						}
+					}
+				});
+				
+				constraints.push(composedConstraint);
+				return; // Don't recurse - we handled the composition
+			}
+		}
+		
+		// Recurse into sub-expressions for other cases
+		if (e.kind === 'application') {
+			analyzeExpression(e.func);
+			e.args.forEach(analyzeExpression);
+		} else if (e.kind === 'binary') {
+			analyzeExpression(e.left);
+			analyzeExpression(e.right);
+		}
+		// Add other cases as needed
+	}
+	
+	analyzeExpression(expr);
+	return constraints;
+}

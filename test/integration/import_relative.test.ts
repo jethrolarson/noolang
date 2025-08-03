@@ -1,12 +1,11 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../src/lexer/lexer';
 import { parse } from '../../src/parser/parser';
 import { Evaluator } from '../../src/evaluator/evaluator';
+import { test, expect } from 'bun:test';
 
 // Test suite: File-relative imports
 const mockFs = {
-	readFileSync: (filePath: unknown, encoding: string) => {
+	readFileSync: (filePath: unknown) => {
 		if (typeof filePath === 'string' && filePath.includes('stdlib.noo')) {
 			return '# Noolang Standard Library\n# This file defines the global default environment\n';
 		}
@@ -45,7 +44,7 @@ test('should import from same directory', () => {
 		program,
 		'/test/dir/test_file.noo'
 	);
-	assert.equal(result.finalResult, { tag: 'number', value: 5 });
+	expect(result.finalResult).toEqual({ tag: 'number', value: 5 });
 });
 
 test('should import from parent directory', () => {
@@ -61,7 +60,7 @@ test('should import from parent directory', () => {
 		program,
 		'/test/dir/subdir/test_file.noo'
 	);
-	assert.equal(result.finalResult, { tag: 'number', value: 30 });
+	expect(result.finalResult).toEqual({ tag: 'number', value: 30 });
 });
 
 test('should handle absolute paths', () => {
@@ -77,7 +76,7 @@ test('should handle absolute paths', () => {
 		program,
 		'/test/dir/test_file.noo'
 	);
-	assert.equal(result.finalResult, { tag: 'number', value: 15 });
+	expect(result.finalResult).toEqual({ tag: 'number', value: 15 });
 });
 
 test('should fall back to current working directory when no file path provided', () => {
@@ -90,7 +89,6 @@ test('should fall back to current working directory when no file path provided',
 	const program = parse(tokens);
 	const evaluator = new Evaluator({ fs: mockFs as any });
 	const result = evaluator.evaluateProgram(program); // No file path
-	assert.equal(result.finalResult, { tag: 'number', value: 10 });
+	expect(result.finalResult).toEqual({ tag: 'number', value: 10 });
 });
 
-test.run();

@@ -1,5 +1,5 @@
 // Type expression dispatcher with proper error handling
-import { type Expression, unitType } from '../ast';
+import { type Expression, typeVariable } from '../ast';
 import { TypeState, TypeResult, createPureTypeResult } from './types';
 import {
 	typeLiteral,
@@ -76,7 +76,9 @@ export const typeExpression = (
 			return typeMutation(expr, state);
 
 		case 'unit':
-			return createPureTypeResult(unitType(), state);
+			// {} should be polymorphic - it can unify with unit, empty tuples, and empty records
+			// Use a type variable that can unify with any of these types
+			return createPureTypeResult(typeVariable('empty_braces'), state);
 
 		case 'type-definition':
 			return typeTypeDefinition(expr, state);

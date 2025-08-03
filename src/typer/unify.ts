@@ -1,4 +1,4 @@
-import { Type, TraitConstraint, VariantType, Constraint, RecordStructure, StructureFieldType } from '../ast';
+import { Type, Constraint } from '../ast';
 import { substitute } from './substitute';
 import { TypeState } from './types';
 import { isTypeKind, typesEqual, constraintsEqual } from './helpers';
@@ -22,64 +22,8 @@ function isValidPrimitiveName(name: string): name is ValidPrimitiveName {
 	return VALID_PRIMITIVES.has(name as ValidPrimitiveName);
 }
 
-// Performance tracking
-let unifyCallCount = 0;
-let totalUnifyTime = 0;
-const slowUnifyCalls: Array<{ type1: string; type2: string; time: number }> =
-	[];
 const unifyCallSources = new Map<string, number>(); // Track where unify calls come from
 const unifyTypePatterns = new Map<string, number>(); // Track what types are being unified
-
-// Enhanced logging functionality
-let testStartCount = 0;
-let testStartTime = 0;
-
-export const resetUnificationCounters = () => {
-	testStartCount = unifyCallCount;
-	testStartTime = totalUnifyTime;
-};
-
-export const getUnificationStats = () => {
-	const callsSinceReset = unifyCallCount - testStartCount;
-	const timeSinceReset = totalUnifyTime - testStartTime;
-	
-	if (callsSinceReset > 0) {
-		const topSources = Array.from(unifyCallSources.entries())
-			.sort((a, b) => b[1] - a[1])
-			.slice(0, 5);
-		
-		const topPatterns = Array.from(unifyTypePatterns.entries())
-			.sort((a, b) => b[1] - a[1])
-			.slice(0, 5);
-		
-		return {
-			calls: callsSinceReset,
-			time: timeSinceReset,
-			totalCalls: unifyCallCount,
-			totalTime: totalUnifyTime,
-			topSources,
-			topPatterns,
-			slowCalls: slowUnifyCalls.length
-		};
-	}
-	
-	return null;
-};
-
-export const logUnificationStats = (testName?: string) => {
-	const stats = getUnificationStats();
-	if (stats && stats.calls > 1000) { // Only log if significant number of calls
-		const prefix = testName ? `[${testName}] ` : '';
-		console.warn(
-			`${prefix}Unify: ${stats.calls} calls, ${stats.time}ms, ${stats.slowCalls} slow calls`
-		);
-		if (stats.calls > 5000) {
-			console.warn(`${prefix}Top unify call sources:`, stats.topSources);
-			console.warn(`${prefix}Most repeated unifications:`, stats.topPatterns);
-		}
-	}
-	return stats;
-};
 
 const typeToPattern = (t: Type): string => {
 	if (!t) return 'undefined';
@@ -112,28 +56,23 @@ const unifyInternal = (
 		reason?: string;
 		operation?: string;
 		hint?: string;
-		constraintContext?: Map<string, TraitConstraint[]>;
+		constraintContext?: Constraint[];
 	}
 ): TypeState => {
 	// Add null check for state
 	if (!state) {
 		throw new Error('Cannot unify with undefined state');
 	}
-	
+
 	// Early equality check before substitution for performance
 	if (t1 === t2) return state;
 
 	const s1 = substitute(t1, state.substitution);
 	const s2 = substitute(t2, state.substitution);
 
-	// PHASE 3: Constraint resolution debug logging (can be removed in production)
-	// if (context?.reason === 'function_application' && (s1.kind === 'variant' || s2.kind === 'variant')) {
-	// 	console.log('PHASE 3: Constraint unification:', s1.kind, 'with', s2.kind);
-	// }
-
 	if (typesEqual(s1, s2)) return state;
 
-	// PHASE 3: Handle constraint resolution EARLY to provide better error messages
+	// Handle constraint resolution EARLY to provide better error messages
 	// Check if one type is a variant with a constrained type variable name
 	if (
 		context?.constraintContext &&
@@ -157,7 +96,7 @@ const unifyInternal = (
 
 	// Handle function types
 	if (isTypeKind(s1, 'function') && isTypeKind(s2, 'function')) {
-		return unifyFunction(s1, s2, state, location);
+		return unifyFunction(s1, s2, state, location, context);
 	}
 
 	// Handle list types
@@ -234,12 +173,9 @@ export const unify = (
 		reason?: string;
 		operation?: string;
 		hint?: string;
-		constraintContext?: Map<string, TraitConstraint[]>;
+		constraintContext?: Constraint[];
 	}
 ): TypeState => {
-	const start = Date.now();
-	unifyCallCount++;
-
 	// Track call sources using stack trace
 	const stack = new Error().stack || '';
 	const caller = stack.split('\n')[2] || 'unknown';
@@ -252,38 +188,7 @@ export const unify = (
 	const pattern = `${typeToPattern(t1)} = ${typeToPattern(t2)}`;
 	unifyTypePatterns.set(pattern, (unifyTypePatterns.get(pattern) || 0) + 1);
 
-	const result = unifyInternal(t1, t2, state, location, context);
-
-	const time = Date.now() - start;
-	totalUnifyTime += time;
-
-	if (time > 10) {
-		slowUnifyCalls.push({
-			type1: `${t1.kind}:${t1.kind === 'variable' ? t1.name : '?'}`,
-			type2: `${t2.kind}:${t2.kind === 'variable' ? t2.name : '?'}`,
-			time,
-		});
-	}
-
-	if (unifyCallCount % 5000 === 0) {
-		console.warn(
-			`Unify: ${unifyCallCount} calls, ${totalUnifyTime}ms total, ${slowUnifyCalls.length} slow calls`
-		);
-
-		// Show top call sources
-		const topSources = Array.from(unifyCallSources.entries())
-			.sort((a, b) => b[1] - a[1])
-			.slice(0, 5);
-		console.warn('Top unify call sources:', topSources);
-
-		// Show most repeated type patterns
-		const topPatterns = Array.from(unifyTypePatterns.entries())
-			.sort((a, b) => b[1] - a[1])
-			.slice(0, 5);
-		console.warn('Most repeated unifications:', topPatterns);
-	}
-
-	return result;
+	return unifyInternal(t1, t2, state, location, context);
 };
 
 function unifyUnion(
@@ -322,6 +227,7 @@ function unifyPrimitive(
 	if (!isTypeKind(s1, 'primitive') || !isTypeKind(s2, 'primitive')) {
 		throw new Error('unifyPrimitive called with non-primitive types');
 	}
+
 	if (s1.name !== s2.name)
 		throw new Error(
 			formatTypeError(
@@ -467,34 +373,28 @@ function unifyVariable(
 	return newState;
 }
 
-let functionUnifyCount = 0;
 const functionUnifyPatterns = new Map<string, number>();
 
 function unifyFunction(
 	s1: Type,
 	s2: Type,
 	state: TypeState,
-	location?: { line: number; column: number }
+	location?: { line: number; column: number },
+	context?: {
+		reason?: string;
+		operation?: string;
+		hint?: string;
+		constraintContext?: Constraint[];
+	}
 ): TypeState {
 	if (!isTypeKind(s1, 'function') || !isTypeKind(s2, 'function')) {
 		throw new Error('unifyFunction called with non-function types');
 	}
-
-	functionUnifyCount++;
 	const pattern = `${s1.params.length}p_${s2.params.length}p`;
 	functionUnifyPatterns.set(
 		pattern,
 		(functionUnifyPatterns.get(pattern) || 0) + 1
 	);
-
-	if (functionUnifyCount % 1000 === 0) {
-		console.warn(
-			`Function unify: ${functionUnifyCount} calls, top patterns:`,
-			Array.from(functionUnifyPatterns.entries())
-				.sort((a, b) => b[1] - a[1])
-				.slice(0, 3)
-		);
-	}
 
 	if (s1.params.length !== s2.params.length)
 		throw new Error(
@@ -516,10 +416,35 @@ function unifyFunction(
 
 	// Then unify parameters and return types
 	for (let i = 0; i < s1.params.length; i++) {
-		// NOTE: Legacy constraint merging removed - handled by new trait system
-		currentState = unify(s1.params[i], s2.params[i], currentState, location);
+		// Check for constraint on s1.params[i] (variable with constraint) and s2.params[i] (concrete)
+		const param1 = s1.params[i];
+		const param2 = s2.params[i];
+		// Only check for 'implements' constraints
+		if (
+			param1.kind === 'variable' &&
+			param1.constraints &&
+			param1.constraints.length > 0 &&
+			param2.kind !== 'variable'
+		) {
+			for (const constraint of param1.constraints) {
+				if (constraint.kind === 'implements') {
+					const traitRegistry = state.traitRegistry;
+					const traitImpls = traitRegistry.implementations.get(
+						constraint.interfaceName
+					);
+					const typeName = getTypeName(param2);
+					if (!traitImpls || !typeName || !traitImpls.has(typeName)) {
+						throw new Error(
+							`Type ${typeName} does not implement trait ${constraint.interfaceName} (required by type variable ${param1.name})`
+						);
+					}
+				}
+			}
+		}
+		// Now unify as usual
+		currentState = unify(param1, param2, currentState, location, context);
 	}
-	currentState = unify(s1.return, s2.return, currentState, location);
+	currentState = unify(s1.return, s2.return, currentState, location, context);
 
 	return currentState;
 }
@@ -652,7 +577,7 @@ function unifyConstrained(
 	// Handle constrained type unification
 	if (isTypeKind(s1, 'constrained') && isTypeKind(s2, 'constrained')) {
 		// Both are constrained - unify base types and merge constraints
-		let currentState = unify(s1.baseType, s2.baseType, state, location);
+		const currentState = unify(s1.baseType, s2.baseType, state, location);
 
 		// For now, just merge constraints (simple conjunction)
 		// TODO: More sophisticated constraint merging
@@ -684,7 +609,7 @@ function tryUnifyConstrainedVariant(
 		reason?: string;
 		operation?: string;
 		hint?: string;
-		constraintContext?: Map<string, TraitConstraint[]>;
+		constraintContext?: Constraint[];
 	}
 ): TypeState | null {
 	// Only proceed if we have constraint context
@@ -707,10 +632,19 @@ function tryUnifyConstrainedVariant(
 		const s2Name = s2.name;
 
 		// Check if s1 is a constrained type variable
-		if (context.constraintContext.has(s1Name)) {
+		const s1HasConstraints = context.constraintContext.some(c => 
+			(c.kind === 'implements' || c.kind === 'hasField' || c.kind === 'is' || c.kind === 'custom' || c.kind === 'has') && 
+			c.typeVar === s1Name
+		);
+		const s2HasConstraints = context.constraintContext.some(c => 
+			(c.kind === 'implements' || c.kind === 'hasField' || c.kind === 'is' || c.kind === 'custom' || c.kind === 'has') && 
+			c.typeVar === s2Name
+		);
+		
+		if (s1HasConstraints) {
 			variantType = s1;
 			concreteType = s2;
-		} else if (context.constraintContext.has(s2Name)) {
+		} else if (s2HasConstraints) {
 			variantType = s2;
 			concreteType = s1;
 		} else {
@@ -721,8 +655,11 @@ function tryUnifyConstrainedVariant(
 	}
 
 	// Check if this variant type variable has constraints
-	const constraints = context.constraintContext.get(variantType.name);
-	if (!constraints) {
+	const constraints = context.constraintContext.filter(c => 
+		(c.kind === 'implements' || c.kind === 'hasField' || c.kind === 'is' || c.kind === 'custom' || c.kind === 'has') && 
+		c.typeVar === variantType.name
+	);
+	if (constraints.length === 0) {
 		return null; // No constraints on this type variable
 	}
 
@@ -748,7 +685,7 @@ function tryUnifyConstrainedVariant(
 	// Check if any constraint can be satisfied by the concrete type
 	for (const constraint of constraints) {
 		if (constraint.kind === 'implements') {
-			const traitName = constraint.trait;
+			const traitName = constraint.interfaceName;
 			const traitImpls = traitRegistry.implementations.get(traitName);
 
 			if (traitImpls && traitImpls.has(concreteTypeName)) {
@@ -793,7 +730,7 @@ function tryUnifyConstrainedVariant(
 				// PHASE 3 FIX: Handle variant types like Option, Result, etc.
 				if (concreteType.kind === 'variant') {
 					const concreteVariant = concreteType; // Type-safe access
-					
+
 					// Validate that we're not trying to create an invalid primitive
 					if (isValidPrimitiveName(concreteVariant.name)) {
 						// Only valid primitives can be substituted as primitives
@@ -864,17 +801,16 @@ function unifyConstrainedWithConcrete(
 ): TypeState {
 	// Get the concrete type name for trait lookup
 	const concreteTypeName = getTypeName(concreteType);
-	
+
 	// Find which constrained type variable can be resolved to the concrete type
 	let resolvedVarName: string | null = null;
-	let resolvedConstraint: string | null = null;
-	
+
 	// Check each constraint to see if the concrete type satisfies it
 	for (const [varName, constraints] of constrainedType.constraints) {
 		for (const constraint of constraints) {
 			if (constraint.kind === 'implements') {
-				const traitName = constraint.trait;
-				
+			const traitName = constraint.interfaceName;
+
 				// Check if we have an implementation of this trait for the concrete type
 				const traitRegistry = state.traitRegistry;
 				if (!traitRegistry) {
@@ -888,7 +824,7 @@ function unifyConstrainedWithConcrete(
 						)
 					);
 				}
-				
+
 				const traitImpls = traitRegistry.implementations.get(traitName);
 				if (!traitImpls || !traitImpls.has(concreteTypeName)) {
 					throw new Error(
@@ -896,22 +832,22 @@ function unifyConstrainedWithConcrete(
 							createTypeError(
 								`No implementation of ${traitName} for ${concreteTypeName}`,
 								{
-									suggestion: `The constraint '${varName} implements ${traitName}' cannot be satisfied by ${concreteTypeName}. ` +
-										       `You need to add: implement ${traitName} ${concreteTypeName} (...)`
+									suggestion:
+										`The constraint '${varName} implements ${traitName}' cannot be satisfied by ${concreteTypeName}. ` +
+										`You need to add: implement ${traitName} ${concreteTypeName} (...)`,
 								},
 								location || { line: 1, column: 1 }
 							)
 						)
 					);
 				}
-				
+
 				// This constraint is satisfied - remember it for substitution
 				resolvedVarName = varName;
-				resolvedConstraint = traitName;
 			}
 		}
 	}
-	
+
 	if (!resolvedVarName) {
 		throw new Error(
 			formatTypeError(
@@ -923,13 +859,13 @@ function unifyConstrainedWithConcrete(
 			)
 		);
 	}
-	
+
 	// Create substitution mapping the constrained variable to the concrete type constructor
 	const newSubstitution = new Map(state.substitution);
-	
+
 	// CONSTRAINT COLLAPSE FIX: When we have a concrete type that satisfies the constraint,
 	// we should substitute the type variable with the concrete type constructor
-	
+
 	if (concreteType.kind === 'list') {
 		// For List Float, we substitute the type constructor variable with List
 		newSubstitution.set(resolvedVarName, { kind: 'primitive', name: 'List' });
@@ -940,35 +876,33 @@ function unifyConstrainedWithConcrete(
 		newSubstitution.set(resolvedVarName, {
 			kind: 'variant',
 			name: concreteType.name,
-			args: [] // Empty args since this is just the constructor
+			args: [], // Empty args since this is just the constructor
 		});
 	} else {
 		// For other types, substitute directly
 		newSubstitution.set(resolvedVarName, concreteType);
 	}
-	
+
 	const newState = { ...state, substitution: newSubstitution };
-	
+
 	// Apply the substitution to the base type
-	const substitutedBaseType = substitute(constrainedType.baseType, newSubstitution);
-	
+	const substitutedBaseType = substitute(
+		constrainedType.baseType,
+		newSubstitution
+	);
+
 	// CRITICAL FIX: Instead of calling unify recursively (which might preserve constraints),
 	// check if the substituted base type now equals the concrete type.
 	// If so, the constraint is fully resolved and we can return the new state.
-	
+
 	// Apply the substitution to make the comparison
 	const finalSubstitutedType = substitute(substitutedBaseType, newSubstitution);
-	
+
 	// If the types are now equal after substitution, constraint is resolved
 	if (typesEqual(finalSubstitutedType, concreteType)) {
 		return newState;
 	}
-	
+
 	// Otherwise, continue with normal unification
-	return unify(
-		substitutedBaseType,
-		concreteType,
-		newState,
-		location
-	);
+	return unify(substitutedBaseType, concreteType, newState, location);
 }

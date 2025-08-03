@@ -1,32 +1,28 @@
 // Phase 3 Effects System Tests
 // Testing effect validation, propagation, and built-in effectful functions
 
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../../src/lexer/lexer';
 import { parse } from '../../../src/parser/parser';
-import { typeProgram } from '../../../src/typer';
+import { typeAndDecorate } from '../../../src/typer';
 import type { Effect } from '../../../src/ast';
+import { test, expect } from 'bun:test';
 
 const runNoolang = (code: string) => {
 	const lexer = new Lexer(code);
-	const tokens = lexer.tokenize();
-	const program = parse(tokens);
-
-	return typeProgram(program);
+	return typeAndDecorate(parse(lexer.tokenize()));
 };
 
 const expectEffects = (code: string, expectedEffects: Effect[]) => {
 	const result = runNoolang(code);
 	const actualEffects = Array.from(result.effects).sort();
 	const expected = expectedEffects.sort();
-	assert.equal(actualEffects, expected);
+	expect(actualEffects).toEqual(expected);
 	return result;
 };
 
 const expectPure = (code: string) => {
 	const result = runNoolang(code);
-	assert.equal(result.effects.size, 0);
+	expect(result.effects.size).toEqual(0);
 	return result;
 };
 
@@ -349,20 +345,20 @@ test('Effects Phase 3 - Effect System Architecture Validation - function returni
 
 test('Effects Phase 3 - Effect Type System Integration - TypeResult includes effects field for effectful expressions', () => {
 	const result = runNoolang('print 42');
-	assert.ok(result.hasOwnProperty('type'), 'result should have type property');
-	assert.ok(result.hasOwnProperty('effects'), 'result should have effects property');
-	assert.ok(result.hasOwnProperty('state'), 'result should have state property');
-	assert.ok(result.effects instanceof Set, 'effects should be a Set');
-	assert.ok(result.effects.has('write'), 'effects should contain write effect');
+	expect(result).toHaveProperty('type');
+	expect(result).toHaveProperty('effects');
+	expect(result).toHaveProperty('state');
+	expect(result.effects instanceof Set).toBeTruthy();
+	expect(result.effects.has('write')).toBeTruthy();
 });
 
 test('Effects Phase 3 - Effect Type System Integration - TypeResult includes effects field for pure expressions', () => {
 	const result = runNoolang('42');
-	assert.ok(result.hasOwnProperty('type'), 'result should have type property');
-	assert.ok(result.hasOwnProperty('effects'), 'result should have effects property');
-	assert.ok(result.hasOwnProperty('state'), 'result should have state property');
-	assert.ok(result.effects instanceof Set, 'effects should be a Set');
-	assert.equal(result.effects.size, 0, 'pure expression should have no effects');
+	expect(result).toHaveProperty('type');
+	expect(result).toHaveProperty('effects');
+	expect(result).toHaveProperty('state');
+	expect(result.effects instanceof Set).toBeTruthy();
+	expect(result.effects.size).toEqual(0);
 });
 
 test('Effects Phase 3 - Effect Type System Integration - complex expressions have proper effect composition', () => {
@@ -373,9 +369,9 @@ test('Effects Phase 3 - Effect Type System Integration - complex expressions hav
 				);
 				loggedRandom 5
 			`);
-	assert.ok(result.effects.has('log'), 'effects should contain log effect');
-	assert.ok(result.effects.has('rand'), 'effects should contain rand effect');
-	assert.equal(result.effects.size, 2, 'should have exactly 2 effects');
+	expect(result.effects.has('log')).toBeTruthy();
+	expect(result.effects.has('rand')).toBeTruthy();
+	expect(result.effects.size).toEqual(2);
 });
 
 test('Effects Phase 3 - Effect Validation Edge Cases - empty function has no effects', () => {
@@ -414,4 +410,3 @@ test('Effects Phase 3 - Effect Validation Edge Cases - curried effectful functio
 	);
 });
 
-test.run();

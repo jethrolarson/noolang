@@ -48,8 +48,7 @@ export type TypeState = {
 	constraints: Constraint[]; // Track constraints during inference
 	adtRegistry: ADTRegistry; // Track ADT definitions
 	accessorCache: Map<string, Type>; // Cache accessor types by field name
-	constraintRegistry: ConstraintRegistry; // Track constraint definitions and implementations (LEGACY)
-	traitRegistry: TraitRegistry; // NEW: Simple trait system
+	traitRegistry: TraitRegistry;
 };
 
 // Type inference result with separated effects

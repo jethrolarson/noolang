@@ -1,71 +1,28 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
-import { Lexer } from '../../lexer/lexer';
+import { Lexer, Token } from '../../lexer/lexer';
 import { parse, parseTypeExpression } from '../parser';
-import type { ParseResult, ParseSuccess, ParseError, UnitExpression, ConstrainedExpression } from '../../ast';
-
-// Helper functions for type-safe testing
-function assertParseSuccess<T>(result: ParseResult<T>): asserts result is ParseSuccess<T> {
-	if (!result.success) {
-		throw new Error(`Expected parse success, got ${result.error}`);
-	}
-}
-
-function assertParseError<T>(result: ParseResult<T>): asserts result is ParseError {
-	if (result.success) {
-		throw new Error(`Expected parse error, got success: (${JSON.stringify(result)})`);
-	}
-}
-
-function assertUnitExpression(expr: any): UnitExpression {
-	if (expr.kind !== 'unit') {
-		throw new Error(`Expected unit expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
-function assertConstrainedExpression(expr: any): ConstrainedExpression {
-	if (expr.kind !== 'constrained') {
-		throw new Error(`Expected constrained expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
-function assertListType(type: any): void {
-	if (type.kind !== 'list') {
-		throw new Error(`Expected list type, got ${type.kind}`);
-	}
-}
-
-function assertVariableType(type: any): void {
-	if (type.kind !== 'variable') {
-		throw new Error(`Expected variable type, got ${type.kind}`);
-	}
-}
-
-function assertFunctionType(type: any): void {
-	if (type.kind !== 'function') {
-		throw new Error(`Expected function type, got ${type.kind}`);
-	}
-}
-
-function assertRecordType(type: any): void {
-	if (type.kind !== 'record') {
-		throw new Error(`Expected record type, got ${type.kind}`);
-	}
-}
-
-function assertTupleType(type: any): void {
-	if (type.kind !== 'tuple') {
-		throw new Error(`Expected tuple type, got ${type.kind}`);
-	}
-}
+import { test, expect } from 'bun:test';
+import {
+	assertParseError,
+	assertParseSuccess,
+	assertUnitExpression,
+	assertListExpression,
+	assertConstrainedExpression,
+	assertRecordType,
+	assertTupleType,
+	assertFunctionType,
+	assertVariableType,
+	assertListType,
+	assertPrimitiveType,
+	assertBinaryExpression,
+	assertParenConstraint,
+	assertLiteralExpression,
+} from '../../../test/utils';
 
 test('Edge Cases and Error Conditions - should handle empty input for type expressions', () => {
-	const tokens: any[] = [];
+	const tokens: Token[] = [];
 	const result = parseTypeExpression(tokens);
 	assertParseError(result);
-	assert.ok(result.error.includes('Expected type expression'));
+	expect(result.error.includes('Expected type expression')).toBeTruthy();
 });
 
 test('Edge Cases and Error Conditions - should handle invalid tokens for type expressions', () => {
@@ -73,7 +30,7 @@ test('Edge Cases and Error Conditions - should handle invalid tokens for type ex
 	const tokens = lexer.tokenize();
 	const result = parseTypeExpression(tokens);
 	assertParseError(result);
-	assert.ok(result.error.includes('Expected type expression'));
+	expect(result.error.includes('Expected type expression')).toBeTruthy();
 });
 
 test('Edge Cases and Error Conditions - should parse Unit type correctly', () => {
@@ -81,7 +38,7 @@ test('Edge Cases and Error Conditions - should parse Unit type correctly', () =>
 	const tokens = lexer.tokenize();
 	const result = parseTypeExpression(tokens);
 	assertParseSuccess(result);
-	assert.is(result.value.kind, 'unit');
+	expect(result.value.kind).toBe('unit');
 });
 
 test('Edge Cases and Error Conditions - should parse Float type correctly', () => {
@@ -89,8 +46,8 @@ test('Edge Cases and Error Conditions - should parse Float type correctly', () =
 	const tokens = lexer.tokenize();
 	const result = parseTypeExpression(tokens);
 	assertParseSuccess(result);
-	assert.is(result.value.kind, 'primitive');
-	assert.is((result.value as any).name, 'Float');
+	assertPrimitiveType(result.value);
+	expect(result.value.name).toBe('Float');
 });
 
 test('Edge Cases and Error Conditions - should handle incomplete function type', () => {
@@ -105,7 +62,7 @@ test('Edge Cases and Error Conditions - should handle invalid effect name', () =
 	const tokens = lexer.tokenize();
 	const result = parseTypeExpression(tokens);
 	assertParseError(result);
-	assert.ok(result.error.includes('Invalid effect: invalideffect'));
+	expect(result.error.includes('Invalid effect: invalideffect')).toBeTruthy();
 });
 
 test('Edge Cases and Error Conditions - should handle missing effect name after exclamation', () => {
@@ -113,7 +70,7 @@ test('Edge Cases and Error Conditions - should handle missing effect name after 
 	const tokens = lexer.tokenize();
 	const result = parseTypeExpression(tokens);
 	assertParseError(result);
-	assert.ok(result.error.includes('Expected effect name after !'));
+	expect(result.error.includes('Expected effect name after !')).toBeTruthy();
 });
 
 test('Edge Cases and Error Conditions - should handle generic List type', () => {
@@ -122,8 +79,8 @@ test('Edge Cases and Error Conditions - should handle generic List type', () => 
 	const result = parseTypeExpression(tokens);
 	assertParseSuccess(result);
 	assertListType(result.value);
-	assert.is(result.value.element.kind, 'variable');
-	assert.is((result.value.element as any).name, 'a');
+	assertVariableType(result.value.element);
+	expect(result.value.element.name).toBe('a');
 });
 
 test('Edge Cases and Error Conditions - should handle List type with argument', () => {
@@ -132,48 +89,48 @@ test('Edge Cases and Error Conditions - should handle List type with argument', 
 	const result = parseTypeExpression(tokens);
 	assertParseSuccess(result);
 	assertListType(result.value);
-	assert.is(result.value.element.kind, 'primitive');
+	assertPrimitiveType(result.value.element);
 });
 
 test('Edge Cases and Error Conditions - should handle empty record fields', () => {
 	const lexer = new Lexer('{ }');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
-	const unit = assertUnitExpression(program.statements[0]);
-	assert.is(unit.kind, 'unit');
+	expect(program.statements.length).toBe(1);
+	assertUnitExpression(program.statements[0]);
 });
 
 test('Edge Cases and Error Conditions - should handle empty list elements', () => {
 	const lexer = new Lexer('[]');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
-	assert.is(program.statements[0].kind, 'list');
-	const list = program.statements[0] as any;
-	assert.is(list.elements.length, 0);
+	expect(program.statements.length).toBe(1);
+	assertListExpression(program.statements[0]);
+	expect(program.statements[0].elements.length).toBe(0);
 });
 
 test('Edge Cases and Error Conditions - should handle adjacent minus for unary operator', () => {
 	const lexer = new Lexer('-123');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
-	assert.is(program.statements[0].kind, 'binary');
-	const binary = program.statements[0] as any;
-	assert.is(binary.operator, '*');
-	assert.is(binary.left.value, -1);
-	assert.is(binary.right.value, 123);
+	expect(program.statements.length).toBe(1);
+	const binary = program.statements[0];
+	assertBinaryExpression(binary);
+	expect(binary.operator).toBe('*');
+	assertLiteralExpression(binary.left);
+	expect(binary.left.value).toBe(-1);
+	assertLiteralExpression(binary.right);
+	expect(binary.right.value).toBe(123);
 });
 
 test('Edge Cases and Error Conditions - should handle non-adjacent minus for binary operator', () => {
 	const lexer = new Lexer('a - b');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
-	assert.is(program.statements[0].kind, 'binary');
-	const binary = program.statements[0] as any;
-	assert.is(binary.operator, '-');
+	expect(program.statements.length).toBe(1);
+	const binary = program.statements[0];
+	assertBinaryExpression(binary);
+	expect(binary.operator).toBe('-');
 });
 
 test('Edge Cases and Error Conditions - should handle function type without effects fallback', () => {
@@ -182,7 +139,7 @@ test('Edge Cases and Error Conditions - should handle function type without effe
 	const result = parseTypeExpression(tokens);
 	assertParseSuccess(result);
 	assertFunctionType(result.value);
-	assert.equal([...result.value.effects], []);
+	expect([...result.value.effects]).toEqual([]);
 });
 
 test('Edge Cases and Error Conditions - should handle lowercase type variable', () => {
@@ -191,7 +148,7 @@ test('Edge Cases and Error Conditions - should handle lowercase type variable', 
 	const result = parseTypeExpression(tokens);
 	assertParseSuccess(result);
 	assertVariableType(result.value);
-	assert.is(result.value.name, 'a');
+	expect(result.value.name).toBe('a');
 });
 
 test('Edge Cases and Error Conditions - should handle record type edge case', () => {
@@ -200,7 +157,7 @@ test('Edge Cases and Error Conditions - should handle record type edge case', ()
 	const result = parseTypeExpression(tokens);
 	assertParseSuccess(result);
 	assertRecordType(result.value);
-	assert.ok(result.value.fields.hasOwnProperty('name'));
+	expect(result.value.fields).toHaveProperty('name');
 });
 
 test('Edge Cases and Error Conditions - should handle tuple type edge case', () => {
@@ -209,14 +166,14 @@ test('Edge Cases and Error Conditions - should handle tuple type edge case', () 
 	const result = parseTypeExpression(tokens);
 	assertParseSuccess(result);
 	assertTupleType(result.value);
-	assert.is(result.value.elements.length, 2);
+	expect(result.value.elements.length).toBe(2);
 });
 
 test('Edge Cases and Error Conditions - should handle unexpected token types in primary parser', () => {
 	// Create a mock token with an unexpected type
-	const tokens = [
+	const tokens: Token[] = [
 		{
-			type: 'COMMENT' as any,
+			type: 'COMMENT',
 			value: '# comment',
 			location: {
 				start: { line: 1, column: 1 },
@@ -224,7 +181,7 @@ test('Edge Cases and Error Conditions - should handle unexpected token types in 
 			},
 		},
 	];
-	assert.throws(() => parse(tokens), /Parse error/);
+	expect(() => parse(tokens)).toThrow();
 });
 
 test('Edge Cases and Error Conditions - should handle various punctuation cases', () => {
@@ -233,7 +190,7 @@ test('Edge Cases and Error Conditions - should handle various punctuation cases'
 	for (const testCase of testCases) {
 		const lexer = new Lexer(testCase);
 		const tokens = lexer.tokenize();
-		assert.throws(() => parse(tokens), /Parse error/);
+		expect(() => parse(tokens)).toThrow();
 	}
 });
 
@@ -253,9 +210,10 @@ test('Edge Cases and Error Conditions - should handle constraint expression edge
 	const lexer = new Lexer('x : a given (a is Eq)');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
-	const constrained = assertConstrainedExpression(program.statements[0]);
-	assert.is(constrained.constraint.kind, 'paren');
+	expect(program.statements.length).toBe(1);
+	const constrained = program.statements[0];
+	assertConstrainedExpression(constrained);
+	assertParenConstraint(constrained.constraint);
 });
 
 test('Edge Cases and Error Conditions - should handle complex parsing edge cases for coverage', () => {
@@ -272,8 +230,6 @@ test('Edge Cases and Error Conditions - should handle complex parsing edge cases
 		const lexer = new Lexer(testCase);
 		const tokens = lexer.tokenize();
 		const program = parse(tokens);
-		assert.is(program.statements.length, 1);
+		expect(program.statements.length).toBe(1);
 	}
 });
-
-test.run();

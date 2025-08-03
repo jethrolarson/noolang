@@ -5,15 +5,11 @@ import {
 	type Expression,
 	typeVariable,
 	type VariableType,
+	type Constraint,
 } from '../ast';
 import { parse } from '../parser/parser';
 import { Lexer } from '../lexer/lexer';
-import {
-	type TypeState,
-	type TypeEnvironment,
-	type TypeScheme,
-	createConstraintRegistry,
-} from './types';
+import { type TypeState, type TypeEnvironment, type TypeScheme } from './types';
 import { createTraitRegistry } from './trait-system';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
@@ -38,7 +34,7 @@ export const freshTypeVariable = (
 // Helper function to create ConstrainedType instances
 export const createConstrainedType = (
 	baseType: Type,
-	constraints: Map<string, Array<{ kind: 'implements'; trait: string } | { kind: 'hasField'; field: string; fieldType: Type }>>
+	constraints: Map<string, Constraint[]> // Use modern constraint format>
 ): Type => ({
 	kind: 'constrained',
 	baseType,
@@ -49,7 +45,7 @@ export const createConstrainedType = (
 export const addConstraintToType = (
 	baseType: Type,
 	varName: string,
-	constraint: { kind: 'implements'; trait: string } | { kind: 'hasField'; field: string; fieldType: Type }
+	constraint: Constraint
 ): Type => {
 	const constraints = new Map();
 	constraints.set(varName, [constraint]);
@@ -186,7 +182,30 @@ export const freshenTypeVariables = (
 				mapping,
 				currentState
 			);
-			return [{ ...type, params: newParams, return: newReturn }, finalState];
+			
+			// Handle function-level constraints
+			let newConstraints: Constraint[] | undefined = undefined;
+			if (type.constraints && type.constraints.length > 0) {
+				newConstraints = type.constraints.map(constraint => {
+					// Update constraint variable names using the mapping
+					if ('typeVar' in constraint) {
+						const mappedVar = mapping.get(constraint.typeVar);
+						if (mappedVar && mappedVar.kind === 'variable') {
+							return {
+								...constraint,
+								typeVar: mappedVar.name,
+							};
+						}
+					}
+					return constraint;
+				});
+			}
+			
+			const freshenedFunction = { ...type, params: newParams, return: newReturn };
+			if (newConstraints) {
+				freshenedFunction.constraints = newConstraints;
+			}
+			return [freshenedFunction, finalState];
 		}
 		case 'list': {
 			const [newElem, nextState] = freshenTypeVariables(
@@ -239,18 +258,44 @@ export const freshenTypeVariables = (
 			return [{ ...type, types: newTypes }, currentState];
 		}
 		case 'variant': {
-			let currentState = state;
-			const newArgs: Type[] = [];
-			for (const arg of type.args) {
-				const [newArg, nextState] = freshenTypeVariables(
-					arg,
-					mapping,
-					currentState
-				);
-				newArgs.push(newArg);
-				currentState = nextState;
+			// Check if this variant name is actually a type parameter that should be freshened
+			const mappedVar = mapping.get(type.name);
+			if (mappedVar && mappedVar.kind === 'variable') {
+				// This variant represents a type parameter, replace it with the fresh type variable
+				let currentState = state;
+				const newArgs: Type[] = [];
+				for (const arg of type.args) {
+					const [newArg, nextState] = freshenTypeVariables(
+						arg,
+						mapping,
+						currentState
+					);
+					newArgs.push(newArg);
+					currentState = nextState;
+				}
+				return [
+					{
+						kind: 'variant',
+						name: mappedVar.name,
+						args: newArgs,
+					},
+					currentState,
+				];
+			} else {
+				// This is a concrete variant type (Bool, Option, etc.), just freshen the args
+				let currentState = state;
+				const newArgs: Type[] = [];
+				for (const arg of type.args) {
+					const [newArg, nextState] = freshenTypeVariables(
+						arg,
+						mapping,
+						currentState
+					);
+					newArgs.push(newArg);
+					currentState = nextState;
+				}
+				return [{ ...type, args: newArgs }, currentState];
 			}
-			return [{ ...type, args: newArgs }, currentState];
 		}
 		default:
 			return [type, state];
@@ -308,7 +353,6 @@ export const createTypeState = (): TypeState => ({
 	constraints: [],
 	adtRegistry: new Map(),
 	accessorCache: new Map(),
-	constraintRegistry: createConstraintRegistry(), // LEGACY
 	traitRegistry: createTraitRegistry(), // NEW: Simple trait system
 });
 

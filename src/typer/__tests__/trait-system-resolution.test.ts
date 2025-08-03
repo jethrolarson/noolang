@@ -1,110 +1,102 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
-import { Lexer } from '../../lexer/lexer';
-import { parse } from '../../parser/parser';
-import { typeProgram } from '../index';
 import { typeToString } from '../helpers';
+import { test, expect, describe } from 'bun:test';
+import {
+	assertListType,
+	assertPrimitiveType,
+	parseAndType,
+} from '../../../test/utils';
 
-test('Trait System Phase 3: Constraint Resolution - Constraint Collapse - should handle constraint collapse for various concrete types', () => {
-	const testCases = [
-		{
-			name: 'List with integers',
-			code: 'map (fn x => x + 1) [1, 2, 3]',
-			expectedKind: 'list',
-			expectedType: 'List Float',
-			shouldCollapse: true
-		},
-		{
-			name: 'Option with integer',
-			code: 'map (fn x => x + 1) (Some 42)',
-			expectedKind: 'variant',
-			expectedType: 'Option Float',
-			shouldCollapse: true
-		},
-		{
-			name: 'Nested map operations',
-			code: 'map (fn x => x * 2) (map (fn x => x + 1) [1, 2, 3])',
-			expectedKind: 'list',
-			expectedType: 'List Float',
-			shouldCollapse: true
-		},
-		{
-			name: 'Partial application (no concrete type)',
-			code: 'map (fn x => x + 1)',
-			expectedKind: 'constrained',
-			expectedType: /implements Functor/,
-			shouldCollapse: false
-		},
-		{
-			name: 'Pure function (preserves constraint)',
-			code: 'pure 1',
-			expectedKind: 'constrained',
-			expectedType: /implements Monad/,
-			shouldCollapse: false
-		}
-	];
+const parseToString = (code: string) => {
+	const typeResult = parseAndType(code);
+	return typeToString(typeResult.type, typeResult.state.substitution);
+};
 
-	for (const testCase of testCases) {
-		const lexer = new Lexer(testCase.code);
-		const tokens = lexer.tokenize();
-		const program = parse(tokens);
-		
-		const typeResult = typeProgram(program);
-		const typeString = typeToString(typeResult.type);
-		
-		// Check type kind
-		assert.is(typeResult.type.kind, testCase.expectedKind);
-		
-		// Check type string
-		if (typeof testCase.expectedType === 'string') {
-			assert.is(typeString, testCase.expectedType);
-		} else {
-			assert.match(typeString, testCase.expectedType);
-		}
-		
-		// Check constraint collapse behavior
-		if (testCase.shouldCollapse) {
-			assert.not.match(typeString, /implements|given|α\d+/);
-		} else {
-			assert.match(typeString, /implements|given|α\d+/);
-		}
-	}
+describe('Constraint Collapse', () => {
+	test('map type is correct', () => {
+		const typeString = parseToString('map');
+
+		expect(typeString).toBe(
+			'(a -> b) -> c a -> c b given c implements Functor'
+		);
+	});
+	test('map should work with unary trait functions', () => {
+		const typeString = parseToString('map show [1, 2, 3]');
+
+		expect(typeString).toBe('List String');
+	});
+	test('List with integers should collapse to concrete type', () => {
+		const typeString = parseToString('map (fn x => x + 1) [1, 2, 3]');
+
+		expect(typeString).toBe('List Float');
+	});
+
+	test('partially applied trait function should collapse to concrete type', () => {
+		const typeString = parseToString('map (add 1) [1, 2, 3]');
+
+		expect(typeString).toBe('List Float');
+	});
+
+	test('Option with integer should collapse to concrete type', () => {
+		const typeString = parseToString('map (fn x => x + 1) (Some 42)');
+
+		expect(typeString).toBe('Option Float');
+	});
+
+	test('Nested map operations should collapse to concrete type', () => {
+		const typeString = parseToString('map show (map (add 1) [1])');
+
+		expect(typeString).toBe('List String');
+	});
+
+	// Will fix with larger work on operator trait delegation
+	test.skip('operators erase constraints that are resolved', () => {
+		const typeString = parseToString('fn x => x + 1');
+
+		expect(typeString).toBe('Float -> Float');
+	});
+
+	test('trait functions erase constraints that are resolved', () => {
+		const typeString = parseToString('(fn x => add x 1)');
+
+		expect(typeString).toBe('Float -> Float');
+	});
+
+	test('Partial application should preserve constraints', () => {
+		const typeString = parseToString('map (fn x => x + 1)');
+
+		expect(typeString).toBe('a Float -> a Float given a implements Functor');
+	});
+
+	test('Pure function should preserve constraints', () => {
+		const typeString = parseToString('pure 1');
+
+		expect(typeString).toBe('m Float given m implements Monad');
+	});
 });
 
-test('Trait System Phase 3: Constraint Resolution - Complex Constraint Resolution - should handle multiple different constraints with partial collapse', () => {
-	const code = `
+describe('Complex Constraint Resolution', () => {
+	test('should handle multiple different constraints with partial collapse', () => {
+		const code = `
 		showAndIncrement = fn x => show (x + 1);
 		result = map showAndIncrement [1, 2, 3]
 	`;
-	
-	const lexer = new Lexer(code);
-	const tokens = lexer.tokenize();
-	const program = parse(tokens);
-	
-	const typeResult = typeProgram(program);
-	
-	// PARTIAL CONSTRAINT COLLAPSE: Functor constraint gets resolved to List,
-	// but Show constraint from within the mapped function is preserved
-	assert.is(typeResult.type.kind, 'list');
-	const typeString = typeToString(typeResult.type);
-	assert.match(typeString, /List String/);
-	assert.match(typeString, /implements Show/); // Show constraint preserved for now
-});
 
-test('Trait System Phase 3: Constraint Resolution - Advanced Edge Cases - should handle polymorphic functions with constraints', () => {
-	const code = `
+		const typeResult = parseAndType(code);
+
+		assertListType(typeResult.type);
+		assertPrimitiveType(typeResult.type.element);
+		expect(typeResult.type.element.name).toBe('String');
+	});
+
+	test('Trait System Phase 3: Constraint Resolution - Advanced Edge Cases - should handle polymorphic functions with constraints', () => {
+		const code = `
 		polymorphicMap = fn f list => map f list;
 		result = polymorphicMap (fn x => x + 1) [1, 2, 3]
 	`;
-	
-	const lexer = new Lexer(code);
-	const tokens = lexer.tokenize();
-	const program = parse(tokens);
-	
-	const typeResult = typeProgram(program);
-	
-	// Should propagate constraints through polymorphic functions
-	assert.is(typeResult.type.kind, 'constrained');
-});
 
-test.run();
+		const typeResult = parseAndType(code);
+		assertListType(typeResult.type);
+		assertPrimitiveType(typeResult.type.element);
+		expect(typeResult.type.element.name).toBe('Float');
+	});
+});

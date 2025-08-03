@@ -1,6 +1,6 @@
 import type { Expression, Type } from '../ast';
 import { createError, type NoolangError, type ErrorLocation } from '../errors';
-import { formatEffectsString } from './helpers';
+import { formatEffectsString } from './effects-utils';
 
 export interface TypeErrorContext {
 	expression?: Expression;
@@ -363,7 +363,7 @@ function typeToString(type: Type): string {
 		case 'record':
 			return `{ ${Object.entries(type.fields)
 				.map(([name, fieldType]) => `${name}: ${typeToString(fieldType)}`)
-				.join(' ')} }`;
+				.join(', ')} }`;
 		case 'variant':
 			if (type.args.length === 0) {
 				return type.name;

@@ -1,10 +1,3 @@
-import { type Program, type Type, unitType, type Effect } from '../ast';
-import { type TypeResult, unionEffects } from './types';
-import { createTypeState, loadStdlib } from './type-operations';
-import { typeExpression } from './expression-dispatcher';
-import { initializeBuiltins } from './builtins';
-import { substitute } from './substitute';
-
 // Re-export TypeResult and effect helpers from types module
 export {
 	type TypeResult,
@@ -67,31 +60,3 @@ export { typeApplication, typePipeline } from './function-application';
 export { typeMatch, typeTypeDefinition } from './pattern-matching';
 
 export { typeAndDecorate } from './decoration';
-
-// Re-export helper functions from their modules
-// Legacy constraint exports removed
-// Export the main program typing function
-export const typeProgram = (program: Program): TypeResult => {
-	let state = createTypeState();
-	state = initializeBuiltins(state);
-	state = loadStdlib(state);
-
-	let finalType: Type | null = null;
-	let allEffects = new Set<Effect>();
-
-	for (const statement of program.statements) {
-		const result = typeExpression(statement, state);
-		state = result.state;
-		finalType = result.type;
-		allEffects = unionEffects(allEffects, result.effects);
-	}
-
-	if (!finalType) {
-		finalType = unitType();
-	}
-
-	// Apply substitution to resolve type variables to concrete types
-	const resolvedType = substitute(finalType, state.substitution);
-
-	return { type: resolvedType, effects: allEffects, state };
-};

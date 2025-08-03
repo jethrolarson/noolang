@@ -1,7 +1,6 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
-import { Lexer } from '../../src/lexer/lexer';
-import * as C from '../../src/parser/combinators';
+import { Lexer } from '../../lexer/lexer';
+import * as C from '../combinators';
+import { test, expect } from 'bun:test';
 
 // Helper function to create tokens for testing
 const createTokens = (input: string) => {
@@ -22,11 +21,11 @@ test('Parser Combinators - token - should match exact token type and value', () 
 	const tokens = createTokensWithoutEOF('42');
 	const result = C.token('NUMBER', '42')(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.type, 'NUMBER');
-		assert.equal(result.value.value, '42');
-		assert.equal(result.remaining.length, 0);
+		expect(result.value.type).toEqual('NUMBER');
+		expect(result.value.value).toEqual('42');
+		expect(result.remaining.length).toEqual(0);
 	}
 });
 
@@ -34,10 +33,10 @@ test('Parser Combinators - token - should match token type without value constra
 	const tokens = createTokens('42');
 	const result = C.token('NUMBER')(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.type, 'NUMBER');
-		assert.equal(result.value.value, '42');
+		expect(result.value.type).toEqual('NUMBER');
+		expect(result.value.value).toEqual('42');
 	}
 });
 
@@ -45,10 +44,10 @@ test('Parser Combinators - token - should fail on wrong token type', () => {
 	const tokens = createTokens('42');
 	const result = C.token('IDENTIFIER')(tokens);
 
-	assert.equal(result.success, false);
+	expect(result.success).toEqual(false);
 	if (!result.success) {
-		assert.ok(result.error.includes('Expected IDENTIFIER'));
-		assert.ok(result.error.includes('but got NUMBER'));
+		expect(result.error.includes('Expected IDENTIFIER')).toBeTruthy();
+		expect(result.error.includes('but got NUMBER')).toBeTruthy();
 	}
 });
 
@@ -56,20 +55,20 @@ test('Parser Combinators - token - should fail on wrong token value', () => {
 	const tokens = createTokens('42');
 	const result = C.token('NUMBER', '43')(tokens);
 
-	assert.equal(result.success, false);
+	expect(result.success).toEqual(false);
 	if (!result.success) {
-		assert.ok(result.error.includes("Expected NUMBER '43'"));
-		assert.ok(result.error.includes("but got NUMBER '42'"));
+		expect(result.error.includes("Expected NUMBER '43'")).toBeTruthy();
+		expect(result.error.includes("but got NUMBER '42'")).toBeTruthy();
 	}
 });
 
 test('Parser Combinators - token - should fail on empty input', () => {
 	const result = C.token('NUMBER')([]);
 
-	assert.equal(result.success, false);
+	expect(result.success).toEqual(false);
 	if (!result.success) {
-		assert.ok(result.error.includes('Expected NUMBER'));
-		assert.ok(result.error.includes('but got end of input'));
+		expect(result.error.includes('Expected NUMBER')).toBeTruthy();
+		expect(result.error.includes('but got end of input')).toBeTruthy();
 	}
 });
 
@@ -77,20 +76,20 @@ test('Parser Combinators - anyToken - should match any token', () => {
 	const tokens = createTokensWithoutEOF('42');
 	const result = C.anyToken()(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.type, 'NUMBER');
-		assert.equal(result.value.value, '42');
-		assert.equal(result.remaining.length, 0);
+		expect(result.value.type).toEqual('NUMBER');
+		expect(result.value.value).toEqual('42');
+		expect(result.remaining.length).toEqual(0);
 	}
 });
 
 test('Parser Combinators - anyToken - should fail on empty input', () => {
 	const result = C.anyToken()([]);
 
-	assert.equal(result.success, false);
+	expect(result.success).toEqual(false);
 	if (!result.success) {
-		assert.equal(result.error, 'Expected any token, but got end of input');
+		expect(result.error).toEqual('Expected any token, but got end of input');
 	}
 });
 
@@ -101,11 +100,11 @@ test('Parser Combinators - seq - should match sequence of parsers', () => {
 		C.token('IDENTIFIER', 'world')
 	)(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.length, 2);
-		assert.equal(result.value[0].value, 'hello');
-		assert.equal(result.value[1].value, 'world');
+		expect(result.value.length).toEqual(2);
+		expect(result.value[0].value).toEqual('hello');
+		expect(result.value[1].value).toEqual('world');
 	}
 });
 
@@ -116,17 +115,17 @@ test('Parser Combinators - seq - should fail if any parser in sequence fails', (
 		C.token('IDENTIFIER', 'world')
 	)(tokens);
 
-	assert.equal(result.success, false);
+	expect(result.success).toEqual(false);
 });
 
 test('Parser Combinators - seq - should handle empty sequence', () => {
 	const tokens = createTokens('hello');
 	const result = C.seq()(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.length, 0);
-		assert.equal(result.remaining, tokens);
+		expect(result.value.length).toEqual(0);
+		expect(result.remaining).toEqual(tokens);
 	}
 });
 
@@ -138,10 +137,10 @@ test('Parser Combinators - choice - should match first successful parser', () =>
 		C.token('STRING')
 	)(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.type, 'NUMBER');
-		assert.equal(result.value.value, '42');
+		expect(result.value.type).toEqual('NUMBER');
+		expect(result.value.value).toEqual('42');
 	}
 });
 
@@ -153,10 +152,10 @@ test('Parser Combinators - choice - should try all parsers in order', () => {
 		C.token('IDENTIFIER')
 	)(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.type, 'IDENTIFIER');
-		assert.equal(result.value.value, 'hello');
+		expect(result.value.type).toEqual('IDENTIFIER');
+		expect(result.value.value).toEqual('hello');
 	}
 });
 
@@ -168,26 +167,26 @@ test('Parser Combinators - choice - should fail if all parsers fail', () => {
 		C.token('PUNCTUATION')
 	)(tokens);
 
-	assert.equal(result.success, false);
+	expect(result.success).toEqual(false);
 });
 
 test('Parser Combinators - choice - should handle empty choice', () => {
 	const tokens = createTokens('hello');
 	const result = C.choice()(tokens);
 
-	assert.equal(result.success, false);
+	expect(result.success).toEqual(false);
 });
 
 test('Parser Combinators - many - should match zero or more occurrences', () => {
 	const tokens = createTokens('42 43 44');
 	const result = C.many(C.token('NUMBER'))(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.length, 3);
-		assert.equal(result.value[0].value, '42');
-		assert.equal(result.value[1].value, '43');
-		assert.equal(result.value[2].value, '44');
+		expect(result.value.length).toEqual(3);
+		expect(result.value[0].value).toEqual('42');
+		expect(result.value[1].value).toEqual('43');
+		expect(result.value[2].value).toEqual('44');
 	}
 });
 
@@ -195,19 +194,19 @@ test('Parser Combinators - many - should match zero occurrences', () => {
 	const tokens = createTokens('hello');
 	const result = C.many(C.token('NUMBER'))(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.length, 0);
-		assert.equal(result.remaining, tokens);
+		expect(result.value.length).toEqual(0);
+		expect(result.remaining).toEqual(tokens);
 	}
 });
 
 test('Parser Combinators - many - should handle empty input', () => {
 	const result = C.many(C.token('NUMBER'))([]);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.length, 0);
+		expect(result.value.length).toEqual(0);
 	}
 });
 
@@ -215,11 +214,11 @@ test('Parser Combinators - many1 - should match one or more occurrences', () => 
 	const tokens = createTokens('42 43');
 	const result = C.many1(C.token('NUMBER'))(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.length, 2);
-		assert.equal(result.value[0].value, '42');
-		assert.equal(result.value[1].value, '43');
+		expect(result.value.length).toEqual(2);
+		expect(result.value[0].value).toEqual('42');
+		expect(result.value[1].value).toEqual('43');
 	}
 });
 
@@ -227,24 +226,24 @@ test('Parser Combinators - many1 - should fail on zero occurrences', () => {
 	const tokens = createTokens('hello');
 	const result = C.many1(C.token('NUMBER'))(tokens);
 
-	assert.equal(result.success, false);
+	expect(result.success).toEqual(false);
 });
 
 test('Parser Combinators - many1 - should fail on empty input', () => {
 	const result = C.many1(C.token('NUMBER'))([]);
 
-	assert.equal(result.success, false);
+	expect(result.success).toEqual(false);
 });
 
 test('Parser Combinators - optional - should match when parser succeeds', () => {
 	const tokens = createTokens('42');
 	const result = C.optional(C.token('NUMBER'))(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.ok(result.value !== null);
+		expect(result.value !== null).toBeTruthy();
 		if (result.value !== null) {
-			assert.equal(result.value.value, '42');
+			expect(result.value.value).toEqual('42');
 		}
 	}
 });
@@ -253,110 +252,127 @@ test('Parser Combinators - optional - should return null when parser fails', () 
 	const tokens = createTokens('hello');
 	const result = C.optional(C.token('NUMBER'))(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value, null);
-		assert.equal(result.remaining, tokens);
+		expect(result.value).toEqual(null);
+		expect(result.remaining).toEqual(tokens);
 	}
 });
 
 test('Parser Combinators - optional - should handle empty input', () => {
 	const result = C.optional(C.token('NUMBER'))([]);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value, null);
+		expect(result.value).toEqual(null);
 	}
 });
 
 test('Parser Combinators - map - should transform successful parse result', () => {
 	const tokens = createTokens('42');
-	const result = C.map(C.token('NUMBER'), (token) => parseInt(token.value))(tokens);
+	const result = C.map(C.token('NUMBER'), token => parseInt(token.value))(
+		tokens
+	);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value, 42);
+		expect(result.value).toEqual(42);
 	}
 });
 
 test('Parser Combinators - map - should preserve failure', () => {
 	const tokens = createTokens('hello');
-	const result = C.map(C.token('NUMBER'), (token) => parseInt(token.value))(tokens);
+	const result = C.map(C.token('NUMBER'), token => parseInt(token.value))(
+		tokens
+	);
 
-	assert.equal(result.success, false);
+	expect(result.success).toEqual(false);
 });
 
 test('Parser Combinators - lazy - should defer parser creation', () => {
 	const tokens = createTokens('42');
 	const result = C.lazy(() => C.token('NUMBER'))(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.value, '42');
+		expect(result.value.value).toEqual('42');
 	}
 });
 
 test('Parser Combinators - lazy - should handle recursive parsers', () => {
 	const tokens = createTokens('( ( 42 ) )');
-	
-	const expr: () => C.Parser<any> = () => C.choice(
-		C.token('NUMBER'),
-		C.map(
-			C.seq(
-				C.token('PUNCTUATION', '('),
-				C.lazy(expr),
-				C.token('PUNCTUATION', ')')
-			),
-			([_, inner, __]) => inner
-		)
-	);
-	
+
+	const expr: () => C.Parser<any> = () =>
+		C.choice(
+			C.token('NUMBER'),
+			C.map(
+				C.seq(
+					C.token('PUNCTUATION', '('),
+					C.lazy(expr),
+					C.token('PUNCTUATION', ')')
+				),
+				([_, inner, __]) => inner
+			)
+		);
+
 	const result = expr()(tokens);
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 });
 
 test('Parser Combinators - sepBy - should parse elements separated by separator', () => {
 	const tokens = createTokens('42, 43, 44');
-	const result = C.sepBy(C.token('NUMBER'), C.token('PUNCTUATION', ','))(tokens);
+	const result = C.sepBy(
+		C.token('NUMBER'),
+		C.token('PUNCTUATION', ',')
+	)(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.length, 3);
-		assert.equal(result.value[0].value, '42');
-		assert.equal(result.value[1].value, '43');
-		assert.equal(result.value[2].value, '44');
+		expect(result.value.length).toEqual(3);
+		expect(result.value[0].value).toEqual('42');
+		expect(result.value[1].value).toEqual('43');
+		expect(result.value[2].value).toEqual('44');
 	}
 });
 
 test('Parser Combinators - sepBy - should parse single element', () => {
 	const tokens = createTokens('42');
-	const result = C.sepBy(C.token('NUMBER'), C.token('PUNCTUATION', ','))(tokens);
+	const result = C.sepBy(
+		C.token('NUMBER'),
+		C.token('PUNCTUATION', ',')
+	)(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.length, 1);
-		assert.equal(result.value[0].value, '42');
+		expect(result.value.length).toEqual(1);
+		expect(result.value[0].value).toEqual('42');
 	}
 });
 
 test('Parser Combinators - sepBy - should parse zero elements', () => {
 	const tokens = createTokens('hello');
-	const result = C.sepBy(C.token('NUMBER'), C.token('PUNCTUATION', ','))(tokens);
+	const result = C.sepBy(
+		C.token('NUMBER'),
+		C.token('PUNCTUATION', ',')
+	)(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.length, 0);
+		expect(result.value.length).toEqual(0);
 	}
 });
 
 test('Parser Combinators - sepBy - should parse partial when separator is followed by invalid element', () => {
 	const tokens = createTokens('42, hello');
-	const result = C.sepBy(C.token('NUMBER'), C.token('PUNCTUATION', ','))(tokens);
+	const result = C.sepBy(
+		C.token('NUMBER'),
+		C.token('PUNCTUATION', ',')
+	)(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.length, 1);
-		assert.equal(result.value[0].value, '42');
+		expect(result.value.length).toEqual(1);
+		expect(result.value[0].value).toEqual('42');
 	}
 });
 
@@ -364,9 +380,9 @@ test('Parser Combinators - parseAll - should succeed when parser consumes all in
 	const tokens = createTokensWithoutEOF('42');
 	const result = C.parseAll(C.token('NUMBER'))(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.value, '42');
+		expect(result.value.value).toEqual('42');
 	}
 });
 
@@ -374,24 +390,24 @@ test('Parser Combinators - parseAll - should fail when input remains', () => {
 	const tokens = createTokens('42 hello');
 	const result = C.parseAll(C.token('NUMBER'))(tokens);
 
-	assert.equal(result.success, false);
+	expect(result.success).toEqual(false);
 });
 
 test('Parser Combinators - parseAll - should preserve parser failure', () => {
 	const tokens = createTokens('hello');
 	const result = C.parseAll(C.token('NUMBER'))(tokens);
 
-	assert.equal(result.success, false);
+	expect(result.success).toEqual(false);
 });
 
 test('Parser Combinators - convenience parsers - identifier should match identifiers', () => {
 	const tokens = createTokens('hello');
 	const result = C.identifier()(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.type, 'IDENTIFIER');
-		assert.equal(result.value.value, 'hello');
+		expect(result.value.type).toEqual('IDENTIFIER');
+		expect(result.value.value).toEqual('hello');
 	}
 });
 
@@ -399,10 +415,10 @@ test('Parser Combinators - convenience parsers - number should match numbers', (
 	const tokens = createTokens('42');
 	const result = C.number()(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.type, 'NUMBER');
-		assert.equal(result.value.value, '42');
+		expect(result.value.type).toEqual('NUMBER');
+		expect(result.value.value).toEqual('42');
 	}
 });
 
@@ -410,10 +426,10 @@ test('Parser Combinators - convenience parsers - string should match strings', (
 	const tokens = createTokens('"hello"');
 	const result = C.string()(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.type, 'STRING');
-		assert.equal(result.value.value, 'hello');
+		expect(result.value.type).toEqual('STRING');
+		expect(result.value.value).toEqual('hello');
 	}
 });
 
@@ -421,10 +437,10 @@ test('Parser Combinators - convenience parsers - keyword should match specific k
 	const tokens = createTokens('if');
 	const result = C.keyword('if')(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.type, 'KEYWORD');
-		assert.equal(result.value.value, 'if');
+		expect(result.value.type).toEqual('KEYWORD');
+		expect(result.value.value).toEqual('if');
 	}
 });
 
@@ -432,10 +448,10 @@ test('Parser Combinators - convenience parsers - operator should match specific 
 	const tokens = createTokens('+');
 	const result = C.operator('+')(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.type, 'OPERATOR');
-		assert.equal(result.value.value, '+');
+		expect(result.value.type).toEqual('OPERATOR');
+		expect(result.value.value).toEqual('+');
 	}
 });
 
@@ -443,10 +459,10 @@ test('Parser Combinators - convenience parsers - punctuation should match specif
 	const tokens = createTokens('(');
 	const result = C.punctuation('(')(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.type, 'PUNCTUATION');
-		assert.equal(result.value.value, '(');
+		expect(result.value.type).toEqual('PUNCTUATION');
+		expect(result.value.value).toEqual('(');
 	}
 });
 
@@ -454,10 +470,10 @@ test('Parser Combinators - convenience parsers - accessor should match accessors
 	const tokens = createTokens('@name');
 	const result = C.accessor()(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.type, 'ACCESSOR');
-		assert.equal(result.value.value, 'name');
+		expect(result.value.type).toEqual('ACCESSOR');
+		expect(result.value.value).toEqual('name');
 	}
 });
 
@@ -472,13 +488,13 @@ test('Parser Combinators - complex combinations - should handle nested sequences
 		C.identifier()
 	)(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.length, 6);
-		assert.equal(result.value[0].value, 'if');
-		assert.equal(result.value[1].value, '42');
-		assert.equal(result.value[3].value, 'hello');
-		assert.equal(result.value[5].value, 'world');
+		expect(result.value.length).toEqual(6);
+		expect(result.value[0].value).toEqual('if');
+		expect(result.value[1].value).toEqual('42');
+		expect(result.value[3].value).toEqual('hello');
+		expect(result.value[5].value).toEqual('world');
 	}
 });
 
@@ -486,11 +502,11 @@ test('Parser Combinators - complex combinations - should handle many with separa
 	const tokens = createTokens('1, 2, 3, 4');
 	const result = C.sepBy(C.number(), C.punctuation(','))(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.length, 4);
+		expect(result.value.length).toEqual(4);
 		result.value.forEach((token, i) => {
-			assert.equal(token.value, String(i + 1));
+			expect(token.value).toEqual(String(i + 1));
 		});
 	}
 });
@@ -503,12 +519,12 @@ test('Parser Combinators - complex combinations - should handle optional with fa
 		C.optional(C.number())
 	)(tokens);
 
-	assert.equal(result.success, true);
+	expect(result.success).toEqual(true);
 	if (result.success) {
-		assert.equal(result.value.length, 3);
-		assert.equal(result.value[0].value, 'hello');
-		assert.ok(result.value[1] !== null);
-		assert.equal(result.value[2], null);
+		expect(result.value.length).toEqual(3);
+		expect(result.value[0].value).toEqual('hello');
+		expect(result.value[1] !== null).toBeTruthy();
+		expect(result.value[2]).toEqual(null);
 	}
 });
 
@@ -516,25 +532,19 @@ test('Parser Combinators - error handling - should provide meaningful error mess
 	const tokens = createTokens('42');
 	const result = C.token('STRING')(tokens);
 
-	assert.equal(result.success, false);
+	expect(result.success).toEqual(false);
 	if (!result.success) {
-		assert.ok(result.error.includes('Expected STRING'));
-		assert.ok(result.error.includes('but got NUMBER'));
+		expect(result.error.includes('Expected STRING')).toBeTruthy();
+		expect(result.error.includes('but got NUMBER')).toBeTruthy();
 	}
 });
 
 test('Parser Combinators - error handling - should track position for error reporting', () => {
 	const tokens = createTokens('hello world 42');
-	const result = C.seq(
-		C.identifier(),
-		C.identifier(),
-		C.string()
-	)(tokens);
+	const result = C.seq(C.identifier(), C.identifier(), C.string())(tokens);
 
-	assert.equal(result.success, false);
+	expect(result.success).toEqual(false);
 	if (!result.success) {
-		assert.ok(result.error.includes('Expected STRING'));
+		expect(result.error.includes('Expected STRING')).toBeTruthy();
 	}
 });
-
-test.run();

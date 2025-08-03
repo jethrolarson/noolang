@@ -2,10 +2,6 @@
 
 # Simplified demo - focusing on basic trait functionality without complex helper functions
 
-# 1. SIMPLE CONSTRAINT DEFINITIONS
-constraint Show a ( show : a -> String );
-constraint Eq a ( equals : a -> a -> Bool );
-
 # 2. BASIC IMPLEMENTATIONS
 # Note: Show Float, Show String, Eq Float, and Eq String are already implemented in stdlib.noo
 

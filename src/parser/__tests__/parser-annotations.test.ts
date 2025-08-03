@@ -1,87 +1,23 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
 import { Lexer } from '../../lexer/lexer';
 import { parse, parseTypeExpression } from '../parser';
-import type { 
-	ParseResult, 
-	ParseSuccess, 
-	ParseError,
-	BinaryExpression,
-	DefinitionExpression,
-	TypedExpression
-} from '../../ast';
+import { test, expect } from 'bun:test';
+import {
+	assertParseSuccess,
+	assertParseError,
+	assertRecordType,
+	assertTupleType,
+	assertListType,
+	assertFunctionType,
+	assertVariableType,
+	assertDefinitionExpression,
+	assertTypedExpression,
+	assertPrimitiveType,
+	assertVariantType,
+	assertFunctionExpression,
+	assertLiteralExpression,
+} from '../../../test/utils';
 
-// Helper functions for type-safe testing
-function assertParseSuccess<T>(result: ParseResult<T>): asserts result is ParseSuccess<T> {
-	if (!result.success) {
-		throw new Error(`Expected parse success, got ${result.error}`);
-	}
-}
-
-function assertParseError<T>(result: ParseResult<T>): asserts result is ParseError {
-	if (result.success) {
-		throw new Error(`Expected parse error, got success: (${JSON.stringify(result)})`);
-	}
-}
-
-function assertRecordType(type: any): void {
-	if (type.kind !== 'record') {
-		throw new Error(`Expected record type, got ${type.kind}`);
-	}
-}
-
-function assertTupleType(type: any): void {
-	if (type.kind !== 'tuple') {
-		throw new Error(`Expected tuple type, got ${type.kind}`);
-	}
-}
-
-function assertListType(type: any): void {
-	if (type.kind !== 'list') {
-		throw new Error(`Expected list type, got ${type.kind}`);
-	}
-}
-
-function assertFunctionType(type: any): void {
-	if (type.kind !== 'function') {
-		throw new Error(`Expected function type, got ${type.kind}`);
-	}
-}
-
-function assertVariableType(type: any): void {
-	if (type.kind !== 'variable') {
-		throw new Error(`Expected variable type, got ${type.kind}`);
-	}
-}
-
-function assertBinaryExpression(expr: any): BinaryExpression {
-	if (expr.kind !== 'binary') {
-		throw new Error(`Expected binary expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
-function assertDefinitionExpression(expr: any): DefinitionExpression {
-	if (expr.kind !== 'definition') {
-		throw new Error(`Expected definition expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
-function assertTypedExpression(expr: any): TypedExpression {
-	if (expr.kind !== 'typed') {
-		throw new Error(`Expected typed expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
-function assertFunctionExpression(expr: any): any {
-	if (expr.kind !== 'function') {
-		throw new Error(`Expected function expression, got ${expr.kind}`);
-	}
-	return expr;
-}
-
+// Helper functions for parsing
 function parseType(typeSrc: string) {
 	const lexer = new Lexer(typeSrc);
 	const tokens = lexer.tokenize();
@@ -98,9 +34,9 @@ test('Top-level sequence parsing - multiple definitions and final expression', (
 	const lexer = new Lexer('a = 1; b = 2; a + b');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const seq = program.statements[0];
-	assert.is(seq.kind, 'binary'); // semicolon sequence
+	expect(seq.kind).toBe('binary'); // semicolon sequence
 });
 
 test('Top-level sequence parsing - multiple definitions and final record', () => {
@@ -113,44 +49,44 @@ test('Top-level sequence parsing - multiple definitions and final record', () =>
 	const lexer = new Lexer(code);
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const seq = program.statements[0];
-	assert.is(seq.kind, 'binary');
+	expect(seq.kind).toBe('binary');
 });
 
 test('Top-level sequence parsing - sequence with trailing semicolon', () => {
 	const lexer = new Lexer('a = 1; b = 2; a + b;');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	assert.is(program.statements.length, 1);
+	expect(program.statements.length).toBe(1);
 	const seq = program.statements[0];
-	assert.is(seq.kind, 'binary');
+	expect(seq.kind).toBe('binary');
 });
 
 test('Type annotation parsing - parses record type annotation', () => {
 	const result = parseType('{ name: String, age: Float }');
 	assertParseSuccess(result);
 	assertRecordType(result.value);
-	assert.is(result.value.kind, 'record');
-	assert.ok(result.value.fields.hasOwnProperty('name'));
-	assert.ok(result.value.fields.hasOwnProperty('age'));
-	assert.is(result.value.fields.name.kind, 'primitive');
-	assert.is(result.value.fields.age.kind, 'primitive');
+	expect(result.value.kind).toBe('record');
+	expect(result.value.fields).toHaveProperty('name');
+	expect(result.value.fields).toHaveProperty('age');
+	expect(result.value.fields.name.kind).toBe('primitive');
+	expect(result.value.fields.age.kind).toBe('primitive');
 });
 
 test('Type annotation parsing - parses tuple type annotation', () => {
 	const result = parseType('{ Float, String }');
 	assertParseSuccess(result);
 	assertTupleType(result.value);
-	assert.is(result.value.elements[0].kind, 'primitive');
-	assert.is(result.value.elements[1].kind, 'primitive');
+	assertPrimitiveType(result.value.elements[0]);
+	assertPrimitiveType(result.value.elements[1]);
 });
 
 test('Type annotation parsing - parses list type annotation', () => {
 	const result = parseType('List Float');
 	assertParseSuccess(result);
 	assertListType(result.value);
-	assert.is(result.value.element.kind, 'primitive');
+	assertPrimitiveType(result.value.element);
 });
 
 test('Type annotation parsing - parses function type annotation', () => {
@@ -158,63 +94,60 @@ test('Type annotation parsing - parses function type annotation', () => {
 	assertParseSuccess(result);
 	assertFunctionType(result.value);
 	const funcType = result.value;
-	assert.is(funcType.params[0].kind, 'primitive');
-	assert.is(funcType.return.kind, 'primitive');
+	assertPrimitiveType(funcType.params[0]);
+	assertPrimitiveType(funcType.return);
 });
 
 test('Type annotation parsing - parses type variable', () => {
 	const result = parseType('a');
 	assertParseSuccess(result);
 	assertVariableType(result.value);
-	assert.is(result.value.kind, 'variable');
-	assert.is(result.value.name, 'a');
+	expect(result.value.name).toBe('a');
 });
 
 test('Type annotation parsing - parses simple type constructor application', () => {
 	const result = parseType('Option Float');
 	assertParseSuccess(result);
-	assert.is(result.value.kind, 'variant');
-	const variantType = result.value as any;
-	assert.is(variantType.name, 'Option');
-	assert.is(variantType.args.length, 1);
-	assert.is(variantType.args[0].kind, 'primitive');
-	assert.is(variantType.args[0].name, 'Float');
+	assertVariantType(result.value);
+	const variantType = result.value;
+	expect(variantType.name).toBe('Option');
+	assertPrimitiveType(variantType.args[0]);
+	expect(variantType.args[0].name).toBe('Float');
 });
 
 test('Type annotation parsing - parses type constructor with type variable', () => {
 	const result = parseType('Option a');
 	assertParseSuccess(result);
-	assert.is(result.value.kind, 'variant');
-	const variantType = result.value as any;
-	assert.is(variantType.name, 'Option');
-	assert.is(variantType.args.length, 1);
-	assert.is(variantType.args[0].kind, 'variable');
-	assert.is(variantType.args[0].name, 'a');
+	assertVariantType(result.value);
+	const variantType = result.value;
+	expect(variantType.name).toBe('Option');
+	assertVariableType(variantType.args[0]);
+	expect(variantType.args[0].name).toBe('a');
 });
 
 test('Type annotation parsing - parses type constructor with multiple arguments', () => {
 	const result = parseType('Either String Float');
 	assertParseSuccess(result);
-	assert.is(result.value.kind, 'variant');
-	const variantType = result.value as any;
-	assert.is(variantType.name, 'Either');
-	assert.is(variantType.args.length, 2);
-	assert.is(variantType.args[0].kind, 'primitive');
-	assert.is(variantType.args[0].name, 'String');
-	assert.is(variantType.args[1].kind, 'primitive');
-	assert.is(variantType.args[1].name, 'Float');
+	assertVariantType(result.value);
+	const variantType = result.value;
+	expect(variantType.name).toBe('Either');
+	expect(variantType.args.length).toBe(2);
+	assertPrimitiveType(variantType.args[0]);
+	expect(variantType.args[0].name).toBe('String');
+	assertPrimitiveType(variantType.args[1]);
+	expect(variantType.args[1].name).toBe('Float');
 });
 
 test('Type annotation parsing - parses nested type constructor application', () => {
 	const result = parseType('Option (Either String Float)');
 	assertParseSuccess(result);
-	assert.is(result.value.kind, 'variant');
-	const variantType = result.value as any;
-	assert.is(variantType.name, 'Option');
-	assert.is(variantType.args.length, 1);
-	assert.is(variantType.args[0].kind, 'variant');
-	assert.is(variantType.args[0].name, 'Either');
-	assert.is(variantType.args[0].args.length, 2);
+	assertVariantType(result.value);
+	const variantType = result.value;
+	expect(variantType.name).toBe('Option');
+	expect(variantType.args.length).toBe(1);
+	assertVariantType(variantType.args[0]);
+	expect(variantType.args[0].name).toBe('Either');
+	expect(variantType.args[0].args.length).toBe(2);
 });
 
 test('Effect parsing - should parse function type with single effect', () => {
@@ -225,10 +158,10 @@ test('Effect parsing - should parse function type with single effect', () => {
 	assertParseSuccess(result);
 	assertFunctionType(result.value);
 	const funcType = result.value;
-	assert.equal([...funcType.effects], ['write']);
-	assert.is(funcType.params.length, 1);
-	assert.is(funcType.params[0].kind, 'primitive');
-	assert.is(funcType.return.kind, 'primitive');
+	expect([...funcType.effects]).toEqual(['write']);
+	expect(funcType.params.length).toBe(1);
+	expect(funcType.params[0].kind).toBe('primitive');
+	expect(funcType.return.kind).toBe('primitive');
 });
 
 test('Effect parsing - should parse function type with multiple effects', () => {
@@ -239,7 +172,7 @@ test('Effect parsing - should parse function type with multiple effects', () => 
 	assertParseSuccess(result);
 	assertFunctionType(result.value);
 	const funcType = result.value;
-	assert.equal([...funcType.effects].sort(), ['log', 'write']);
+	expect([...funcType.effects].sort()).toEqual(['log', 'write']);
 });
 
 test('Effect parsing - should parse function type with all valid effects', () => {
@@ -252,7 +185,7 @@ test('Effect parsing - should parse function type with all valid effects', () =>
 	assertParseSuccess(result);
 	assertFunctionType(result.value);
 	const funcType = result.value;
-	assert.equal([...funcType.effects].sort(), [
+	expect([...funcType.effects].sort()).toEqual([
 		'async',
 		'ffi',
 		'log',
@@ -272,7 +205,7 @@ test('Effect parsing - should parse function type with no effects', () => {
 	assertParseSuccess(result);
 	assertFunctionType(result.value);
 	const funcType = result.value;
-	assert.equal([...funcType.effects], []);
+	expect([...funcType.effects]).toEqual([]);
 });
 
 test('Effect parsing - should reject invalid effect names', () => {
@@ -281,7 +214,7 @@ test('Effect parsing - should reject invalid effect names', () => {
 	const result = parseTypeExpression(tokens);
 
 	assertParseError(result);
-	assert.ok(result.error.includes('Invalid effect: invalid'));
+	expect(result.error.includes('Invalid effect: invalid')).toBeTruthy();
 });
 
 test('Effect parsing - should require effect name after exclamation mark', () => {
@@ -290,41 +223,41 @@ test('Effect parsing - should require effect name after exclamation mark', () =>
 	const result = parseTypeExpression(tokens);
 
 	assertParseError(result);
-	assert.ok(result.error.includes('Expected effect name after !'));
+	expect(result.error.includes('Expected effect name after !')).toBeTruthy();
 });
 
 test('Top-level definitions with type annotations - parses definition with function type annotation', () => {
 	const result = parseDefinition(
 		'sum = fn x y => x + y : Float -> Float -> Float;'
 	);
-	assert.is(result.statements.length, 1);
-	assert.is(result.statements[0].kind, 'definition');
-	const def = assertDefinitionExpression(result.statements[0]);
-	assert.is(def.name, 'sum');
-	assert.is(def.value.kind, 'function');
+	expect(result.statements.length).toBe(1);
+	const def = result.statements[0];
+	assertDefinitionExpression(def);
+	expect(def.name).toBe('sum');
+	assertFunctionExpression(def.value);
 });
 
 test('Top-level definitions with type annotations - parses definition with primitive type annotation', () => {
 	const result = parseDefinition('answer = 42 : Float;');
-	assert.is(result.statements.length, 1);
-	assert.is(result.statements[0].kind, 'definition');
-	const def = assertDefinitionExpression(result.statements[0]);
-	assert.is(def.name, 'answer');
-	const typed = assertTypedExpression(def.value);
-	assert.is(typed.expression.kind, 'literal');
-	assert.is(typed.type.kind, 'primitive');
+	expect(result.statements.length).toBe(1);
+	const def = result.statements[0];
+	assertDefinitionExpression(def);
+	expect(def.name).toBe('answer');
+	const typed = def.value;
+	assertTypedExpression(typed);
+	assertLiteralExpression(typed.expression);
+	assertPrimitiveType(typed.type);
 });
 
 test('Top-level definitions with type annotations - parses definition with list type annotation', () => {
-	const result = parseDefinition('numbers = [1, 2, 3] : List Float;');
-	assert.is(result.statements.length, 1);
-	const def = assertDefinitionExpression(result.statements[0]);
-	assert.is(def.name, 'numbers');
-	const typed = assertTypedExpression(def.value);
-	assert.is(typed.expression.kind, 'list');
-	assert.is(typed.type.kind, 'list'); // List types have kind "list"
-	assert.is((typed.type as any).element.kind, 'primitive'); // Float is a primitive type
-	assert.is((typed.type as any).element.name, 'Float');
+	const result = parseDefinition('numbers = [1, 2, 3] : List Float');
+	expect(result.statements.length).toBe(1);
+	const def = result.statements[0];
+	assertDefinitionExpression(def);
+	expect(def.name).toBe('numbers');
+	const typed = def.value;
+	assertTypedExpression(typed);
+	assertListType(typed.type);
+	assertPrimitiveType(typed.type.element);
+	expect(typed.type.element.name).toBe('Float');
 });
-
-test.run();

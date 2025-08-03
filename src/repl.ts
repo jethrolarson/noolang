@@ -43,23 +43,30 @@ export class REPLCore {
 	typeState: TypeState;
 	private output: REPLOutput;
 
-	constructor(output: REPLOutput = new ConsoleOutput(), options: { skipStdlib?: boolean } = {}) {
+	constructor(
+		output: REPLOutput = new ConsoleOutput(),
+		options: { skipStdlib?: boolean } = {}
+	) {
 		this.typeState = createTypeState();
 		this.typeState = initializeBuiltins(this.typeState);
-		
+
 		if (!options.skipStdlib) {
 			this.typeState = loadStdlib(this.typeState); // Ensure stdlib types are loaded
 		}
-		
-		this.evaluator = new Evaluator({ 
+
+		this.evaluator = new Evaluator({
 			traitRegistry: this.typeState.traitRegistry,
-			skipStdlib: options.skipStdlib 
+			skipStdlib: options.skipStdlib,
 		});
 		this.output = output;
 	}
 
 	// Main method for processing REPL input - fully testable
-	public processInput(input: string): { success: boolean; output?: string; error?: string } {
+	public processInput(input: string): {
+		success: boolean;
+		output?: string;
+		error?: string;
+	} {
 		if (input === '') {
 			return { success: true };
 		}
@@ -171,7 +178,9 @@ export class REPLCore {
 		this.output.log(colorize.section('Noolang REPL Commands:'));
 		this.output.log('');
 		this.output.log(colorize.section('Basic Commands:'));
-		this.output.log(`  ${colorize.command('.help')}     - Show this help message`);
+		this.output.log(
+			`  ${colorize.command('.help')}     - Show this help message`
+		);
 		this.output.log(`  ${colorize.command('.quit')}     - Exit the REPL`);
 		this.output.log(`  ${colorize.command('.exit')}     - Exit the REPL`);
 		this.output.log('');
@@ -179,26 +188,36 @@ export class REPLCore {
 		this.output.log(
 			`  ${colorize.command('.env')}      - Show current environment with types`
 		);
-		this.output.log(`  ${colorize.command('.env-json')} - Show environment as JSON`);
+		this.output.log(
+			`  ${colorize.command('.env-json')} - Show environment as JSON`
+		);
 		this.output.log(`  ${colorize.command('.clear-env')} - Clear environment`);
-		this.output.log(`  ${colorize.command('.types')}    - Show type environment`);
+		this.output.log(
+			`  ${colorize.command('.types')}    - Show type environment`
+		);
 		this.output.log('');
 		this.output.log(colorize.section('Debugging Commands:'));
 		this.output.log(
 			`  ${colorize.command('.tokens (expr)')}     - Show tokens for expression`
 		);
-		this.output.log(`  ${colorize.command('.tokens-file file')}  - Show tokens for file`);
+		this.output.log(
+			`  ${colorize.command('.tokens-file file')}  - Show tokens for file`
+		);
 		this.output.log(
 			`  ${colorize.command('.ast (expr)')}        - Show AST for expression`
 		);
 		this.output.log(
 			`  ${colorize.command('.ast-file file')}     - Show AST for expression`
 		);
-		this.output.log(`  ${colorize.command('.ast-json (expr)')}   - Show AST as JSON`);
+		this.output.log(
+			`  ${colorize.command('.ast-json (expr)')}   - Show AST as JSON`
+		);
 		this.output.log(
 			`  ${colorize.command('.error-detail')}      - Show detailed error info`
 		);
-		this.output.log(`  ${colorize.command('.error-context')}     - Show error context`);
+		this.output.log(
+			`  ${colorize.command('.error-context')}     - Show error context`
+		);
 		this.output.log('');
 		this.output.log(colorize.section('Examples:'));
 		this.output.log(`  ${colorize.identifier('add = fn x y => x + y')}`);
@@ -207,9 +226,13 @@ export class REPLCore {
 		this.output.log(`  ${colorize.identifier('if true then 1 else 2')}`);
 		this.output.log('');
 		this.output.log(colorize.section('Debugging Examples:'));
-		this.output.log(`  ${colorize.command('.tokens (result1 = (@add math) 2 3)')}`);
+		this.output.log(
+			`  ${colorize.command('.tokens (result1 = (@add math) 2 3)')}`
+		);
 		this.output.log(`  ${colorize.command('.ast (a = 1; b = 2)')}`);
-		this.output.log(`  ${colorize.command('.ast-file test_import_record.noo')}`);
+		this.output.log(
+			`  ${colorize.command('.ast-file test_import_record.noo')}`
+		);
 	}
 
 	private showEnvironment(): void {
@@ -230,7 +253,11 @@ export class REPLCore {
 		}
 	}
 
-	private handleCommand(input: string): { success: boolean; output?: string; error?: string } {
+	private handleCommand(input: string): {
+		success: boolean;
+		output?: string;
+		error?: string;
+	} {
 		const [command, ...args] = input.split(' ');
 
 		switch (command) {
@@ -248,10 +275,6 @@ export class REPLCore {
 
 			case '.env-json':
 				this.showEnvironmentAsJSON();
-				return { success: true };
-
-			case '.clear-env':
-				this.clearEnvironment();
 				return { success: true };
 
 			case '.types':
@@ -312,14 +335,6 @@ export class REPLCore {
 		}
 
 		this.output.log(JSON.stringify(envObj, null, 2));
-	}
-
-	private clearEnvironment(): void {
-		this.evaluator = new Evaluator();
-		this.typeState = createTypeState();
-		this.typeState = initializeBuiltins(this.typeState);
-		this.typeState = loadStdlib(this.typeState);
-		this.output.log(colorize.success('Environment cleared'));
 	}
 
 	private showTokensFromParens(input: string): void {
@@ -510,11 +525,15 @@ export class REPLCore {
 	}
 
 	private showErrorDetail(): void {
-		this.output.log(colorize.warning('Error detail not available - no recent error'));
+		this.output.log(
+			colorize.warning('Error detail not available - no recent error')
+		);
 	}
 
 	private showErrorContext(): void {
-		this.output.log(colorize.warning('Error context not available - no recent error'));
+		this.output.log(
+			colorize.warning('Error context not available - no recent error')
+		);
 	}
 
 	private astToString(expr: Expression, indent: number = 0): string {
@@ -595,7 +614,9 @@ export class REPLCore {
 			const typeStr = typeScheme.type
 				? typeToString(typeScheme.type, this.typeState.substitution)
 				: 'unknown';
-			this.output.log(`  ${colorize.identifier(name)}: ${colorize.type(typeStr)}`);
+			this.output.log(
+				`  ${colorize.identifier(name)}: ${colorize.type(typeStr)}`
+			);
 		}
 	}
 }
@@ -623,8 +644,8 @@ export class REPL {
 
 		this.rl.on('line', (input: string) => {
 			try {
-				const result = this.core.processInput(input.trim());
-				
+				this.core.processInput(input.trim());
+
 				// Handle exit commands
 				if (input.trim() === '.quit' || input.trim() === '.exit') {
 					this.rl.close();

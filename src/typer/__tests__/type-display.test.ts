@@ -1,107 +1,89 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
+import { test, expect, describe } from 'bun:test';
+import { parseAndType } from '../../../test/utils';
 import { typeToString } from '../helpers';
-import { recordType, stringType, floatType } from '../../ast';
 
-test('Type Display (typeToString) - Record Type Display - should display record type with @field syntax', () => {
-	const recordTypeWithFields = recordType({
-		name: stringType(),
-		age: floatType(),
+describe('Type Display', () => {
+	test('add partially applied', () => {
+		const result = parseAndType('add 1');
+		const typeStr = typeToString(result.type, result.state.substitution);
+		expect(typeStr).toBe('Float -> Float');
 	});
 
-	const result = typeToString(recordTypeWithFields);
-	assert.is(result, '{ @name String, @age Float }');
-});
-
-test('Type Display (typeToString) - Record Type Display - should display single field record type', () => {
-	const singleFieldRecord = recordType({
-		name: stringType(),
+	test('add fully applied', () => {
+		const result = parseAndType('add 1 2');
+		const typeStr = typeToString(result.type, result.state.substitution);
+		expect(typeStr).toBe('Float');
 	});
 
-	const result = typeToString(singleFieldRecord);
-	assert.is(result, '{ @name String }');
-});
-
-test('Type Display (typeToString) - Record Type Display - should display empty record type', () => {
-	const emptyRecord = recordType({});
-
-	const result = typeToString(emptyRecord);
-	assert.is(result, '{ }');
-});
-
-test('Type Display (typeToString) - Record Type Display - should display record type with multiple fields in consistent order', () => {
-	const multiFieldRecord = recordType({
-		name: stringType(),
-		age: floatType(),
-		active: { kind: 'primitive', name: 'Bool' } as const,
+	test('map trait type', () => {
+		const result = parseAndType('map');
+		const typeStr = typeToString(result.type, result.state.substitution);
+		expect(typeStr).toBe('(a -> b) -> c a -> c b given c implements Functor');
 	});
 
-	const result = typeToString(multiFieldRecord);
-	// Note: Object.entries() order should be consistent in modern JS
-	assert.match(result, /^{ @\w+ \w+(?:, @\w+ \w+)* }$/);
-	assert.ok(result.includes('@name String'));
-	assert.ok(result.includes('@age Float'));
-	assert.ok(result.includes('@active Bool'));
-});
-
-test('Type Display (typeToString) - Record Type Display - should display nested record types correctly', () => {
-	const nestedRecord = recordType({
-		person: recordType({
-			name: stringType(),
-			age: floatType(),
-		}),
+	test('map partially applied', () => {
+		const result = parseAndType('map (add 1)');
+		const typeStr = typeToString(result.type, result.state.substitution);
+		expect(typeStr).toBe('a Float -> a Float given a implements Functor');
 	});
 
-	const result = typeToString(nestedRecord);
-	assert.is(result, '{ @person { @name String, @age Float } }');
-});
-
-test('Type Display (typeToString) - Record Type Display Consistency - should use commas between fields', () => {
-	const recordTypeWithFields = recordType({
-		name: stringType(),
-		age: floatType(),
+	test('map fully applied', () => {
+		const result = parseAndType('map (add 1) [1, 2]');
+		const typeStr = typeToString(result.type, result.state.substitution);
+		expect(typeStr).toBe('List Float');
 	});
 
-	const result = typeToString(recordTypeWithFields);
-	assert.ok(result.includes(', '));
-});
-
-test('Type Display (typeToString) - Record Type Display Consistency - should not use colons in field definitions', () => {
-	const recordTypeWithFields = recordType({
-		name: stringType(),
-		age: floatType(),
+	test('Trait constraints propagate', () => {
+		const result = parseAndType('fn x y => x + y');
+		const typeStr = typeToString(result.type, result.state.substitution);
+		expect(typeStr).toBe('a -> a -> a given a implements Add');
 	});
 
-	const result = typeToString(recordTypeWithFields);
-	assert.ok(!result.includes(':'));
-});
-
-test('Type Display (typeToString) - Record Type Display Consistency - should use @ prefix for all field names', () => {
-	const recordTypeWithFields = recordType({
-		name: stringType(),
-		age: floatType(),
-		active: { kind: 'primitive', name: 'Bool' } as const,
+	test('Structural constraints propagate', () => {
+		const result = parseAndType('fn obj => @name obj');
+		const typeStr = typeToString(result.type, result.state.substitution);
+		expect(typeStr).toBe('a -> b given a has {@name b}');
 	});
 
-	const result = typeToString(recordTypeWithFields);
-	const fields = result.match(/@\w+/g);
-	assert.is(fields?.length, 3);
-	assert.ok(fields?.includes('@name'));
-	assert.ok(fields?.includes('@age'));
-	assert.ok(fields?.includes('@active'));
-});
-
-test('Type Display (typeToString) - Record Type Display Consistency - should match input syntax format', () => {
-	// This test ensures the display format matches what users type
-	const recordTypeWithFields = recordType({
-		name: stringType(),
-		age: floatType(),
+	test('Complex constraints with Functor and structural', () => {
+		const result = parseAndType('map @name');
+		const typeStr = typeToString(result.type, result.state.substitution);
+		expect(typeStr).toBe(
+			'a b -> a c given b has {@name c} and a implements Functor'
+		);
 	});
 
-	const result = typeToString(recordTypeWithFields);
+	test('Variable name consistency', () => {
+		const result = parseAndType('map @name');
+		const typeStr = typeToString(result.type, result.state.substitution);
 
-	// Should match the format: { @field Type, @field Type }
-	assert.match(result, /^{ @\w+ \w+(?:, @\w+ \w+)* }$/);
+		// Parse the type string to check variable consistency
+		expect(typeStr).toBe(
+			'a b -> a c given b has {@name c} and a implements Functor'
+		);
+	});
+
+	test('Simple types without constraints', () => {
+		// Test that simple types work correctly
+		const simpleResult = parseAndType('42');
+		const simpleStr = typeToString(
+			simpleResult.type,
+			simpleResult.state.substitution
+		);
+		expect(simpleStr).toBe('Float');
+
+		const identityResult = parseAndType('fn x => x');
+		const identityStr = typeToString(
+			identityResult.type,
+			identityResult.state.substitution
+		);
+		expect(identityStr).toBe('a -> a');
+	});
+
+	test('Variant type variable normalization', () => {
+		// Test that variant type variables are consistently normalized
+		const result = parseAndType('map id');
+		const typeStr = typeToString(result.type, result.state.substitution);
+		expect(typeStr).toBe('a b -> a b given a implements Functor');
+	});
 });
-
-test.run();

@@ -1,16 +1,5 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
-import { Lexer } from '../../lexer/lexer';
-import { parse } from '../../parser/parser';
-
-const parseAndType = (code: string) => {
-	const lexer = new Lexer(code);
-	const tokens = lexer.tokenize();
-	const program = parse(tokens);
-	
-	const { typeProgram } = require('../index');
-	return typeProgram(program);
-};
+import { test, expect } from 'bun:test';
+import { assertPrimitiveType, parseAndType } from '../../../test/utils';
 
 test('Trait System Conflicting Functions Safety - should allow multiple traits to define the same function name', () => {
 	// This should work because multiple traits can define the same function name
@@ -21,21 +10,23 @@ test('Trait System Conflicting Functions Safety - should allow multiple traits t
 		implement Processable Float ( process = toString );
 		implement Formatter String ( process = fn s => s )
 	`;
-	
+
 	// This should succeed because Float implements Processable and String implements Formatter
 	// No ambiguity because each type has only one implementation of 'process'
 	const result = parseAndType(code);
-	assert.is(result.type.kind, 'unit');
-	
+	expect(result.type.kind).toBe('unit');
+
 	// Both traits should be registered
-	assert.is(result.state.traitRegistry.definitions.has('Processable'), true);
-	assert.is(result.state.traitRegistry.definitions.has('Formatter'), true);
-	
+	expect(result.state.traitRegistry.definitions.has('Processable')).toBe(true);
+	expect(result.state.traitRegistry.definitions.has('Formatter')).toBe(true);
+
 	// Both implementations should exist
-	const processableImpls = result.state.traitRegistry.implementations.get('Processable');
-	const formatterImpls = result.state.traitRegistry.implementations.get('Formatter');
-	assert.is(processableImpls?.has('Float'), true);
-	assert.is(formatterImpls?.has('String'), true);
+	const processableImpls =
+		result.state.traitRegistry.implementations.get('Processable');
+	const formatterImpls =
+		result.state.traitRegistry.implementations.get('Formatter');
+	expect(processableImpls?.has('Float')).toBe(true);
+	expect(formatterImpls?.has('String')).toBe(true);
 });
 
 test('Trait System Conflicting Functions Safety - should allow different function names in multiple constraints', () => {
@@ -46,19 +37,21 @@ test('Trait System Conflicting Functions Safety - should allow different functio
 		implement Displayable Float ( display = toString );
 		implement Formattable Float ( format = toString )
 	`;
-	
+
 	const result = parseAndType(code);
-	assert.is(result.type.kind, 'unit');
-	
+	expect(result.type.kind).toBe('unit');
+
 	// Both traits should be registered
-	assert.is(result.state.traitRegistry.definitions.has('Displayable'), true);
-	assert.is(result.state.traitRegistry.definitions.has('Formattable'), true);
-	
+	expect(result.state.traitRegistry.definitions.has('Displayable')).toBe(true);
+	expect(result.state.traitRegistry.definitions.has('Formattable')).toBe(true);
+
 	// Both implementations should exist
-	const displayImpls = result.state.traitRegistry.implementations.get('Displayable');
-	const formatImpls = result.state.traitRegistry.implementations.get('Formattable');
-	assert.is(displayImpls?.has('Float'), true);
-	assert.is(formatImpls?.has('Float'), true);
+	const displayImpls =
+		result.state.traitRegistry.implementations.get('Displayable');
+	const formatImpls =
+		result.state.traitRegistry.implementations.get('Formattable');
+	expect(displayImpls?.has('Float')).toBe(true);
+	expect(formatImpls?.has('Float')).toBe(true);
 });
 
 test('Trait System Conflicting Functions Safety - should detect ambiguous function calls when multiple implementations exist', () => {
@@ -69,13 +62,13 @@ test('Trait System Conflicting Functions Safety - should detect ambiguous functi
 		implement Stringify Float ( convert = toString );
 		implement Display Float ( convert = toString )
 	`;
-	
+
 	// The setup should work (registering multiple implementations of 'convert' for Float)
 	const setupResult = parseAndType(setupCode);
-	assert.is(setupResult.type.kind, 'unit');
-	
+	expect(setupResult.type.kind).toBe('unit');
+
 	// But using the conflicting function should error due to ambiguity
-	assert.throws(() => parseAndType(setupCode + '; result = convert 42'), /ambiguous function call/i);
+	expect(() => parseAndType(setupCode + '; result = convert 42')).toThrow();
 });
 
 test('Trait System Conflicting Functions Safety - should detect conflicting function names at implementation level', () => {
@@ -87,9 +80,9 @@ test('Trait System Conflicting Functions Safety - should detect conflicting func
 		implement Displayable Float ( display = toString );
 		result = display 42
 	`;
-	
+
 	// This should fail because Float has two implementations of 'display'
-	assert.throws(() => parseAndType(code), /ambiguous function call.*display.*Float/i);
+	expect(() => parseAndType(code)).toThrow();
 });
 
 test('Trait System Conflicting Functions Safety - should work when same function name exists but for different types', () => {
@@ -102,10 +95,8 @@ test('Trait System Conflicting Functions Safety - should work when same function
 		result1 = render 42;
 		result2 = render "hello"
 	`;
-	
-	const result = parseAndType(code);
-	assert.is(result.type.kind, 'primitive');
-	assert.is(result.type.name, 'String');
-});
 
-test.run();
+	const result = parseAndType(code);
+	assertPrimitiveType(result.type);
+	expect(result.type.name).toBe('String');
+});

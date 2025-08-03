@@ -37,7 +37,6 @@ import {
 	type MatchExpression,
 	type ConstructorDefinition,
 	type Pattern,
-	type RecordPatternField,
 	type MatchCase,
 	type UnitExpression,
 	type RecordExpression,
@@ -50,6 +49,7 @@ import {
 	type RecordStructure,
 	type StructureFieldType,
 	recordStructure,
+	hasStructureConstraint,
 } from '../ast';
 import * as C from './combinators';
 
@@ -94,15 +94,31 @@ const parsePrimitiveType = (tokens: Token[]): C.ParseResult<Type> => {
 		if (result.success) {
 			switch (typeName) {
 				case 'Float':
-					return { success: true, value: floatType(), remaining: result.remaining };
+					return {
+						success: true,
+						value: floatType(),
+						remaining: result.remaining,
+					};
 				case 'String':
-					return { success: true, value: stringType(), remaining: result.remaining };
+					return {
+						success: true,
+						value: stringType(),
+						remaining: result.remaining,
+					};
 				case 'Unit':
-					return { success: true, value: unitType(), remaining: result.remaining };
+					return {
+						success: true,
+						value: unitType(),
+						remaining: result.remaining,
+					};
 			}
 		}
 	}
-	return { success: false, error: 'Expected primitive type', position: tokens[0]?.location.start.line || 0 };
+	return {
+		success: false,
+		error: 'Expected primitive type',
+		position: tokens[0]?.location.start.line || 0,
+	};
 };
 
 // Parse List type with optional element type
@@ -113,13 +129,25 @@ const parseListType = (tokens: Token[]): C.ParseResult<Type> => {
 		const argResult = C.lazy(() => parseTypeAtom)(listKeywordResult.remaining);
 		if (argResult.success) {
 			// List with specific element type: List Float, List String, etc.
-			return { success: true, value: listTypeWithElement(argResult.value), remaining: argResult.remaining };
+			return {
+				success: true,
+				value: listTypeWithElement(argResult.value),
+				remaining: argResult.remaining,
+			};
 		} else {
 			// Just List (generic)
-			return { success: true, value: listTypeWithElement(typeVariable('a')), remaining: listKeywordResult.remaining };
+			return {
+				success: true,
+				value: listTypeWithElement(typeVariable('a')),
+				remaining: listKeywordResult.remaining,
+			};
 		}
 	}
-	return { success: false, error: 'Expected List type', position: tokens[0]?.location.start.line || 0 };
+	return {
+		success: false,
+		error: 'Expected List type',
+		position: tokens[0]?.location.start.line || 0,
+	};
 };
 
 // Parse record type {field: Type, ...} or {@field Type, ...}
@@ -163,10 +191,7 @@ const parseRecordType = (tokens: Token[]): C.ParseResult<Type> => {
 					C.seq(
 						C.choice(
 							// Support @field syntax (ACCESSOR tokens)
-							C.map(
-								C.accessor(),
-								(accessor) => ({ value: accessor.value })
-							),
+							C.map(C.accessor(), accessor => ({ value: accessor.value })),
 							// Also support plain identifier for backward compatibility
 							C.identifier()
 						),
@@ -186,9 +211,17 @@ const parseRecordType = (tokens: Token[]): C.ParseResult<Type> => {
 		for (const [name, type] of fields) {
 			fieldObj[name] = type;
 		}
-		return { success: true, value: recordType(fieldObj), remaining: recordResult.remaining };
+		return {
+			success: true,
+			value: recordType(fieldObj),
+			remaining: recordResult.remaining,
+		};
 	}
-	return { success: false, error: 'Expected record type', position: tokens[0]?.location.start.line || 0 };
+	return {
+		success: false,
+		error: 'Expected record type',
+		position: tokens[0]?.location.start.line || 0,
+	};
 };
 
 // Parse tuple type {Type, Type, ...}
@@ -205,9 +238,17 @@ const parseTupleType = (tokens: Token[]): C.ParseResult<Type> => {
 	)(tokens);
 	if (tupleResult.success) {
 		const elements = tupleResult.value[1] || [];
-		return { success: true, value: tupleType(elements), remaining: tupleResult.remaining };
+		return {
+			success: true,
+			value: tupleType(elements),
+			remaining: tupleResult.remaining,
+		};
 	}
-	return { success: false, error: 'Expected tuple type', position: tokens[0]?.location.start.line || 0 };
+	return {
+		success: false,
+		error: 'Expected tuple type',
+		position: tokens[0]?.location.start.line || 0,
+	};
 };
 
 // Parse parenthesized type (Type)
@@ -218,20 +259,32 @@ const parseParenthesizedType = (tokens: Token[]): C.ParseResult<Type> => {
 		C.punctuation(')')
 	)(tokens);
 	if (parenResult.success) {
-		return { success: true, value: parenResult.value[1], remaining: parenResult.remaining };
+		return {
+			success: true,
+			value: parenResult.value[1],
+			remaining: parenResult.remaining,
+		};
 	}
-	return { success: false, error: 'Expected parenthesized type', position: tokens[0]?.location.start.line || 0 };
+	return {
+		success: false,
+		error: 'Expected parenthesized type',
+		position: tokens[0]?.location.start.line || 0,
+	};
 };
 
 // Parse type constructor or variable (TypeName, a, Option a, etc.)
-const parseTypeConstructorOrVariable = (tokens: Token[]): C.ParseResult<Type> => {
+const parseTypeConstructorOrVariable = (
+	tokens: Token[]
+): C.ParseResult<Type> => {
 	if (tokens.length > 0 && tokens[0].type === 'IDENTIFIER') {
 		const typeNameResult = C.identifier()(tokens);
 		if (typeNameResult.success) {
 			const typeName = typeNameResult.value.value;
-			
+
 			// Try to parse type arguments
-			const argsResult = C.many(C.lazy(() => parseTypeAtom))(typeNameResult.remaining);
+			const argsResult = C.many(C.lazy(() => parseTypeAtom))(
+				typeNameResult.remaining
+			);
 			if (argsResult.success && argsResult.value.length > 0) {
 				// Type constructor with arguments (like Option a, f a, List String)
 				return {
@@ -260,22 +313,38 @@ const parseTypeConstructorOrVariable = (tokens: Token[]): C.ParseResult<Type> =>
 			}
 		}
 	}
-	return { success: false, error: 'Expected type constructor or variable', position: tokens[0]?.location.start.line || 0 };
+	return {
+		success: false,
+		error: 'Expected type constructor or variable',
+		position: tokens[0]?.location.start.line || 0,
+	};
 };
 
 // Parse Tuple type constructor: Tuple T1 T2 T3
 const parseTupleConstructor = (tokens: Token[]): C.ParseResult<Type> => {
-	if (tokens.length > 0 && tokens[0].type === 'IDENTIFIER' && tokens[0].value === 'Tuple') {
+	if (
+		tokens.length > 0 &&
+		tokens[0].type === 'IDENTIFIER' &&
+		tokens[0].value === 'Tuple'
+	) {
 		const tupleConstructorResult = C.seq(
 			C.identifier(),
 			C.many(C.lazy(() => parseTypeExpression))
 		)(tokens);
 		if (tupleConstructorResult.success) {
 			const elementTypes = tupleConstructorResult.value[1];
-			return { success: true, value: tupleTypeConstructor(elementTypes), remaining: tupleConstructorResult.remaining };
+			return {
+				success: true,
+				value: tupleTypeConstructor(elementTypes),
+				remaining: tupleConstructorResult.remaining,
+			};
 		}
 	}
-	return { success: false, error: 'Expected Tuple constructor', position: tokens[0]?.location.start.line || 0 };
+	return {
+		success: false,
+		error: 'Expected Tuple constructor',
+		position: tokens[0]?.location.start.line || 0,
+	};
 };
 
 // Main type atom parser - now clean and focused
@@ -310,9 +379,9 @@ function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
 const parseFunctionTypeWithoutEffects: C.Parser<Type> = tokens => {
 	const leftResult = parseTypeAtom(tokens);
 	if (!leftResult.success) return leftResult;
-	
+
 	const rest = leftResult.remaining;
-	
+
 	// Check for -> operator
 	if (
 		rest &&
@@ -333,7 +402,7 @@ const parseFunctionTypeWithoutEffects: C.Parser<Type> = tokens => {
 		return {
 			success: true as const,
 			value: functionType([leftResult.value], rightResult.value),
-			remaining: rightResult.remaining
+			remaining: rightResult.remaining,
 		};
 	}
 
@@ -345,7 +414,7 @@ export const parseTypeExpression: C.Parser<Type> = tokens => {
 	const funcType = (() => {
 		const leftResult = parseTypeAtom(tokens);
 		if (!leftResult.success) return leftResult;
-		
+
 		const rest = leftResult.remaining;
 
 		// Check for -> operator for right-associative parsing
@@ -364,68 +433,79 @@ export const parseTypeExpression: C.Parser<Type> = tokens => {
 					position: tokens[0]?.location.start.line || 0,
 				};
 
-			const functionTypeResult = functionType([leftResult.value], rightResult.value);
-			
+			const functionTypeResult = functionType(
+				[leftResult.value],
+				rightResult.value
+			);
+
 			// Parse effects at the end of the entire function type chain
 			const effects = new Set<Effect>();
 			let effectRest = rightResult.remaining;
 
-		// Parse effects: !effect1 !effect2 ...
-		while (
-			effectRest &&
-			effectRest.length > 0 &&
-			effectRest[0].type === 'OPERATOR' &&
-			effectRest[0].value === '!'
-		) {
-			effectRest = effectRest.slice(1); // consume !
-
-			// Expect an effect name (identifier or keyword)
-			if (
-				!effectRest ||
-				effectRest.length === 0 ||
-				(effectRest[0].type !== 'IDENTIFIER' &&
-					effectRest[0].type !== 'KEYWORD')
+			// Parse effects: !effect1 !effect2 ...
+			while (
+				effectRest &&
+				effectRest.length > 0 &&
+				effectRest[0].type === 'OPERATOR' &&
+				effectRest[0].value === '!'
 			) {
-				return {
-					success: false,
-					error: 'Expected effect name after !',
-					position: effectRest?.[0]?.location?.start?.line || 0,
-				};
+				effectRest = effectRest.slice(1); // consume !
+
+				// Expect an effect name (identifier or keyword)
+				if (
+					!effectRest ||
+					effectRest.length === 0 ||
+					(effectRest[0].type !== 'IDENTIFIER' &&
+						effectRest[0].type !== 'KEYWORD')
+				) {
+					return {
+						success: false,
+						error: 'Expected effect name after !',
+						position: effectRest?.[0]?.location?.start?.line || 0,
+					};
+				}
+
+				const effectName = effectRest[0].value;
+
+				// Validate effect name
+				const validEffects: Effect[] = [
+					'log',
+					'read',
+					'write',
+					'state',
+					'time',
+					'rand',
+					'ffi',
+					'async',
+				];
+				if (!validEffects.includes(effectName as Effect)) {
+					return {
+						success: false,
+						error: `Invalid effect: ${effectName}. Valid effects: ${validEffects.join(', ')}`,
+						position: effectRest[0].location.start.line,
+					};
+				}
+
+				effects.add(effectName as Effect);
+				effectRest = effectRest.slice(1); // consume effect name
 			}
-
-			const effectName = effectRest[0].value;
-
-			// Validate effect name
-			const validEffects: Effect[] = [
-				'log',
-				'read',
-				'write',
-				'state',
-				'time',
-				'rand',
-				'ffi',
-				'async',
-			];
-			if (!validEffects.includes(effectName as Effect)) {
-				return {
-					success: false,
-					error: `Invalid effect: ${effectName}. Valid effects: ${validEffects.join(', ')}`,
-					position: effectRest[0].location.start.line,
-				};
-			}
-
-			effects.add(effectName as Effect);
-			effectRest = effectRest.slice(1); // consume effect name
-		}
 
 			// Apply effects to the function type (including empty effects)
 			const finalType = { ...functionTypeResult, effects };
 
-			return { success: true as const, value: finalType, remaining: effectRest };
+			return {
+				success: true as const,
+				value: finalType,
+				remaining: effectRest,
+			};
 		}
 
 		// If no arrow, just return the left result
-		return { success: true as const, value: leftResult.value, remaining: leftResult.remaining };
+		return {
+			success: true as const,
+			value: leftResult.value,
+			remaining: leftResult.remaining,
+		};
 	})();
 
 	if (funcType.success && funcType.value) {
@@ -527,6 +607,7 @@ export const parseTypeExpression: C.Parser<Type> = tokens => {
 		position: tokens[0]?.location.start.line || 0,
 	};
 };
+
 // --- Basic Parsers ---
 const parseIdentifier = C.map(
 	C.identifier(),
@@ -912,7 +993,7 @@ const parseIfExpression: C.Parser<Expression> = C.map(
 const parsePrimary: C.Parser<Expression> = tokens => {
 	// DEBUG: Log tokens at entry
 	if (process.env.NOO_DEBUG_PARSE) {
-			console.log('parsePrimary tokens:', tokens.map(t => t.value).join(' '));
+		console.log('parsePrimary tokens:', tokens.map(t => t.value).join(' '));
 	}
 
 	// Fast token-based dispatch instead of sequential choice attempts
@@ -1085,13 +1166,16 @@ const parseApplication: C.Parser<Expression> = tokens => {
 	return parsePostfixFromResult(appResult.value, appResult.remaining);
 };
 
-// --- Multiplicative (*, /) ---
+// --- Multiplicative (*, /, %) ---
 const parseMultiplicative: C.Parser<Expression> = tokens => {
 	const multResult = C.map(
 		C.seq(
 			parseApplication,
 			C.many(
-				C.seq(C.choice(C.operator('*'), C.operator('/')), parseApplication)
+				C.seq(
+					C.choice(C.operator('*'), C.operator('/'), C.operator('%')),
+					parseApplication
+				)
 			)
 		),
 		([left, rest]) => {
@@ -1099,7 +1183,7 @@ const parseMultiplicative: C.Parser<Expression> = tokens => {
 			for (const [op, right] of rest) {
 				result = {
 					kind: 'binary',
-					operator: op.value as '*' | '/',
+					operator: op.value as '*' | '/' | '%',
 					left: result,
 					right,
 					location: result.location,
@@ -1197,7 +1281,9 @@ const parseCompose: C.Parser<Expression> = tokens => {
 		([left, rest]) => {
 			// Build steps array for pipeline expression
 			const steps = [left];
-			for (const [_op, right] of rest) {
+			const operators: ('|>' | '<|')[] = [];
+			for (const [op, right] of rest) {
+				operators.push(op.value as '|>' | '<|');
 				steps.push(right);
 			}
 
@@ -1206,6 +1292,7 @@ const parseCompose: C.Parser<Expression> = tokens => {
 				const result: PipelineExpression = {
 					kind: 'pipeline',
 					steps,
+					operators,
 					location: left.location,
 				};
 				return result;
@@ -1307,7 +1394,7 @@ const parseTypeAnnotation = C.map(
 	),
 	([_colon, type, constraintClause]) => ({
 		type,
-		constraint: constraintClause ? constraintClause[1] : undefined
+		constraint: constraintClause ? constraintClause[1] : undefined,
 	})
 );
 
@@ -1341,7 +1428,7 @@ const parsePostfixFromResult = (
 				location: result.location,
 			};
 		}
-		
+
 		remaining = annotationResult.remaining;
 	}
 
@@ -1350,102 +1437,117 @@ const parsePostfixFromResult = (
 
 // --- Destructuring Element Parser ---
 const parseDestructuringElement: C.Parser<DestructuringElement> = C.choice(
-	C.map(C.identifier(), (name): DestructuringElement => ({
-		kind: 'variable',
-		name: name.value,
-		location: name.location,
-	})),
-	C.map(C.lazy(() => parseTupleDestructuringPattern), (pattern): DestructuringElement => ({
-		kind: 'nested-tuple',
-		pattern,
-		location: pattern.location,
-	})),
-	C.map(C.lazy(() => parseRecordDestructuringPattern), (pattern): DestructuringElement => ({
-		kind: 'nested-record',
-		pattern,
-		location: pattern.location,
-	}))
-);
-
-// --- Tuple Destructuring Pattern Parser ---
-const parseTupleDestructuringPattern: C.Parser<TupleDestructuringPattern> = C.map(
-	C.seq(
-		C.punctuation('{'),
-		C.sepBy(parseDestructuringElement, C.punctuation(',')),
-		C.punctuation('}')
-	),
-	([openBrace, elements, _closeBrace]): TupleDestructuringPattern => ({
-		kind: 'tuple-destructuring-pattern',
-		elements,
-		location: openBrace.location,
-	})
-);
-
-// --- Record Destructuring Field Parser ---
-const parseRecordDestructuringField: C.Parser<RecordDestructuringField> = C.choice(
-	// {@field localName} - rename
 	C.map(
-		C.seq(C.accessor(), C.identifier()),
-		([accessor, localName]): RecordDestructuringField => ({
-			kind: 'rename',
-			fieldName: accessor.value,
-			localName: localName.value,
-			location: accessor.location,
+		C.identifier(),
+		(name): DestructuringElement => ({
+			kind: 'variable',
+			name: name.value,
+			location: name.location,
 		})
 	),
-	// {@field {x, y}} - nested tuple
 	C.map(
-		C.seq(C.accessor(), parseTupleDestructuringPattern),
-		([accessor, pattern]): RecordDestructuringField => ({
+		C.lazy(() => parseTupleDestructuringPattern),
+		(pattern): DestructuringElement => ({
 			kind: 'nested-tuple',
-			fieldName: accessor.value,
 			pattern,
-			location: accessor.location,
+			location: pattern.location,
 		})
 	),
-	// {@field {@nested}} - nested record
 	C.map(
-		C.seq(C.accessor(), C.lazy(() => parseRecordDestructuringPattern)),
-		([accessor, pattern]): RecordDestructuringField => ({
+		C.lazy(() => parseRecordDestructuringPattern),
+		(pattern): DestructuringElement => ({
 			kind: 'nested-record',
-			fieldName: accessor.value,
 			pattern,
-			location: accessor.location,
-		})
-	),
-	// {@field} - shorthand
-	C.map(
-		C.accessor(),
-		(accessor): RecordDestructuringField => ({
-			kind: 'shorthand',
-			fieldName: accessor.value,
-			location: accessor.location,
+			location: pattern.location,
 		})
 	)
 );
 
+// --- Tuple Destructuring Pattern Parser ---
+const parseTupleDestructuringPattern: C.Parser<TupleDestructuringPattern> =
+	C.map(
+		C.seq(
+			C.punctuation('{'),
+			C.sepBy(parseDestructuringElement, C.punctuation(',')),
+			C.punctuation('}')
+		),
+		([openBrace, elements, _closeBrace]): TupleDestructuringPattern => ({
+			kind: 'tuple-destructuring-pattern',
+			elements,
+			location: openBrace.location,
+		})
+	);
+
+// --- Record Destructuring Field Parser ---
+const parseRecordDestructuringField: C.Parser<RecordDestructuringField> =
+	C.choice(
+		// {@field localName} - rename
+		C.map(
+			C.seq(C.accessor(), C.identifier()),
+			([accessor, localName]): RecordDestructuringField => ({
+				kind: 'rename',
+				fieldName: accessor.value,
+				localName: localName.value,
+				location: accessor.location,
+			})
+		),
+		// {@field {x, y}} - nested tuple
+		C.map(
+			C.seq(C.accessor(), parseTupleDestructuringPattern),
+			([accessor, pattern]): RecordDestructuringField => ({
+				kind: 'nested-tuple',
+				fieldName: accessor.value,
+				pattern,
+				location: accessor.location,
+			})
+		),
+		// {@field {@nested}} - nested record
+		C.map(
+			C.seq(
+				C.accessor(),
+				C.lazy(() => parseRecordDestructuringPattern)
+			),
+			([accessor, pattern]): RecordDestructuringField => ({
+				kind: 'nested-record',
+				fieldName: accessor.value,
+				pattern,
+				location: accessor.location,
+			})
+		),
+		// {@field} - shorthand
+		C.map(
+			C.accessor(),
+			(accessor): RecordDestructuringField => ({
+				kind: 'shorthand',
+				fieldName: accessor.value,
+				location: accessor.location,
+			})
+		)
+	);
+
 // --- Record Destructuring Pattern Parser ---
-const parseRecordDestructuringPattern: C.Parser<RecordDestructuringPattern> = C.map(
-	C.seq(
-		C.punctuation('{'),
-		C.sepBy(parseRecordDestructuringField, C.punctuation(',')),
-		C.punctuation('}')
-	),
-	([openBrace, fields, _closeBrace]): RecordDestructuringPattern => ({
-		kind: 'record-destructuring-pattern',
-		fields,
-		location: openBrace.location,
-	})
-);
+const parseRecordDestructuringPattern: C.Parser<RecordDestructuringPattern> =
+	C.map(
+		C.seq(
+			C.punctuation('{'),
+			C.sepBy(parseRecordDestructuringField, C.punctuation(',')),
+			C.punctuation('}')
+		),
+		([openBrace, fields, _closeBrace]): RecordDestructuringPattern => ({
+			kind: 'record-destructuring-pattern',
+			fields,
+			location: openBrace.location,
+		})
+	);
 
 // --- Lookahead to detect destructuring vs expression ---
 const isDestructuringPattern = (tokens: Token[]): boolean => {
 	if (tokens.length < 3) return false;
 	if (tokens[0].type !== 'PUNCTUATION' || tokens[0].value !== '{') return false;
-	
+
 	let braceCount = 0;
 	let i = 0;
-	
+
 	// Look for the closing brace and then an equals sign
 	while (i < tokens.length) {
 		const token = tokens[i];
@@ -1455,9 +1557,11 @@ const isDestructuringPattern = (tokens: Token[]): boolean => {
 			braceCount--;
 			if (braceCount === 0) {
 				// Found the closing brace, check if next token is '='
-				if (i + 1 < tokens.length && 
-					tokens[i + 1].type === 'OPERATOR' && 
-					tokens[i + 1].value === '=') {
+				if (
+					i + 1 < tokens.length &&
+					tokens[i + 1].type === 'OPERATOR' &&
+					tokens[i + 1].value === '='
+				) {
 					return true;
 				}
 				return false;
@@ -1465,16 +1569,22 @@ const isDestructuringPattern = (tokens: Token[]): boolean => {
 		}
 		i++;
 	}
-	
+
 	return false;
 };
 
 // --- Tuple Destructuring Expression Parser ---
-const parseTupleDestructuring: C.Parser<TupleDestructuringExpression> = tokens => {
+const parseTupleDestructuring: C.Parser<
+	TupleDestructuringExpression
+> = tokens => {
 	if (!isDestructuringPattern(tokens)) {
-		return { success: false, error: 'Not a destructuring pattern', position: 0 };
+		return {
+			success: false,
+			error: 'Not a destructuring pattern',
+			position: 0,
+		};
 	}
-	
+
 	return C.map(
 		C.seq(
 			parseTupleDestructuringPattern,
@@ -1491,11 +1601,17 @@ const parseTupleDestructuring: C.Parser<TupleDestructuringExpression> = tokens =
 };
 
 // --- Record Destructuring Expression Parser ---
-const parseRecordDestructuring: C.Parser<RecordDestructuringExpression> = tokens => {
+const parseRecordDestructuring: C.Parser<
+	RecordDestructuringExpression
+> = tokens => {
 	if (!isDestructuringPattern(tokens)) {
-		return { success: false, error: 'Not a destructuring pattern', position: 0 };
+		return {
+			success: false,
+			error: 'Not a destructuring pattern',
+			position: 0,
+		};
 	}
-	
+
 	return C.map(
 		C.seq(
 			parseRecordDestructuringPattern,
@@ -1526,7 +1642,7 @@ const parseDefinition: C.Parser<Expression> = tokens => {
 			return recordResult;
 		}
 	}
-	
+
 	// Fallback to regular definition
 	return C.map(
 		C.seq(
@@ -1586,14 +1702,17 @@ const parseMutation: C.Parser<MutationExpression> = C.map(
 
 // Custom parser for where clause definitions (both regular and mutable)
 const parseWhereDefinition: C.Parser<
-	DefinitionExpression | TupleDestructuringExpression | RecordDestructuringExpression | MutableDefinitionExpression
+	| DefinitionExpression
+	| TupleDestructuringExpression
+	| RecordDestructuringExpression
+	| MutableDefinitionExpression
 > = tokens => {
 	// Try mutable definition first
 	const mutableResult = parseMutableDefinition(tokens);
 	if (mutableResult.success) {
 		return mutableResult;
 	}
-	
+
 	// Try destructuring patterns
 	if (isDestructuringPattern(tokens)) {
 		// Try tuple destructuring first
@@ -1607,7 +1726,7 @@ const parseWhereDefinition: C.Parser<
 			return recordResult;
 		}
 	}
-	
+
 	// Fallback to regular definition
 	const regularResult = C.map(
 		C.seq(
@@ -1624,11 +1743,11 @@ const parseWhereDefinition: C.Parser<
 			};
 		}
 	)(tokens);
-	
+
 	if (regularResult.success) {
 		return regularResult;
 	}
-	
+
 	return {
 		success: false,
 		error: 'Expected definition in where clause',
@@ -1669,7 +1788,7 @@ const parseSimpleTypeVariable = (tokens: Token[]): C.ParseResult<Type> => {
 		const typeNameResult = C.identifier()(tokens);
 		if (typeNameResult.success) {
 			const typeName = typeNameResult.value.value;
-			
+
 			// Check if it's a type constructor (uppercase) or type variable (lowercase)
 			const isUpperCase = typeName[0] === typeName[0].toUpperCase();
 			if (isUpperCase) {
@@ -1689,7 +1808,11 @@ const parseSimpleTypeVariable = (tokens: Token[]): C.ParseResult<Type> => {
 			}
 		}
 	}
-	return { success: false, error: 'Expected type variable or nullary type constructor', position: tokens[0]?.location.start.line || 0 };
+	return {
+		success: false,
+		error: 'Expected type variable or nullary type constructor',
+		position: tokens[0]?.location.start.line || 0,
+	};
 };
 
 // --- ADT Constructor ---
@@ -1737,12 +1860,14 @@ const parseConstraintFunction: C.Parser<ConstraintFunction> = C.map(
 		C.punctuation(':'),
 		C.lazy(() => parseTypeExpression)
 	),
-	([name, typeParams, colon, type]): ConstraintFunction => ({
-		name: name.value,
-		typeParams: typeParams.map(p => p.value),
-		type,
-		location: createLocation(name.location.start, colon.location.end),
-	})
+	([name, typeParams, colon, type]): ConstraintFunction => {
+		return {
+			name: name.value,
+			typeParams: typeParams.map(p => p.value),
+			type,
+			location: createLocation(name.location.start, colon.location.end),
+		};
+	}
 );
 
 // --- Constraint Definition ---
@@ -1877,14 +2002,22 @@ const parseBasicPattern: C.Parser<Pattern> = C.choice(
 );
 
 // --- Tuple/Record Pattern Parsing ---
-const parsePatternFieldOrElement = (index: number): C.Parser<{ isRecord: boolean; fieldName?: string; pattern: Pattern }> => {
+const parsePatternFieldOrElement = (
+	index: number
+): C.Parser<{ isRecord: boolean; fieldName?: string; pattern: Pattern }> => {
 	// Try record field pattern first: @field pattern
 	const recordFieldResult = C.seq(
 		C.accessor(),
 		C.lazy(() => parsePattern)
 	);
-	
-	return (tokens: Token[]): C.ParseResult<{ isRecord: boolean; fieldName?: string; pattern: Pattern }> => {
+
+	return (
+		tokens: Token[]
+	): C.ParseResult<{
+		isRecord: boolean;
+		fieldName?: string;
+		pattern: Pattern;
+	}> => {
 		const result = recordFieldResult(tokens);
 		if (result.success) {
 			const [accessor, pattern] = result.value;
@@ -1893,12 +2026,12 @@ const parsePatternFieldOrElement = (index: number): C.Parser<{ isRecord: boolean
 				value: {
 					isRecord: true,
 					fieldName: accessor.value, // Accessor value already excludes the @ prefix
-					pattern
+					pattern,
 				},
-				remaining: result.remaining
+				remaining: result.remaining,
 			};
 		}
-		
+
 		// Try tuple element pattern: pattern
 		const elementResult = C.lazy(() => parsePattern)(tokens);
 		if (elementResult.success) {
@@ -1906,16 +2039,17 @@ const parsePatternFieldOrElement = (index: number): C.Parser<{ isRecord: boolean
 				success: true,
 				value: {
 					isRecord: false,
-					pattern: elementResult.value
+					fieldName: `@${index}`, // Create positional field name for tuple elements
+					pattern: elementResult.value,
 				},
-				remaining: elementResult.remaining
+				remaining: elementResult.remaining,
 			};
 		}
-		
+
 		return {
 			success: false,
-			error: 'Expected pattern or @field pattern',
-			position: tokens[0]?.location.start.line || 0
+			error: `Expected pattern or @field pattern at position ${index}`,
+			position: tokens[0]?.location.start.line || 0,
 		};
 	};
 };
@@ -2262,16 +2396,9 @@ const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
 	),
 	// a has {@name String, @age Float} - Try this first since it has distinct syntax
 	C.map(
-		C.seq(
-			C.identifier(),
-			C.keyword('has'),
-			parseRecordStructure
-		),
-		([typeVar, _has, structure]): ConstraintExpr => ({
-			kind: 'has',
-			typeVar: typeVar.value,
-			structure,
-		})
+		C.seq(C.identifier(), C.keyword('has'), parseRecordStructure),
+		([typeVar, _has, structure]): ConstraintExpr =>
+			hasStructureConstraint(typeVar.value, structure)
 	),
 	// a has field "name" of type T
 	C.map(

@@ -1,14 +1,20 @@
 // NEW MINIMAL TRAIT SYSTEM
 // Designed to make `map increment (Some 1)` work with simple dispatch
 
-import { Type, Expression, FunctionExpression, ConstraintExpr } from '../ast';
+import {
+	Type,
+	Expression,
+	FunctionExpression,
+	ConstraintExpr,
+	FunctionType,
+} from '../ast';
 import { TypeState } from './types';
 
 // Simple trait definition - just a name and function signatures
 export type TraitDefinition = {
 	name: string;
 	typeParam: string; // Usually 'a' or 'f'
-	functions: Map<string, Type>; // function name -> function type
+	functions: Map<string, FunctionType>; // function name -> function type
 };
 
 // Simple trait implementation - concrete functions for a specific type
@@ -83,39 +89,43 @@ export function addTraitImplementation(
 	if (!traitImpls) {
 		return false; // Trait not found
 	}
-	
+
 	// Check for duplicate implementation
 	if (traitImpls.has(impl.typeName)) {
-		throw new Error(`Duplicate implementation of ${traitName} for ${impl.typeName}`);
+		throw new Error(
+			`Duplicate implementation of ${traitName} for ${impl.typeName}`
+		);
 	}
-	
+
 	// Get the trait definition for signature validation
 	const traitDef = registry.definitions.get(traitName);
 	if (!traitDef) {
 		throw new Error(`Trait definition not found for ${traitName}`);
 	}
-	
+
 	// Validate each function signature matches the constraint definition
 	for (const [functionName, implExpr] of impl.functions.entries()) {
 		const expectedType = traitDef.functions.get(functionName);
 		if (!expectedType) {
-			throw new Error(`Function '${functionName}' not defined in trait ${traitName}`);
+			throw new Error(
+				`Function '${functionName}' not defined in trait ${traitName}`
+			);
 		}
-		
+
 		// Count parameters in expected type vs implementation
 		const expectedParamCount = countTypeParams(expectedType);
 		const actualParamCount = countExpressionParams(implExpr);
-		
+
 		// Only validate arity for function expressions (actualParamCount >= 0)
 		// For variable references and other expressions, we can't determine arity at this stage
 		if (actualParamCount >= 0 && actualParamCount !== expectedParamCount) {
 			throw new Error(
 				`Function signature mismatch for '${functionName}' in ${traitName} implementation for ${impl.typeName}: ` +
-				`expected ${expectedParamCount} parameters, got ${actualParamCount}`
+					`expected ${expectedParamCount} parameters, got ${actualParamCount}`
 			);
 		}
 	}
-	
+
 	// TODO: Validate given constraints are satisfied
 	// For now, just store the implementation with its given constraints
 	traitImpls.set(impl.typeName, impl);
@@ -148,66 +158,150 @@ export function getTypeName(type: Type): string {
 	}
 }
 
-// Try to resolve a trait function call
 export function resolveTraitFunction(
 	registry: TraitRegistry,
 	functionName: string,
 	argTypes: Type[]
-): { found: boolean; traitName?: string; typeName?: string; impl?: Expression } {
-	// For now, just look at the first argument type
+): {
+	found: boolean;
+	traitName?: string;
+	typeName?: string;
+	impl?: Expression;
+	needsConstraint?: boolean;
+} {
 	if (argTypes.length === 0) {
 		return { found: false };
 	}
 
-	const firstArgTypeName = getTypeName(argTypes[0]);
-	if (!firstArgTypeName) {
+	// Get the trait that defines this function
+	const definingTraits = registry.functionTraits.get(functionName) || [];
+	if (definingTraits.length === 0) {
 		return { found: false };
 	}
 
-	// Find all traits that define this function and have implementations for this type
+	// For now, use the first trait that defines this function
+	// TODO: Handle ambiguous cases where multiple traits define the same function
+	const traitName = definingTraits[0];
+	const traitDef = registry.definitions.get(traitName);
+	if (!traitDef) {
+		return { found: false };
+	}
+
+	const functionType = traitDef.functions.get(functionName);
+	if (!functionType || functionType.kind !== 'function') {
+		return { found: false };
+	}
+
+	// Try to find a concrete implementation by examining all argument types
+	// Look for any argument that has a concrete type we can dispatch on
 	const candidateImplementations: Array<{
 		traitName: string;
+		typeName: string;
 		impl: Expression;
 	}> = [];
 
-	// Search through all traits to find implementations
-	for (const [traitName, traitDef] of registry.definitions) {
-		if (traitDef.functions.has(functionName)) {
-			// Check if we have an implementation for this type
-			const traitImpls = registry.implementations.get(traitName);
-			if (traitImpls) {
-				const impl = traitImpls.get(firstArgTypeName);
-				if (impl && impl.functions.has(functionName)) {
-					candidateImplementations.push({
-						traitName,
-						impl: impl.functions.get(functionName)!,
-					});
+	// Check each argument type to see if we can find a concrete implementation
+	for (const argType of argTypes) {
+		const typeName = getTypeName(argType);
+		if (typeName && typeName !== 'variable') {
+			// Check ALL traits that define this function for implementations for this type
+			for (const candidateTraitName of definingTraits) {
+				const traitImpls = registry.implementations.get(candidateTraitName);
+				if (traitImpls) {
+					const impl = traitImpls.get(typeName);
+					if (impl && impl.functions.has(functionName)) {
+						candidateImplementations.push({
+							traitName: candidateTraitName,
+							typeName,
+							impl: impl.functions.get(functionName)!,
+						});
+					}
 				}
 			}
 		}
 	}
 
-	// Check for ambiguity - multiple traits providing implementations for the same type
-	if (candidateImplementations.length > 1) {
-		const traitNames = candidateImplementations.map(c => c.traitName);
+	// Remove duplicates (same implementation found via different arguments)
+	const uniqueImplementations = candidateImplementations.filter(
+		(impl, index, array) =>
+			array.findIndex(
+				other =>
+					other.traitName === impl.traitName && other.typeName === impl.typeName
+			) === index
+	);
+
+	// Check for ambiguity - multiple different implementations
+	if (uniqueImplementations.length > 1) {
+		const typeNames = uniqueImplementations.map(c => c.typeName);
 		throw new Error(
-			`Ambiguous function call '${functionName}' for type '${firstArgTypeName}': ` +
-			`multiple implementations found in traits: ${traitNames.join(', ')}. ` +
-			`Cannot determine which implementation to use.`
+			`Ambiguous function call '${functionName}': ` +
+				`multiple implementations found for types: ${typeNames.join(', ')}. ` +
+				`Cannot determine which implementation to use.`
 		);
 	}
 
-	if (candidateImplementations.length === 1) {
-		const candidate = candidateImplementations[0];
+	if (uniqueImplementations.length === 1) {
+		const candidate = uniqueImplementations[0];
 		return {
 			found: true,
 			traitName: candidate.traitName,
-			typeName: firstArgTypeName,
+			typeName: candidate.typeName,
 			impl: candidate.impl,
 		};
 	}
 
-	return { found: false };
+	// No concrete implementation found - check if we should error or create constraint
+	// For functions where the trait type parameter is in the return type (like pure: a -> m a),
+	// we can't dispatch on arguments, so always create constrained type
+	const traitTypeParam = traitDef.typeParam;
+	
+	// Helper to check if a type contains the trait type parameter
+	const containsTypeParameter = (type: Type, paramName: string): boolean => {
+		switch (type.kind) {
+			case 'variable':
+				return type.name === paramName;
+			case 'variant':
+				return type.name === paramName || type.args.some(arg => containsTypeParameter(arg, paramName));
+			case 'function':
+				return type.params.some(param => containsTypeParameter(param, paramName)) ||
+					   containsTypeParameter(type.return, paramName);
+			case 'list':
+				return containsTypeParameter(type.element, paramName);
+			default:
+				return false;
+		}
+	};
+	
+	// Check if trait type parameter is only in return type
+	const paramHasTraitType = functionType.params.some(param => containsTypeParameter(param, traitTypeParam));
+	const returnHasTraitType = containsTypeParameter(functionType.return, traitTypeParam);
+	
+	if (!paramHasTraitType && returnHasTraitType) {
+		// Trait type parameter only in return type (like pure) - always create constraint
+		return {
+			found: false,
+			needsConstraint: true,
+			traitName: definingTraits[0],
+		};
+	}
+	
+	// For functions where trait type parameter is in arguments, check for concrete types
+	const hasConcreteArgs = argTypes.some(argType => {
+		const typeName = getTypeName(argType);
+		return typeName && typeName !== 'variable' && argType.kind !== 'variable';
+	});
+	
+	if (hasConcreteArgs) {
+		// Concrete types with no implementation should error
+		return { found: false };
+	}
+	
+	// Type variables/polymorphic cases should create constrained type
+	return {
+		found: false,
+		needsConstraint: true,
+		traitName: definingTraits[0], // Use first defining trait for constraint creation
+	};
 }
 
 // Check if a function name is defined in any trait
@@ -225,18 +319,49 @@ export function getTraitFunctionInfo(
 	functionName: string
 ): { traitName: string; functionType: Type; typeParam: string } | null {
 	const definingTraits = registry.functionTraits.get(functionName) || [];
-	
+
 	if (definingTraits.length === 0) {
 		return null;
 	}
-	
+
 	// For type inference purposes, we can use any trait that defines this function
 	// The ambiguity will be detected later during function resolution if multiple implementations exist
 	const traitName = definingTraits[0];
 	const traitDef = registry.definitions.get(traitName)!;
+	const rawFunctionType = traitDef.functions.get(functionName)!;
+
+	// Find the actual variable name that corresponds to the trait parameter
+	// The trait parameter (e.g., 'f' for Functor) appears as a variant type in the function
+	let actualTypeVar = traitDef.typeParam; // fallback
+	if (
+		rawFunctionType.kind === 'function' &&
+		rawFunctionType.params.length > 0
+	) {
+		const firstParam = rawFunctionType.params[0];
+		if (
+			firstParam.kind === 'variant' &&
+			firstParam.name === traitDef.typeParam
+		) {
+			// This is the trait parameter, use its name
+			actualTypeVar = firstParam.name;
+		}
+	}
+
+	// Attach the trait constraint to the function type
+	const functionTypeWithConstraints = {
+		...(rawFunctionType as FunctionType),
+		constraints: [
+			{
+				kind: 'implements' as const,
+				typeVar: actualTypeVar,
+				interfaceName: traitName,
+			},
+		],
+	};
+
 	return {
 		traitName,
-		functionType: traitDef.functions.get(functionName)!,
+		functionType: functionTypeWithConstraints,
 		typeParam: traitDef.typeParam,
 	};
 }

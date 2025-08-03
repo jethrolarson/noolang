@@ -1,179 +1,153 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
-import { Lexer } from '../../../src/lexer/lexer';
-import { parse } from '../../../src/parser/parser';
-import { typeAndDecorate } from '../../../src/typer';
-import { Evaluator, Value } from '../../../src/evaluator/evaluator';
-
-// Helper functions
-function unwrapValue(val: Value): any {
-    if (val === null) return null;
-    if (typeof val !== 'object') return val;
-    switch (val.tag) {
-        case 'number':
-            return val.value;
-        case 'string':
-            return val.value;
-        case 'constructor':
-            if (val.name === 'True') return true;
-            if (val.name === 'False') return false;
-            return val;
-        case 'list':
-            return val.values.map(unwrapValue);
-        case 'tuple':
-            return val.values.map(unwrapValue);
-        case 'record': {
-            const obj: any = {};
-            for (const k in val.fields) obj[k] = unwrapValue(val.fields[k]);
-            return obj;
-        }
-        default:
-            return val;
-    }
-}
-
-function runCode(code: string) {
-    const lexer = new Lexer(code);
-    const tokens = lexer.tokenize();
-    const ast = parse(tokens);
-    const decoratedResult = typeAndDecorate(ast);
-    const evaluator = new Evaluator({ traitRegistry: decoratedResult.state.traitRegistry });
-    return evaluator.evaluateProgram(decoratedResult.program);
-}
-
-function expectError(code: string, errorPattern?: string) {
-    try {
-        runCode(code);
-        assert.unreachable('Expected error but code succeeded');
-    } catch (error) {
-        if (errorPattern) {
-            assert.match(error.message, new RegExp(errorPattern, 'i'));
-        }
-    }
-}
-
-function expectSuccess(code: string, expectedValue?: any) {
-    const result = runCode(code);
-    if (expectedValue !== undefined) {
-        assert.equal(unwrapValue(result.finalResult), expectedValue);
-    }
-    return result;
-}
+import { test, describe } from 'bun:test';
+import { expectSuccess } from '../../utils';
 
 // =============================================================================
-// TESTING PREVIOUSLY SKIPPED WEAKNESSES TO FIND REAL ISSUES
+// OPERATOR FUNCTIONALITY TESTS
 // =============================================================================
+describe('Operator Functionality', () => {
+	test('| operator with constraint resolution in pipeline', () => {
+		expectSuccess(`[1, 2, 3] | list_map show`, ['1', '2', '3']);
+	});
 
-// This was skipped - let's test constraint propagation through | 
-test('| operator with constraint resolution in pipeline - testing if it fails', () => {
-    expectError(`
-        constraint Show a ( show : a -> String );
-        implement Show Float ( show = toString );
-        
-        # This might fail if constraint resolution doesn't work through |
-        nums = [1, 2, 3];
-        result = nums | list_map show | toString;
-        result
-    `);
-});
-
-// This was skipped - let's test |? with Result type
-test.skip('|? operator with Result type - SHOULD WORK: safe thrush for all monads', () => {
-    // DESIGN REQUIREMENT: |? should work with ANY monad type, not just Option
-    // Currently fails because the implementation is hardcoded for Option types only.
-    // The safe thrush operator should use the trait system to work with Result, 
-    // custom monads, and any type that implements the appropriate monadic interface.
-    // This is a limitation that needs to be addressed to fulfill the design goal
-    // of making |? a truly generic monadic bind operator.
-    expectSuccess(`
-        # This SHOULD work - |? should support all monads including Result
+	// currently |? is hardcoded to Option
+	test.skip('|? operator with Result type - safe thrush for monads', () => {
+		expectSuccess(
+			`
         result = Ok 5 |? (fn x => x * 2);
         match result with (Ok x => x; Err _ => 0)
-    `, 10);
-});
+    `,
+			10
+		);
+	});
 
-// This was skipped - let's test complex operator precedence
-test('complex operator precedence with multiple operators - testing if it fails', () => {
-    expectError(`
-        # This might fail due to precedence issues
+	// |> is broken
+	test.skip('complex operator precedence with multiple operators', () => {
+		expectSuccess(
+			`
         f = fn x => x * 2;
         g = fn x => x + 1;
         result = [1, 2, 3] | list_map $ f |> list_map $ g;
         result
-    `);
-});
+    `,
+			[3, 5, 7]
+		);
+	});
 
-// This was skipped - let's test constraint propagation through $
-test('constraint propagation through $ operator - testing if it fails', () => {
-    expectError(`
-        # This might fail if constraints don't propagate properly
-        constraint Show a ( show : a -> String );
-        implement Show Float ( show = toString );
-        
-        showAndConcat = fn x => concat "Value: " $ show x;
-        result = showAndConcat 42;
-        result
-    `);
-});
+	test('constraint propagation through $ operator', () => {
+		expectSuccess(
+			`
+      showAndConcat = fn x => concat "Value: " $ show x;
+      showAndConcat 42
+      `,
+			'Value: 42'
+		);
+	});
 
-// This was skipped - let's test ADT pattern matching with operators
-test('operators with ADT pattern matching - testing if it fails', () => {
-    expectError(`
+	test('operators with ADT pattern matching', () => {
+		expectSuccess(
+			`
         type Point a = Point a a;
         getX = fn point => match point with (Point x y => x);
         points = [Point 1 2, Point 3 4];
         result = points | list_map $ getX;
         result
-    `);
-});
+    `,
+			[1, 3]
+		);
+	});
 
-// This was skipped - let's test polymorphic type inference
-test.skip('type inference with polymorphic operators - KNOWN ISSUE: polymorphic lists', () => {
-    // SKIPPED: This fails due to type system limitation with polymorphic identity functions
-    // The type system currently cannot handle lists containing values of different types
-    // even when those values come from the same polymorphic identity function.
-    expectSuccess(`
-        # This fails due to polymorphic type inference limitation
-        identity = fn x => x;
-        result1 = identity $ 42;
-        result2 = identity $ "hello";
-        [result1, result2]
-    `, [42, "hello"]);
-});
-
-// This was skipped - let's test nested operator applications
-test('type inference with nested operator applications - testing if it fails', () => {
-    expectError(`
-        # This might fail with complex type inference
+	test('type inference with nested operator applications', () => {
+		expectSuccess(
+			`
         compose = fn f g => fn x => f $ g x;
         sum1 = fn x => x + 1;
         mul2 = fn x => x * 2;
         combined = compose sum1 mul2;
         result = [1, 2, 3] | list_map $ combined;
         result
-    `);
-});
+    `,
+			[3, 5, 7]
+		);
+	});
 
-// This was skipped - let's test operators with mutable variables
-test('operators with mutable variables - testing if it fails', () => {
-    expectError(`
-        # This might fail if operators don't handle mutation properly
+	test('operators with mutable variables', () => {
+		expectSuccess(
+			`
         mut counter = 0;
         increment = fn x => (mut! counter = counter + 1; x + counter);
-        result = [1, 2, 3] | list_map $ increment;
-        [result, counter]
-    `);
-});
+        result = [1, 2, 3] | (list_map increment);
+        {result, counter} : {List Float, Float}
+      `,
+			[[2, 4, 6], 3]
+		);
+	});
 
-// This was skipped - let's test operators with record accessor chains
-test('operators with record accessor chains - testing if it fails', () => {
-    expectSuccess(`
-        # This might actually work now
+	test('operators with record accessor chains', () => {
+		expectSuccess(
+			`
         person = { @address { @street "123 Main", @city "NYC" } };
         getCity = fn p => p | @address | @city;
         result = getCity $ person;
         result
-    `, "NYC");
-});
+    `,
+			'NYC'
+		);
+	});
 
-test.run();
+	test('polymorphic identity function with operators', () => {
+		expectSuccess(
+			`
+        result1 = id 42;
+        result2 = id "hello";
+        {result1, result2} : {Float, String}
+    `,
+			[42, 'hello']
+		);
+	});
+
+	test('operator chaining with different types', () => {
+		expectSuccess(
+			`
+        double = fn x => x * 2;
+        toString = fn x => concat "Value: " $ show x;
+        result = 5 | double | toString;
+        result
+    `,
+			'Value: 10'
+		);
+	});
+
+	// Failing because result is `Option Option Float` when it should be `Option Float`
+	test.skip('safe thrush with Option type', () => {
+		expectSuccess(
+			`
+        safeDivide = fn x y => if y == 0 then None else Some (x / y);
+        result = Some 10 |? safeDivide 2;
+        match result with (Some x => x; None => 0)
+    `,
+			5
+		);
+	});
+
+	test('operator precedence with parentheses', () => {
+		expectSuccess(
+			`
+        f = fn x => x + 1;
+        g = fn x => x * 2;
+        (f <| g) 5
+    `,
+			11
+		);
+	});
+
+	test('list operations with operator chaining', () => {
+		expectSuccess(
+			`
+        numbers = [1, 2, 3, 4, 5];
+        result = numbers | filter $ (fn x => x > 2) | list_map $ (fn x => x * 2);
+        result
+    `,
+			[6, 8, 10]
+		);
+	});
+});

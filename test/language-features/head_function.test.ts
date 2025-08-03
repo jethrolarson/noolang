@@ -1,104 +1,98 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
-import { Lexer } from '../../src/lexer/lexer';
-import { parse } from '../../src/parser/parser';
-import { typeAndDecorate } from '../../src/typer';
-import { Evaluator, type Value } from '../../src/evaluator/evaluator';
+import { test, expect } from 'bun:test';
+import { runCode } from '../utils';
 
-function unwrapValue(val: Value): any {
-	if (val === null) return null;
-	if (typeof val !== 'object') return val;
-	switch (val.tag) {
-		case 'number':
-			return val.value;
-		case 'string':
-			return val.value;
-		case 'constructor':
-			if (val.name === 'True') return true;
-			if (val.name === 'False') return false;
-			return { name: val.name, args: val.args.map(unwrapValue) };
-		case 'list':
-			return val.values.map(unwrapValue);
-		case 'tuple':
-			return val.values.map(unwrapValue);
-		case 'record': {
-			const obj: any = {};
-			for (const k in val.fields) obj[k] = unwrapValue(val.fields[k]);
-			return obj;
-		}
-		default:
-			return val;
-	}
-}
-
-// Test suite: Head Function Tests
-let evaluator: Evaluator;
-
-// Setup function (was beforeEach)
-const setup = () => {
-	evaluator = new Evaluator();
-};
-
-const runCode = (code: string) => {
-	const lexer = new Lexer(code);
-	const tokens = lexer.tokenize();
-	const ast = parse(tokens);
-	const decoratedResult = typeAndDecorate(ast);
-	return evaluator.evaluateProgram(decoratedResult.program);
-};
-
-test('should work with integer lists', () => {
-	setup();
-	const code = `
-      numbers = [1, 2, 3, 4, 5];
-      head numbers
-    `;
+test('should load stdlib and have length function', () => {
+	const code = `length [1, 2, 3]`;
 	const result = runCode(code);
-	// head now returns Some 1, so we check for the constructor
-	const finalResult = unwrapValue(result.finalResult);
-	assert.is(finalResult.name, 'Some');
-	assert.is(unwrapValue(finalResult.args[0]), 1);
+	expect(result.finalValue).toBe(3);
 });
 
-test('should work with string lists', () => {
-	setup();
-	const code = `
-      strings = ["hello", "world", "noolang"];
-      head strings
-    `;
+test('should work with == operator directly', () => {
+	const code = `(length [1, 2, 3]) == 3`;
 	const result = runCode(code);
-	// head now returns Some "hello"
-	const finalResult = unwrapValue(result.finalResult);
-	assert.is(finalResult.name, 'Some');
-	assert.is(unwrapValue(finalResult.args[0]), 'hello');
+	expect(result.finalValue).toBe(true);
 });
 
-test('should work with boolean lists', () => {
-	setup();
-	const code = `
-      bools = [True, False, True];
-      head bools
-    `;
+test('should work with if expression directly', () => {
+	const code = `if (length [1, 2, 3]) == 3 then "yes" else "no"`;
 	const result = runCode(code);
-	// head now returns Some True
-	const finalResult = unwrapValue(result.finalResult);
-	assert.is(finalResult.name, 'Some');
-	const boolResult = finalResult.args[0];
-	// The Bool constructor gets unwrapped to JavaScript boolean
-	assert.is(boolResult, true);
+	expect(result.finalValue).toBe('yes');
 });
 
-test('should work with nested lists', () => {
-	setup();
-	const code = `
-      nested = [[1, 2], [3, 4]];
-      head nested
-    `;
+test('should work with list_get directly', () => {
+	const code = `list_get 0 [1, 2, 3]`;
 	const result = runCode(code);
-	// head now returns Some [1, 2]
-	const finalResult = unwrapValue(result.finalResult);
-	assert.is(finalResult.name, 'Some');
-	assert.equal(unwrapValue(finalResult.args[0]), [1, 2]);
+	expect(result.finalValue).toEqual({
+		tag: 'constructor',
+		name: 'Some',
+		args: [{ tag: 'number', value: 1 }],
+	});
 });
 
-test.run();
+test('head function should work with simple list', () => {
+	const code = `head [1]`;
+	const result = runCode(code);
+	expect(result.finalValue).toEqual({
+		tag: 'constructor',
+		name: 'Some',
+		args: [{ tag: 'number', value: 1 }],
+	});
+});
+
+test('head function should work with integer lists', () => {
+	const code = `head [1, 2, 3]`;
+	const result = runCode(code);
+	expect(result.finalValue).toEqual({
+		tag: 'constructor',
+		name: 'Some',
+		args: [{ tag: 'number', value: 1 }],
+	});
+});
+
+test('head function should work with string lists', () => {
+	const code = `head ["a", "b", "c"]`;
+	const result = runCode(code);
+	expect(result.finalValue).toEqual({
+		tag: 'constructor',
+		name: 'Some',
+		args: [{ tag: 'string', value: 'a' }],
+	});
+});
+
+test('head function should work with boolean lists', () => {
+	const code = `head [True, False, True]`;
+	const result = runCode(code);
+	expect(result.finalValue).toEqual({
+		tag: 'constructor',
+		name: 'Some',
+		args: [{ tag: 'constructor', name: 'True', args: [] }],
+	});
+});
+
+test('head function should work with nested lists', () => {
+	const code = `head [[1, 2], [3, 4], [5, 6]]`;
+	const result = runCode(code);
+	expect(result.finalValue).toEqual({
+		tag: 'constructor',
+		name: 'Some',
+		args: [
+			{
+				tag: 'list',
+				values: [
+					{ tag: 'number', value: 1 },
+					{ tag: 'number', value: 2 },
+				],
+			},
+		],
+	});
+});
+
+test('head function should return None for empty list', () => {
+	const code = `head []`;
+	const result = runCode(code);
+	expect(result.finalValue).toEqual({
+		tag: 'constructor',
+		name: 'None',
+		args: [],
+	});
+});

@@ -1,60 +1,31 @@
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
-import { Lexer } from '../../src/lexer/lexer';
-import { parse } from '../../src/parser/parser';
-import { Evaluator } from '../../src/evaluator/evaluator';
-import { typeProgram } from '../../src/typer';
-import { typeToString } from '../../src/typer/helpers';
+import { test, expect, describe } from 'bun:test';
 
 // Helper function to parse and evaluate Noolang code
-const runNoolang = (source: string) => {
-	const lexer = new Lexer(source);
-	const tokens = lexer.tokenize();
-	const program = parse(tokens);
+import { runCode } from '../utils';
+describe('Algebraic Data Types', () => {
+	describe('Option Type', () => {
+		test('should create Some values', () => {
+			const result = runCode(`Some 42`);
 
-	// Type check first
-	const typeResult = typeProgram(program);
+			expect(result.finalValue).toEqual({
+				tag: 'constructor',
+				name: 'Some',
+				args: [{ tag: 'number', value: 42 }],
+			});
+		});
 
-	// Then evaluate
-	const evaluator = new Evaluator();
-	const evalResult = evaluator.evaluateProgram(program);
+		test('should create None values', () => {
+			const result = runCode(`None`);
 
-	return {
-		typeResult,
-		evalResult,
-		finalType: typeToString(typeResult.type, typeResult.state.substitution),
-		finalValue: evalResult.finalResult,
-	};
-};
+			expect(result.finalValue).toEqual({
+				tag: 'constructor',
+				name: 'None',
+				args: [],
+			});
+		});
 
-test('Algebraic Data Types (ADTs) - Built-in Option Type - should create Some values', () => {
-	const result = runNoolang(`
-		x = Some 42;
-		x
-	`);
-
-	assert.equal(result.finalValue, {
-		tag: 'constructor',
-		name: 'Some',
-		args: [{ tag: 'number', value: 42 }],
-	});
-});
-
-test('Algebraic Data Types (ADTs) - Built-in Option Type - should create None values', () => {
-	const result = runNoolang(`
-		x = None;
-		x
-	`);
-
-	assert.equal(result.finalValue, {
-		tag: 'constructor',
-		name: 'None',
-		args: [],
-	});
-});
-
-test('Algebraic Data Types (ADTs) - Built-in Option Type - should pattern match on Some', () => {
-	const result = runNoolang(`
+		test('should pattern match on Some', () => {
+			const result = runCode(`
 		opt = Some 42;
 		match opt with (
 			Some x => x;
@@ -62,14 +33,11 @@ test('Algebraic Data Types (ADTs) - Built-in Option Type - should pattern match 
 		)
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'number',
-		value: 42,
-	});
-});
+			expect(result.finalValue).toEqual(42);
+		});
 
-test('Algebraic Data Types (ADTs) - Built-in Option Type - should pattern match on None', () => {
-	const result = runNoolang(`
+		test('should pattern match on None', () => {
+			const result = runCode(`
 		opt = None;
 		match opt with (
 			Some x => x;
@@ -77,14 +45,11 @@ test('Algebraic Data Types (ADTs) - Built-in Option Type - should pattern match 
 		)
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'number',
-		value: 0,
-	});
-});
+			expect(result.finalValue).toEqual(0);
+		});
 
-test('Algebraic Data Types (ADTs) - Built-in Option Type - should handle nested Some values', () => {
-	const result = runNoolang(`
+		test('should handle nested Some values', () => {
+			const result = runCode(`
 		nested = Some (Some 42);
 		match nested with (
 			Some (Some x) => x;
@@ -93,28 +58,25 @@ test('Algebraic Data Types (ADTs) - Built-in Option Type - should handle nested 
 		)
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'number',
-		value: 42,
+			expect(result.finalValue).toEqual(42);
+		});
 	});
-});
 
-test('Algebraic Data Types (ADTs) - Custom ADT Definition - should define simple ADT', () => {
-	const result = runNoolang(`
+	test('Custom ADT Definition - should define simple ADT', () => {
+		const result = runCode(`
 		type Color = Red | Green | Blue;
-		x = Red;
-		x
+		Red
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'constructor',
-		name: 'Red',
-		args: [],
+		expect(result.evalResult.finalResult).toEqual({
+			tag: 'constructor',
+			name: 'Red',
+			args: [],
+		});
 	});
-});
 
-test('Algebraic Data Types (ADTs) - Custom ADT Definition - should pattern match on custom ADT', () => {
-	const result = runNoolang(`
+	test('Custom ADT Definition - should pattern match on custom ADT', () => {
+		const result = runCode(`
 		type Color = Red | Green | Blue;
 		
 		colorToString = fn color => match color with (
@@ -126,63 +88,68 @@ test('Algebraic Data Types (ADTs) - Custom ADT Definition - should pattern match
 		colorToString Red
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'string',
-		value: 'red',
+		expect(result.finalValue).toEqual('red');
 	});
-});
 
-test('Algebraic Data Types (ADTs) - Custom ADT Definition - should define ADT with parameters', () => {
-	const result = runNoolang(`
+	test('Custom ADT Definition - should define ADT with parameters', () => {
+		const result = runCode(`
 		type Box a = Empty | Full a;
-		x = Full 42;
-		x
+		Full 42
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'constructor',
-		name: 'Full',
-		args: [{ tag: 'number', value: 42 }],
+		expect(result.evalResult.finalResult).toEqual({
+			tag: 'constructor',
+			name: 'Full',
+			args: [{ tag: 'number', value: 42 }],
+		});
 	});
-});
 
-test('Algebraic Data Types (ADTs) - Custom ADT Definition - should handle ADT with single parameter', () => {
-	const result = runNoolang(`
+	test('Custom ADT Definition - should handle ADT with single parameter', () => {
+		const result = runCode(`
 		type Wrapper = Wrap Float;
-		x = Wrap 42;
-		x
+		Wrap 42
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'constructor',
-		name: 'Wrap',
-		args: [{ tag: 'number', value: 42 }],
+		expect(result.evalResult.finalResult).toEqual({
+			tag: 'constructor',
+			name: 'Wrap',
+			args: [{ tag: 'number', value: 42 }],
+		});
 	});
-});
 
-test.skip('Algebraic Data Types (ADTs) - Pattern Matching - should handle recursive ADTs - TODO: Fix recursive type unification', () => {
-	const result = runNoolang(`
+	test.skip('should not allow shadowing built in types', () => {
+		expect(() =>
+			runCode(`
 		type List a = Cons a (List a) | Nil;
-		list = Cons 1 (Cons 2 Nil);
-		list
+	`)
+		).toThrow('Shadowing built in type List');
+	});
+
+	test('Pattern Matching - should handle recursive ADTs', () => {
+		const result = runCode(`
+		type Lyst a = Cons a (Lyst a) | Nil;
+		Cons 1 (Cons 2 Nil);
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'constructor',
-		name: 'Cons',
-		args: [
-			{ tag: 'number', value: 1 },
-			{
-				tag: 'constructor',
-				name: 'Cons',
-				args: [{ tag: 'number', value: 2 }, { tag: 'constructor', name: 'Nil', args: [] }],
-			},
-		],
+		expect(result.evalResult.finalResult).toEqual({
+			tag: 'constructor',
+			name: 'Cons',
+			args: [
+				{ tag: 'number', value: 1 },
+				{
+					tag: 'constructor',
+					name: 'Cons',
+					args: [
+						{ tag: 'number', value: 2 },
+						{ tag: 'constructor', name: 'Nil', args: [] },
+					],
+				},
+			],
+		});
 	});
-});
 
-test('Algebraic Data Types (ADTs) - Pattern Matching - should handle complex pattern matching with variables', () => {
-	const result = runNoolang(`
+	test('Pattern Matching - should handle complex pattern matching with variables', () => {
+		const result = runCode(`
 		type Result a b = Ok a | Error b;
 		
 		unwrap = fn result => match result with (
@@ -193,14 +160,11 @@ test('Algebraic Data Types (ADTs) - Pattern Matching - should handle complex pat
 		unwrap (Ok 42)
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'number',
-		value: 42,
+		expect(result.finalValue).toEqual(42);
 	});
-});
 
-test('Algebraic Data Types (ADTs) - Pattern Matching - should match on ADT with multiple parameters', () => {
-	const result = runNoolang(`
+	test('Pattern Matching - should match on ADT with multiple parameters', () => {
+		const result = runCode(`
 		type Point = Point Float Float;
 		
 		getX = fn point => match point with (
@@ -210,14 +174,11 @@ test('Algebraic Data Types (ADTs) - Pattern Matching - should match on ADT with 
 		getX (Point 3 4)
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'number',
-		value: 3,
+		expect(result.finalValue).toEqual(3);
 	});
-});
 
-test('Algebraic Data Types (ADTs) - Pattern Matching - should handle nested pattern matching', () => {
-	const result = runNoolang(`
+	test('Pattern Matching - should handle nested pattern matching', () => {
+		const result = runCode(`
 		type Inner = InnerValue Float;
 		type Outer = OuterValue Inner;
 		
@@ -230,29 +191,25 @@ test('Algebraic Data Types (ADTs) - Pattern Matching - should handle nested patt
 		getValue (OuterValue (InnerValue 42))
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'number',
-		value: 42,
+		expect(result.finalValue).toEqual(42);
 	});
-});
 
-test('Algebraic Data Types (ADTs) - Type Inference - should infer ADT types correctly', () => {
-	const result = runNoolang(`
+	test('Type Inference - should infer ADT types correctly', () => {
+		const result = runCode(`
 		type Maybe a = Just a | Nothing;
-		x = Just 42;
-		x
+		Just 42
 	`);
 
-	assert.is(result.finalType, 'Maybe Float');
-	assert.equal(result.finalValue, {
-		tag: 'constructor',
-		name: 'Just',
-		args: [{ tag: 'number', value: 42 }],
+		expect(result.finalType).toBe('Maybe Float');
+		expect(result.evalResult.finalResult).toEqual({
+			tag: 'constructor',
+			name: 'Just',
+			args: [{ tag: 'number', value: 42 }],
+		});
 	});
-});
 
-test('Algebraic Data Types (ADTs) - Type Inference - should handle polymorphic ADTs', () => {
-	const result = runNoolang(`
+	test('Type Inference - should handle polymorphic ADTs', () => {
+		const result = runCode(`
 		type Container a = Container a;
 		
 		makeContainer = fn value => Container value;
@@ -263,15 +220,15 @@ test('Algebraic Data Types (ADTs) - Type Inference - should handle polymorphic A
 		stringContainer
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'constructor',
-		name: 'Container',
-		args: [{ tag: 'string', value: 'hello' }],
+		expect(result.evalResult.finalResult).toEqual({
+			tag: 'constructor',
+			name: 'Container',
+			args: [{ tag: 'string', value: 'hello' }],
+		});
 	});
-});
 
-test('Algebraic Data Types (ADTs) - Function Integration - should work with functions that return ADTs', () => {
-	const result = runNoolang(`
+	test('Function Integration - should work with functions that return ADTs', () => {
+		const result = runCode(`
 		type Status = Success | Failure;
 		
 		checkNumber = fn x => if x > 0 then Success else Failure;
@@ -279,15 +236,15 @@ test('Algebraic Data Types (ADTs) - Function Integration - should work with func
 		checkNumber 5
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'constructor',
-		name: 'Success',
-		args: [],
+		expect(result.evalResult.finalResult).toEqual({
+			tag: 'constructor',
+			name: 'Success',
+			args: [],
+		});
 	});
-});
 
-test('Algebraic Data Types (ADTs) - Function Integration - should work with functions that take ADTs as parameters', () => {
-	const result = runNoolang(`
+	test('Function Integration - should work with functions that take ADTs as parameters', () => {
+		const result = runCode(`
 		type Status = Success | Failure;
 		
 		statusToNumber = fn status => match status with (
@@ -298,14 +255,11 @@ test('Algebraic Data Types (ADTs) - Function Integration - should work with func
 		statusToNumber Success
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'number',
-		value: 1,
+		expect(result.finalValue).toEqual(1);
 	});
-});
 
-test('Algebraic Data Types (ADTs) - Function Integration - should work with list_map and ADTs', () => {
-	const result = runNoolang(`
+	test('Function Integration - should work with list_map and ADTs', () => {
+		const result = runCode(`
 		type Status = Success | Failure;
 		
 		statusToNumber = fn status => match status with (
@@ -317,18 +271,18 @@ test('Algebraic Data Types (ADTs) - Function Integration - should work with list
 		list_map statusToNumber statuses
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'list',
-		values: [
-			{ tag: 'number', value: 1 },
-			{ tag: 'number', value: 0 },
-			{ tag: 'number', value: 1 },
-		],
+		expect(result.evalResult.finalResult).toEqual({
+			tag: 'list',
+			values: [
+				{ tag: 'number', value: 1 },
+				{ tag: 'number', value: 0 },
+				{ tag: 'number', value: 1 },
+			],
+		});
 	});
-});
 
-test.skip('Algebraic Data Types (ADTs) - Multiple ADTs - should handle multiple ADT definitions in the same program - TODO: Fix ADT pattern matching', () => {
-	const result = runNoolang(`
+	test('Multiple ADTs - should handle multiple ADT definitions in the same program - TODO: Fix ADT pattern matching', () => {
+		const result = runCode(`
 		type Color = Red | Green | Blue;
 		type Size = Small | Medium | Large;
 		
@@ -336,17 +290,17 @@ test.skip('Algebraic Data Types (ADTs) - Multiple ADTs - should handle multiple 
 		item
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'tuple',
-		values: [
-			{ tag: 'constructor', name: 'Red', args: [] },
-			{ tag: 'constructor', name: 'Small', args: [] },
-		],
+		expect(result.evalResult.finalResult).toEqual({
+			tag: 'tuple',
+			values: [
+				{ tag: 'constructor', name: 'Red', args: [] },
+				{ tag: 'constructor', name: 'Small', args: [] },
+			],
+		});
 	});
-});
 
-test.skip('Algebraic Data Types (ADTs) - Multiple ADTs - should handle pattern matching on different ADTs separately - TODO: Fix ADT pattern matching', () => {
-	const result = runNoolang(`
+	test('Multiple ADTs - should handle pattern matching on different ADTs separately - TODO: Fix ADT pattern matching', () => {
+		const result = runCode(`
 		type Color = Red | Green | Blue;
 		type Size = Small | Medium | Large;
 		
@@ -356,14 +310,11 @@ test.skip('Algebraic Data Types (ADTs) - Multiple ADTs - should handle pattern m
 		colorToString Red
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'string',
-		value: 'red',
+		expect(result.finalValue).toEqual('red');
 	});
-});
 
-test.skip('Algebraic Data Types (ADTs) - Multiple ADTs - should now work with list_map and multiple ADTs (polymorphism fixed) - TODO: Actually fix it', () => {
-	const result = runNoolang(`
+	test('Multiple ADTs - should now work with list_map and multiple ADTs (polymorphism fixed)', () => {
+		const result = runCode(`
 		type Color = Red | Green | Blue;
 		type Status = Success | Failure;
 		
@@ -377,50 +328,49 @@ test.skip('Algebraic Data Types (ADTs) - Multiple ADTs - should now work with li
 		list_map colorToStatus colors
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'list',
-		values: [
-			{ tag: 'constructor', name: 'Failure', args: [] },
-			{ tag: 'constructor', name: 'Success', args: [] },
-			{ tag: 'constructor', name: 'Failure', args: [] },
-		],
+		expect(result.evalResult.finalResult).toEqual({
+			tag: 'list',
+			values: [
+				{ tag: 'constructor', name: 'Failure', args: [] },
+				{ tag: 'constructor', name: 'Success', args: [] },
+				{ tag: 'constructor', name: 'Failure', args: [] },
+			],
+		});
 	});
-});
 
-test.skip('Algebraic Data Types (ADTs) - Edge Cases - should handle ADT constructors with no parameters - TODO: Fix parser for types with same name as constructor', () => {
-	const result = runNoolang(`
-		type Unit = Unit;
-		x = Unit;
-		x
+	test('Edge Cases - should handle ADT constructors with no parameters - TODO: Fix parser for types with same name as constructor', () => {
+		const result = runCode(`
+		type U = U;
+		U
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'constructor',
-		name: 'Unit',
-		args: [],
+		expect(result.evalResult.finalResult).toEqual({
+			tag: 'constructor',
+			name: 'U',
+			args: [],
+		});
 	});
-});
 
-test.skip('Algebraic Data Types (ADTs) - Edge Cases - should handle ADT with same name as constructor - TODO: Fix parser for types with same name as constructor', () => {
-	const result = runNoolang(`
-		type Unit = Unit;
+	test('Edge Cases - should handle ADT with same name as constructor - TODO: Fix parser for types with same name as constructor', () => {
+		const result = runCode(`
+		type U = U;
 		
-		isUnit = fn x => match x with (
-			Unit => True
+		isU = fn x => match x with (
+			U => True
 		);
 		
-		isUnit Unit
+		isU U
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'constructor',
-		name: 'True',
-		args: [],
+		expect(result.evalResult.finalResult).toEqual({
+			tag: 'constructor',
+			name: 'True',
+			args: [],
+		});
 	});
-});
 
-test.skip('Algebraic Data Types (ADTs) - Complex Scenarios - should work when shapes are processed separately - TODO: Fix ADT pattern matching', () => {
-	const result = runNoolang(`
+	test.skip('Complex Scenarios - should work when shapes are processed separately', () => {
+		const result = runCode(`
 		type Color = Red | Green | Blue;
 		type Shape a = Circle a | Rectangle a a | Triangle a a a;
 		shapes = [Circle 3, Rectangle 5 4];
@@ -429,67 +379,67 @@ test.skip('Algebraic Data Types (ADTs) - Complex Scenarios - should work when sh
 		areas
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'list',
-		values: [
-			{ tag: 'number', value: 27 },
-			{ tag: 'number', value: 20 },
-		],
+		expect(result.evalResult.finalResult).toEqual({
+			tag: 'list',
+			values: [
+				{ tag: 'number', value: 27 },
+				{ tag: 'number', value: 20 },
+			],
+		});
 	});
-});
 
-test('Algebraic Data Types (ADTs) - Generic Constructors - should handle Point with generic parameters (issue fix)', () => {
-	const result = runNoolang(`
+	test('Generic Constructors - should handle Point with generic parameters (issue fix)', () => {
+		const result = runCode(`
 		type Point a = Point a a;
 		origin = Point 0.0 0.0;
 		origin
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'constructor',
-		name: 'Point',
-		args: [
-			{ tag: 'number', value: 0.0 },
-			{ tag: 'number', value: 0.0 }
-		],
+		expect(result.evalResult.finalResult).toEqual({
+			tag: 'constructor',
+			name: 'Point',
+			args: [
+				{ tag: 'number', value: 0.0 },
+				{ tag: 'number', value: 0.0 },
+			],
+		});
 	});
-});
 
-test('Algebraic Data Types (ADTs) - Generic Constructors - should handle Shape with multiple constructors (issue fix)', () => {
-	const result = runNoolang(`
+	test('Generic Constructors - should handle Shape with multiple constructors (issue fix)', () => {
+		const result = runCode(`
 		type Shape a = Circle a | Rectangle a a;
 		circle = Circle 5.0;
 		circle
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'constructor',
-		name: 'Circle',
-		args: [{ tag: 'number', value: 5.0 }],
+		expect(result.evalResult.finalResult).toEqual({
+			tag: 'constructor',
+			name: 'Circle',
+			args: [{ tag: 'number', value: 5.0 }],
+		});
 	});
-});
 
-test('Algebraic Data Types (ADTs) - Generic Constructors - should handle partial application of generic constructors', () => {
-	const result = runNoolang(`
+	test('Generic Constructors - should handle partial application of generic constructors', () => {
+		const result = runCode(`
 		type Point a = Point a a;
 		makeOrigin = Point 0.0;
 		point = makeOrigin 0.0;
 		point
 	`);
 
-	assert.equal(result.finalValue, {
-		tag: 'constructor',
-		name: 'Point',
-		args: [
-			{ tag: 'number', value: 0.0 },
-			{ tag: 'number', value: 0.0 }
-		],
+		expect(result.evalResult.finalResult).toEqual({
+			tag: 'constructor',
+			name: 'Point',
+			args: [
+				{ tag: 'number', value: 0.0 },
+				{ tag: 'number', value: 0.0 },
+			],
+		});
 	});
-});
 
-// New Recursive ADT Tests
-test('Recursive ADT - Binary Tree construction and pattern matching', () => {
-	const result = runNoolang(`
+	// New Recursive ADT Tests
+	test('Recursive ADT - Binary Tree construction and pattern matching', () => {
+		const result = runCode(`
 		type Tree a = Node a (Tree a) (Tree a) | Leaf;
 
 		tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
@@ -502,11 +452,11 @@ test('Recursive ADT - Binary Tree construction and pattern matching', () => {
 		getValue tree
 	`);
 
-	assert.equal(result.finalValue, { tag: 'number', value: 5 });
-});
+		expect(result.evalResult.finalResult).toEqual({ tag: 'number', value: 5 });
+	});
 
-test('Recursive ADT - LinkedList with pattern matching', () => {
-	const result = runNoolang(`
+	test('Recursive ADT - LinkedList with pattern matching', () => {
+		const result = runCode(`
 		type LinkedList a = Cons a (LinkedList a) | Nil;
 
 		sum = fn lst => match lst with (
@@ -518,11 +468,11 @@ test('Recursive ADT - LinkedList with pattern matching', () => {
 		sum myList
 	`);
 
-	assert.equal(result.finalValue, { tag: 'number', value: 6 });
-});
+		expect(result.evalResult.finalResult).toEqual({ tag: 'number', value: 6 });
+	});
 
-test('Recursive ADT - List operations with proper recursion', () => {
-	const result = runNoolang(`
+	test('Recursive ADT - List operations with proper recursion', () => {
+		const result = runCode(`
 		type MyList a = Cons a (MyList a) | Nil;
 
 		length = fn lst => match lst with (
@@ -534,11 +484,11 @@ test('Recursive ADT - List operations with proper recursion', () => {
 		length lst
 	`);
 
-	assert.equal(result.finalValue, { tag: 'number', value: 3 });
-});
+		expect(result.evalResult.finalResult).toEqual({ tag: 'number', value: 3 });
+	});
 
-test('Recursive ADT - Nested pattern matching', () => {
-	const result = runNoolang(`
+	test('Recursive ADT - Nested pattern matching', () => {
+		const result = runCode(`
 		type Tree a = Node a (Tree a) (Tree a) | Leaf;
 
 		sumTree = fn t => match t with (
@@ -550,7 +500,6 @@ test('Recursive ADT - Nested pattern matching', () => {
 		sumTree tree
 	`);
 
-	assert.equal(result.finalValue, { tag: 'number', value: 6 });
+		expect(result.evalResult.finalResult).toEqual({ tag: 'number', value: 6 });
+	});
 });
-
-test.run();
