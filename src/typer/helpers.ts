@@ -376,6 +376,7 @@ export const propagateConstraintToTypeVariable = (
 	}
 };
 
+// TODO Break this up into smaller functions
 // Utility function to convert type to string
 export const typeToString = (
 	type: Type,
@@ -578,13 +579,13 @@ export const typeToString = (
 									.join(', ');
 								return `@${nestedFieldName} {${deepNestedDesc}}`;
 							} else {
-								return `@${nestedFieldName} ${norm(nestedFieldType as Type)}`;
+								return `@${nestedFieldName} ${norm(nestedFieldType)}`;
 							}
 						})
 						.join(', ');
 					return `@${fieldName} {${nestedFieldDescs}}`;
 				} else {
-					const fieldTypeStr = norm(fieldType as Type);
+					const fieldTypeStr = norm(fieldType);
 					// Check if the field type has nested constraints
 					if (
 						fieldType.kind === 'variable' &&
@@ -609,7 +610,7 @@ export const typeToString = (
 												return `@${nestedFieldName} {${nestedDesc}}`;
 											} else {
 												// Handle regular field type
-												return `@${nestedFieldName} ${norm(nestedFieldType as Type)}`;
+												return `@${nestedFieldName} ${norm(nestedFieldType)}`;
 											}
 										})
 										.join(', ');
@@ -738,48 +739,59 @@ export const typeToString = (
 	return baseTypeStr;
 };
 
+const substituteTypeVar = (
+	typeVar: string,
+	substitution: Map<string, Type>,
+	constraint: Constraint
+): Constraint => {
+	const varType = substitute({ kind: 'variable', name: typeVar }, substitution);
+	return {
+		...constraint,
+		typeVar: varType.kind === 'variable' ? varType.name : typeVar,
+	};
+};
+
 // Helper function to deduplicate constraints
-function deduplicateConstraints(constraints: Constraint[], substitution: Map<string, Type>): Constraint[] {
+function deduplicateConstraints(
+	constraints: Constraint[],
+	substitution: Map<string, Type>
+): Constraint[] {
 	const result: Constraint[] = [];
 
 	for (const constraint of constraints) {
 		// Apply substitution to both constraint and existing constraints before comparison
-		const substitutedConstraint = {
-			...constraint,
-			typeVar: (() => {
-				const varType = substitute({ kind: 'variable', name: constraint.typeVar }, substitution);
-				return varType.kind === 'variable' ? varType.name : constraint.typeVar;
-			})()
-		};
-		
+		const substitutedConstraint = substituteTypeVar(
+			constraint.typeVar,
+			substitution,
+			constraint
+		);
+
 		// Special handling for structural constraints that might be semantically duplicate
 		// even if they have different field type variables
 		const isDuplicate = result.some(c => {
-			const substitutedC = {
-				...c,
-				typeVar: (() => {
-					const varType = substitute({ kind: 'variable', name: c.typeVar }, substitution);
-					return varType.kind === 'variable' ? varType.name : c.typeVar;
-				})()
-			};
-			
+			const substitutedC = substituteTypeVar(c.typeVar, substitution, c);
+
 			// If both are 'has' constraints with same typeVar and same field structure
-			if (substitutedC.kind === 'has' && substitutedConstraint.kind === 'has' && 
-				substitutedC.typeVar === substitutedConstraint.typeVar) {
-				
+			if (
+				substitutedC.kind === 'has' &&
+				substitutedConstraint.kind === 'has' &&
+				substitutedC.typeVar === substitutedConstraint.typeVar
+			) {
 				const fields1 = Object.keys(substitutedC.structure.fields);
 				const fields2 = Object.keys(substitutedConstraint.structure.fields);
-				
+
 				// If they have the same field names, consider them duplicate regardless of field types
-				if (fields1.length === fields2.length && 
-					fields1.every(field => fields2.includes(field))) {
+				if (
+					fields1.length === fields2.length &&
+					fields1.every(field => fields2.includes(field))
+				) {
 					return true;
 				}
 			}
-			
+
 			return constraintsEqual(substitutedC, substitutedConstraint);
 		});
-		
+
 		if (!isDuplicate) {
 			result.push(constraint);
 		}

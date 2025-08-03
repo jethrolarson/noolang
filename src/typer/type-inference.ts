@@ -38,7 +38,6 @@ import {
 	ApplicationExpression,
 	hasStructureConstraint,
 	implementsConstraint,
-	type VariableType,
 	Pattern,
 } from '../ast';
 import {
@@ -72,7 +71,6 @@ import {
 	instantiate,
 	freshenTypeVariables,
 	flattenStatements,
-	createConstrainedType,
 } from './type-operations';
 import { typeApplication } from './function-application';
 
@@ -83,8 +81,6 @@ import {
 	getTypeName,
 	addTraitImplementation,
 } from './trait-system';
-
-import { isSimpleFieldConstraint } from './constraint-composition';
 
 // Note: Main typeExpression is now in expression-dispatcher.ts
 // This file only contains the individual type inference functions
@@ -122,17 +118,17 @@ export const typeVariableExpr = (
 				// First, collect all type variables from the trait function type
 				const typeVars = new Set<string>();
 				collectTypeVariables(traitInfo.functionType, typeVars);
-				
+
 				// Add the trait type parameter if not already collected
 				typeVars.add(traitInfo.typeParam);
-				
+
 				// Create a type scheme and instantiate it properly
 				const scheme: TypeScheme = {
 					quantifiedVars: Array.from(typeVars),
 					type: traitInfo.functionType,
-					effects: emptyEffects()
+					effects: emptyEffects(),
 				};
-				
+
 				const [freshenedType, state1] = instantiate(scheme, state);
 				return createPureTypeResult(freshenedType, state1);
 			}
@@ -666,276 +662,6 @@ function usesOperator(expr: Expression, targetOperator: string): boolean {
 // Helper function to check if an expression uses the + operator (for backward compatibility)
 function usesAddOperator(expr: Expression): boolean {
 	return usesOperator(expr, '+');
-}
-
-// Helper function to collect structural constraints from accessor expressions in function bodies
-function collectAccessorConstraints(
-	expr: Expression,
-	paramNames: string[],
-	paramTypes: Type[],
-	state: TypeState
-): Constraint[] {
-	const constraints: Constraint[] = [];
-
-	// Create a mapping from parameter names to their type variables
-	const paramTypeVars = new Map<string, string>();
-	for (let i = 0; i < paramNames.length && i < paramTypes.length; i++) {
-		const paramType = paramTypes[i];
-		if (paramType.kind === 'variable') {
-			paramTypeVars.set(paramNames[i], paramType.name);
-		}
-	}
-
-	// Helper function to check if a type is an accessor type
-	function isAccessorType(type: Type): boolean {
-		return (
-			type.kind === 'function' &&
-			!!type.constraints &&
-			type.constraints.some((c: Constraint) => c.kind === 'has')
-		);
-	}
-
-	// Helper function to extract field name from accessor constraint
-	function getAccessorField(constraint: Constraint): string | null {
-		if (
-			constraint.kind === 'has' &&
-			constraint.structure &&
-			constraint.structure.fields
-		) {
-			const fieldNames = Object.keys(constraint.structure.fields);
-			return fieldNames.length === 1 ? fieldNames[0] : null;
-		}
-		return null;
-	}
-
-	// Recursively collect accessor constraints from the expression
-	function collectFromExpression(e: Expression): void {
-		if (!e) return;
-
-		switch (e.kind) {
-			case 'application': {
-				const func = e.func;
-				const args = e.args;
-
-				// Case 1: Direct accessor applications like "@name obj"
-				if (func.kind === 'accessor' && args.length === 1) {
-					const accessorField = func.field;
-					const arg = args[0];
-
-					// Check if the argument is one of our parameters
-					if (arg.kind === 'variable' && paramTypeVars.has(arg.name)) {
-						const paramTypeVar = paramTypeVars.get(arg.name)!;
-
-						// Create a fresh type variable for the field type
-						const fieldTypeVar = `α${Math.random().toString(36).substr(2, 9)}`;
-
-						// Create the structural constraint: paramTypeVar has {accessorField: fieldTypeVar}
-						constraints.push(
-							hasStructureConstraint(paramTypeVar, {
-								fields: {
-									[accessorField]: { kind: 'variable', name: fieldTypeVar },
-								},
-							})
-						);
-					}
-				}
-
-				// Case 2: Variable references that are accessors (like "getAddress obj")
-				if (func.kind === 'variable' && args.length === 1) {
-					const varName = func.name;
-					const arg = args[0];
-
-					// Check if the argument is one of our parameters
-					if (arg.kind === 'variable' && paramTypeVars.has(arg.name)) {
-						const paramTypeVar = paramTypeVars.get(arg.name)!;
-
-						// Check if the variable is an accessor by looking it up in the environment
-						const scheme = state.environment.get(varName);
-						if (scheme) {
-							// Apply substitution to get the actual type
-							const actualType = substitute(scheme.type, state.substitution);
-
-							if (isAccessorType(actualType)) {
-								// Extract the field name from the accessor's constraints
-								const accessorConstraint = (
-									actualType as FunctionType
-								).constraints?.find((c: Constraint) => c.kind === 'has');
-								if (accessorConstraint) {
-									const fieldName = getAccessorField(accessorConstraint);
-									if (fieldName) {
-										// Create a fresh type variable for the field type
-										const fieldTypeVar = `α${Math.random().toString(36).substr(2, 9)}`;
-
-										// Create the structural constraint: paramTypeVar has {fieldName: fieldTypeVar}
-										constraints.push(
-											hasStructureConstraint(paramTypeVar, {
-												fields: {
-													[fieldName]: { kind: 'variable', name: fieldTypeVar },
-												},
-											})
-										);
-									}
-								}
-							}
-						}
-					}
-				}
-
-				// Case 3: Composed accessor patterns like "getStreet (getAddress person)"
-				if (
-					func.kind === 'variable' &&
-					args.length === 1 &&
-					args[0].kind === 'application'
-				) {
-					const outerAccessorName = func.name;
-					const innerApplication = args[0];
-
-					// Check if inner application is also an accessor
-					if (
-						innerApplication.func.kind === 'variable' &&
-						innerApplication.args.length === 1 &&
-						innerApplication.args[0].kind === 'variable' &&
-						paramTypeVars.has(innerApplication.args[0].name)
-					) {
-						const innerAccessorName = innerApplication.func.name;
-						const paramName = innerApplication.args[0].name;
-						const paramTypeVar = paramTypeVars.get(paramName)!;
-
-						// Get both accessor types from environment
-						const outerScheme = state.environment.get(outerAccessorName);
-						const innerScheme = state.environment.get(innerAccessorName);
-
-						if (outerScheme && innerScheme) {
-							const outerType = substitute(
-								outerScheme.type,
-								state.substitution
-							);
-							const innerType = substitute(
-								innerScheme.type,
-								state.substitution
-							);
-
-							// Check if both are accessor types with simple constraints
-							if (isAccessorType(outerType) && isAccessorType(innerType)) {
-								const outerConstraint = (
-									outerType as FunctionType
-								).constraints?.find((c: Constraint) => c.kind === 'has');
-								const innerConstraint = (
-									innerType as FunctionType
-								).constraints?.find((c: Constraint) => c.kind === 'has');
-
-								if (
-									outerConstraint &&
-									innerConstraint &&
-									outerConstraint.kind === 'has' &&
-									innerConstraint.kind === 'has' &&
-									isSimpleFieldConstraint(outerConstraint) &&
-									isSimpleFieldConstraint(innerConstraint)
-								) {
-									// Extract field names
-									const outerField = getAccessorField(outerConstraint);
-									const innerField = getAccessorField(innerConstraint);
-
-									if (outerField && innerField) {
-										// Create constraint variables for composition
-										const intermediateVar = `α${Math.random().toString(36).substr(2, 9)}`;
-										const finalVar = `α${Math.random().toString(36).substr(2, 9)}`;
-
-										// Create the inner constraint: paramTypeVar has {innerField: intermediateVar}
-										const innerComposedConstraint = hasStructureConstraint(
-											paramTypeVar,
-											{
-												fields: {
-													[innerField]: {
-														kind: 'variable',
-														name: intermediateVar,
-													},
-												},
-											}
-										);
-
-										// Create the outer constraint: intermediateVar has {outerField: finalVar}
-										const outerComposedConstraint = hasStructureConstraint(
-											intermediateVar,
-											{
-												fields: {
-													[outerField]: { kind: 'variable', name: finalVar },
-												},
-											}
-										);
-
-										// For composed accessor patterns, use separate constraints that can be resolved by existing logic
-										// This creates the logical relationship between constraints while working with the current resolution system
-										constraints.push(innerComposedConstraint);
-										constraints.push(outerComposedConstraint);
-									}
-								}
-							}
-						}
-					}
-				}
-
-				// Recursively check function and arguments
-				collectFromExpression(func);
-				args.forEach(collectFromExpression);
-				break;
-			}
-
-			case 'function':
-				collectFromExpression(e.body);
-				break;
-
-			case 'binary':
-				collectFromExpression(e.left);
-				collectFromExpression(e.right);
-				break;
-
-			case 'if':
-				collectFromExpression(e.condition);
-				collectFromExpression(e.then);
-				collectFromExpression(e.else);
-				break;
-
-			case 'record':
-				e.fields.forEach(field => collectFromExpression(field.value));
-				break;
-
-			case 'tuple':
-				e.elements.forEach(collectFromExpression);
-				break;
-
-			case 'list':
-				e.elements.forEach(collectFromExpression);
-				break;
-
-			case 'where':
-				collectFromExpression(e.main);
-				e.definitions.forEach(def => {
-					if (def.kind === 'definition') {
-						collectFromExpression(def.value);
-					} else if (def.kind === 'tuple-destructuring') {
-						collectFromExpression(def.value);
-					} else if (def.kind === 'record-destructuring') {
-						collectFromExpression(def.value);
-					} else if (def.kind === 'mutable-definition') {
-						collectFromExpression(def.value);
-					}
-				});
-				break;
-
-			case 'match':
-				collectFromExpression(e.expression);
-				e.cases.forEach(case_ => collectFromExpression(case_.expression));
-				break;
-
-			default:
-				// No nested expressions to check
-				break;
-		}
-	}
-
-	collectFromExpression(expr);
-	return constraints;
 }
 
 function collectTypeVariables(type: Type, vars: Set<string>): void {

@@ -91,13 +91,3 @@ export function extractResultTypeVar(
 
 	return null;
 }
-
-/**
- * Check if a constraint is a simple single-field constraint.
- * Example: {street: α} -> true, {street: α, city: β} -> false
- */
-export function isSimpleFieldConstraint(
-	constraint: HasStructureConstraint
-): boolean {
-	return Object.keys(constraint.structure.fields).length === 1;
-}
