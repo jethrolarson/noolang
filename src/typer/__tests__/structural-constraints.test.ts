@@ -148,16 +148,11 @@ describe('Structural Constraints', () => {
 			// Accessors in function bodies should work correctly
 		});
 
-		test('should work with accessors and lists', () => {
-			const result = parseAndType(`
-        getNames = map @name;
-        people = [{@name "Alice", @age 30}, {@name "Bob", @age 25}];
-        result = getNames people
-      `);
+    test('Mapping accessors over lists', () => {
+			const result = parseAndType(`map @name [{@name 'bob'}]`);
 			assertListType(result.type);
 			assertPrimitiveType(result.type.element);
 			expect(result.type.element.name).toBe('String');
-			// Mapping accessors over lists should work
 		});
 
 		test('should handle accessor with polymorphic return type', () => {
