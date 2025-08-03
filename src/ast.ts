@@ -72,7 +72,7 @@ export type StructureFieldType = Type | NestedStructureFieldType;
 // Extracted type definitions
 export type PrimitiveType = {
 	kind: 'primitive';
-	name: 'String' | 'Bool' | 'List' | 'Float';
+	name: 'String' | 'Bool' | 'List' | 'Float'; // TODO: Remove List
 };
 
 export type FunctionType = {

@@ -15,7 +15,6 @@ import {
 	assertVariantType,
 	assertFunctionExpression,
 	assertLiteralExpression,
-	assertListExpression,
 } from '../../../test/utils';
 
 // Helper functions for parsing
@@ -251,15 +250,14 @@ test('Top-level definitions with type annotations - parses definition with primi
 });
 
 test('Top-level definitions with type annotations - parses definition with list type annotation', () => {
-	const result = parseDefinition('numbers = [1, 2, 3] : List Float;');
+	const result = parseDefinition('numbers = [1, 2, 3] : List Float');
 	expect(result.statements.length).toBe(1);
 	const def = result.statements[0];
 	assertDefinitionExpression(def);
 	expect(def.name).toBe('numbers');
 	const typed = def.value;
 	assertTypedExpression(typed);
-	assertListExpression(typed.expression);
-	assertPrimitiveType(typed.expression.type!);
-	expect(typed.expression.type.name).toBe('Float');
+	assertListType(typed.type);
+	assertPrimitiveType(typed.type.element);
+	expect(typed.type.element.name).toBe('Float');
 });
-
