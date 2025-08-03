@@ -29,22 +29,20 @@ test('trait functions work with descriptive type parameter names', () => {
 });
 
 test('trait functions work with uppercase type parameter names', () => {
-	const program = `
-        constraint Container ContainerType (
-            empty : ContainerType a;
-            insert : a -> ContainerType a -> ContainerType a
-        );
-        
-        implement Container List (
-            empty = [];
-            insert = fn x list => cons x list
-        );
-        
-        # Should work with uppercase parameter name
-        empty
-    `;
-
-	const result = parseAndType(program);
+	const result = parseAndType(`
+      constraint Container ContainerType (
+          empty : ContainerType a;
+          insert : a -> ContainerType a -> ContainerType a
+      );
+      
+      implement Container List (
+          empty = [];
+          insert = fn x list => cons x list
+      );
+      
+      # Should work with uppercase parameter name
+      empty
+  `);
 
 	// Should return a constrained type with variant baseType (ContainerType a)
 	assertConstrainedType(result.type);

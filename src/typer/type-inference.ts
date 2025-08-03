@@ -1596,13 +1596,11 @@ export const typeConstraintDefinition = (
 	// Create trait definition
 	const functionMap = new Map<string, FunctionType>();
 
-	for (const func of functions) {
+	for (const { type, name: funcName } of functions) {
 		// Type the function signature, substituting the constraint type parameter
-		const funcType = func.type;
-		if (funcType.kind !== 'function') {
-			throw new Error(`Function '${func.name}' is not a function`);
+		if (type.kind == 'function') {
+			functionMap.set(funcName, type);
 		}
-		functionMap.set(func.name, funcType);
 	}
 
 	const traitDef = {

@@ -12,6 +12,26 @@ const parseToString = (code: string) => {
 };
 
 describe('Constraint Collapse', () => {
+  test('map type is correct', () => {
+		const typeString = parseToString('map');
+
+		expect(typeString).toBe(
+			'(a -> b) -> c a -> c b given c implements Functor'
+		);
+	});
+	test('map type is correct raw type names', () => {
+		const typeResult = parseAndType('map');
+		const typeString = typeToString(
+			typeResult.type,
+			typeResult.state.substitution,
+			true,
+			false
+		);
+
+		expect(typeString).toBe(
+			'(α126 -> α127) -> α128 α126 -> α128 α127 given α128 implements Functor'
+		);
+	});
 	test('map should work with unary trait functions', () => {
 		const typeString = parseToString('map show [1, 2, 3]');
 
@@ -52,10 +72,17 @@ describe('Constraint Collapse', () => {
 
 		expect(typeString).toBe('a Float given a implements Monad');
 	});
-	test('Pure function should preserve constraints', () => {
-		const typeString = parseToString('pure 1');
 
-		expect(typeString).toBe('α127 Float given a implements Monad');
+	test('Pure function should preserve constraints raw type names', () => {
+		const typeResult = parseAndType('pure 1');
+		const typeString = typeToString(
+			typeResult.type,
+			typeResult.state.substitution,
+			true,
+			false
+		);
+
+		expect(typeString).toBe('α127 Float given α127 implements Monad');
 	});
 });
 

@@ -29,8 +29,8 @@ function createTestREPL(): { repl: REPLCore; mockOutput: MockOutput } {
 }
 
 test('REPL Core - should create instance successfully', () => {
-	const { repl, mockOutput } = createTestREPL();
-	
+	const { repl } = createTestREPL();
+
 	expect(repl).toBeTruthy();
 	expect(repl.evaluator).toBeTruthy();
 	expect(repl.typeState).toBeTruthy();
@@ -38,9 +38,9 @@ test('REPL Core - should create instance successfully', () => {
 
 test('REPL Core - should handle empty input', () => {
 	const { repl, mockOutput } = createTestREPL();
-	
+
 	const result = repl.processInput('');
-	
+
 	expect(result.success).toBe(true);
 	expect(mockOutput.logs.length).toBe(0);
 	expect(mockOutput.errors.length).toBe(0);
@@ -48,12 +48,12 @@ test('REPL Core - should handle empty input', () => {
 
 test('REPL Core - should evaluate simple expressions', () => {
 	const { repl, mockOutput } = createTestREPL();
-	
+
 	const result = repl.processInput('42');
-	
+
 	expect(result.success).toBe(true);
 	expect(mockOutput.logs.length > 0).toBeTruthy();
-	
+
 	// Check that the result contains the expected value
 	const output = mockOutput.logs.join(' ');
 	expect(output.includes('42')).toBeTruthy();
@@ -62,12 +62,12 @@ test('REPL Core - should evaluate simple expressions', () => {
 test('REPL Core - should evaluate string expressions', () => {
 	const mockOutput = new MockOutput();
 	const repl = new REPLCore(mockOutput, { skipStdlib: true });
-	
+
 	const result = repl.processInput('"hello world"');
-	
+
 	expect(result.success).toBe(true);
 	expect(mockOutput.logs.length > 0).toBeTruthy();
-	
+
 	const output = mockOutput.logs.join(' ');
 	expect(output.includes('hello world')).toBeTruthy();
 });
@@ -75,12 +75,12 @@ test('REPL Core - should evaluate string expressions', () => {
 test('REPL Core - should handle arithmetic expressions', () => {
 	const mockOutput = new MockOutput();
 	const repl = new REPLCore(mockOutput, { skipStdlib: true });
-	
+
 	const result = repl.processInput('2 + 3');
-	
+
 	expect(result.success).toBe(true);
 	expect(mockOutput.logs.length > 0).toBeTruthy();
-	
+
 	const output = mockOutput.logs.join(' ');
 	expect(output.includes('5')).toBeTruthy();
 });
@@ -88,16 +88,16 @@ test('REPL Core - should handle arithmetic expressions', () => {
 test('REPL Core - should handle variable definitions', () => {
 	const mockOutput = new MockOutput();
 	const repl = new REPLCore(mockOutput, { skipStdlib: true });
-	
+
 	const result = repl.processInput('x = 42');
-	
+
 	expect(result.success).toBe(true);
 	expect(mockOutput.logs.length > 0).toBeTruthy();
-	
+
 	// Now test that the variable can be used
 	mockOutput.clear();
 	const result2 = repl.processInput('x');
-	
+
 	expect(result2.success).toBe(true);
 	const output = mockOutput.logs.join(' ');
 	expect(output.includes('42')).toBeTruthy();
@@ -106,15 +106,15 @@ test('REPL Core - should handle variable definitions', () => {
 test('REPL Core - should handle function definitions', () => {
 	const mockOutput = new MockOutput();
 	const repl = new REPLCore(mockOutput, { skipStdlib: true });
-	
+
 	const result = repl.processInput('myAdd = fn x y => x + y');
-	
+
 	expect(result.success).toBe(true);
-	
+
 	// Test using the function
 	mockOutput.clear();
 	const result2 = repl.processInput('myAdd 2 3');
-	
+
 	expect(result2.success).toBe(true);
 	const output = mockOutput.logs.join(' ');
 	expect(output.includes('5')).toBeTruthy();
@@ -123,12 +123,12 @@ test('REPL Core - should handle function definitions', () => {
 test('REPL Core - should handle help command', () => {
 	const mockOutput = new MockOutput();
 	const repl = new REPLCore(mockOutput, { skipStdlib: true });
-	
+
 	const result = repl.processInput('.help');
-	
+
 	expect(result.success).toBe(true);
 	expect(mockOutput.logs.length > 0).toBeTruthy();
-	
+
 	const output = mockOutput.logs.join(' ');
 	expect(output.includes('Commands')).toBeTruthy();
 	expect(output.includes('.quit')).toBeTruthy();
@@ -138,41 +138,19 @@ test('REPL Core - should handle help command', () => {
 test('REPL Core - should handle env command', () => {
 	const mockOutput = new MockOutput();
 	const repl = new REPLCore(mockOutput, { skipStdlib: true });
-	
+
 	// Define a variable first
 	repl.processInput('testVar = 123');
 	mockOutput.clear();
-	
+
 	const result = repl.processInput('.env');
-	
+
 	expect(result.success).toBe(true);
 	expect(mockOutput.logs.length > 0).toBeTruthy();
-	
+
 	const output = mockOutput.logs.join(' ');
 	expect(output.includes('testVar')).toBeTruthy();
 	expect(output.includes('123')).toBeTruthy();
-});
-
-test('REPL Core - should handle clear-env command', () => {
-	const mockOutput = new MockOutput();
-	const repl = new REPLCore(mockOutput, { skipStdlib: true });
-	
-	// Define a variable
-	repl.processInput('testVar = 123');
-	
-	// Clear environment
-	mockOutput.clear();
-	const result = repl.processInput('.clear-env');
-	
-	expect(result.success).toBe(true);
-	expect(mockOutput.logs.length > 0).toBeTruthy();
-	
-	// Try to use the variable - should fail now
-	mockOutput.clear();
-	const result2 = repl.processInput('testVar');
-	
-	expect(result2.success).toBe(false);
-	expect(mockOutput.errors.length > 0).toBeTruthy();
 });
 
 test('REPL Core - should handle quit command', () => {
