@@ -2,348 +2,24 @@ import {
 	type ApplicationExpression,
 	type PipelineExpression,
 	type Type,
-	type Constraint,
-	functionType,
-	constrainedFunctionType,
-	isConstraint,
-	type FunctionType,
-	implementsConstraint,
-	type RecordType,
 } from '../ast';
-import {
-	functionApplicationError,
-	nonFunctionApplicationError,
-	formatTypeError,
-} from './type-errors';
-import {
-	getExprLocation,
-	throwTypeError,
-	typeToString,
-	propagateConstraintToTypeVariable,
-} from './helpers';
+import { nonFunctionApplicationError, formatTypeError } from './type-errors';
 import {
 	type TypeState,
 	type TypeResult,
 	createTypeResult,
 	unionEffects,
 } from './types';
-import { substitute } from './substitute';
-import { unify } from './unify';
 import { typeExpression } from './expression-dispatcher';
-import { freshTypeVariable } from './type-operations';
-import {
-	getTypeName,
-	resolveTraitFunction,
-	isTraitFunction,
-	getTraitFunctionInfo,
-} from './trait-system';
-import type { RecordStructure } from '../ast';
+import { unify } from './unify';
+import { substitute } from './substitute';
+import { typeToString } from './helpers';
+import { handleTraitFunctionApplication } from './trait-function-handling';
+import { extractFunctionConstraints } from './constraint-resolution';
+import { handleRegularFunctionApplication } from './regular-function-application';
+import { handleVariableTypeApplication } from './variable-type-handling';
 
-// Helper function to resolve nested structure constraints recursively
-function resolveNestedStructure(
-	actualRecord: Type & { kind: 'record' },
-	nestedStructure: RecordStructure,
-	currentSubstitution: Map<string, Type>
-): Map<string, Type> | null {
-	const result = new Map(currentSubstitution);
-
-	// Resolve each field in the nested structure
-	for (const [fieldName, fieldType] of Object.entries(nestedStructure.fields)) {
-		const normalizedFieldName = fieldName.startsWith('@')
-			? fieldName.slice(1)
-			: fieldName;
-
-		if (!(normalizedFieldName in actualRecord.fields)) {
-			// Required field not found
-			return null;
-		}
-
-		const actualFieldType = actualRecord.fields[normalizedFieldName];
-
-		if (fieldType.kind === 'variable') {
-			// Simple field - substitute the variable with the actual field type
-			result.set(fieldType.name, actualFieldType);
-		} else if (fieldType.kind === 'nested') {
-			// Nested structure - recurse
-			if (actualFieldType.kind === 'record') {
-				const nestedResult = resolveNestedStructure(
-					actualFieldType,
-					fieldType.structure,
-					result
-				);
-				if (!nestedResult) {
-					return null; // Nested resolution failed
-				}
-				// Merge nested results
-				for (const [varName, varType] of nestedResult.entries()) {
-					result.set(varName, varType);
-				}
-			} else {
-				// Expected nested record but got something else
-				return null;
-			}
-		}
-	}
-
-	return result;
-}
-
-// CONSTRAINT COLLAPSE FIX: Function to try resolving constraints using argument types
-export function tryResolveConstraints(
-	returnType: Type,
-	functionConstraints: Constraint[],
-	argTypes: Type[],
-	state: TypeState
-): { resolvedType: Type; updatedState: TypeState } | null {
-	// For each constraint, check if any of the argument types can satisfy it
-	for (const constraint of functionConstraints) {
-		if (constraint.kind === 'implements') {
-			const traitName = constraint.interfaceName;
-			const varName = constraint.typeVar;
-
-			// Check each argument type to see if it implements the required trait
-			for (const argType of argTypes) {
-				const argTypeName = getTypeName(argType);
-
-				// Check if we have an implementation of this trait for this argument type
-				let hasImplementation = false;
-
-				// Built-in implementations for traits to avoid circular dependency
-				if (
-					traitName === 'Add' &&
-					(argTypeName === 'Float' || argTypeName === 'String')
-				) {
-					hasImplementation = true;
-				} else if (traitName === 'Numeric' && argTypeName === 'Float') {
-					hasImplementation = true;
-				} else {
-					// Check trait registry for user-defined implementations
-					const traitRegistry = state.traitRegistry;
-					if (traitRegistry) {
-						const traitImpls = traitRegistry.implementations.get(traitName);
-						hasImplementation = !!traitImpls && traitImpls.has(argTypeName);
-					}
-				}
-
-				if (hasImplementation) {
-					// This argument type satisfies the constraint!
-					// Create a substitution and apply it to the return type
-					const substitution = new Map(state.substitution);
-
-					if (argType.kind === 'list') {
-						// For List types, substitute the type constructor
-						substitution.set(varName, { kind: 'primitive', name: 'List' });
-					} else if (argType.kind === 'variant') {
-						// For variant types, substitute with the constructor
-						substitution.set(varName, {
-							kind: 'variant',
-							name: argType.name,
-							args: [], // Just the constructor
-						});
-					} else {
-						// For other types, substitute directly
-						substitution.set(varName, argType);
-					}
-
-					// Apply substitution to return type
-					const resolvedType = substitute(returnType, substitution);
-					// Merge the local substitution back into the global state
-					const updatedSubstitution = new Map([
-						...state.substitution,
-						...substitution,
-					]);
-					const updatedState = { ...state, substitution: updatedSubstitution };
-					return { resolvedType, updatedState };
-				}
-			}
-		} else if (constraint.kind === 'has') {
-			// Handle structural constraints (accessors)
-			const requiredStructure = constraint.structure;
-
-			// Check each argument type to see if it has the required structure
-			for (const argType of argTypes) {
-				// Handle different container types that might contain records
-				let actualRecordType: RecordType | null = null;
-				
-				if (argType.kind === 'record') {
-					actualRecordType = argType;
-				} else if (argType.kind === 'variable') {
-					// Check if this type variable has constraints that tell us it should be a record
-					// For now, we'll try to see if it's already been substituted to a record
-					const substitutedType = substitute(argType, state.substitution);
-					if (substitutedType.kind === 'record') {
-						actualRecordType = substitutedType;
-					}
-				} else if (argType.kind === 'list') {
-					// For list types, check if the element type is a record
-					const elementType = argType.element;
-					if (elementType.kind === 'record') {
-						actualRecordType = elementType;
-					} else if (elementType.kind === 'variable') {
-						const substitutedElement = substitute(elementType, state.substitution);
-						if (substitutedElement.kind === 'record') {
-							actualRecordType = substitutedElement;
-						}
-					}
-				} else if (argType.kind === 'variant') {
-					// For functor types like Maybe a, Option a, etc., check the first type argument
-					if (argType.args.length > 0) {
-						const elementType = argType.args[0];
-						if (elementType.kind === 'record') {
-							actualRecordType = elementType;
-						} else if (elementType.kind === 'variable') {
-							const substitutedElement = substitute(elementType, state.substitution);
-							if (substitutedElement.kind === 'record') {
-								actualRecordType = substitutedElement;
-							}
-						}
-					}
-				}
-
-				if (actualRecordType) {
-					// Check if the record type has all required fields
-					let hasAllFields = true;
-					const substitution = new Map(state.substitution);
-
-					for (const fieldName of Object.keys(requiredStructure.fields)) {
-						// Normalize field names - remove @ prefix if it exists
-						const normalizedFieldName = fieldName.startsWith('@')
-							? fieldName.slice(1)
-							: fieldName;
-						if (!(normalizedFieldName in actualRecordType.fields)) {
-							hasAllFields = false;
-							break;
-						}
-					}
-
-					if (hasAllFields) {
-						// Structural constraint satisfied!
-						// For accessor functions: substitute the actual field types for the constraint's field type variables
-						for (const [fieldName, constraintFieldType] of Object.entries(
-							requiredStructure.fields
-						)) {
-							const normalizedFieldName = fieldName.startsWith('@')
-								? fieldName.slice(1)
-								: fieldName;
-							const actualFieldType =
-								actualRecordType.fields[normalizedFieldName];
-							if (actualFieldType && constraintFieldType.kind === 'variable') {
-								// Substitute the field type variable with the actual field type from the record
-								substitution.set(constraintFieldType.name, actualFieldType);
-							} else if (
-								actualFieldType &&
-								constraintFieldType.kind === 'nested'
-							) {
-								// Handle nested structure constraints
-								const nestedStructure = constraintFieldType.structure;
-								if (actualFieldType.kind === 'record') {
-									// Resolve nested field access recursively
-									const nestedResult = resolveNestedStructure(
-										actualFieldType,
-										nestedStructure,
-										substitution
-									);
-									if (nestedResult) {
-										// Apply any additional substitutions from nested resolution
-										for (const [varName, varType] of nestedResult.entries()) {
-											substitution.set(varName, varType);
-										}
-									}
-								}
-							}
-						}
-						// Apply substitution to return type
-						let resolvedType = substitute(returnType, substitution);
-
-						// SPECIAL CASE: If the return type is still a variable and we have field type substitutions,
-						// check if the return type should be unified with the field type (common in accessor functions)
-						if (
-							resolvedType.kind === 'variable' &&
-							resolvedType === returnType
-						) {
-							// The return type wasn't substituted, but we have field substitutions
-							// In accessor functions, the return type should match the field type
-							// Handle both simple and nested field constraints
-							function findResultVariable(fields: Record<string, any>): Type | null {
-								for (const [_fieldName, fieldType] of Object.entries(fields)) {
-									if (fieldType.kind === 'variable' && substitution.has(fieldType.name)) {
-										// Found a direct variable that was substituted
-										return substitution.get(fieldType.name)!;
-									} else if (fieldType.kind === 'nested') {
-										// Recursively search nested structure
-										const nestedResult = findResultVariable(fieldType.structure.fields);
-										if (nestedResult) return nestedResult;
-									}
-								}
-								return null;
-							}
-							
-							const resultType = findResultVariable(requiredStructure.fields);
-							if (resultType) {
-								substitution.set(resolvedType.name, resultType);
-								resolvedType = resultType;
-							}
-						}
-						// Merge the local substitution back into the global state
-						const updatedSubstitution = new Map([
-							...state.substitution,
-							...substitution,
-						]);
-						const updatedState = {
-							...state,
-							substitution: updatedSubstitution,
-						};
-						return { resolvedType, updatedState };
-					}
-				}
-			}
-		}
-	}
-
-	// Could not resolve any constraints
-	return null;
-}
-
-// Utility: check if a type is fully concrete (no variables anywhere)
-function isFullyConcrete(type: Type): boolean {
-	if (type.kind === 'primitive' || type.kind === 'unit') return true;
-	if (type.kind === 'variable') return false;
-	if (type.kind === 'variant') {
-		return (type.args ?? []).every(isFullyConcrete);
-	}
-	if (type.kind === 'list') {
-		return isFullyConcrete(type.element);
-	}
-	if (type.kind === 'constrained') {
-		return isFullyConcrete(type.baseType);
-	}
-	if (type.kind === 'function') {
-		return type.params.every(isFullyConcrete) && isFullyConcrete(type.return);
-	}
-	return false;
-}
-
-// Utility: check if a type has any type variables (is polymorphic)
-function hasTypeVariables(type: Type): boolean {
-	if (type.kind === 'variable') return true;
-	if (type.kind === 'primitive' || type.kind === 'unit') return false;
-	if (type.kind === 'variant') {
-		return (type.args ?? []).some(hasTypeVariables);
-	}
-	if (type.kind === 'list') {
-		return hasTypeVariables(type.element);
-	}
-	if (type.kind === 'constrained') {
-		return hasTypeVariables(type.baseType);
-	}
-	if (type.kind === 'function') {
-		return type.params.some(hasTypeVariables) || hasTypeVariables(type.return);
-	}
-	return false;
-}
-
-// TODO break this up into smaller functions
-// Update typeApplication to thread state through freshenTypeVariables
+// Main function application entry point - delegates to specialized handlers
 export const typeApplication = (
 	expr: ApplicationExpression,
 	state: TypeState
@@ -366,562 +42,40 @@ export const typeApplication = (
 		allEffects = unionEffects(allEffects, argResult.effects);
 	}
 
-	// NEW: Try trait function resolution if we have arguments
+	// Try trait function resolution if we have arguments
 	if (argTypes.length > 0) {
-		// Check if this could be a trait function call
-		if (
-			expr.func.kind === 'variable' &&
-			isTraitFunction(currentState.traitRegistry, expr.func.name)
-		) {
-			// Get the trait function signature to understand its arity
-			const traitInfo = getTraitFunctionInfo(
-				currentState.traitRegistry,
-				expr.func.name
-			);
-			if (traitInfo && traitInfo.functionType.kind === 'function') {
-				const traitFuncType = traitInfo.functionType;
-
-				// For trait functions, we need to check if we have enough arguments to fully apply the function
-				// A trait function like `add : a -> a -> a` needs 2 arguments to be fully applied
-				// We can determine this by checking if the return type is still a function type
-				const isFullyApplied = traitFuncType.return.kind !== 'function';
-
-				if (!isFullyApplied) {
-					// Partial application: return a function type with remaining parameters and constraints
-					// Unify the supplied arguments with the corresponding parameters
-					let partialState = currentState;
-					for (let i = 0; i < argTypes.length; i++) {
-						partialState = unify(
-							traitFuncType.params[i],
-							argTypes[i],
-							partialState,
-							getExprLocation(expr)
-						);
-					}
-					// Build the remaining curried function type
-					// For curried functions, we need to handle the case where we've applied one argument
-					// and the return type is still a function
-					const resultType = substitute(
-						traitFuncType.return,
-						partialState.substitution
-					);
-					let curriedType: Type = resultType;
-					// Collect constraints from both the trait function and the argument types
-					const allConstraints: Constraint[] = [];
-
-					// Add trait function constraints (e.g., f implements Functor)
-					if (
-						traitFuncType.constraints &&
-						traitFuncType.constraints.length > 0
-					) {
-						const substitutedConstraints = traitFuncType.constraints.map(
-							constraint => {
-								if (constraint.kind === 'implements') {
-									const substitutedVar = substitute(
-										{ kind: 'variable', name: constraint.typeVar },
-										partialState.substitution
-									);
-
-									if (substitutedVar.kind === 'variable') {
-										return {
-											...constraint,
-											typeVar: substitutedVar.name,
-										};
-									}
-									return null;
-								}
-								return constraint;
-							}
-						);
-						allConstraints.push(
-							...substitutedConstraints.filter(c => c !== null)
-						);
-					}
-
-					// Add constraints from argument types (e.g., a has {@name b} from @name)
-					for (let i = 0; i < argTypes.length; i++) {
-						const argType = argTypes[i];
-						if (argType.kind === 'function' && argType.constraints) {
-							// For now, just propagate the constraints directly with variable substitution
-							const substitutedArgConstraints = argType.constraints.map(
-								constraint => {
-									// Apply substitution to update variable names
-									const substitutedVar = substitute(
-										{ kind: 'variable', name: constraint.typeVar },
-										partialState.substitution
-									);
-
-									if (substitutedVar.kind === 'variable') {
-										return {
-											...constraint,
-											typeVar: substitutedVar.name,
-										};
-									}
-									return constraint;
-								}
-							);
-							allConstraints.push(...substitutedArgConstraints);
-						}
-					}
-
-					// Apply constraints to the result type if it's a function
-					if (resultType.kind === 'function' && allConstraints.length > 0) {
-						curriedType = {
-							...resultType,
-							constraints: (resultType.constraints || []).concat(
-								allConstraints
-							),
-						};
-					}
-					return createTypeResult(
-						curriedType,
-						funcResult.effects,
-						partialState
-					);
-				}
-
-				// Only resolve trait functions when fully applied
-				if (isFullyApplied) {
-					const resolution = resolveTraitFunction(
-						currentState.traitRegistry,
-						expr.func.name,
-						argTypes
-					);
-
-					if (resolution.found && resolution.impl) {
-						// We found a trait implementation - evaluate it with the arguments
-						// The trait implementation is an expression we need to type
-						const traitImplType = typeExpression(resolution.impl, currentState);
-
-						// Apply the trait implementation to the arguments
-						if (traitImplType.type.kind === 'function') {
-							// FIXED: Use direct function application logic instead of recursive typeApplication
-							// to avoid exponential blowup while maintaining compatibility
-							const funcType = traitImplType.type;
-							let resultState = traitImplType.state;
-
-							// Type arguments first
-							const argResults = expr.args.map(arg =>
-								typeExpression(arg, resultState)
-							);
-							for (const argResult of argResults) {
-								resultState = argResult.state;
-							}
-							const argTypes = argResults.map(result => result.type);
-
-							// Apply normal function application logic (copied from main path)
-							if (argTypes.length > funcType.params.length) {
-								throwTypeError(
-									location =>
-										functionApplicationError(
-											funcType.params[funcType.params.length - 1],
-											argTypes[funcType.params.length - 1],
-											funcType.params.length - 1,
-											undefined,
-											location
-										),
-									getExprLocation(expr)
-								);
-							}
-
-							// Unify each argument with the corresponding parameter type
-							for (let i = 0; i < argTypes.length; i++) {
-								const unificationContext = {
-									reason: 'function_application' as const,
-									operation: `applying argument ${i + 1}`,
-									hint: `Argument ${i + 1} has type ${typeToString(
-										argTypes[i],
-										resultState.substitution
-									)} but the function parameter expects ${typeToString(
-										funcType.params[i],
-										resultState.substitution
-									)}.`,
-								};
-
-								resultState = unify(
-									funcType.params[i],
-									argTypes[i],
-									resultState,
-									getExprLocation(expr),
-									unificationContext
-								);
-							}
-
-							// Return the function's return type with effects
-							const resultType = substitute(
-								funcType.return,
-								resultState.substitution
-							);
-
-							const resultEffects = unionEffects(
-								traitImplType.effects,
-								...argResults.map(r => r.effects)
-							);
-							return createTypeResult(resultType, resultEffects, resultState);
-						} else {
-							// The trait implementation should be a function
-							const funcName =
-								expr.func.kind === 'variable' ? expr.func.name : 'unknown';
-							throwTypeError(
-								location => ({
-									type: 'TypeError' as const,
-									kind: 'general',
-									message: `Trait implementation for ${funcName} is not a function`,
-									location,
-								}),
-								getExprLocation(expr)
-							);
-						}
-					} else if (resolution.found === false) {
-						// No trait implementation found - check if this is polymorphic
-						const funcName =
-							expr.func.kind === 'variable' ? expr.func.name : 'unknown';
-
-						// Check if the trait function return type has unresolved type variables
-						const hasUnresolvedVariables = hasTypeVariables(
-							traitFuncType.return
-						);
-
-						if (!hasUnresolvedVariables && isFullyConcrete(argTypes[0])) {
-							// Concrete function with concrete argument: error
-							const argTypeNames = argTypes
-								.map(t => getTypeName(t))
-								.filter(Boolean);
-							const typeStr =
-								argTypeNames.length > 0
-									? argTypeNames.join(', ')
-									: 'unknown type';
-							throwTypeError(
-								location => ({
-									type: 'TypeError' as const,
-									kind: 'general',
-									message: `No implementation of trait function '${funcName}' for ${typeStr}`,
-									location,
-								}),
-								getExprLocation(expr)
-							);
-						}
-						// Otherwise, allow constraint to be created (polymorphic or type variable arguments)
-					}
-				}
-				// For partial applications, fall through to normal function application logic
-				// which will handle the trait function as a constrained function type
-			}
+		const traitResult = handleTraitFunctionApplication(
+			expr,
+			funcType,
+			argTypes,
+			currentState,
+			funcResult
+		);
+		if (traitResult) {
+			return traitResult;
 		}
 	}
 
 	// Handle function application by checking if funcType is a function or constrained function
-	let actualFuncType = funcType;
-	let functionConstraints: Constraint[] | undefined;
-
-	// If it's a constrained type, extract the base type and constraints
-	if (funcType.kind === 'constrained') {
-		actualFuncType = funcType.baseType;
-		// Extract constraints from ConstrainedType
-		functionConstraints = [];
-		for (const [typeVar, traitConstraints] of funcType.constraints.entries()) {
-			for (const traitConstraint of traitConstraints) {
-				if (traitConstraint.kind === 'implements') {
-					functionConstraints.push(
-						implementsConstraint(typeVar, traitConstraint.interfaceName)
-					);
-				} else if (traitConstraint.kind === 'hasField') {
-					// Convert hasField trait constraint to modern hasField constraint
-					functionConstraints.push({
-						kind: 'hasField',
-						typeVar,
-						field: traitConstraint.field,
-						fieldType: traitConstraint.fieldType,
-					});
-				}
-			}
-		}
-	} else if (actualFuncType.kind === 'function' && actualFuncType.constraints) {
-		// Use modern constraint system directly
-		functionConstraints = actualFuncType.constraints;
-	}
+	const { actualFuncType, functionConstraints } =
+		extractFunctionConstraints(funcType);
 
 	if (actualFuncType.kind === 'function') {
-		if (argTypes.length > actualFuncType.params.length) {
-			throwTypeError(
-				location =>
-					functionApplicationError(
-						actualFuncType.params[actualFuncType.params.length - 1],
-						argTypes[actualFuncType.params.length - 1],
-						actualFuncType.params.length - 1,
-						undefined,
-						location
-					),
-				getExprLocation(expr)
-			);
-		}
-
-		// Unify each argument with the corresponding parameter type
-		for (let i = 0; i < argTypes.length; i++) {
-			// Pass constraint context to unification if we have function constraints
-
-			const unificationContext = {
-				reason: 'function_application' as const,
-				operation: `applying argument ${i + 1}`,
-				hint: `Argument ${i + 1} has type ${typeToString(
-					argTypes[i],
-					currentState.substitution
-				)} but the function parameter expects ${typeToString(
-					actualFuncType.params[i],
-					currentState.substitution
-				)}.`,
-				// Pass constraint information if available
-				...(functionConstraints && { constraintContext: functionConstraints }),
-			};
-
-			currentState = unify(
-				actualFuncType.params[i],
-				argTypes[i],
-				currentState,
-				getExprLocation(expr),
-				unificationContext
-			);
-		}
-
-		// Apply substitution to get the return type
-		const returnType = substitute(
-			actualFuncType.return,
-			currentState.substitution
+		return handleRegularFunctionApplication(
+			expr,
+			actualFuncType,
+			argTypes,
+			functionConstraints,
+			currentState,
+			allEffects
 		);
-
-		// NOTE: Return type constraint validation removed - will be handled by new trait system
-
-		// Phase 3: Add effect validation for function calls
-		// Add function's effects to the collected effects
-		allEffects = unionEffects(allEffects, actualFuncType.effects);
-
-		if (argTypes.length === actualFuncType.params.length) {
-			// Full application - return the return type
-
-			// CONSTRAINT COLLAPSE FIX: Instead of blindly preserving constraints,
-			// try to resolve them using the actual argument types
-			let finalReturnType = returnType;
-			if (functionConstraints && functionConstraints.length > 0) {
-				// Apply current substitution to argument types before constraint resolution
-				const substitutedArgTypes = argTypes.map(argType =>
-					substitute(argType, currentState.substitution)
-				);
-
-				// Try to resolve constraints using substituted argument types
-				const constraintResult = tryResolveConstraints(
-					returnType,
-					functionConstraints,
-					substitutedArgTypes,
-					currentState
-				);
-
-				if (constraintResult) {
-					// Constraints were successfully resolved to a concrete type
-					finalReturnType = constraintResult.resolvedType;
-					currentState = constraintResult.updatedState;
-				} else {
-					// Could not resolve constraints, preserve them on the return type if it's a function
-					if (returnType.kind === 'function') {
-						finalReturnType = {
-							...returnType,
-							constraints: (returnType.constraints || []).concat(
-								functionConstraints
-							),
-						};
-					} else {
-						// For non-function types, just return the type as-is
-						// Constraint resolution for non-function return types is handled elsewhere
-						finalReturnType = returnType;
-					}
-				}
-			}
-
-			// CRITICAL FIX: Handle function composition constraint propagation
-
-			// Case 1: Direct compose function call
-			if (
-				expr.func.kind === 'variable' &&
-				expr.func.name === 'compose' &&
-				expr.args.length >= 1
-			) {
-				const fArg = expr.args[0]; // First function (f in "compose f g")
-				const fResult = typeExpression(fArg, currentState);
-
-				// If f has constraints and returnType is a function, propagate the constraints
-				if (
-					fResult.type.kind === 'function' &&
-					fResult.type.constraints &&
-					returnType.kind === 'function'
-				) {
-					const enhancedReturnType = { ...returnType };
-
-					// Map constraint variables from f's type to the new function's type variables
-					const updatedConstraints: Constraint[] = [];
-					for (const constraint of fResult.type.constraints) {
-						if (constraint.kind === 'is') {
-							// Find the corresponding parameter in the new function
-							// The first parameter of the composed function should inherit f's parameter constraints
-							if (
-								enhancedReturnType.params.length > 0 &&
-								enhancedReturnType.params[0].kind === 'variable'
-							) {
-								const newConstraint = isConstraint(
-									enhancedReturnType.params[0].name,
-									constraint.constraint
-								);
-								updatedConstraints.push(newConstraint);
-							}
-						} else {
-							// For non-"is" constraints, copy as-is for now
-							updatedConstraints.push(constraint);
-						}
-					}
-
-					enhancedReturnType.constraints = (
-						enhancedReturnType.constraints || []
-					).concat(updatedConstraints);
-
-					// Also propagate constraints to parameter type variables in the result function
-					for (const constraint of updatedConstraints) {
-						if (constraint.kind === 'is') {
-							propagateConstraintToTypeVariable(enhancedReturnType, constraint);
-						}
-					}
-
-					finalReturnType = enhancedReturnType;
-				}
-			}
-
-			// Case 2: Application to result of compose (e.g., (compose head) id)
-			else if (
-				expr.func.kind === 'application' &&
-				expr.func.func.kind === 'variable' &&
-				expr.func.func.name === 'compose' &&
-				expr.func.args.length >= 1
-			) {
-				// This is applying the second argument to a partial compose result
-				const fArg = expr.func.args[0]; // First function from the compose
-				const fResult = typeExpression(fArg, currentState);
-
-				if (
-					fResult.type.kind === 'function' &&
-					fResult.type.constraints &&
-					returnType.kind === 'function'
-				) {
-					const enhancedReturnType = { ...returnType };
-
-					// Map constraint variables from f's type to the new function's type variables
-					const updatedConstraints: Constraint[] = [];
-					for (const constraint of fResult.type.constraints) {
-						if (constraint.kind === 'is') {
-							// Find the corresponding parameter in the new function
-							if (
-								enhancedReturnType.params.length > 0 &&
-								enhancedReturnType.params[0].kind === 'variable'
-							) {
-								const newConstraint = isConstraint(
-									enhancedReturnType.params[0].name,
-									constraint.constraint
-								);
-								updatedConstraints.push(newConstraint);
-							}
-						} else {
-							updatedConstraints.push(constraint);
-						}
-					}
-
-					enhancedReturnType.constraints = (
-						enhancedReturnType.constraints || []
-					).concat(updatedConstraints);
-
-					for (const constraint of updatedConstraints) {
-						if (constraint.kind === 'is') {
-							propagateConstraintToTypeVariable(enhancedReturnType, constraint);
-						}
-					}
-
-					finalReturnType = enhancedReturnType;
-				}
-			}
-
-			return createTypeResult(finalReturnType, allEffects, currentState);
-		} else {
-			// Partial application - return a function with remaining parameters
-			const remainingParams = actualFuncType.params.slice(argTypes.length);
-			const partialFunctionType = functionType(
-				remainingParams,
-				returnType,
-				actualFuncType.effects
-			);
-
-			// If the original function had constraints, preserve them in the partial function
-			let finalPartialType: FunctionType = partialFunctionType;
-			if (functionConstraints && functionConstraints.length > 0) {
-				finalPartialType = {
-					...partialFunctionType,
-					constraints: (partialFunctionType.constraints || []).concat(
-						functionConstraints
-					),
-				};
-			}
-
-			// CRITICAL FIX: Handle partial application of compose
-			if (
-				expr.func.kind === 'variable' &&
-				expr.func.name === 'compose' &&
-				expr.args.length >= 1
-			) {
-				const fArg = expr.args[0]; // First function
-				const fResult = typeExpression(fArg, currentState);
-
-				// If f has constraints, the partial result should eventually inherit them
-				if (
-					fResult.type.kind === 'function' &&
-					fResult.type.constraints &&
-					partialFunctionType.kind === 'function'
-				) {
-					partialFunctionType.constraints = (
-						partialFunctionType.constraints || []
-					).concat(fResult.type.constraints);
-
-					for (const constraint of fResult.type.constraints) {
-						if (constraint.kind === 'is') {
-							propagateConstraintToTypeVariable(
-								partialFunctionType,
-								constraint
-							);
-						}
-					}
-				}
-			}
-
-			return createTypeResult(finalPartialType, allEffects, currentState);
-		}
 	} else if (funcType.kind === 'variable') {
-		// If it's a type variable, create a function type and unify
-		if (argTypes.length === 0) {
-			return createTypeResult(funcType, allEffects, currentState);
-		}
-
-		const [paramType, newState] = freshTypeVariable(currentState);
-		currentState = newState;
-		const [returnType, finalState] = freshTypeVariable(currentState);
-		currentState = finalState;
-
-		const freshFunctionType = functionType([paramType], returnType);
-		currentState = unify(funcType, freshFunctionType, currentState, {
-			line: expr.location?.start.line || 1,
-			column: expr.location?.start.column || 1,
-		});
-		currentState = unify(paramType, argTypes[0], currentState, {
-			line: expr.location?.start.line || 1,
-			column: expr.location?.start.column || 1,
-		});
-
-		return createTypeResult(
-			substitute(returnType, currentState.substitution),
-			allEffects,
-			currentState
+		return handleVariableTypeApplication(
+			expr,
+			funcType,
+			argTypes,
+			currentState,
+			allEffects
 		);
 	} else {
 		throw new Error(
@@ -979,20 +133,7 @@ export const typePipeline = (
 		) {
 			// Check that the output of composedType matches the input of nextFuncType
 			if (nextFuncType.type.params.length !== 1) {
-				throw new Error(
-					formatTypeError(
-						functionApplicationError(
-							nextFuncType.type.params[0],
-							nextFuncType.type,
-							0,
-							undefined,
-							{
-								line: expr.location?.start.line || 1,
-								column: expr.location?.start.column || 1,
-							}
-						)
-					)
-				);
+				throw new Error(`Pipeline function must take exactly one parameter`);
 			}
 
 			currentState = unify(
@@ -1010,67 +151,32 @@ export const typePipeline = (
 			const firstConstraints = composedType.type.constraints || [];
 			const secondConstraints = nextFuncType.type.constraints || [];
 
-			// For accessor composition, we want to:
-			// 1. Keep the first accessor's constraint (e.g., α has {@person γ})
-			// 2. Add a nested constraint to the person field (e.g., γ has {@city β})
-
-			// Start with the first function's constraints
-			const mergedConstraints = [...firstConstraints];
-
-			// For the second function, we need to find what field it's accessing
-			// and add a constraint that the person field has that field
-			for (const constraint of secondConstraints) {
-				if (constraint.kind === 'has') {
-					// Find what field the second accessor is trying to access
-					const fieldNames = Object.keys(constraint.structure.fields);
-					if (fieldNames.length === 1) {
-						const _fieldName = fieldNames[0];
-
-						// Find the person field constraint from the first function
-						const personConstraint = firstConstraints.find(
-							c => c.kind === 'has' && c.structure.fields.person
-						);
-
-						if (personConstraint && personConstraint.kind === 'has') {
-							// Add the constraint that the person field has the target field
-							const personFieldType = personConstraint.structure.fields.person;
-							if (personFieldType.kind === 'variable') {
-								// Create a new constraint that the person field has the target field
-								const nestedConstraint = {
-									kind: 'has' as const,
-									typeVar: personFieldType.name,
-									structure: constraint.structure,
-								};
-								mergedConstraints.push(nestedConstraint);
-							}
-						}
-					}
-				}
-			}
-
 			// For accessor composition, we want to create a clean constraint structure
 			// The result should be: α has {person: γ} and γ has {city: β}
-			const uniqueConstraints: Constraint[] = [];
+			const uniqueConstraints: any[] = [];
 
 			// Find the person constraint from the first function
 			const personConstraint = firstConstraints.find(
-				c => c.kind === 'has' && c.structure.fields.person
+				c => c.kind === 'has' && (c as any).structure.fields.person
 			);
 
 			if (personConstraint && personConstraint.kind === 'has') {
 				// Get the person field variable
-				const personFieldType = personConstraint.structure.fields.person;
+				const personFieldType = (personConstraint as any).structure.fields
+					.person;
 				if (personFieldType.kind === 'variable') {
 					// Find what field the second accessor is trying to access
 					for (const constraint of secondConstraints) {
 						if (constraint.kind === 'has') {
-							const fieldNames = Object.keys(constraint.structure.fields);
+							const fieldNames = Object.keys(
+								(constraint as any).structure.fields
+							);
 							if (fieldNames.length === 1) {
 								// Create a constraint that the person field has the target field
 								const nestedConstraint = {
 									kind: 'has' as const,
 									typeVar: personFieldType.name,
-									structure: constraint.structure,
+									structure: (constraint as any).structure,
 								};
 								uniqueConstraints.push(nestedConstraint);
 								break; // Only add the first matching constraint
@@ -1081,12 +187,13 @@ export const typePipeline = (
 			}
 
 			composedType = createTypeResult(
-				constrainedFunctionType(
-					[composedType.type.params[0]],
-					nextFuncType.type.return,
-					allEffects,
-					uniqueConstraints
-				),
+				{
+					kind: 'function',
+					params: [composedType.type.params[0]],
+					return: nextFuncType.type.return,
+					effects: allEffects,
+					constraints: uniqueConstraints,
+				},
 				allEffects,
 				currentState
 			);

@@ -49,6 +49,7 @@ import {
 	type RecordStructure,
 	type StructureFieldType,
 	recordStructure,
+	hasStructureConstraint,
 } from '../ast';
 import * as C from './combinators';
 
@@ -2392,16 +2393,9 @@ const parseAtomicConstraint: C.Parser<ConstraintExpr> = C.choice(
 	),
 	// a has {@name String, @age Float} - Try this first since it has distinct syntax
 	C.map(
-		C.seq(
-			C.identifier(),
-			C.keyword('has'),
-			parseRecordStructure
-		),
-		([typeVar, _has, structure]): ConstraintExpr => ({
-			kind: 'has',
-			typeVar: typeVar.value,
-			structure,
-		})
+		C.seq(C.identifier(), C.keyword('has'), parseRecordStructure),
+		([typeVar, _has, structure]): ConstraintExpr =>
+			hasStructureConstraint(typeVar.value, structure)
 	),
 	// a has field "name" of type T
 	C.map(

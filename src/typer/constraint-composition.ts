@@ -1,4 +1,8 @@
-import type { HasStructureConstraint, StructureFieldType } from '../ast';
+import {
+	hasStructureConstraint,
+	type HasStructureConstraint,
+	type StructureFieldType,
+} from '../ast';
 
 /**
  * Compose two structural constraints to create a nested constraint.
@@ -50,13 +54,9 @@ export function composeStructuralConstraints(
 		}
 	}
 
-	return {
-		kind: 'has',
-		typeVar: innerConstraint.typeVar,
-		structure: {
-			fields: composedFields,
-		},
-	};
+	return hasStructureConstraint(innerConstraint.typeVar, {
+		fields: composedFields,
+	});
 }
 
 /**
@@ -81,11 +81,10 @@ export function extractResultTypeVar(
 
 	if (field.kind === 'nested') {
 		// Recursively extract from nested structure
-		const nestedConstraint: HasStructureConstraint = {
-			kind: 'has',
-			typeVar: 'dummy', // Not used in recursion
-			structure: field.structure,
-		};
+		const nestedConstraint: HasStructureConstraint = hasStructureConstraint(
+			'dummy', // Not used in recursion
+			field.structure
+		);
 		return extractResultTypeVar(nestedConstraint);
 	}
 

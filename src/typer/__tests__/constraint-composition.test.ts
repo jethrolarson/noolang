@@ -2,9 +2,8 @@ import { test, expect } from 'bun:test';
 import {
 	composeStructuralConstraints,
 	extractResultTypeVar,
-	isSimpleFieldConstraint,
 } from '../constraint-composition';
-import type { HasStructureConstraint } from '../../ast';
+import { hasStructureConstraint, type HasStructureConstraint } from '../../ast';
 import {
 	assertNestedStructureFieldType,
 	assertStructureFieldType,
@@ -17,15 +16,11 @@ function hasConstraint(
 	fieldName: string,
 	fieldTypeVar: string
 ): HasStructureConstraint {
-	return {
-		kind: 'has',
-		typeVar,
-		structure: {
-			fields: {
-				[fieldName]: { kind: 'variable', name: fieldTypeVar },
-			},
+	return hasStructureConstraint(typeVar, {
+		fields: {
+			[fieldName]: { kind: 'variable', name: fieldTypeVar },
 		},
-	};
+	});
 }
 
 test('composeStructuralConstraints - basic composition', () => {
@@ -65,16 +60,12 @@ test('composeStructuralConstraints - connection variable not found', () => {
 
 test('composeStructuralConstraints - multiple fields in inner', () => {
 	// person has {address: α, name: γ}
-	const inner: HasStructureConstraint = {
-		kind: 'has',
-		typeVar: 'person',
-		structure: {
-			fields: {
-				address: { kind: 'variable', name: 'α1' },
-				name: { kind: 'variable', name: 'α3' },
-			},
+	const inner: HasStructureConstraint = hasStructureConstraint('person', {
+		fields: {
+			address: { kind: 'variable', name: 'α1' },
+			name: { kind: 'variable', name: 'α3' },
 		},
-	};
+	});
 
 	const outer = hasConstraint('dummy', 'street', 'α2');
 
@@ -105,61 +96,33 @@ test('extractResultTypeVar - simple constraint', () => {
 
 test('extractResultTypeVar - nested constraint', () => {
 	// Create: person has {address: {street: α123}}
-	const constraint: HasStructureConstraint = {
-		kind: 'has',
-		typeVar: 'person',
-		structure: {
-			fields: {
-				address: {
-					kind: 'nested',
-					structure: {
-						fields: {
-							street: { kind: 'variable', name: 'α1' },
-						},
+	const constraint: HasStructureConstraint = hasStructureConstraint('person', {
+		fields: {
+			address: {
+				kind: 'nested',
+				structure: {
+					fields: {
+						street: { kind: 'variable', name: 'α1' },
 					},
 				},
 			},
 		},
-	};
+	});
 
 	const result = extractResultTypeVar(constraint);
 	expect(result).toBe('α1');
 });
 
 test('extractResultTypeVar - multi-field constraint', () => {
-	const constraint: HasStructureConstraint = {
-		kind: 'has',
-		typeVar: 'person',
-		structure: {
-			fields: {
-				street: { kind: 'variable', name: 'α1' },
-				city: { kind: 'variable', name: 'α2' },
-			},
+	const constraint: HasStructureConstraint = hasStructureConstraint('person', {
+		fields: {
+			street: { kind: 'variable', name: 'α1' },
+			city: { kind: 'variable', name: 'α2' },
 		},
-	};
+	});
 
 	const result = extractResultTypeVar(constraint);
 	expect(result).toBe(null); // Multi-field not supported
-});
-
-test('isSimpleFieldConstraint - single field', () => {
-	const constraint = hasConstraint('person', 'street', 'α1');
-	expect(isSimpleFieldConstraint(constraint)).toBe(true);
-});
-
-test('isSimpleFieldConstraint - multiple fields', () => {
-	const constraint: HasStructureConstraint = {
-		kind: 'has',
-		typeVar: 'person',
-		structure: {
-			fields: {
-				street: { kind: 'variable', name: 'α1' },
-				city: { kind: 'variable', name: 'α2' },
-			},
-		},
-	};
-
-	expect(isSimpleFieldConstraint(constraint)).toBe(false);
 });
 
 test('constraint composition integration example', () => {

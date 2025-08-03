@@ -22,7 +22,7 @@ import {
 import { formatTypeError } from './type-errors';
 import { NoolangError } from '../errors';
 import { substitute } from './substitute';
-import type { Effect } from '../ast';
+import { formatEffectsString } from './effects-utils';
 
 type CodeLocation = {
 	line: number;
@@ -44,14 +44,6 @@ export function throwTypeError(
 ): never {
 	const loc = location || { line: 1, column: 1 };
 	throw new Error(formatTypeError(errorFactory(loc)));
-}
-
-// Helper: Format effects as string for type display
-export function formatEffectsString(effects: Set<Effect>): string {
-	if (effects.size === 0) return '';
-	return ` ${Array.from(effects)
-		.map(e => `!${e}`)
-		.join(' ')}`;
 }
 
 // Helper: Create common function types

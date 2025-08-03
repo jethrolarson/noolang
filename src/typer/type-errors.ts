@@ -1,6 +1,6 @@
 import type { Expression, Type } from '../ast';
 import { createError, type NoolangError, type ErrorLocation } from '../errors';
-import { formatEffectsString } from './helpers';
+import { formatEffectsString } from './effects-utils';
 
 export interface TypeErrorContext {
 	expression?: Expression;
