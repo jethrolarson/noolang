@@ -1,6 +1,0 @@
-// Test cases to debug composition
-let record = {@name 'bob'};
-let list = [{@name 'bob'}];
-let accessor = @name;
-let direct = @name {@name 'bob'};
-let mapped = map @name [{@name 'bob'}];
