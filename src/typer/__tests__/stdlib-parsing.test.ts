@@ -61,27 +61,16 @@ test('Stdlib Parsing Regression Tests - should parse stdlib without errors', () 
 	// Read the actual stdlib file
 	const stdlibPath = path.join(__dirname, '../../../stdlib.noo');
 
-	let stdlibExists = false;
-	try {
-		const stdlibContent = fs.readFileSync(stdlibPath, 'utf8');
-		stdlibExists = true;
+	const stdlibContent = fs.readFileSync(stdlibPath, 'utf8');
 
-		// This should not throw
-		const lexer = new Lexer(stdlibContent);
-		const tokens = lexer.tokenize();
-		const program = parse(tokens);
-		expect(program.statements).toBeTruthy();
+	// This should not throw
+	const lexer = new Lexer(stdlibContent);
+	const tokens = lexer.tokenize();
+	const program = parse(tokens);
+	expect(program.statements).toBeTruthy();
 
-		// Should have multiple statements
-		expect(program.statements.length > 0).toBeTruthy();
-	} catch (error) {
-		if (!stdlibExists) {
-			// Skip this test if stdlib doesn't exist
-			console.log('Skipping stdlib parsing test - file not found');
-			return;
-		}
-		throw error;
-	}
+	// Should have multiple statements
+	expect(program.statements.length > 0).toBeTruthy();
 });
 
 test('Stdlib Parsing Regression Tests - should handle type state initialization', () => {

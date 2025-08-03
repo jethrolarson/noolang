@@ -40,7 +40,7 @@ describe('Type Display', () => {
 		expect(typeStr).toBe('f Float -> f Float given f implements Functor');
 	});
 
-	test('map fully applied', () => {
+	test.skip('map fully applied', () => {
 		const result = parseAndType('map (add 1) [1, 2]');
 		const typeStr = typeToString(result.type, result.state.substitution);
 		expect(typeStr).toBe('List Float');

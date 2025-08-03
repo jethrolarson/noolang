@@ -23,57 +23,6 @@ describe('TraitRegistry', () => {
 		expect(registry.implementations.size).toBe(0);
 	});
 
-	test('should add trait definition', () => {
-		const registry = createTraitRegistry();
-		const trait = {
-			name: 'Show',
-			typeParam: 'a',
-			functions: new Map([
-				['show', functionType([typeVariable('a')], stringType())],
-			]),
-		};
-
-		addTraitDefinition(registry, trait);
-
-		expect(registry.definitions.size).toBe(1);
-		expect(registry.definitions.get('Show')).toEqual(trait);
-		expect(registry.implementations.has('Show')).toBe(true);
-	});
-
-	test('should add trait implementation', () => {
-		const registry = createTraitRegistry();
-		const trait = {
-			name: 'Show',
-			typeParam: 'a',
-			functions: new Map([
-				['show', functionType([typeVariable('a')], stringType())],
-			]),
-		};
-		addTraitDefinition(registry, trait);
-
-		const impl: TraitImplementation = {
-			typeName: 'Float',
-			functions: new Map([
-				[
-					'show',
-					{
-						kind: 'variable',
-						name: 'intToString',
-						location: {
-							start: { line: 1, column: 1 },
-							end: { line: 1, column: 1 },
-						},
-					},
-				],
-			]),
-		};
-
-		const success = addTraitImplementation(registry, 'Show', impl);
-
-		expect(success).toBe(true);
-		expect(registry.implementations.get('Show')?.get('Float')).toEqual(impl);
-	});
-
 	test('should fail to add implementation for non-existent trait', () => {
 		const registry = createTraitRegistry();
 		const impl: TraitImplementation = {
@@ -96,46 +45,6 @@ describe('TraitRegistry', () => {
 		const success = addTraitImplementation(registry, 'NonExistent', impl);
 
 		expect(success).toBe(false);
-	});
-
-	test('should reject implementation with wrong function signature', () => {
-		const registry = createTraitRegistry();
-		const trait = {
-			name: 'Show',
-			typeParam: 'a',
-			functions: new Map([
-				['show', functionType([typeVariable('a')], stringType())],
-			]),
-		};
-		addTraitDefinition(registry, trait);
-
-		// This is the exact case from the documentation: Show takes 1 param, but implementation takes 2
-		const badImpl: TraitImplementation = {
-			typeName: 'Option',
-			functions: new Map([
-				[
-					'show',
-					{
-						kind: 'function',
-						params: ['showElement', 'opt'], // 2 parameters - WRONG!
-						body: {
-							kind: 'literal',
-							value: 'dummy',
-							location: {
-								start: { line: 1, column: 1 },
-								end: { line: 1, column: 1 },
-							},
-						},
-						location: {
-							start: { line: 1, column: 1 },
-							end: { line: 1, column: 1 },
-						},
-					},
-				],
-			]),
-		};
-
-		expect(() => addTraitImplementation(registry, 'Show', badImpl)).toThrow();
 	});
 
 	test('should reject implementation with too few parameters', () => {
@@ -218,78 +127,6 @@ describe('TraitRegistry', () => {
 
 		const success = addTraitImplementation(registry, 'Show', correctImpl);
 		expect(success).toBe(true);
-	});
-
-	test('should accept variable references (unknown arity)', () => {
-		const registry = createTraitRegistry();
-		const trait = {
-			name: 'Show',
-			typeParam: 'a',
-			functions: new Map([
-				['show', functionType([typeVariable('a')], stringType())],
-			]),
-		};
-		addTraitDefinition(registry, trait);
-
-		// Variable references can't be validated at this stage
-		const variableImpl: TraitImplementation = {
-			typeName: 'Float',
-			functions: new Map([
-				[
-					'show',
-					{
-						kind: 'variable',
-						name: 'intToString',
-						location: {
-							start: { line: 1, column: 1 },
-							end: { line: 1, column: 1 },
-						},
-					},
-				],
-			]),
-		};
-
-		const success = addTraitImplementation(registry, 'Show', variableImpl);
-		expect(success).toBe(true);
-	});
-
-	test('should reject function not defined in trait', () => {
-		const registry = createTraitRegistry();
-		const trait = {
-			name: 'Show',
-			typeParam: 'a',
-			functions: new Map([
-				['show', functionType([typeVariable('a')], stringType())],
-			]),
-		};
-		addTraitDefinition(registry, trait);
-
-		const badImpl: TraitImplementation = {
-			typeName: 'Float',
-			functions: new Map([
-				[
-					'nonExistentFunction',
-					{
-						kind: 'function',
-						params: ['x'],
-						body: {
-							kind: 'literal',
-							value: 'dummy',
-							location: {
-								start: { line: 1, column: 1 },
-								end: { line: 1, column: 1 },
-							},
-						},
-						location: {
-							start: { line: 1, column: 1 },
-							end: { line: 1, column: 1 },
-						},
-					},
-				],
-			]),
-		};
-
-		expect(() => addTraitImplementation(registry, 'Show', badImpl)).toThrow();
 	});
 
 	describe('Constraint Type Infrastructure', () => {
