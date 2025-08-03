@@ -182,7 +182,30 @@ export const freshenTypeVariables = (
 				mapping,
 				currentState
 			);
-			return [{ ...type, params: newParams, return: newReturn }, finalState];
+			
+			// Handle function-level constraints
+			let newConstraints: Constraint[] | undefined = undefined;
+			if (type.constraints && type.constraints.length > 0) {
+				newConstraints = type.constraints.map(constraint => {
+					// Update constraint variable names using the mapping
+					if ('typeVar' in constraint) {
+						const mappedVar = mapping.get(constraint.typeVar);
+						if (mappedVar && mappedVar.kind === 'variable') {
+							return {
+								...constraint,
+								typeVar: mappedVar.name,
+							};
+						}
+					}
+					return constraint;
+				});
+			}
+			
+			const freshenedFunction = { ...type, params: newParams, return: newReturn };
+			if (newConstraints) {
+				freshenedFunction.constraints = newConstraints;
+			}
+			return [freshenedFunction, finalState];
 		}
 		case 'list': {
 			const [newElem, nextState] = freshenTypeVariables(

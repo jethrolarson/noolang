@@ -23,7 +23,11 @@ function printUsage() {
 	console.log(`       ${colorize.command('noo --types-detailed <expr>')}`);
 	console.log(`       ${colorize.command('noo --types-env <expr>')}`);
 	console.log(`       ${colorize.command('noo --types-ast <expr>')}`);
-	console.log(`       ${colorize.command('noo --symbol-type <file> <symbol>')}`);
+	console.log(`       ${colorize.command('noo --type-ast <expr>')}`);
+	console.log(`       ${colorize.command('noo --type-ast-file <file>')}`);
+	console.log(
+		`       ${colorize.command('noo --symbol-type <file> <symbol>')}`
+	);
 	console.log('');
 	console.log(colorize.section('Examples:'));
 	console.log(`  ${colorize.identifier('noo my_program.noo')}`);
@@ -45,6 +49,10 @@ function printUsage() {
 	);
 	console.log(`  ${colorize.identifier('noo --types-env "fn x => x + 1"')}`);
 	console.log(`  ${colorize.identifier('noo --types-ast "fn x => x + 1"')}`);
+	console.log(`  ${colorize.identifier('noo --type-ast "fn x => x + 1"')}`);
+	console.log(
+		`  ${colorize.identifier('noo --type-ast-file examples/demo.noo')}`
+	);
 	console.log(`  ${colorize.identifier('noo --symbol-type examples/demo.noo factorial')}`);
 	console.log('');
 	console.log(colorize.section('Or use the REPL:'));
@@ -258,6 +266,46 @@ async function main() {
 		return;
 	}
 
+	// Check for --type-ast flag
+	if (args[0] === '--type-ast' && args[1]) {
+		const expr = args[1];
+		try {
+			const lexer = new Lexer(expr);
+			const tokens = lexer.tokenize();
+			const program = parse(tokens);
+			const { program: decoratedProgram, state } = typeAndDecorate(program);
+			console.log('Type AST (what typeAndDecorate returns):');
+			console.log(
+				JSON.stringify({ program: decoratedProgram, state }, null, 2)
+			);
+		} catch (err) {
+			console.error('Error:', (err as Error).message);
+			process.exit(1);
+		}
+		return;
+	}
+
+	// Check for --type-ast-file flag
+	if (args[0] === '--type-ast-file' && args[1]) {
+		const file = args[1];
+		try {
+			const fullPath = path.resolve(file);
+			const code = fs.readFileSync(fullPath, 'utf8');
+			const lexer = new Lexer(code);
+			const tokens = lexer.tokenize();
+			const program = parse(tokens);
+			const { program: decoratedProgram, state } = typeAndDecorate(program);
+			console.log('Type AST (what typeAndDecorate returns):');
+			console.log(
+				JSON.stringify({ program: decoratedProgram, state }, null, 2)
+			);
+		} catch (err) {
+			console.error('Error:', (err as Error).message);
+			process.exit(1);
+		}
+		return;
+	}
+
 	// Check for --symbol-type flag
 	if (args[0] === '--symbol-type' && args[1] && args[2]) {
 		const file = args[1];
@@ -265,19 +313,20 @@ async function main() {
 		try {
 			const fullPath = path.resolve(file);
 			const code = fs.readFileSync(fullPath, 'utf8');
-			
+
 			// Create a program that includes the original file content plus the symbol reference
 			const testExpr = `${symbol}`;
 			const combinedCode = `${code}; ${testExpr}`;
-			
+
 			const lexer = new Lexer(combinedCode);
 			const tokens = lexer.tokenize();
 			const program = parse(tokens);
 			const { program: decoratedProgram, state } = typeAndDecorate(program);
-			
+
 			// Get the type of the last statement (which is our symbol reference)
 			if (decoratedProgram.statements.length > 0) {
-				const lastStmt = decoratedProgram.statements[decoratedProgram.statements.length - 1];
+				const lastStmt =
+					decoratedProgram.statements[decoratedProgram.statements.length - 1];
 				if (lastStmt.type) {
 					const typeStr = typeToString(lastStmt.type, state.substitution);
 					console.log(`Symbol '${symbol}' has type: ${typeStr}`);

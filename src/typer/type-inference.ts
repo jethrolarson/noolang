@@ -118,8 +118,22 @@ export const typeVariableExpr = (
 			// Get the trait function's type and constraint information
 			const traitInfo = getTraitFunctionInfo(state.traitRegistry, expr.name);
 			if (traitInfo) {
-				// Create fresh type variables for the trait function type
-				const typeVarMapping = new Map<string, VariableType>();
+				// Use standard type scheme instantiation instead of manual freshening
+				// First, collect all type variables from the trait function type
+				const typeVars = new Set<string>();
+				collectTypeVariables(traitInfo.functionType, typeVars);
+				
+				// Add the trait type parameter if not already collected
+				typeVars.add(traitInfo.typeParam);
+				
+				// Create a type scheme and instantiate it properly
+				const scheme: TypeScheme = {
+					quantifiedVars: Array.from(typeVars),
+					type: traitInfo.functionType,
+					effects: emptyEffects()
+				};
+				
+				const [freshenedType, state1] = instantiate(scheme, state);
 
 				// Helper function to recursively freshen type variables
 				const freshenType = (
@@ -267,17 +281,22 @@ export const typeVariableExpr = (
 					}
 				};
 
-				const [freshenedType, state1] = freshenType(
-					traitInfo.functionType,
-					state
-				);
-
-				// Create constraints for any type variables that correspond to the trait type parameter
-				// We need to find which freshened type variable corresponds to the original trait type parameter
-				const constraintsMap = new Map<string, Constraint[]>();
 
 				// Find the freshened type variable that corresponds to the trait type parameter
-				const traitTypeParamVar = typeVarMapping.get(traitInfo.typeParam);
+				// Look for variant types in the function signature that represent the trait type parameter
+				let traitTypeParamVar: VariableType | null = null;
+				if (freshenedType.kind === 'function') {
+					// Look for variant types that should be the trait type parameter
+					for (const param of freshenedType.params) {
+						if (param.kind === 'variant') {
+							traitTypeParamVar = { kind: 'variable', name: param.name };
+							break;
+						}
+					}
+					if (!traitTypeParamVar && freshenedType.return.kind === 'variant') {
+						traitTypeParamVar = { kind: 'variable', name: freshenedType.return.name };
+					}
+				}
 				if (traitTypeParamVar && traitTypeParamVar.kind === 'variable') {
 					// Use modern constraint system - put constraints directly on function type
 					if (freshenedType.kind === 'function') {
@@ -2020,8 +2039,6 @@ function generateDepthFirstConstraints(
 				});
 				
 				constraints.push(composedConstraint);
-				console.log(`[DEPTH-FIRST] Generated: ${paramName} has {${innerField}: {${outerField}: ${resultVar}}}`);
-				console.log(`[DEPTH-FIRST] Full constraint:`, JSON.stringify(composedConstraint, null, 2));
 				return; // Don't recurse - we handled the composition
 			}
 		}

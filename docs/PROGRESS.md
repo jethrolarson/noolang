@@ -250,7 +250,8 @@ noolang/
 ```
 
 # Things the human is tracking
-
+- Need to focus on cleanup and simplification of the codebase.
+- Find all TODOs
 - Type and parser errors should show the source code line and the line above and below
 - Imports aren't being inferred correctly
 - What if we have a way for the llm to ask what the type at a particular point in the program is? maybe with a `^` character? Similar to how users can hover over code with the mouse. or maybe just supporting LSP will do that?
@@ -258,4 +259,10 @@ noolang/
 - we're using both camelCase and snake. Everything should be snake.
 - print should be : a -> a given a is Show (maybe log too, or can we just leave that with dumb encoding inferred in host language?)
 - <https://llmstxt.org> may be a model for how to document the language. e.g. https://bun.sh/llms.txt
-- `match {1, False} with ({a} => a)` should be valid
+- Maybe not, I'm not sure ~partial match for tuples should be okay: `match {1, False} with ({a} => a)` should be valid~
+- Add cli flag for outputing the type-ast
+- repl comments shouldn't be typed 
+  ```
+    noolang> # shouldn't output anything
+    ➡ []     : unknown
+  ```

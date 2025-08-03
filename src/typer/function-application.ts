@@ -162,8 +162,9 @@ export function tryResolveConstraints(
 
 			// Check each argument type to see if it has the required structure
 			for (const argType of argTypes) {
-				// Handle both direct record types and type variables that might resolve to records
+				// Handle different container types that might contain records
 				let actualRecordType: RecordType | null = null;
+				
 				if (argType.kind === 'record') {
 					actualRecordType = argType;
 				} else if (argType.kind === 'variable') {
@@ -172,6 +173,30 @@ export function tryResolveConstraints(
 					const substitutedType = substitute(argType, state.substitution);
 					if (substitutedType.kind === 'record') {
 						actualRecordType = substitutedType;
+					}
+				} else if (argType.kind === 'list') {
+					// For list types, check if the element type is a record
+					const elementType = argType.element;
+					if (elementType.kind === 'record') {
+						actualRecordType = elementType;
+					} else if (elementType.kind === 'variable') {
+						const substitutedElement = substitute(elementType, state.substitution);
+						if (substitutedElement.kind === 'record') {
+							actualRecordType = substitutedElement;
+						}
+					}
+				} else if (argType.kind === 'variant') {
+					// For functor types like Maybe a, Option a, etc., check the first type argument
+					if (argType.args.length > 0) {
+						const elementType = argType.args[0];
+						if (elementType.kind === 'record') {
+							actualRecordType = elementType;
+						} else if (elementType.kind === 'variable') {
+							const substitutedElement = substitute(elementType, state.substitution);
+							if (substitutedElement.kind === 'record') {
+								actualRecordType = substitutedElement;
+							}
+						}
 					}
 				}
 
@@ -238,22 +263,25 @@ export function tryResolveConstraints(
 						) {
 							// The return type wasn't substituted, but we have field substitutions
 							// In accessor functions, the return type should match the field type
-							for (const [_fieldName, constraintFieldType] of Object.entries(
-								requiredStructure.fields
-							)) {
-								if (
-									constraintFieldType.kind === 'variable' &&
-									substitution.has(constraintFieldType.name)
-								) {
-									// We found a field type that was substituted
-									const fieldTypeSubstitution = substitution.get(
-										constraintFieldType.name
-									)!;
-									// Also add this to the substitution map for future use
-									substitution.set(resolvedType.name, fieldTypeSubstitution);
-									resolvedType = fieldTypeSubstitution;
-									break;
+							// Handle both simple and nested field constraints
+							function findResultVariable(fields: Record<string, any>): Type | null {
+								for (const [_fieldName, fieldType] of Object.entries(fields)) {
+									if (fieldType.kind === 'variable' && substitution.has(fieldType.name)) {
+										// Found a direct variable that was substituted
+										return substitution.get(fieldType.name)!;
+									} else if (fieldType.kind === 'nested') {
+										// Recursively search nested structure
+										const nestedResult = findResultVariable(fieldType.structure.fields);
+										if (nestedResult) return nestedResult;
+									}
 								}
+								return null;
+							}
+							
+							const resultType = findResultVariable(requiredStructure.fields);
+							if (resultType) {
+								substitution.set(resolvedType.name, resultType);
+								resolvedType = resultType;
 							}
 						}
 						// Merge the local substitution back into the global state
@@ -378,13 +406,11 @@ export const typeApplication = (
 						partialState.substitution
 					);
 					let curriedType: Type = resultType;
-					// Preserve constraints only if the result type is a function
-					if (
-						traitFuncType.constraints &&
-						traitFuncType.constraints.length > 0 &&
-						resultType.kind === 'function'
-					) {
-						// Apply substitution to the constraints to update variable names
+					// Collect constraints from both the trait function and the argument types
+					const allConstraints: Constraint[] = [];
+					
+					// Add trait function constraints (e.g., f implements Functor)
+					if (traitFuncType.constraints && traitFuncType.constraints.length > 0) {
 						const substitutedConstraints = traitFuncType.constraints.map(
 							constraint => {
 								if (constraint.kind === 'implements') {
@@ -393,26 +419,49 @@ export const typeApplication = (
 										partialState.substitution
 									);
 
-									// If the substitution resulted in a variable, use its name
 									if (substitutedVar.kind === 'variable') {
 										return {
 											...constraint,
 											typeVar: substitutedVar.name,
 										};
 									}
-									// If it was substituted to a concrete type, the constraint is resolved
-									// and should not be preserved
 									return null;
 								}
 								return constraint;
 							}
 						);
+						allConstraints.push(...substitutedConstraints.filter(c => c !== null));
+					}
+					
+					// Add constraints from argument types (e.g., a has {@name b} from @name)
+					for (let i = 0; i < argTypes.length; i++) {
+						const argType = argTypes[i];
+						if (argType.kind === 'function' && argType.constraints) {
+							// For now, just propagate the constraints directly with variable substitution
+							const substitutedArgConstraints = argType.constraints.map(constraint => {
+								// Apply substitution to update variable names
+								const substitutedVar = substitute(
+									{ kind: 'variable', name: constraint.typeVar },
+									partialState.substitution
+								);
+								
+								if (substitutedVar.kind === 'variable') {
+									return {
+										...constraint,
+										typeVar: substitutedVar.name,
+									};
+								}
+								return constraint;
+							});
+							allConstraints.push(...substitutedArgConstraints);
+						}
+					}
 
+					// Apply constraints to the result type if it's a function
+					if (resultType.kind === 'function' && allConstraints.length > 0) {
 						curriedType = {
 							...resultType,
-							constraints: (resultType.constraints || []).concat(
-								substitutedConstraints.filter(c => c !== null)
-							),
+							constraints: (resultType.constraints || []).concat(allConstraints),
 						};
 					}
 					return createTypeResult(

@@ -363,7 +363,7 @@ function typeToString(type: Type): string {
 		case 'record':
 			return `{ ${Object.entries(type.fields)
 				.map(([name, fieldType]) => `${name}: ${typeToString(fieldType)}`)
-				.join(' ')} }`;
+				.join(', ')} }`;
 		case 'variant':
 			if (type.args.length === 0) {
 				return type.name;

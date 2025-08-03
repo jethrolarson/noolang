@@ -255,7 +255,7 @@ export function assertVariantType(type: Type): asserts type is VariantType {
 export function assertNestedStructureFieldType(
 	field: StructureFieldType
 ): asserts field is NestedStructureFieldType {
-	if (field.kind === 'nested') {
+	if (field.kind !== 'nested') {
 		throw new Error(`Expected nested structure field, got ${field.kind}`);
 	}
 }
@@ -263,7 +263,7 @@ export function assertNestedStructureFieldType(
 export function assertStructureFieldType(
 	field: StructureFieldType
 ): asserts field is Type {
-	if (field.kind !== 'nested') {
+	if (field.kind === 'nested') {
 		throw new Error(`Expected simple field type, got nested structure`);
 	}
 }
