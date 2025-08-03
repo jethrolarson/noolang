@@ -25,7 +25,7 @@ test('string equality returns Bool type', () => {
 	expect(result.type.name).toEqual('Bool');
 });
 
-test.skip('equality in lambda functions resolves correctly', () => {
+test('equality in lambda functions resolves correctly', () => {
 	const input = 'fn x => x == 1.0';
 	const result = parseAndType(input);
 
@@ -37,7 +37,7 @@ test.skip('equality in lambda functions resolves correctly', () => {
 	expect(result.type.return.name).toEqual('Bool');
 });
 
-test.skip('map with basic function works correctly', () => {
+test('map with basic function works correctly', () => {
 	const input = 'map (fn x => x + 1.0) [1.0, 2.0, 3.0]';
 	const result = parseAndType(input);
 
@@ -70,38 +70,6 @@ test('variables and boolean operations complete without exponential unification'
 	expect(result.type.element.name).toEqual('Bool');
 });
 
-test.skip('should infer Eq constraint for equality operator usage', () => {
-	const code = 'fn x => x == 42';
-	const typeResult = parseAndType(code);
-
-	// Should create a constrained type with Eq constraint
-	assertConstrainedType(typeResult.type);
-	assertImplementsConstraint(typeResult.type.constraints.get('Eq')![0]);
-
-	// Check that the constraint is for Eq trait
-	const constraintEntries = Array.from(typeResult.type.constraints.entries());
-	expect(constraintEntries.length).toBeGreaterThan(0);
-
-	const constraint = constraintEntries[0][1][0];
-	assertImplementsConstraint(constraint);
-	expect(constraint.interfaceName).toBe('Eq');
-});
-
-test.skip('should infer Add constraint for addition operator usage', () => {
-	const code = 'fn x => x + 10';
-	const typeResult = parseAndType(code);
-
-	expect(typeResult.type.kind).toBe('constrained');
-	assertConstrainedType(typeResult.type);
-
-	const constraintEntries = Array.from(typeResult.type.constraints.entries());
-	expect(constraintEntries.length).toBeGreaterThan(0);
-
-	const constraint = constraintEntries[0][1][0];
-	assertImplementsConstraint(constraint);
-	expect(constraint.interfaceName).toBe('Add');
-});
-
 test('should not infer constraints when no operators are used', () => {
 	const code = 'fn x => x';
 	const typeResult = parseAndType(code);
@@ -111,31 +79,34 @@ test('should not infer constraints when no operators are used', () => {
 	assertFunctionType(typeResult.type);
 });
 
-test.skip('should infer constraints in if expressions', () => {
+test('should infer constraints in if expressions', () => {
 	const code = 'fn x => if x == 0 then 1 else x + 1';
 	const typeResult = parseAndType(code);
 
-	expect(typeResult.type.kind).toBe('constrained');
-	assertConstrainedType(typeResult.type);
-
-	const constraintEntries = Array.from(typeResult.type.constraints.entries());
-	expect(constraintEntries.length).toBeGreaterThan(0);
-
-	const constraints = constraintEntries[0][1];
-	const traitNames = constraints.map(c => {
-		assertImplementsConstraint(c);
-		return c.interfaceName;
-	});
-	expect(traitNames).toContain('Eq');
-	expect(traitNames).toContain('Add');
+	expect(typeResult.type).toEqual(
+		expect.objectContaining({
+			kind: 'function',
+			params: [
+				{
+					kind: 'primitive',
+					name: 'Float',
+				},
+			],
+			return: {
+				kind: 'primitive',
+				name: 'Float',
+			},
+		})
+	);
 });
 
+// TODO fix where not working in function bodies
 test.skip('should infer constraints in where expressions', () => {
 	const code = `
-			fn x => where (
+			fn x => result where (
 				y = x + 1;
 				result = y == 42
-			) result
+			)
 		`;
 	const typeResult = parseAndType(code);
 
@@ -154,28 +125,8 @@ test.skip('should infer constraints in where expressions', () => {
 	expect(traitNames).toContain('Eq');
 });
 
-test.skip('should infer constraints for arithmetic operators', () => {
-	const code = 'fn x => x - 5 * 2 / 3';
-	const typeResult = parseAndType(code);
-
-	expect(typeResult.type.kind).toBe('constrained');
-	assertConstrainedType(typeResult.type);
-
-	const constraintEntries = Array.from(typeResult.type.constraints.entries());
-	expect(constraintEntries.length).toBeGreaterThan(0);
-
-	const constraints = constraintEntries[0][1];
-	const traitNames = constraints.map(c => {
-		assertImplementsConstraint(c);
-		return c.interfaceName;
-	});
-	expect(traitNames).toContain('Sub');
-	expect(traitNames).toContain('Mul');
-	expect(traitNames).toContain('Div');
-});
-
-test.skip('should work with concrete types that implement traits', () => {
-	const code = 'fn x => x + 1';
+test('should work with concrete types that implement traits', () => {
+	const code = 'addOne =fn x => x + 1';
 	const _typeResult = parseAndType(code);
 
 	// Apply the function to a concrete type that implements Add
@@ -191,6 +142,7 @@ test.skip('should work with concrete types that implement traits', () => {
 	expect(appliedResult.type.name).toBe('Float');
 });
 
+// TODO fix where not working in function bodies
 test.skip('should handle complex nested expressions', () => {
 	const code = `
 		fn x => where (

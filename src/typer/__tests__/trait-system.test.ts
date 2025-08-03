@@ -28,7 +28,7 @@ import {
 	runCode,
 	assertImplementsConstraint,
 } from '../../../test/utils';
-import { createNumber } from '../../evaluator/evaluator';
+import { createNumber } from '../../evaluator/evaluator-utils';
 
 describe('Trait System', () => {
 	describe('Trait Registry', () => {
@@ -386,24 +386,25 @@ describe('Trait System', () => {
 			expect(() => parseAndType(code)).toThrow();
 		});
 
-		test.skip('should handle partial application with constraint preservation', () => {
-			const code = 'mapIncrement = map (fn x => x + 1)';
+		test('should handle partial application with constraint preservation', () => {
+			const code = 'map (fn x => x + 1)';
 
 			const typeResult = parseAndType(code);
-			assertConstrainedType(typeResult.type);
-			const constraint = Array.from(typeResult.type.constraints.values())[0][0];
-			assertImplementsConstraint(constraint);
-			expect(constraint.interfaceName).toBe('Functor');
-			assertFunctionType(typeResult.type.baseType);
-			assertPrimitiveType(typeResult.type.baseType.return);
-			expect(typeResult.type.baseType.return.name).toBe('Float');
+			assertFunctionType(typeResult.type);
+			assertVariantType(typeResult.type.params[0]);
+			assertPrimitiveType(typeResult.type.params[0].args[0]);
+			expect(typeResult.type.params[0].args[0].name).toBe('Float');
+			assertVariantType(typeResult.type.return);
+			expect(typeResult.type.constraints).toHaveLength(1);
+			assertImplementsConstraint(typeResult.type.constraints![0]);
+			expect(typeResult.type.constraints![0].interfaceName).toBe('Functor');
 		});
 
-		test.skip('should handle nested function applications', () => {
+		test('should handle nested function applications', () => {
 			// This tests multiple constraint resolutions in sequence
 			const code = `
-        increment = fn x => x + 1;
-        double = fn x => x * 2;
+        increment = fn x => add x 1;
+        double = fn x => multiply x 2;
         result = map double (map increment [1, 2, 3])
       `;
 
@@ -436,7 +437,7 @@ describe('Trait System', () => {
 			expect(typeResult.type.name).toBe('Float');
 		});
 
-		test.skip('should integrate with ADT pattern matching', () => {
+		test('should integrate with ADT pattern matching', () => {
 			const code = `
 		handleOption = fn opt => match opt with (
 			Some x => show x;
@@ -579,13 +580,13 @@ describe('Trait System', () => {
 
 		test('should work when same function name exists but for different types', () => {
 			const code = `
-		constraint Printable a ( display: a -> String );
-		constraint Renderable a ( display: a -> String );
-		implement Printable Float ( display = toString );
-		implement Renderable String ( display = fn s => s );
-		intResult = display 42;
-		stringResult = display "hello"
-	`;
+        constraint Printable a ( display: a -> String );
+        constraint Renderable a ( display: a -> String );
+        implement Printable Float ( display = toString );
+        implement Renderable String ( display = fn s => s );
+        intResult = display 42;
+        stringResult = display "hello"
+      `;
 
 			const typeResult = parseAndType(code);
 			assertPrimitiveType(typeResult.type);
@@ -594,7 +595,7 @@ describe('Trait System', () => {
 	});
 
 	describe('Evaluation Integration', () => {
-		test.skip('should evaluate trait functions with stdlib', () => {
+		test('should evaluate trait functions with stdlib', () => {
 			const code = `map (fn x => x + 1) [1, 2, 3]`;
 
 			const { typeResult, evalResult } = runCode(code);

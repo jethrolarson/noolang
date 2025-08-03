@@ -1166,13 +1166,16 @@ const parseApplication: C.Parser<Expression> = tokens => {
 	return parsePostfixFromResult(appResult.value, appResult.remaining);
 };
 
-// --- Multiplicative (*, /) ---
+// --- Multiplicative (*, /, %) ---
 const parseMultiplicative: C.Parser<Expression> = tokens => {
 	const multResult = C.map(
 		C.seq(
 			parseApplication,
 			C.many(
-				C.seq(C.choice(C.operator('*'), C.operator('/')), parseApplication)
+				C.seq(
+					C.choice(C.operator('*'), C.operator('/'), C.operator('%')),
+					parseApplication
+				)
 			)
 		),
 		([left, rest]) => {
@@ -1180,7 +1183,7 @@ const parseMultiplicative: C.Parser<Expression> = tokens => {
 			for (const [op, right] of rest) {
 				result = {
 					kind: 'binary',
-					operator: op.value as '*' | '/',
+					operator: op.value as '*' | '/' | '%',
 					left: result,
 					right,
 					location: result.location,

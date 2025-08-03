@@ -61,7 +61,7 @@ test('Unified Math Trait System (Float-only) - Numeric Trait (supports Float for
 });
 
 // TODO this should type error as there are no implementations of the trait for string
-test.skip('Unified Math Trait System (Float-only) - Numeric Trait (supports Float for -, *, /) - should allow string operations through type-checking', () => {
+test.skip('Unified Math Trait System (Float-only) - Numeric Trait (supports Float for -, *, /) - should prohibit using wrong operators', () => {
 	expect(() => parseAndType('"hello" - "world"')).toThrow();
 	expect(() => parseAndType('"hello" * "world"')).toThrow();
 });

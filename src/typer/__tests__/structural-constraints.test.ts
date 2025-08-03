@@ -228,7 +228,7 @@ describe('Structural Constraints', () => {
 	});
 });
 describe('Pipeline Operator Composition', () => {
-	test('Pipeline Operator Composition - should correctly compose accessors with <| operator', () => {
+	test('should correctly compose accessors with <| operator', () => {
 		// @city <| @person should be equivalent to fn s => (@city (@person s))
 		// This should have type: a -> y given a has {@person b} and b has {@city y}
 		const result = parseAndType('@city <| @person');
@@ -280,7 +280,7 @@ describe('Pipeline Operator Composition', () => {
 		expect(typeString).toMatch(/^a -> \w+ given \w+ has \{@city \w+\}$/);
 	});
 
-	test.skip('Nested Structure Fields - should handle complex nested relationships correctly', () => {
+	test('Nested Structure Fields - should handle complex nested relationships correctly', () => {
 		// Test a case with nested structure fields: a has {@user {@name String, @age Float}}
 		const result = parseAndType(`
       getUserName = (fn obj => @name (@user obj))

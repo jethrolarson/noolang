@@ -221,7 +221,7 @@ The FFI system revealed a dependency chain that requires foundational features:
 2. **Monadic Operators**: `|?` operator for Option/Result chaining (requires traits)
 3. **FFI System**: Foreign function interface with platform adapters (requires Unknown type)
 4. **Optional Accessors**: `@field?` syntax for safe field access returning Options
-5. **Record Type Annotations**: Support `{@name String, @age Number}` syntax
+5. **Record Type Annotations**: Support `{@name String, @age Float}` syntax
 6. **Module System**: Code organization across files
 7. **VSCode Integration**: Language Server Protocol (LSP) for intellisense and hover types
 
@@ -251,18 +251,22 @@ noolang/
 
 # Things the human is tracking
 - Need to focus on cleanup and simplification of the codebase.
+- Need ability to create user types that aren't adts such as `type User = {@name String, @age Float}`
 - Find all TODOs
 - Type and parser errors should show the source code line and the line above and below
 - Imports aren't being inferred correctly
 - What if we have a way for the llm to ask what the type at a particular point in the program is? maybe with a `^` character? Similar to how users can hover over code with the mouse. or maybe just supporting LSP will do that?
 - Need module paths. Having to load everything via relative paths is troublesome
 - we're using both camelCase and snake. Everything should be snake.
-- print should be : a -> a given a is Show (maybe log too, or can we just leave that with dumb encoding inferred in host language?)
 - <https://llmstxt.org> may be a model for how to document the language. e.g. https://bun.sh/llms.txt
 - Maybe not, I'm not sure ~partial match for tuples should be okay: `match {1, False} with ({a} => a)` should be valid~
-- Add cli flag for outputing the type-ast
 - repl comments shouldn't be typed 
   ```
     noolang> # shouldn't output anything
     ➡ []     : unknown
+  ```
+- The way we're doing testing using assertions is really hard for me to understand. We should switch to declarative form like expect(type).toEqual(expect.objectContaining(foo))
+- Shadowing built in types should be prohibited 
+  ```
+  type List a = Cons a (List a) | Nil;
   ```

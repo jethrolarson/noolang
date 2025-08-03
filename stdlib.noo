@@ -25,6 +25,11 @@ constraint Mul a (
   multiply : a -> a -> a
 );
 
+# Constraint for modulus operation
+constraint Modulus a (
+  modulus : a -> a -> a
+);
+
 # Constraint for division operation (returns Option for safety)
 constraint Div a (
   divide : a -> a -> Option Float
@@ -59,6 +64,10 @@ implement Mul Float (
 
 implement Div Float (
   divide = primitive_float_divide
+);
+
+implement Modulus Float (
+  modulus = primitive_float_modulus
 );
 
 # Constraint for monads

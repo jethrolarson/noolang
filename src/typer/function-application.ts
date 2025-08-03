@@ -133,6 +133,7 @@ export const typePipeline = (
 		) {
 			// Check that the output of composedType matches the input of nextFuncType
 			if (nextFuncType.type.params.length !== 1) {
+				// FIXME this case makes no sense. All functions take exactly one parameter
 				throw new Error(`Pipeline function must take exactly one parameter`);
 			}
 

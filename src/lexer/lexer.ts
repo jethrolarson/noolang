@@ -200,6 +200,7 @@ export class Lexer {
 			'+',
 			'-',
 			'*',
+			'%',
 			'/',
 			'<',
 			'>',
@@ -222,7 +223,7 @@ export class Lexer {
 		}
 
 		// If no multi-character operator matched, try single character
-		if (!value && /[+\-*/<>=!|$]/.test(this.peek())) {
+		if (!value && /[+\-*/%<>=!|$]/.test(this.peek())) {
 			value = this.advance();
 		}
 
@@ -308,7 +309,7 @@ export class Lexer {
 				const lookAhead = this.input.slice(this.position);
 				if (lookAhead.match(/^_\s*=>/)) {
 					// Check if preceded by "fn " (function parameter)
-					let precedingStart = Math.max(0, this.position - 10); // Look back further
+					const precedingStart = Math.max(0, this.position - 10); // Look back further
 					const preceding = this.input.slice(precedingStart, this.position);
 					// Check for function context patterns
 					if (preceding.match(/fn\s*$/)) {
@@ -325,7 +326,7 @@ export class Lexer {
 			return this.readNumber();
 		}
 
-		if (/[+\-*/<>=!|$]/.test(char)) {
+		if (/[+\-*/%<>=!|$]/.test(char)) {
 			return this.readOperator();
 		}
 

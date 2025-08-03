@@ -75,6 +75,18 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a'],
 	});
 
+	// Modulo operator - returns Option Float for safety (modulo by zero)
+	const moduloOpType = functionType(
+		[typeVariable('a'), typeVariable('a')],
+		optionType(floatType()),
+		new Set()
+	);
+	moduloOpType.constraints = [implementsConstraint('a', 'Numeric')];
+	newEnv.set('%', {
+		type: moduloOpType,
+		quantifiedVars: ['a'],
+	});
+
 	// Comparison operators
 	newEnv.set('==', {
 		type: functionType([typeVariable('a'), typeVariable('a')], boolType()),
@@ -351,6 +363,12 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 
 	// Primitive Multiply trait implementations for type checking
 	newEnv.set('primitive_float_multiply', {
+		type: createBinaryFunctionType(floatType(), floatType(), floatType()),
+		quantifiedVars: [],
+	});
+
+	// Primitive Modulus trait implementations for type checking
+	newEnv.set('primitive_float_modulus', {
 		type: createBinaryFunctionType(floatType(), floatType(), floatType()),
 		quantifiedVars: [],
 	});

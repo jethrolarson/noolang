@@ -4,7 +4,7 @@ import {
 	createList,
 	createNumber,
 	createString,
-} from '../../evaluator/evaluator';
+} from '../../evaluator/evaluator-utils';
 
 describe('Trait System Evaluation', () => {
 	test('map should work with unary trait functions', () => {

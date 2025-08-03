@@ -24,181 +24,63 @@ import type {
 	MutationExpression,
 } from '../ast';
 import type { TraitRegistry } from '../typer/trait-system';
+import {
+	Value,
+	Cell,
+	isFunction,
+	isNativeFunction,
+	isTraitFunctionValue,
+	createNativeFunction,
+	createFunction,
+	createNumber,
+	createString,
+	createBool,
+	boolValue,
+	createTrue,
+	createFalse,
+	createUnit,
+	createTuple,
+	createConstructor,
+	createList,
+	createRecord,
+	isNumber,
+	isString,
+	isBool,
+	isUnit,
+	isAnyFunction,
+	isList,
+	isRecord,
+	isConstructor,
+	isTuple,
+	isCell,
+	createCell,
+} from './evaluator-utils';
+
+// Re-export commonly used utilities for backward compatibility
+export {
+	type Value,
+	isFunction,
+	isNativeFunction,
+	isTraitFunctionValue,
+	isNumber,
+	isString,
+	isBool,
+	isList,
+	isRecord,
+	isTuple,
+	isUnit,
+	isConstructor,
+	isAnyFunction,
+	boolValue,
+	createFunction,
+	createNativeFunction,
+	createNumber,
+};
 
 import { createError } from '../errors';
 import { formatValue } from '../format';
 import { Lexer } from '../lexer/lexer';
 import { parse } from '../parser/parser';
-
-// Value types (Phase 6: functions and native functions as tagged union)
-export type Value =
-	| NumberValue
-	| StringValue
-	| TupleValue
-	| ListValue
-	| RecordValue
-	| FunctionValue
-	| NativeValue
-	| ConstructorValue
-	| TraitFunctionValue
-	| UnitValue;
-
-export type NumberValue = { tag: 'number'; value: number };
-export type StringValue = { tag: 'string'; value: string };
-export type TupleValue = { tag: 'tuple'; values: Value[] };
-export type ListValue = { tag: 'list'; values: Value[] };
-export type RecordValue = { tag: 'record'; fields: { [key: string]: Value } };
-export type FunctionValue = {
-	tag: 'function';
-	fn: (...args: Value[]) => Value;
-};
-export type NativeValue = { tag: 'native'; name: string; fn: unknown };
-export type ConstructorValue = {
-	tag: 'constructor';
-	name: string;
-	args: Value[];
-};
-export type TraitFunctionValue = {
-	tag: 'trait-function';
-	name: string;
-	traitRegistry: TraitRegistry;
-	partialArgs?: Value[];
-};
-export type UnitValue = { tag: 'unit' };
-
-// --- Mutable Cell type ---
-export type Cell = { cell: true; value: Value };
-export const isCell = (val: any): val is Cell =>
-	val && typeof val === 'object' && val.cell === true && 'value' in val;
-
-export const createCell = (value: Value): Cell => ({ cell: true, value });
-
-export const isNumber = (
-	value: Value
-): value is { tag: 'number'; value: number } => value.tag === 'number';
-
-export const createNumber = (value: number): Value => ({
-	tag: 'number',
-	value,
-});
-
-export const isString = (
-	value: Value
-): value is { tag: 'string'; value: string } => value.tag === 'string';
-
-export const createString = (value: string): Value => ({
-	tag: 'string',
-	value,
-});
-
-export const createTrue = (): Value => ({
-	tag: 'constructor',
-	name: 'True',
-	args: [],
-});
-
-export const createFalse = (): Value => ({
-	tag: 'constructor',
-	name: 'False',
-	args: [],
-});
-
-export const createBool = (value: boolean): Value =>
-	createConstructor(value ? 'True' : 'False', []);
-
-export const isBool = (
-	value: Value
-): value is { tag: 'constructor'; name: 'True' | 'False'; args: [] } =>
-	value.tag === 'constructor' &&
-	(value.name === 'True' || value.name === 'False');
-
-export const boolValue = (value: Value): boolean => {
-	if (value.tag === 'constructor' && value.name === 'True') return true;
-	if (value.tag === 'constructor' && value.name === 'False') return false;
-	throw new Error(`Expected Bool constructor, got ${value.tag}`);
-};
-
-export const isList = (
-	value: Value
-): value is { tag: 'list'; values: Value[] } => value.tag === 'list';
-
-export const createList = (values: Value[]): Value => ({ tag: 'list', values });
-
-export const isRecord = (
-	value: Value
-): value is { tag: 'record'; fields: { [key: string]: Value } } =>
-	value.tag === 'record';
-
-export const createRecord = (fields: { [key: string]: Value }): Value => ({
-	tag: 'record',
-	fields,
-});
-
-export const isFunction = (
-	value: Value
-): value is { tag: 'function'; fn: (...args: Value[]) => Value } =>
-	value.tag === 'function';
-
-export const createFunction = (fn: (...args: Value[]) => Value): Value => ({
-	tag: 'function',
-	fn,
-});
-
-export const isNativeFunction = (
-	value: Value
-): value is { tag: 'native'; name: string; fn: (...args: Value[]) => Value } =>
-	value.tag === 'native';
-
-// using `any` because we don't know the curried arity of the function. They all eventually return `Value`
-export const createNativeFunction = (
-	name: string,
-	fn: (a: Value) => Value | ((b: Value) => any)
-): Value => ({
-	tag: 'native',
-	name,
-	fn: (arg: Value) => {
-		const result = fn(arg);
-		// If the result is a function, wrap it as a native function
-		if (typeof result === 'function') {
-			return createNativeFunction(`${name}_partial`, result);
-		}
-		return result;
-	},
-});
-
-export const isTuple = (
-	value: Value
-): value is { tag: 'tuple'; values: Value[] } => value.tag === 'tuple';
-
-export const createTuple = (values: Value[]): Value => ({
-	tag: 'tuple',
-	values,
-});
-
-export const isUnit = (value: Value): value is { tag: 'unit' } =>
-	value.tag === 'unit';
-
-export const createUnit = (): Value => ({ tag: 'unit' });
-
-export const isConstructor = (
-	value: Value
-): value is { tag: 'constructor'; name: string; args: Value[] } =>
-	value.tag === 'constructor';
-
-export const createConstructor = (name: string, args: Value[]): Value => ({
-	tag: 'constructor',
-	name,
-	args,
-});
-
-export const isTraitFunctionValue = (
-	value: Value
-): value is {
-	tag: 'trait-function';
-	name: string;
-	traitRegistry: TraitRegistry;
-	partialArgs?: Value[];
-} => value.tag === 'trait-function';
 
 export type ExecutionStep = {
 	expression: string;
@@ -223,11 +105,9 @@ const flattenStatements = (expr: Expression): Expression[] => {
 	return [expr];
 };
 
-// Helper function to apply either regular or native functions
+// Helper function to apply any kind of function (regular, native, or trait functions)
 function applyValueFunction(func: Value, arg: Value): Value {
-	if (isFunction(func)) {
-		return func.fn(arg);
-	} else if (isNativeFunction(func)) {
+	if (isFunction(func) || isNativeFunction(func)) {
 		return func.fn(arg);
 	}
 	throw new Error(
@@ -293,6 +173,27 @@ export class Evaluator {
 				if (isNumber(a) && isNumber(b)) return createNumber(a.value * b.value);
 				throw new Error(
 					`Cannot multiply ${a?.tag || 'unit'} and ${b?.tag || 'unit'}`
+				);
+			})
+		);
+		this.environment.set(
+			'%',
+			createNativeFunction('%', (a: Value) => (b: Value) => {
+				if (isNumber(a) && isNumber(b)) {
+					if (b.value === 0) {
+						const error = createError(
+							'RuntimeError',
+							'Division by zero',
+							undefined,
+							`${a.value} % ${b.value}`,
+							'Check that the divisor is not zero before dividing'
+						);
+						throw error;
+					}
+					return createNumber(a.value % b.value);
+				}
+				throw new Error(
+					`Cannot modulus ${a?.tag || 'unit'} and ${b?.tag || 'unit'}`
 				);
 			})
 		);
@@ -386,7 +287,11 @@ export class Evaluator {
 		this.environment.set(
 			'|',
 			createNativeFunction('|', (value: Value) => (func: Value) => {
-				if (isFunction(func)) return func.fn(value);
+				if (isFunction(func) || isNativeFunction(func)) {
+					return func.fn(value);
+				} else if (isTraitFunctionValue(func)) {
+					return this.applyTraitFunctionWithValues(func, [value]);
+				}
 				throw new Error(
 					`Cannot apply non-function in thrush: ${func?.tag || 'unit'}`
 				);
@@ -397,8 +302,31 @@ export class Evaluator {
 		this.environment.set(
 			'|>',
 			createNativeFunction('|>', (f: Value) => (g: Value) => {
-				if (isFunction(f) && isFunction(g)) {
-					return createFunction((x: Value) => g.fn(f.fn(x)));
+				if (isAnyFunction(f) && isAnyFunction(g)) {
+					return createFunction((x: Value) => {
+						// Apply f to x
+						let intermediate: Value;
+						if (isFunction(f) || isNativeFunction(f)) {
+							intermediate = f.fn(x);
+						} else if (isTraitFunctionValue(f)) {
+							intermediate = this.applyTraitFunctionWithValues(f, [x]);
+						} else {
+							throw new Error(
+								`Invalid function type in composition: ${(f as any).tag}`
+							);
+						}
+
+						// Apply g to the result
+						if (isFunction(g) || isNativeFunction(g)) {
+							return g.fn(intermediate);
+						} else if (isTraitFunctionValue(g)) {
+							return this.applyTraitFunctionWithValues(g, [intermediate]);
+						} else {
+							throw new Error(
+								`Invalid function type in composition: ${(g as any).tag}`
+							);
+						}
+					});
 				}
 				throw new Error(
 					`Cannot compose non-functions: ${f?.tag || 'unit'} and ${
@@ -412,9 +340,33 @@ export class Evaluator {
 		this.environment.set(
 			'<|',
 			createNativeFunction('<|', (f: Value) => (g: Value) => {
-				if (isFunction(f) && isFunction(g)) {
-					return createFunction((x: Value) => f.fn(g.fn(x)));
+				if (isAnyFunction(f) && isAnyFunction(g)) {
+					return createFunction((x: Value) => {
+						// Apply g to x first
+						let intermediate: Value;
+						if (isFunction(g) || isNativeFunction(g)) {
+							intermediate = g.fn(x);
+						} else if (isTraitFunctionValue(g)) {
+							intermediate = this.applyTraitFunctionWithValues(g, [x]);
+						} else {
+							throw new Error(
+								`Invalid function type in composition: ${(g as Value).tag}`
+							);
+						}
+
+						// Apply f to the result
+						if (isFunction(f) || isNativeFunction(f)) {
+							return f.fn(intermediate);
+						} else if (isTraitFunctionValue(f)) {
+							return this.applyTraitFunctionWithValues(f, [intermediate]);
+						} else {
+							throw new Error(
+								`Invalid function type in composition: ${(f as Value).tag}`
+							);
+						}
+					});
 				}
+
 				throw new Error(
 					`Cannot compose non-functions: ${f?.tag || 'unit'} and ${
 						g?.tag || 'unit'
@@ -517,9 +469,6 @@ export class Evaluator {
 						// Use the trait registry to resolve the function for each item's type
 						return createList(
 							list.values.map((item: Value) => {
-								// Get the type name of the item
-								const itemTypeName = this.getValueTypeName(item);
-
 								// Resolve the trait function for this specific type
 								const resolved = this.resolveTraitFunctionWithArgs(
 									func.name,
@@ -1409,74 +1358,65 @@ export class Evaluator {
 	private evaluatePipeline(expr: PipelineExpression): Value {
 		// Pipeline should be function composition, not function application
 		// For a pipeline like f |> g |> h, we want to compose them as h(g(f(x)))
+		// For a pipeline like f <| g <| h, we want to compose them as f(g(h(x)))
 
 		if (expr.steps.length === 1) {
 			return this.evaluateExpression(expr.steps[0]);
 		}
 
+		// Determine composition direction based on operators
+		const isLeftToRight = expr.operators.every(op => op === '|>');
+		const isRightToLeft = expr.operators.every(op => op === '<|');
+
+		if (!isLeftToRight && !isRightToLeft) {
+			throw new Error(
+				`Cannot mix pipeline operators |> and <| in the same expression`
+			);
+		}
+
+		// For right-to-left composition (<|), reverse the steps
+		const steps = isRightToLeft ? [...expr.steps].reverse() : expr.steps;
+
 		// Start with the first function
-		let composed = this.evaluateExpression(expr.steps[0]);
+		let composed = this.evaluateExpression(steps[0]);
 
 		// Compose with each subsequent function
-		for (let i = 1; i < expr.steps.length; i++) {
-			const nextFunc = this.evaluateExpression(expr.steps[i]);
+		for (let i = 1; i < steps.length; i++) {
+			const nextFunc = this.evaluateExpression(steps[i]);
 
-			if (isFunction(composed) && isFunction(nextFunc)) {
+			if (isAnyFunction(composed) && isAnyFunction(nextFunc)) {
+				// Capture the current composed function to avoid infinite recursion
+				const currentComposed = composed;
 				// Compose: nextFunc(composed(x))
-				const composedFn = composed as {
-					tag: 'function';
-					fn: (...args: Value[]) => Value;
-				};
-				const nextFuncFn = nextFunc as {
-					tag: 'function';
-					fn: (...args: Value[]) => Value;
-				};
-				composed = createFunction((x: Value) =>
-					nextFuncFn.fn(composedFn.fn(x))
-				);
-			} else if (isNativeFunction(composed) && isNativeFunction(nextFunc)) {
-				// Compose: nextFunc(composed(x))
-				const composedFn = composed as {
-					tag: 'native';
-					name: string;
-					fn: (...args: Value[]) => Value;
-				};
-				const nextFuncFn = nextFunc as {
-					tag: 'native';
-					name: string;
-					fn: (...args: Value[]) => Value;
-				};
-				composed = createFunction((x: Value) =>
-					nextFuncFn.fn(composedFn.fn(x))
-				);
-			} else if (isFunction(composed) && isNativeFunction(nextFunc)) {
-				// Compose: nextFunc(composed(x))
-				const composedFn = composed as {
-					tag: 'function';
-					fn: (...args: Value[]) => Value;
-				};
-				const nextFuncFn = nextFunc as {
-					tag: 'native';
-					name: string;
-					fn: (...args: Value[]) => Value;
-				};
-				composed = createFunction((x: Value) =>
-					nextFuncFn.fn(composedFn.fn(x))
-				);
-			} else if (isNativeFunction(composed) && isFunction(nextFunc)) {
-				// Compose: nextFunc(composed(x))
-				const composedFn = composed as {
-					tag: 'native';
-					name: string;
-					fn: (...args: Value[]) => Value;
-				};
-				const nextFuncFn = nextFunc as {
-					tag: 'function';
-					fn: (...args: Value[]) => Value;
-				};
-				composed = createFunction((x: Value) =>
-					nextFuncFn.fn(composedFn.fn(x))
-				);
+				composed = createFunction((x: Value) => {
+					// Apply currentComposed to x
+					let intermediate: Value;
+					if (
+						isFunction(currentComposed) ||
+						isNativeFunction(currentComposed)
+					) {
+						intermediate = currentComposed.fn(x);
+					} else if (isTraitFunctionValue(currentComposed)) {
+						intermediate = this.applyTraitFunctionWithValues(currentComposed, [
+							x,
+						]);
+					} else {
+						throw new Error(
+							`Invalid function type in pipeline: ${(currentComposed as any).tag}`
+						);
+					}
+
+					// Apply nextFunc to the result
+					if (isFunction(nextFunc) || isNativeFunction(nextFunc)) {
+						return nextFunc.fn(intermediate);
+					} else if (isTraitFunctionValue(nextFunc)) {
+						return this.applyTraitFunctionWithValues(nextFunc, [intermediate]);
+					} else {
+						throw new Error(
+							`Invalid function type in pipeline: ${(nextFunc as any).tag}`
+						);
+					}
+				});
 			} else {
 				throw new Error(
 					`Cannot compose non-functions in pipeline: ${valueToString(
@@ -1518,7 +1458,7 @@ export class Evaluator {
 			const right = this.evaluateExpression(expr.right);
 
 			// Check that right operand is a function
-			if (!isFunction(right) && !isNativeFunction(right)) {
+			if (!isAnyFunction(right)) {
 				throw new Error(
 					`Cannot apply non-function in safe thrush: ${valueToString(right)}`
 				);
@@ -1551,33 +1491,89 @@ export class Evaluator {
 
 			if (isFunction(left) || isNativeFunction(left)) {
 				return left.fn(right);
+			} else if (isTraitFunctionValue(left)) {
+				return this.applyTraitFunctionWithValues(left, [right]);
 			} else {
 				throw new Error(
 					`Cannot apply non-function in dollar operator: ${valueToString(left)}`
 				);
 			}
 		} else if (expr.operator === '|>') {
-			// Left-to-right composition: evaluate left first, then right
+			// Left-to-right composition: f |> g means g(f(x))
 			const left = this.evaluateExpression(expr.left);
 			const leftVal = isCell(left) ? left.value : left;
 			const right = this.evaluateExpression(expr.right);
 			const rightVal = isCell(right) ? right.value : right;
 
-			// Left-to-right: g(f(x))
-			return createFunction((x: Value) =>
-				applyValueFunction(rightVal, applyValueFunction(leftVal, x))
-			);
+			if (!isAnyFunction(leftVal) || !isAnyFunction(rightVal)) {
+				throw new Error(
+					`Both operands of |> must be functions, got ${leftVal.tag} and ${rightVal.tag}`
+				);
+			}
+
+			// Left-to-right composition: g(f(x))
+			return createFunction((x: Value) => {
+				// Apply left function first
+				let intermediate: Value;
+				if (isFunction(leftVal) || isNativeFunction(leftVal)) {
+					intermediate = leftVal.fn(x);
+				} else if (isTraitFunctionValue(leftVal)) {
+					intermediate = this.applyTraitFunctionWithValues(leftVal, [x]);
+				} else {
+					throw new Error(
+						`Invalid function type in |> composition: ${(leftVal as any).tag}`
+					);
+				}
+
+				// Apply right function to the result
+				if (isFunction(rightVal) || isNativeFunction(rightVal)) {
+					return rightVal.fn(intermediate);
+				} else if (isTraitFunctionValue(rightVal)) {
+					return this.applyTraitFunctionWithValues(rightVal, [intermediate]);
+				} else {
+					throw new Error(
+						`Invalid function type in |> composition: ${(rightVal as any).tag}`
+					);
+				}
+			});
 		} else if (expr.operator === '<|') {
-			// Right-to-left composition: evaluate right first, then left
-			const right = this.evaluateExpression(expr.right);
-			const rightVal = isCell(right) ? right.value : right;
+			// Right-to-left composition: f <| g means f(g(x))
 			const left = this.evaluateExpression(expr.left);
 			const leftVal = isCell(left) ? left.value : left;
+			const right = this.evaluateExpression(expr.right);
+			const rightVal = isCell(right) ? right.value : right;
 
-			// Right-to-left: f(g(x)) - for 'left <| right'
-			return createFunction((x: Value) =>
-				applyValueFunction(leftVal, applyValueFunction(rightVal, x))
-			);
+			if (!isAnyFunction(leftVal) || !isAnyFunction(rightVal)) {
+				throw new Error(
+					`Both operands of <| must be functions, got ${leftVal.tag} and ${rightVal.tag}`
+				);
+			}
+
+			// Right-to-left composition: f(g(x))
+			return createFunction((x: Value) => {
+				// Apply right function first
+				let intermediate: Value;
+				if (isFunction(rightVal) || isNativeFunction(rightVal)) {
+					intermediate = rightVal.fn(x);
+				} else if (isTraitFunctionValue(rightVal)) {
+					intermediate = this.applyTraitFunctionWithValues(rightVal, [x]);
+				} else {
+					throw new Error(
+						`Invalid function type in <| composition: ${(rightVal as any).tag}`
+					);
+				}
+
+				// Apply left function to the result
+				if (isFunction(leftVal) || isNativeFunction(leftVal)) {
+					return leftVal.fn(intermediate);
+				} else if (isTraitFunctionValue(leftVal)) {
+					return this.applyTraitFunctionWithValues(leftVal, [intermediate]);
+				} else {
+					throw new Error(
+						`Invalid function type in <| composition: ${(leftVal as any).tag}`
+					);
+				}
+			});
 		} else {
 			// Handle other binary operators (arithmetic, comparison, etc.)
 			const left = this.evaluateExpression(expr.left);
@@ -1679,6 +1675,33 @@ export class Evaluator {
 				}
 				throw new Error(
 					`Cannot divide ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`
+				);
+			}
+
+			if (expr.operator === '%') {
+				if (isNumber(leftVal) && isNumber(rightVal)) {
+					if (rightVal.value === 0) {
+						return createConstructor('None', []); // None for modulo by zero
+					}
+					return createConstructor('Some', [
+						createNumber(leftVal.value % rightVal.value),
+					]); // Some(result)
+				}
+				// For complex types, try trait resolution
+				if (this.isTraitFunction('modulus')) {
+					try {
+						const result = this.resolveTraitFunctionWithArgs(
+							'modulus',
+							[leftVal, rightVal],
+							this.traitRegistry
+						);
+						return result;
+					} catch (_e) {
+						// Fall through to error
+					}
+				}
+				throw new Error(
+					`Cannot modulus ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`
 				);
 			}
 
@@ -2123,10 +2146,7 @@ export class Evaluator {
 
 	private getValueTypeName(value: Value): string {
 		// Get a type name from a runtime value for constraint resolution
-		if (isNumber(value)) {
-			// Distinguish between Float and Float based on whether it's an integer
-			return Number.isInteger(value.value) ? 'Float' : 'Float';
-		}
+		if (isNumber(value)) return 'Float';
 		if (isString(value)) return 'String';
 		if (isBool(value)) return 'Bool';
 		if (isList(value)) return 'List';
@@ -2385,10 +2405,6 @@ export class Evaluator {
 				traitFunc.traitRegistry
 			);
 		}
-	}
-
-	private ensureEnvironment(): Environment {
-		return this.environment;
 	}
 }
 

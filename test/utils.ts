@@ -57,8 +57,8 @@ import type {
 	StructureFieldType,
 	NestedStructureFieldType,
 } from '../src/ast';
+import type { ProgramResult } from '../src/evaluator/evaluator';
 import type {
-	ProgramResult,
 	Value,
 	ConstructorValue,
 	NativeValue,
@@ -70,7 +70,7 @@ import type {
 	TupleValue,
 	NumberValue,
 	StringValue,
-} from '../src/evaluator/evaluator';
+} from '../src/evaluator/evaluator-utils';
 import type {
 	ParseError,
 	ParseResult,

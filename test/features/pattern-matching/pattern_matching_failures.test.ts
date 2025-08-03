@@ -1,4 +1,4 @@
-import { test, expect } from 'bun:test';
+import { test, expect, describe } from 'bun:test';
 import { runCode } from '../../utils';
 /**
  * PATTERN MATCHING FAILURES - TYPE SYSTEM LIMITATION
@@ -20,55 +20,56 @@ import { runCode } from '../../utils';
  * to support parametric pattern matching. This is a known limitation that
  * requires substantial type system development work.
  */
-
-test.skip('should handle parametric ADT pattern matching', () => {
-	// FIXME: Currently fails with "Pattern expects constructor but got α"
-	const code = `
+describe('Pattern Matching Failures', () => {
+	test('should handle parametric ADT pattern matching', () => {
+		// FIXME: Currently fails with "Pattern expects constructor but got α"
+		const code = `
       type Point a = Point a a;
       get_x = fn point => match point with (Point x y => x);
       origin = Point 0 0;
       get_x origin
     `;
-	const result = runCode(code);
-	expect(result.finalValue).toBe(0);
-});
+		const result = runCode(code);
+		expect(result.finalValue).toBe(0);
+	});
 
-test.skip('should handle Option pattern matching in functions', () => {
-	// FIXME: Currently fails with "Pattern expects constructor but got α"
-	const code = `
+	test('should handle Option pattern matching in functions', () => {
+		// FIXME: Currently fails with "Pattern expects constructor but got α"
+		const code = `
       handle_option = fn opt => match opt with (
         Some value => value * 2;
         None => 0
       );
       handle_option (Some 21)
     `;
-	const result = runCode(code);
-	expect(result.finalValue).toBe(42);
-});
+		const result = runCode(code);
+		expect(result.finalValue).toBe(42);
+	});
 
-test.skip('should handle Result pattern matching', () => {
-	// FIXME: Currently fails with "Pattern expects constructor but got α"
-	const code = `
+	test('should handle Result pattern matching', () => {
+		// FIXME: Currently fails with "Pattern expects constructor but got α"
+		const code = `
       handle_result = fn res => match res with (
         Ok value => value + 10;
         Err msg => 0
       );
       handle_result (Ok 32)
     `;
-	const result = runCode(code);
-	expect(result.finalValue).toBe(42);
-});
+		const result = runCode(code);
+		expect(result.finalValue).toBe(42);
+	});
 
-test.skip('should handle complex Shape pattern matching', () => {
-	// FIXME: Currently fails with "Pattern expects constructor but got α"
-	const code = `
-      type Shape = Circle Number | Rectangle Number Number;
+	test('should handle complex Shape pattern matching', () => {
+		// FIXME: Currently fails with "Pattern expects constructor but got α"
+		const code = `
+      type Shape = Circle Float | Rectangle Float Float;
       calculate_area = fn shape => match shape with (
         Circle radius => radius * radius * 3;
         Rectangle width height => width * height
       );
       calculate_area (Circle 5)
     `;
-	const result = runCode(code);
-	expect(result.finalValue).toBe(75);
+		const result = runCode(code);
+		expect(result.finalValue).toBe(75);
+	});
 });

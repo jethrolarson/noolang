@@ -23,16 +23,16 @@ Noolang is a principled, expression-based language designed for LLM-assisted and
 
 * **Sequences**: Type annotations apply to the expression immediately preceding them
   ```noolang
-  a = 1; b = 2; c = 3 : Number  # Only c = 3 is Number
+  a = 1; b = 2; c = 3 : Float  # Only c = 3 is Float
   ```
 * **Parentheses**: Group expressions to apply type to the whole group
   ```noolang
-  a = (1; 2; 3) : Number  # Only the final expression '3' is Number
+  a = (1; 2; 3) : Float  # Only the final expression '3' is Float
   ```
 * **Nested annotations**: Can annotate subexpressions within sequences
   ```noolang
   (
-    1 : Number;
+    1 : Float;
     False : Boolean;
     "foo" : String
   ) : String  # Each subexpression checked, final type is String
@@ -40,24 +40,24 @@ Noolang is a principled, expression-based language designed for LLM-assisted and
 
 #### **Primitive Types**
 
-* `Number`, `Bool`, `String`
-* Type constructors: `List T`, `Tuple T1 T2`, `Record { name: String age: Number }` (planned)
+* `Float`, `Bool`, `String`
+* Type constructors: `List T`, `Tuple T1 T2`, `Record { name: String age: Float }` (planned)
 * `unit` represents the unit type (empty value)
 
 #### **Data Structure Type Annotations**
 
 * **Tuples**: Require type for each slot
   ```noolang
-  pair = {1, 2} : {Number, Number}  # ✅ Correct
-  triple = {1, 2, 3} : Number       # ❌ Error - tuples need types for each slot
+  pair = {1, 2} : {Float, Float}  # ✅ Correct
+  triple = {1, 2, 3} : {Float}       # ❌ Error - tuples need types for each slot
   ```
 * **Records**: Require type for each field
   ```noolang
-  person = {@name "Alice", @age 30} : {@name String, @age Number}
+  person = {@name "Alice", @age 30} : {@name String, @age Float}
   ```
 * **Lists**: Type applies to element type
   ```noolang
-  numbers = [1, 2, 3] : [Number]
+  numbers = [1, 2, 3] : [Float]
   ```
 
 #### **Polymorphism**
@@ -80,7 +80,7 @@ Noolang now supports **type constraints** for more expressive and safe generic p
 
 * **✅ Constraint System**: Fully implemented with Hindley-Milner style inference
 * **✅ Constraint Propagation**: Constraints are properly propagated through function composition
-* **✅ Built-in Constraints**: `Collection`, `Number`, `String`, `Boolean`, `Show`, `List`, `Record`, `Function`
+* **✅ Built-in Constraints**: `Collection`, `Float`, `String`, `Boolean`, `Show`, `List`, `Record`, `Function`
 * **✅ Constraint Validation**: Type checker enforces constraints during unification
 * **✅ Error Reporting**: Clear error messages when constraints are violated
 
@@ -189,7 +189,7 @@ Constraints are currently embedded in function types and propagated automaticall
 # Built-in functions with constraints
 head : List a -> a given a is Collection
 tail : List a -> List a given a is Collection
-length : List a -> Number given a is Collection
+length : List a -> Float given a is Collection
 
 # Constraint propagation works through composition
 compose = fn f g => fn x => f (g x)
@@ -418,8 +418,8 @@ content = match result with (
 Explicit conversion from any type to `Unknown`:
 
 ```noolang
-myNumber = 42;                    # myNumber: Float
-dynamic = forget myNumber;        # dynamic: Unknown
+myFloat = 42;                    # myFloat: Float
+dynamic = forget myFloat;        # dynamic: Unknown
 refined = match dynamic with (
   Float n => n * 2;
   _ => 0
@@ -554,7 +554,7 @@ custom = ffi "myplatform" "some.api";         # Returns Unknown
 * **Expression-level type annotations**: ✅ `(expr : type)` syntax fully implemented and working
 * **Type Variables**: ✅ Proper unification to concrete types (shows `(Float) -> Float` not `t1 -> t2`)
 * **Effect Annotations**: ✅ Parser fully supports `!effect` syntax (Phase 1 complete)
-* **Record Type Annotations**: ❌ Parser doesn't support `{ name: String, age: Number }` yet
+* **Record Type Annotations**: ❌ Parser doesn't support `{ name: String, age: Float }` yet
 * **Type Constructors**: ❌ `List T`, `Tuple T1 T2` not implemented yet
 * **Constraint Annotations**: ❌ `given` syntax not implemented yet (constraints work automatically)
 
@@ -608,7 +608,7 @@ Extract values from tuples by position:
 {one, two} = {1, True}  # one = 1, two = True
 
 # With type annotations
-{first: Number, second: String} = {42, "hello"}  # first = 42, second = "hello"
+{first: Float, second: String} = {42, "hello"}  # first = 42, second = "hello"
 
 # Nested destructuring (future)
 {outer: {inner, rest}} = {outer: {1, 2}, rest: 3}

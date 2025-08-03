@@ -479,4 +479,17 @@ test('Parser - should parse minus operator (non-adjacent)', () => {
 	assertLiteralExpression(binary.right);
 	expect(binary.right.value).toBe(5);
 });
+test('Parser - should parse % operator', () => {
+	const lexer = new Lexer('10 % 5');
+	const tokens = lexer.tokenize();
+	const program = parse(tokens);
+	expect(program.statements.length).toBe(1);
+	const binary = program.statements[0];
+	assertBinaryExpression(binary);
+	expect(binary.operator).toBe('%');
+	assertLiteralExpression(binary.left);
+	expect(binary.left.value).toBe(10);
+	assertLiteralExpression(binary.right);
+	expect(binary.right.value).toBe(5);
+});
 

@@ -218,6 +218,7 @@ export interface BinaryExpression {
 		| '-'
 		| '*'
 		| '/'
+		| '%'
 		| '=='
 		| '!='
 		| '<'

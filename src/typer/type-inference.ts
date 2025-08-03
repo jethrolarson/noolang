@@ -1003,7 +1003,7 @@ export const typeBinary = (
 	// Get operator type from environment
 	const operatorScheme = currentState.environment.get(expr.operator);
 	if (!operatorScheme) {
-		throw new Error(`Unknown operator: ${expr.operator}`);
+		throw new Error(`Unknown operator inferred: ${expr.operator}`);
 	}
 
 	const [operatorType, newState] = instantiate(operatorScheme, currentState);
