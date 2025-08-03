@@ -29,7 +29,7 @@ describe('Constraint Collapse', () => {
 		);
 
 		expect(typeString).toBe(
-			'(α126 -> α127) -> α128 α126 -> α128 α127 given α128 implements Functor'
+			'(α130 -> α131) -> α132 α130 -> α132 α131 given α132 implements Functor'
 		);
 	});
 	test('map should work with unary trait functions', () => {

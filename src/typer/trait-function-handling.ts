@@ -60,7 +60,7 @@ export function handleTraitFunctionApplication(
 			// For trait functions, we need to check if we have enough arguments to fully apply the function
 			// For curried functions like `add : a -> a -> a`, we need to check if the return type is still a function
 			// after applying the arguments
-			let isFullyApplied = false;
+			let isFullyApplied: boolean = false;
 			let currentFuncType = traitFuncType;
 			let remainingArgs = argTypes.length;
 
@@ -73,6 +73,9 @@ export function handleTraitFunctionApplication(
 				currentFuncType = currentFuncType.return as FunctionType;
 			}
 
+			// For trait functions, we need to check if we have enough arguments to fully apply the function
+			// For curried functions like `add : a -> a -> a`, we need to check if the return type is still a function
+			// after applying the arguments
 			// If we've applied all arguments and the result is not a function, it's fully applied
 			isFullyApplied =
 				remainingArgs === 0 && currentFuncType.kind !== 'function';
