@@ -191,6 +191,15 @@ export const createConstructor = (name: string, args: Value[]): Value => ({
 	args,
 });
 
+export const isTraitFunctionValue = (
+	value: Value
+): value is {
+	tag: 'trait-function';
+	name: string;
+	traitRegistry: TraitRegistry;
+	partialArgs?: Value[];
+} => value.tag === 'trait-function';
+
 export type ExecutionStep = {
 	expression: string;
 	result: Value;
@@ -498,10 +507,30 @@ export class Evaluator {
 		this.environment.set(
 			'list_map',
 			createNativeFunction('list_map', (func: Value) => (list: Value) => {
-				if ((isFunction(func) || isNativeFunction(func)) && isList(list)) {
-					return createList(
-						list.values.map((item: Value) => applyValueFunction(func, item))
-					);
+				if (isList(list)) {
+					if (isFunction(func) || isNativeFunction(func)) {
+						return createList(
+							list.values.map((item: Value) => applyValueFunction(func, item))
+						);
+					} else if (isTraitFunctionValue(func)) {
+						// For trait functions, we need to resolve them for each item
+						// Use the trait registry to resolve the function for each item's type
+						return createList(
+							list.values.map((item: Value) => {
+								// Get the type name of the item
+								const itemTypeName = this.getValueTypeName(item);
+
+								// Resolve the trait function for this specific type
+								const resolved = this.resolveTraitFunctionWithArgs(
+									func.name,
+									[item],
+									func.traitRegistry
+								);
+
+								return resolved;
+							})
+						);
+					}
 				}
 				throw new Error(createHOFError('list_map', ['a function', 'a list']));
 			})

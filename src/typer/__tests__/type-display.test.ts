@@ -18,7 +18,20 @@ describe('Type Display', () => {
 	test('map trait type', () => {
 		const result = parseAndType('map');
 		const typeStr = typeToString(result.type, result.state.substitution);
-		expect(typeStr).toBe('(a -> b) -> f a -> f b given f implements Functor');
+		expect(typeStr).toBe('(a -> b) -> c a -> c b given c implements Functor');
+	});
+
+	test('map trait type raw type variable names', () => {
+		const result = parseAndType('map');
+		const typeStr = typeToString(
+			result.type,
+			result.state.substitution,
+			true,
+			false
+		);
+		expect(typeStr).toBe(
+			'(α126 -> α127) -> α128 α126 -> α128 α127 given α128 implements Functor'
+		);
 	});
 
 	test('map partially applied', () => {

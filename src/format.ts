@@ -28,15 +28,15 @@ export function formatValue(value: Value): string {
 		return boolValue(value) ? 'True' : 'False';
 	}
 	if (isList(value)) {
-		return `[${value.values.map(formatValue).join('; ')}]`;
+		return `[${value.values.map(formatValue).join(', ')}]`;
 	}
 	if (isTuple(value)) {
-		return `{${value.values.map(formatValue).join('; ')}}`;
+		return `{${value.values.map(formatValue).join(', ')}}`;
 	}
 	if (isRecord(value)) {
 		return `{${Object.entries(value.fields)
 			.map(([k, v]) => `@${k} ${formatValue(v)}`)
-			.join('; ')}}`;
+			.join(', ')}}`;
 	}
 	if (isFunction(value)) {
 		return '<function>';

@@ -258,18 +258,44 @@ export const freshenTypeVariables = (
 			return [{ ...type, types: newTypes }, currentState];
 		}
 		case 'variant': {
-			let currentState = state;
-			const newArgs: Type[] = [];
-			for (const arg of type.args) {
-				const [newArg, nextState] = freshenTypeVariables(
-					arg,
-					mapping,
-					currentState
-				);
-				newArgs.push(newArg);
-				currentState = nextState;
+			// Check if this variant name is actually a type parameter that should be freshened
+			const mappedVar = mapping.get(type.name);
+			if (mappedVar && mappedVar.kind === 'variable') {
+				// This variant represents a type parameter, replace it with the fresh type variable
+				let currentState = state;
+				const newArgs: Type[] = [];
+				for (const arg of type.args) {
+					const [newArg, nextState] = freshenTypeVariables(
+						arg,
+						mapping,
+						currentState
+					);
+					newArgs.push(newArg);
+					currentState = nextState;
+				}
+				return [
+					{
+						kind: 'variant',
+						name: mappedVar.name,
+						args: newArgs,
+					},
+					currentState,
+				];
+			} else {
+				// This is a concrete variant type (Bool, Option, etc.), just freshen the args
+				let currentState = state;
+				const newArgs: Type[] = [];
+				for (const arg of type.args) {
+					const [newArg, nextState] = freshenTypeVariables(
+						arg,
+						mapping,
+						currentState
+					);
+					newArgs.push(newArg);
+					currentState = nextState;
+				}
+				return [{ ...type, args: newArgs }, currentState];
 			}
-			return [{ ...type, args: newArgs }, currentState];
 		}
 		default:
 			return [type, state];
