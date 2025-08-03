@@ -184,13 +184,19 @@ function getContainerArgIndex(
 
 	// Find which parameter contains the trait's type parameter
 	const traitTypeParam = traitDef.typeParam;
-	
+
 	// Check each parameter to see if it contains the trait type parameter
 	for (let i = 0; i < functionType.params.length; i++) {
 		const param = functionType.params[i];
 		if (containsTypeParameter(param, traitTypeParam)) {
 			return i;
 		}
+	}
+
+	// Special case: if trait type parameter is only in return type (like pure: a -> m a)
+	// return -1 to indicate we should look at return type context
+	if (containsTypeParameter(functionType.return, traitTypeParam)) {
+		return -1; // Special value meaning "check return type"
 	}
 
 	return 0; // fallback
@@ -232,6 +238,7 @@ export function resolveTraitFunction(
 	traitName?: string;
 	typeName?: string;
 	impl?: Expression;
+	needsConstraint?: boolean;
 } {
 	if (argTypes.length === 0) {
 		return { found: false };
@@ -240,12 +247,16 @@ export function resolveTraitFunction(
 	// Determine which argument contains the container type based on the function signature
 	const containerArgIndex = getContainerArgIndex(registry, functionName);
 
-	// Special handling for 'pure' function - we need to look at the return type
+	// Special handling for functions where trait type parameter is in return type (like 'pure')
 	if (containerArgIndex === -1) {
-		// For 'pure', we need to determine the monad type from context
-		// This is more complex and may require looking at the expected return type
-		// For now, return not found and let the type system handle it
-		return { found: false };
+		// For these functions, we can't determine the implementation from arguments alone
+		// but we should still create a constrained type
+		// Return a special marker that indicates we need constraint handling
+		return {
+			found: false,
+			needsConstraint: true,
+			traitName: registry.functionTraits.get(functionName)?.[0], // Get the trait name
+		};
 	}
 
 	// Get the container type from the appropriate argument

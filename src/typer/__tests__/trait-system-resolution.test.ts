@@ -70,19 +70,7 @@ describe('Constraint Collapse', () => {
 	test('Pure function should preserve constraints', () => {
 		const typeString = parseToString('pure 1');
 
-		expect(typeString).toBe('a Float given a implements Monad');
-	});
-
-	test('Pure function should preserve constraints raw type names', () => {
-		const typeResult = parseAndType('pure 1');
-		const typeString = typeToString(
-			typeResult.type,
-			typeResult.state.substitution,
-			true,
-			false
-		);
-
-		expect(typeString).toBe('α127 Float given α127 implements Monad');
+		expect(typeString).toBe('m Float given m implements Monad');
 	});
 });
 

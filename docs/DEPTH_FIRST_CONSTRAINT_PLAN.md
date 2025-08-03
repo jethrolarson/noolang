@@ -22,8 +22,21 @@
 
 ## Root Cause Analysis
 
-### Primary Issue: Incorrect Trait Function Resolution for Lists
-The `resolveTraitFunction` function in `src/typer/trait-system.ts:162-220` has a fundamental flaw:
+### Primary Issue: Eager Constraint Resolution Architecture
+The fundamental architectural flaw is that constraint resolution is **eager** instead of **lazy and incremental**:
+
+```typescript
+// CURRENT (BROKEN): Try to resolve all constraints immediately
+pure 1 → Try to find specific Monad implementation → Fail → Return unconstrained type
+
+// SHOULD BE: Create constrained types, resolve incrementally
+pure 1 → Return "α Float given α implements Monad" → Resolve α later when context provides concrete type
+```
+
+**Core Principle**: Constraint resolution should be **partial and incremental** - only resolve type variables that have concrete information available, preserve constraints for abstract variables.
+
+### Secondary Issue: Incorrect Trait Function Resolution for Lists
+The `resolveTraitFunction` function in `src/typer/trait-system.ts:162-220` has a flaw:
 
 ```typescript
 // CURRENT (BROKEN): Only looks at first argument
@@ -37,7 +50,7 @@ const firstArgTypeName = getTypeName(argTypes[0]);
 
 **Evidence**: All failing tests show the same pattern - getting `f Float` instead of `List Float`, indicating the trait system can't resolve the List implementation.
 
-### Secondary Issue: Constraint Preservation in Partial Application
+### Tertiary Issue: Constraint Preservation in Partial Application
 When trait functions are partially applied, the constraints are not being preserved correctly:
 
 ```typescript
@@ -48,7 +61,7 @@ mapIncrement = map (fn x => x + 1) // Returns: function type
 mapIncrement = map (fn x => x + 1) // Should return: constrained type with Functor constraint
 ```
 
-### Tertiary Issue: Structural Constraint Integration
+### Quaternary Issue: Structural Constraint Integration
 The depth-first constraint plan was partially implemented but structural constraints are not integrating properly with trait functions:
 
 ```typescript
@@ -60,6 +73,25 @@ map @name [{@name 'bob'}] // Should return: List String
 ```
 
 ## Recovery Plan
+
+### Phase 0: Implement Lazy Constraint Resolution (Priority 0 - Foundational)
+**Goal**: Change constraint resolution from eager to lazy/incremental architecture
+
+**Core Changes**:
+1. **Always create constrained types** for trait functions based on their signatures
+2. **Resolve incrementally** - only substitute type variables with concrete types available
+3. **Preserve constraints** for abstract type variables until more context arrives
+4. **Defer resolution** until assignment, unification, or evaluation boundary
+
+**Files to modify**:
+- `src/typer/trait-function-handling.ts` - Always return constrained types, never fall back to unconstrained
+- `src/typer/constraint-resolution.ts` - Implement partial/incremental resolution
+- `src/typer/trait-system.ts` - Remove eager resolution failures
+
+**Tests to fix**:
+- `pure 1` should return `α Float given α implements Monad`
+- `map f` should return `f a -> f b given f implements Functor` 
+- All trait functions should preserve constraints when resolution fails
 
 ### Phase 1: Fix Trait Function Resolution (Priority 1)
 **Goal**: Make `map (fn x => x + 1) [1, 2, 3]` return `List Float` instead of `f Float`

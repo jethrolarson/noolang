@@ -437,7 +437,7 @@ function handleFullTraitFunctionApplication(
 			);
 		}
 	} else if (resolution.found === false) {
-		// No trait implementation found - check if this is polymorphic
+		// No trait implementation found - create constrained type based on trait function signature
 		let funcName = 'unknown';
 		if (expr.func.kind === 'variable') {
 			funcName = expr.func.name;
@@ -445,6 +445,101 @@ function handleFullTraitFunctionApplication(
 			// For nested applications, try to extract the function name from the inner application
 			if (expr.func.func.kind === 'variable') {
 				funcName = expr.func.func.name;
+			}
+		}
+
+		// Check if this is a special case that needs constraint handling (like pure)
+		if (resolution.needsConstraint && resolution.traitName) {
+			// Create constrained type based on trait function signature
+			// This implements Phase 0: Lazy constraint resolution
+
+			// Get trait function info to build constrained type
+			const traitInfo = getTraitFunctionInfo(
+				currentState.traitRegistry,
+				funcName
+			);
+			if (traitInfo) {
+				// Freshen type variables in the trait function type to avoid conflicts
+				const mapping = new Map<string, Type>();
+				const freeVars = new Set<string>();
+
+				const collectVars = (type: Type) => {
+					if (type.kind === 'variable') {
+						freeVars.add(type.name);
+					} else if (type.kind === 'function') {
+						type.params.forEach(collectVars);
+						collectVars(type.return);
+					}
+				};
+				collectVars(traitInfo.functionType);
+
+				// Create fresh variables for each free variable
+				let freshState = currentState;
+				for (const varName of freeVars) {
+					const [freshVar, newState] = freshTypeVariable(freshState);
+					mapping.set(varName, freshVar);
+					freshState = newState;
+				}
+
+				const [freshenedTraitFuncType, freshenedState] = freshenTypeVariables(
+					traitInfo.functionType,
+					mapping,
+					freshState
+				);
+
+				if (freshenedTraitFuncType.kind === 'function') {
+					// Unify arguments with trait function parameters
+					let resultState = freshenedState;
+					for (
+						let i = 0;
+						i < argTypes.length && i < freshenedTraitFuncType.params.length;
+						i++
+					) {
+						resultState = unify(
+							freshenedTraitFuncType.params[i],
+							argTypes[i],
+							resultState,
+							{
+								line: expr.location?.start.line || 1,
+								column: expr.location?.start.column || 1,
+							}
+						);
+					}
+
+					// Create constrained return type with trait constraint preserved
+					let resultType = substitute(
+						freshenedTraitFuncType.return,
+						resultState.substitution
+					);
+
+					// Preserve the trait constraint from the function type
+					const constraints = freshenedTraitFuncType.constraints || [];
+					if (constraints.length > 0) {
+						// Create a Map for the constrained type structure
+						const constraintMap = new Map<string, Constraint[]>();
+
+						// Group constraints by type variable
+						for (const constraint of constraints) {
+							if (constraint.kind === 'implements') {
+								const typeVar = constraint.typeVar;
+								const existing = constraintMap.get(typeVar) || [];
+								existing.push(constraint);
+								constraintMap.set(typeVar, existing);
+							}
+						}
+
+						// Create new constrained type with proper Map structure
+						if (constraintMap.size > 0) {
+							resultType = {
+								kind: 'constrained',
+								baseType: resultType,
+								constraints: constraintMap,
+							};
+						}
+					}
+
+					return createTypeResult(resultType, new Set(), resultState);
+				}
 			}
 		}
 
