@@ -1863,10 +1863,6 @@ function generateDepthFirstConstraints(
 		} else if (e.kind === 'binary') {
 			analyzeExpression(e.left);
 			analyzeExpression(e.right);
-		} else if (e.kind === 'conditional') {
-			analyzeExpression(e.condition);
-			analyzeExpression(e.then);
-			analyzeExpression(e.else);
 		}
 		// Add other cases as needed
 	}

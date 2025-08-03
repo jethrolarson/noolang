@@ -22,7 +22,6 @@ function printUsage() {
 	console.log(`       ${colorize.command('noo --types-file <file>')}`);
 	console.log(`       ${colorize.command('noo --types-detailed <expr>')}`);
 	console.log(`       ${colorize.command('noo --types-env <expr>')}`);
-	console.log(`       ${colorize.command('noo --types-ast <expr>')}`);
 	console.log(`       ${colorize.command('noo --type-ast <expr>')}`);
 	console.log(`       ${colorize.command('noo --type-ast-file <file>')}`);
 	console.log(
@@ -48,12 +47,13 @@ function printUsage() {
 		`  ${colorize.identifier('noo --types-detailed "fn x => x + 1"')}`
 	);
 	console.log(`  ${colorize.identifier('noo --types-env "fn x => x + 1"')}`);
-	console.log(`  ${colorize.identifier('noo --types-ast "fn x => x + 1"')}`);
 	console.log(`  ${colorize.identifier('noo --type-ast "fn x => x + 1"')}`);
 	console.log(
 		`  ${colorize.identifier('noo --type-ast-file examples/demo.noo')}`
 	);
-	console.log(`  ${colorize.identifier('noo --symbol-type examples/demo.noo factorial')}`);
+	console.log(
+		`  ${colorize.identifier('noo --symbol-type examples/demo.noo factorial')}`
+	);
 	console.log('');
 	console.log(colorize.section('Or use the REPL:'));
 	console.log(`  ${colorize.identifier('noo')}`);
@@ -242,23 +242,6 @@ async function main() {
 			// if the user wants to keep this functionality.
 			// For now, we'll just print the type environment.
 			console.log(JSON.stringify(state.substitution, null, 2));
-		} catch (err) {
-			console.error('Error:', (err as Error).message);
-			process.exit(1);
-		}
-		return;
-	}
-
-	// Check for --types-ast flag
-	if (args[0] === '--types-ast' && args[1]) {
-		const expr = args[1];
-		try {
-			const lexer = new Lexer(expr);
-			const tokens = lexer.tokenize();
-			const program = parse(tokens);
-			const { program: decoratedProgram } = typeAndDecorate(program);
-			console.log('Typed AST:');
-			console.log(JSON.stringify(decoratedProgram, null, 2));
 		} catch (err) {
 			console.error('Error:', (err as Error).message);
 			process.exit(1);

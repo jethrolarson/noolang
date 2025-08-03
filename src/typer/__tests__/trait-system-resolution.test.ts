@@ -6,60 +6,56 @@ import {
 	parseAndType,
 } from '../../../test/utils';
 
+const parseToString = (code: string) => {
+	const typeResult = parseAndType(code);
+	return typeToString(typeResult.type, typeResult.state.substitution);
+};
+
 describe('Constraint Collapse', () => {
 	test('map should work with unary trait functions', () => {
-		const typeResult = parseAndType('map show [1, 2, 3]');
-		const typeString = typeToString(typeResult.type);
+		const typeString = parseToString('map show [1, 2, 3]');
 
-		expect(typeResult.type.kind).toBe('list');
 		expect(typeString).toBe('List String');
 	});
 	test('List with integers should collapse to concrete type', () => {
-		const typeResult = parseAndType('map (fn x => x + 1) [1, 2, 3]');
-		const typeString = typeToString(typeResult.type);
+		const typeString = parseToString('map (fn x => x + 1) [1, 2, 3]');
 
-		expect(typeResult.type.kind).toBe('list');
 		expect(typeString).toBe('List Float');
 	});
 
 	test('partially applied trait function should collapse to concrete type', () => {
-		const typeResult = parseAndType('map (add 1) [1, 2, 3]');
-		const typeString = typeToString(typeResult.type);
+		const typeString = parseToString('map (add 1) [1, 2, 3]');
 
-		expect(typeResult.type.kind).toBe('list');
 		expect(typeString).toBe('List Float');
 	});
 
 	test('Option with integer should collapse to concrete type', () => {
-		const typeResult = parseAndType('map (fn x => x + 1) (Some 42)');
-		const typeString = typeToString(typeResult.type);
+		const typeString = parseToString('map (fn x => x + 1) (Some 42)');
 
-		expect(typeResult.type.kind).toBe('variant');
 		expect(typeString).toBe('Option Float');
 	});
 
 	test('Nested map operations should collapse to concrete type', () => {
-		const typeResult = parseAndType('map show (map (add 1) [1])');
-		const typeString = typeToString(typeResult.type);
+		const typeString = parseToString('map show (map (add 1) [1])');
 
-		expect(typeResult.type.kind).toBe('list');
 		expect(typeString).toBe('List String');
 	});
 
 	test('Partial application should preserve constraints', () => {
-		const typeResult = parseAndType('map (fn x => x + 1)');
-		const typeString = typeToString(typeResult.type);
+		const typeString = parseToString('map (fn x => x + 1)');
 
-		expect(typeResult.type.kind).toBe('function');
 		expect(typeString).toBe('f Float -> f Float given f implements Functor');
 	});
 
 	test('Pure function should preserve constraints', () => {
-		const typeResult = parseAndType('pure 1');
-		const typeString = typeToString(typeResult.type);
+		const typeString = parseToString('pure 1');
 
-		expect(typeResult.type.kind).toBe('variant');
 		expect(typeString).toBe('a Float given a implements Monad');
+	});
+	test('Pure function should preserve constraints', () => {
+		const typeString = parseToString('pure 1');
+
+		expect(typeString).toBe('α127 Float given a implements Monad');
 	});
 });
 

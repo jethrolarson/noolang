@@ -1152,7 +1152,6 @@ npm run start -- --types "fn x => x + 1"
 npm run start -- --types-file examples/demo.noo
 npm run start -- --types-detailed "fn x => x + 1"
 npm run start -- --types-env "fn x => x + 1"
-npm run start -- --types-ast "fn x => x + 1"
 npm run start -- --type-ast "fn x => x + 1"
 npm run start -- --type-ast-file examples/demo.noo
 

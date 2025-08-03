@@ -408,9 +408,12 @@ export const typeApplication = (
 					let curriedType: Type = resultType;
 					// Collect constraints from both the trait function and the argument types
 					const allConstraints: Constraint[] = [];
-					
+
 					// Add trait function constraints (e.g., f implements Functor)
-					if (traitFuncType.constraints && traitFuncType.constraints.length > 0) {
+					if (
+						traitFuncType.constraints &&
+						traitFuncType.constraints.length > 0
+					) {
 						const substitutedConstraints = traitFuncType.constraints.map(
 							constraint => {
 								if (constraint.kind === 'implements') {
@@ -430,29 +433,33 @@ export const typeApplication = (
 								return constraint;
 							}
 						);
-						allConstraints.push(...substitutedConstraints.filter(c => c !== null));
+						allConstraints.push(
+							...substitutedConstraints.filter(c => c !== null)
+						);
 					}
-					
+
 					// Add constraints from argument types (e.g., a has {@name b} from @name)
 					for (let i = 0; i < argTypes.length; i++) {
 						const argType = argTypes[i];
 						if (argType.kind === 'function' && argType.constraints) {
 							// For now, just propagate the constraints directly with variable substitution
-							const substitutedArgConstraints = argType.constraints.map(constraint => {
-								// Apply substitution to update variable names
-								const substitutedVar = substitute(
-									{ kind: 'variable', name: constraint.typeVar },
-									partialState.substitution
-								);
-								
-								if (substitutedVar.kind === 'variable') {
-									return {
-										...constraint,
-										typeVar: substitutedVar.name,
-									};
+							const substitutedArgConstraints = argType.constraints.map(
+								constraint => {
+									// Apply substitution to update variable names
+									const substitutedVar = substitute(
+										{ kind: 'variable', name: constraint.typeVar },
+										partialState.substitution
+									);
+
+									if (substitutedVar.kind === 'variable') {
+										return {
+											...constraint,
+											typeVar: substitutedVar.name,
+										};
+									}
+									return constraint;
 								}
-								return constraint;
-							});
+							);
 							allConstraints.push(...substitutedArgConstraints);
 						}
 					}
@@ -461,7 +468,9 @@ export const typeApplication = (
 					if (resultType.kind === 'function' && allConstraints.length > 0) {
 						curriedType = {
 							...resultType,
-							constraints: (resultType.constraints || []).concat(allConstraints),
+							constraints: (resultType.constraints || []).concat(
+								allConstraints
+							),
 						};
 					}
 					return createTypeResult(
