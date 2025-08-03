@@ -158,77 +158,6 @@ export function getTypeName(type: Type): string {
 	}
 }
 
-// Helper function to determine which argument contains the container type
-// Derived from the trait definition by finding where the trait's type parameter appears
-function getContainerArgIndex(
-	registry: TraitRegistry,
-	functionName: string,
-): number {
-	// Find the trait definition for this function
-	const definingTraits = registry.functionTraits.get(functionName) || [];
-	if (definingTraits.length === 0) {
-		return 0; // fallback
-	}
-
-	// Use the first trait that defines this function
-	const traitName = definingTraits[0];
-	const traitDef = registry.definitions.get(traitName);
-	if (!traitDef) {
-		return 0; // fallback
-	}
-
-	const functionType = traitDef.functions.get(functionName);
-	if (!functionType || functionType.kind !== 'function') {
-		return 0; // fallback
-	}
-
-	// Find which parameter contains the trait's type parameter
-	const traitTypeParam = traitDef.typeParam;
-
-	// Check each parameter to see if it contains the trait type parameter
-	for (let i = 0; i < functionType.params.length; i++) {
-		const param = functionType.params[i];
-		if (containsTypeParameter(param, traitTypeParam)) {
-			return i;
-		}
-	}
-
-	// Special case: if trait type parameter is only in return type (like pure: a -> m a)
-	// return -1 to indicate we should look at return type context
-	if (containsTypeParameter(functionType.return, traitTypeParam)) {
-		return -1; // Special value meaning "check return type"
-	}
-
-	return 0; // fallback
-}
-
-// Helper to check if a type contains a specific type parameter
-function containsTypeParameter(type: Type, paramName: string): boolean {
-	switch (type.kind) {
-		case 'variable':
-			return type.name === paramName;
-		case 'variant':
-			// Check if the variant name is the type parameter
-			if (type.name === paramName) {
-				return true;
-			}
-			// Check arguments recursively
-			return type.args.some(arg => containsTypeParameter(arg, paramName));
-		case 'function':
-			// Check parameters and return type
-			return type.params.some(param => containsTypeParameter(param, paramName)) ||
-				   containsTypeParameter(type.return, paramName);
-		case 'list':
-			return containsTypeParameter(type.element, paramName);
-		case 'tuple':
-			return type.elements.some(element => containsTypeParameter(element, paramName));
-		case 'record':
-			return Object.values(type.fields).some(field => containsTypeParameter(field, paramName));
-		default:
-			return false;
-	}
-}
-
 export function resolveTraitFunction(
 	registry: TraitRegistry,
 	functionName: string,
@@ -244,73 +173,135 @@ export function resolveTraitFunction(
 		return { found: false };
 	}
 
-	// Determine which argument contains the container type based on the function signature
-	const containerArgIndex = getContainerArgIndex(registry, functionName);
-
-	// Special handling for functions where trait type parameter is in return type (like 'pure')
-	if (containerArgIndex === -1) {
-		// For these functions, we can't determine the implementation from arguments alone
-		// but we should still create a constrained type
-		// Return a special marker that indicates we need constraint handling
-		return {
-			found: false,
-			needsConstraint: true,
-			traitName: registry.functionTraits.get(functionName)?.[0], // Get the trait name
-		};
-	}
-
-	// Get the container type from the appropriate argument
-	const containerArgType = argTypes[containerArgIndex];
-	const containerTypeName = getTypeName(containerArgType);
-
-	if (!containerTypeName) {
+	// Get the trait that defines this function
+	const definingTraits = registry.functionTraits.get(functionName) || [];
+	if (definingTraits.length === 0) {
 		return { found: false };
 	}
 
-	// Find all traits that define this function and have implementations for this type
+	// For now, use the first trait that defines this function
+	// TODO: Handle ambiguous cases where multiple traits define the same function
+	const traitName = definingTraits[0];
+	const traitDef = registry.definitions.get(traitName);
+	if (!traitDef) {
+		return { found: false };
+	}
+
+	const functionType = traitDef.functions.get(functionName);
+	if (!functionType || functionType.kind !== 'function') {
+		return { found: false };
+	}
+
+	// Try to find a concrete implementation by examining all argument types
+	// Look for any argument that has a concrete type we can dispatch on
 	const candidateImplementations: Array<{
 		traitName: string;
+		typeName: string;
 		impl: Expression;
 	}> = [];
 
-	// Search through all traits to find implementations
-	for (const [traitName, traitDef] of registry.definitions) {
-		if (traitDef.functions.has(functionName)) {
-			// Check if we have an implementation for this type
-			const traitImpls = registry.implementations.get(traitName);
-			if (traitImpls) {
-				const impl = traitImpls.get(containerTypeName);
-				if (impl && impl.functions.has(functionName)) {
-					candidateImplementations.push({
-						traitName,
-						impl: impl.functions.get(functionName)!,
-					});
+	// Check each argument type to see if we can find a concrete implementation
+	for (const argType of argTypes) {
+		const typeName = getTypeName(argType);
+		if (typeName && typeName !== 'variable') {
+			// Check ALL traits that define this function for implementations for this type
+			for (const candidateTraitName of definingTraits) {
+				const traitImpls = registry.implementations.get(candidateTraitName);
+				if (traitImpls) {
+					const impl = traitImpls.get(typeName);
+					if (impl && impl.functions.has(functionName)) {
+						candidateImplementations.push({
+							traitName: candidateTraitName,
+							typeName,
+							impl: impl.functions.get(functionName)!,
+						});
+					}
 				}
 			}
 		}
 	}
 
-	// Check for ambiguity - multiple traits providing implementations for the same type
-	if (candidateImplementations.length > 1) {
-		const traitNames = candidateImplementations.map(c => c.traitName);
+	// Remove duplicates (same implementation found via different arguments)
+	const uniqueImplementations = candidateImplementations.filter(
+		(impl, index, array) =>
+			array.findIndex(
+				other =>
+					other.traitName === impl.traitName && other.typeName === impl.typeName
+			) === index
+	);
+
+	// Check for ambiguity - multiple different implementations
+	if (uniqueImplementations.length > 1) {
+		const typeNames = uniqueImplementations.map(c => c.typeName);
 		throw new Error(
-			`Ambiguous function call '${functionName}' for type '${containerTypeName}': ` +
-				`multiple implementations found in traits: ${traitNames.join(', ')}. ` +
+			`Ambiguous function call '${functionName}': ` +
+				`multiple implementations found for types: ${typeNames.join(', ')}. ` +
 				`Cannot determine which implementation to use.`
 		);
 	}
 
-	if (candidateImplementations.length === 1) {
-		const candidate = candidateImplementations[0];
+	if (uniqueImplementations.length === 1) {
+		const candidate = uniqueImplementations[0];
 		return {
 			found: true,
 			traitName: candidate.traitName,
-			typeName: containerTypeName,
+			typeName: candidate.typeName,
 			impl: candidate.impl,
 		};
 	}
 
-	return { found: false };
+	// No concrete implementation found - check if we should error or create constraint
+	// For functions where the trait type parameter is in the return type (like pure: a -> m a),
+	// we can't dispatch on arguments, so always create constrained type
+	const traitTypeParam = traitDef.typeParam;
+	
+	// Helper to check if a type contains the trait type parameter
+	const containsTypeParameter = (type: Type, paramName: string): boolean => {
+		switch (type.kind) {
+			case 'variable':
+				return type.name === paramName;
+			case 'variant':
+				return type.name === paramName || type.args.some(arg => containsTypeParameter(arg, paramName));
+			case 'function':
+				return type.params.some(param => containsTypeParameter(param, paramName)) ||
+					   containsTypeParameter(type.return, paramName);
+			case 'list':
+				return containsTypeParameter(type.element, paramName);
+			default:
+				return false;
+		}
+	};
+	
+	// Check if trait type parameter is only in return type
+	const paramHasTraitType = functionType.params.some(param => containsTypeParameter(param, traitTypeParam));
+	const returnHasTraitType = containsTypeParameter(functionType.return, traitTypeParam);
+	
+	if (!paramHasTraitType && returnHasTraitType) {
+		// Trait type parameter only in return type (like pure) - always create constraint
+		return {
+			found: false,
+			needsConstraint: true,
+			traitName: definingTraits[0],
+		};
+	}
+	
+	// For functions where trait type parameter is in arguments, check for concrete types
+	const hasConcreteArgs = argTypes.some(argType => {
+		const typeName = getTypeName(argType);
+		return typeName && typeName !== 'variable' && argType.kind !== 'variable';
+	});
+	
+	if (hasConcreteArgs) {
+		// Concrete types with no implementation should error
+		return { found: false };
+	}
+	
+	// Type variables/polymorphic cases should create constrained type
+	return {
+		found: false,
+		needsConstraint: true,
+		traitName: definingTraits[0], // Use first defining trait for constraint creation
+	};
 }
 
 // Check if a function name is defined in any trait

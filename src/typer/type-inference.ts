@@ -503,14 +503,38 @@ function buildNormalFunctionType(
 	bodyResult: TypeResult,
 	implicitConstraints: Constraint[]
 ): Type {
+	// Extract constraints from the body result type if it's constrained
+	const bodyConstraints: Constraint[] = [];
+	let bodyType = bodyResult.type;
+	
+	if (bodyType.kind === 'constrained') {
+		// Extract constraints from constrained body type
+		for (const [typeVar, constraints] of bodyType.constraints.entries()) {
+			for (const constraint of constraints) {
+				if (constraint.kind === 'implements') {
+					bodyConstraints.push({
+						kind: 'implements',
+						typeVar,
+						interfaceName: constraint.interfaceName,
+					});
+				}
+			}
+		}
+		// Use the base type for function construction
+		bodyType = bodyType.baseType;
+	}
+
 	// Build the function type normally
-	let funcType = bodyResult.type;
+	let funcType = bodyType;
 	for (let i = paramTypes.length - 1; i >= 0; i--) {
 		funcType = functionType([paramTypes[i]], funcType);
 	}
 
-	// Apply implicit constraints even when there are no explicit constraints
-	if (implicitConstraints.length > 0 && funcType.kind === 'function') {
+	// Combine implicit constraints with body constraints
+	const allConstraints = [...implicitConstraints, ...bodyConstraints];
+
+	// Apply constraints if we have any
+	if (allConstraints.length > 0 && funcType.kind === 'function') {
 		// Only apply constraints if the function has type variables (is polymorphic)
 		const hasTypeVariables = paramTypes.some(
 			paramType => paramType.kind === 'variable'
@@ -518,7 +542,7 @@ function buildNormalFunctionType(
 
 		if (hasTypeVariables) {
 			// Attach constraints directly to the function type
-			funcType.constraints = implicitConstraints;
+			funcType.constraints = allConstraints;
 		}
 	}
 

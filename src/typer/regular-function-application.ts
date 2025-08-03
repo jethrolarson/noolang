@@ -113,7 +113,7 @@ export function handleRegularFunctionApplication(
 				finalReturnType = constraintResult.resolvedType;
 				currentState = constraintResult.updatedState;
 			} else {
-				// Could not resolve constraints, preserve them on the return type if it's a function
+				// Could not resolve constraints, preserve them on the return type
 				if (returnType.kind === 'function') {
 					finalReturnType = {
 						...returnType,
@@ -122,9 +122,29 @@ export function handleRegularFunctionApplication(
 						),
 					};
 				} else {
-					// For non-function types, just return the type as-is
-					// Constraint resolution for non-function return types is handled elsewhere
-					finalReturnType = returnType;
+					// For non-function types, create a constrained type to preserve the constraints
+					// This handles cases like `map f list` returning `f b given f implements Functor`
+					const constraintMap = new Map<string, Constraint[]>();
+					
+					// Group constraints by type variable
+					for (const constraint of functionConstraints) {
+						if (constraint.kind === 'implements') {
+							const typeVar = constraint.typeVar;
+							const existing = constraintMap.get(typeVar) || [];
+							existing.push(constraint);
+							constraintMap.set(typeVar, existing);
+						}
+					}
+					
+					if (constraintMap.size > 0) {
+						finalReturnType = {
+							kind: 'constrained',
+							baseType: returnType,
+							constraints: constraintMap,
+						};
+					} else {
+						finalReturnType = returnType;
+					}
 				}
 			}
 		}
@@ -140,8 +160,14 @@ export function handleRegularFunctionApplication(
 	} else {
 		// Partial application - return a function with remaining parameters
 		const remainingParams = actualFuncType.params.slice(argTypes.length);
+		
+		// Apply substitution to remaining parameters to preserve unification results
+		const substitutedRemainingParams = remainingParams.map(param =>
+			substitute(param, currentState.substitution)
+		);
+		
 		const partialFunctionType = functionType(
-			remainingParams,
+			substitutedRemainingParams,
 			returnType,
 			actualFuncType.effects
 		);

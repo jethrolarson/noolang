@@ -24,7 +24,7 @@ describe('Type Display', () => {
 	test('map partially applied', () => {
 		const result = parseAndType('map (add 1)');
 		const typeStr = typeToString(result.type, result.state.substitution);
-		expect(typeStr).toBe('f Float -> f Float given f implements Functor');
+		expect(typeStr).toBe('a Float -> a Float given a implements Functor');
 	});
 
 	test('map fully applied', () => {
@@ -49,7 +49,7 @@ describe('Type Display', () => {
 		const result = parseAndType('map @name');
 		const typeStr = typeToString(result.type, result.state.substitution);
 		expect(typeStr).toBe(
-			'f a -> f b given a has {@name b} and f implements Functor'
+			'a b -> a c given b has {@name c} and a implements Functor'
 		);
 	});
 
@@ -59,7 +59,7 @@ describe('Type Display', () => {
 
 		// Parse the type string to check variable consistency
 		expect(typeStr).toBe(
-			'f a -> f b given a has {@name b} and f implements Functor'
+			'a b -> a c given b has {@name c} and a implements Functor'
 		);
 	});
 
@@ -84,6 +84,6 @@ describe('Type Display', () => {
 		// Test that variant type variables are consistently normalized
 		const result = parseAndType('map id');
 		const typeStr = typeToString(result.type, result.state.substitution);
-		expect(typeStr).toBe('f a -> f a given f implements Functor');
+		expect(typeStr).toBe('a b -> a b given a implements Functor');
 	});
 });

@@ -121,12 +121,25 @@ function handlePartialTraitFunctionApplication(
 	const collectVars = (type: Type) => {
 		if (type.kind === 'variable') {
 			freeVars.add(type.name);
+		} else if (type.kind === 'variant') {
+			// Include variant names (like 'f' in 'f a') as variables to be freshened
+			freeVars.add(type.name);
+			type.args.forEach(collectVars);
 		} else if (type.kind === 'function') {
 			type.params.forEach(collectVars);
 			collectVars(type.return);
 		}
 	};
 	collectVars(traitFuncType);
+	
+	// Also collect constraint variables to avoid collisions with lambda parameters
+	if (traitFuncType.constraints) {
+		for (const constraint of traitFuncType.constraints) {
+			if (constraint.kind === 'implements') {
+				freeVars.add(constraint.typeVar);
+			}
+		}
+	}
 
 	// Create fresh variables for each free variable
 	let freshState = currentState;
@@ -218,11 +231,16 @@ function handlePartialTraitFunctionApplication(
 	}
 
 	// Add constraints from argument types (e.g., a has {@name b} from @name)
+	// Only propagate structural constraints (like 'has'), not trait implementation constraints
 	for (let i = 0; i < argTypes.length; i++) {
 		const argType = argTypes[i];
 		if (argType.kind === 'function' && argType.constraints) {
-			// For now, just propagate the constraints directly with variable substitution
-			const substitutedArgConstraints = argType.constraints.map(constraint => {
+			// Filter to only structural constraints - don't propagate trait implementation constraints
+			const structuralConstraints = argType.constraints.filter(constraint => 
+				constraint.kind === 'has' // Only propagate structural constraints like accessor constraints
+			);
+			
+			const substitutedArgConstraints = structuralConstraints.map(constraint => {
 				// Apply substitution to update variable names
 				const substitutedVar = substitute(
 					{ kind: 'variable', name: constraint.typeVar },
