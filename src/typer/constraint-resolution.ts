@@ -329,6 +329,7 @@ export function extractFunctionConstraints(funcType: Type): {
 function getTypeName(type: Type): string | null {
 	if (type.kind === 'primitive') return type.name;
 	if (type.kind === 'variant') return type.name;
+	if (type.kind === 'list') return 'List';
 	if (type.kind === 'unit') return 'Unit';
 	return null;
 }

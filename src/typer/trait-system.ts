@@ -158,7 +158,71 @@ export function getTypeName(type: Type): string {
 	}
 }
 
-// Try to resolve a trait function call
+// Helper function to determine which argument contains the container type
+// Derived from the trait definition by finding where the trait's type parameter appears
+function getContainerArgIndex(
+	registry: TraitRegistry,
+	functionName: string,
+): number {
+	// Find the trait definition for this function
+	const definingTraits = registry.functionTraits.get(functionName) || [];
+	if (definingTraits.length === 0) {
+		return 0; // fallback
+	}
+
+	// Use the first trait that defines this function
+	const traitName = definingTraits[0];
+	const traitDef = registry.definitions.get(traitName);
+	if (!traitDef) {
+		return 0; // fallback
+	}
+
+	const functionType = traitDef.functions.get(functionName);
+	if (!functionType || functionType.kind !== 'function') {
+		return 0; // fallback
+	}
+
+	// Find which parameter contains the trait's type parameter
+	const traitTypeParam = traitDef.typeParam;
+	
+	// Check each parameter to see if it contains the trait type parameter
+	for (let i = 0; i < functionType.params.length; i++) {
+		const param = functionType.params[i];
+		if (containsTypeParameter(param, traitTypeParam)) {
+			return i;
+		}
+	}
+
+	return 0; // fallback
+}
+
+// Helper to check if a type contains a specific type parameter
+function containsTypeParameter(type: Type, paramName: string): boolean {
+	switch (type.kind) {
+		case 'variable':
+			return type.name === paramName;
+		case 'variant':
+			// Check if the variant name is the type parameter
+			if (type.name === paramName) {
+				return true;
+			}
+			// Check arguments recursively
+			return type.args.some(arg => containsTypeParameter(arg, paramName));
+		case 'function':
+			// Check parameters and return type
+			return type.params.some(param => containsTypeParameter(param, paramName)) ||
+				   containsTypeParameter(type.return, paramName);
+		case 'list':
+			return containsTypeParameter(type.element, paramName);
+		case 'tuple':
+			return type.elements.some(element => containsTypeParameter(element, paramName));
+		case 'record':
+			return Object.values(type.fields).some(field => containsTypeParameter(field, paramName));
+		default:
+			return false;
+	}
+}
+
 export function resolveTraitFunction(
 	registry: TraitRegistry,
 	functionName: string,
@@ -169,13 +233,26 @@ export function resolveTraitFunction(
 	typeName?: string;
 	impl?: Expression;
 } {
-	// For now, just look at the first argument type
 	if (argTypes.length === 0) {
 		return { found: false };
 	}
 
-	const firstArgTypeName = getTypeName(argTypes[0]);
-	if (!firstArgTypeName) {
+	// Determine which argument contains the container type based on the function signature
+	const containerArgIndex = getContainerArgIndex(registry, functionName);
+
+	// Special handling for 'pure' function - we need to look at the return type
+	if (containerArgIndex === -1) {
+		// For 'pure', we need to determine the monad type from context
+		// This is more complex and may require looking at the expected return type
+		// For now, return not found and let the type system handle it
+		return { found: false };
+	}
+
+	// Get the container type from the appropriate argument
+	const containerArgType = argTypes[containerArgIndex];
+	const containerTypeName = getTypeName(containerArgType);
+
+	if (!containerTypeName) {
 		return { found: false };
 	}
 
@@ -191,7 +268,7 @@ export function resolveTraitFunction(
 			// Check if we have an implementation for this type
 			const traitImpls = registry.implementations.get(traitName);
 			if (traitImpls) {
-				const impl = traitImpls.get(firstArgTypeName);
+				const impl = traitImpls.get(containerTypeName);
 				if (impl && impl.functions.has(functionName)) {
 					candidateImplementations.push({
 						traitName,
@@ -206,7 +283,7 @@ export function resolveTraitFunction(
 	if (candidateImplementations.length > 1) {
 		const traitNames = candidateImplementations.map(c => c.traitName);
 		throw new Error(
-			`Ambiguous function call '${functionName}' for type '${firstArgTypeName}': ` +
+			`Ambiguous function call '${functionName}' for type '${containerTypeName}': ` +
 				`multiple implementations found in traits: ${traitNames.join(', ')}. ` +
 				`Cannot determine which implementation to use.`
 		);
@@ -217,7 +294,7 @@ export function resolveTraitFunction(
 		return {
 			found: true,
 			traitName: candidate.traitName,
-			typeName: firstArgTypeName,
+			typeName: containerTypeName,
 			impl: candidate.impl,
 		};
 	}

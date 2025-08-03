@@ -332,7 +332,7 @@ describe('Trait System', () => {
 		});
 	});
 	describe('Constraint Resolution', () => {
-		test.skip('should resolve Functor constraint for List', () => {
+		test('should resolve Functor constraint for List', () => {
 			const code = 'result = map (fn x => x + 1) [1, 2, 3]';
 
 			const typeResult = parseAndType(code);

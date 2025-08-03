@@ -30,22 +30,50 @@ export function handleTraitFunctionApplication(
 	funcResult: TypeResult
 ): TypeResult | null {
 	// Check if this could be a trait function call
+	// Only call trait function application for the inner application (when func is a variable)
+	// NOT for the outer application (when func is an application)
+	let traitFunctionName: string | null = null;
+
+	if (expr.func.kind === 'variable') {
+		// This is the inner application - check if it's a trait function
+		if (isTraitFunction(currentState.traitRegistry, expr.func.name)) {
+			traitFunctionName = expr.func.name;
+		}
+	}
+	// Don't call trait function application for outer applications (when func is an application)
+	// The outer application should resolve the constrained type returned by the inner application
+
 	if (
-		expr.func.kind === 'variable' &&
-		isTraitFunction(currentState.traitRegistry, expr.func.name)
+		traitFunctionName &&
+		isTraitFunction(currentState.traitRegistry, traitFunctionName)
 	) {
 		// Get the trait function signature to understand its arity
 		const traitInfo = getTraitFunctionInfo(
 			currentState.traitRegistry,
-			expr.func.name
+			traitFunctionName
 		);
 		if (traitInfo && traitInfo.functionType.kind === 'function') {
 			const traitFuncType = traitInfo.functionType;
 
 			// For trait functions, we need to check if we have enough arguments to fully apply the function
-			// A trait function like `add : a -> a -> a` needs 2 arguments to be fully applied
-			// We can determine this by checking if the return type is still a function type
-			const isFullyApplied = traitFuncType.return.kind !== 'function';
+			// For curried functions like `add : a -> a -> a`, we need to check if the return type is still a function
+			// after applying the arguments
+			let isFullyApplied = false;
+			let currentFuncType = traitFuncType;
+			let remainingArgs = argTypes.length;
+
+			// Recursively check if we have enough arguments to fully apply the function
+			while (remainingArgs > 0 && currentFuncType.kind === 'function') {
+				if (currentFuncType.params.length === 0) {
+					break;
+				}
+				remainingArgs--;
+				currentFuncType = currentFuncType.return as FunctionType;
+			}
+
+			// If we've applied all arguments and the result is not a function, it's fully applied
+			isFullyApplied =
+				remainingArgs === 0 && currentFuncType.kind !== 'function';
 
 			if (!isFullyApplied) {
 				return handlePartialTraitFunctionApplication(
@@ -162,7 +190,16 @@ function handleFullTraitFunctionApplication(
 	argTypes: Type[],
 	currentState: TypeState
 ): TypeResult | null {
-	const funcName = expr.func.kind === 'variable' ? expr.func.name : 'unknown';
+	let funcName = 'unknown';
+	if (expr.func.kind === 'variable') {
+		funcName = expr.func.name;
+	} else if (expr.func.kind === 'application') {
+		// For nested applications, try to extract the function name from the inner application
+		// This handles cases like (map (fn x => x + 1)) [1, 2, 3]
+		if (expr.func.func.kind === 'variable') {
+			funcName = expr.func.func.name;
+		}
+	}
 	const resolution = resolveTraitFunction(
 		currentState.traitRegistry,
 		funcName,
@@ -231,7 +268,23 @@ function handleFullTraitFunctionApplication(
 			}
 
 			// Return the function's return type with effects
-			const resultType = substitute(funcType.return, resultState.substitution);
+			let resultType = substitute(funcType.return, resultState.substitution);
+
+			// Substitute the trait type parameter with the concrete type (e.g., f -> List)
+			const traitDef = currentState.traitRegistry.definitions.get(
+				resolution.traitName!
+			);
+			if (traitDef) {
+				const traitTypeSubstitution = new Map();
+				traitTypeSubstitution.set(traitDef.typeParam, {
+					kind: 'variant',
+					name: resolution.typeName!,
+					args: [],
+				});
+				resultType = substitute(resultType, traitTypeSubstitution);
+				// Normalize List variant to canonical list type
+				resultType = normalizeListType(resultType);
+			}
 
 			const resultEffects = unionEffects(
 				traitImplType.effects,
@@ -257,7 +310,15 @@ function handleFullTraitFunctionApplication(
 		}
 	} else if (resolution.found === false) {
 		// No trait implementation found - check if this is polymorphic
-		const funcName = expr.func.kind === 'variable' ? expr.func.name : 'unknown';
+		let funcName = 'unknown';
+		if (expr.func.kind === 'variable') {
+			funcName = expr.func.name;
+		} else if (expr.func.kind === 'application') {
+			// For nested applications, try to extract the function name from the inner application
+			if (expr.func.func.kind === 'variable') {
+				funcName = expr.func.func.name;
+			}
+		}
 
 		// Check if the trait function return type has unresolved type variables
 		const hasUnresolvedVariables = hasTypeVariables(traitFuncType.return);
@@ -321,4 +382,33 @@ function hasTypeVariables(type: Type): boolean {
 		return type.params.some(hasTypeVariables) || hasTypeVariables(type.return);
 	}
 	return false;
+}
+
+// Helper to normalize List variant to canonical list type
+function normalizeListType(type: Type): Type {
+	if (
+		type &&
+		type.kind === 'variant' &&
+		type.name === 'List' &&
+		type.args.length === 1
+	) {
+		return { kind: 'list', element: normalizeListType(type.args[0]) };
+	}
+	if (type && type.kind === 'function') {
+		return {
+			...type,
+			params: type.params.map(normalizeListType),
+			return: normalizeListType(type.return),
+		};
+	}
+	if (type && type.kind === 'tuple') {
+		return { ...type, elements: type.elements.map(normalizeListType) };
+	}
+	if (type && type.kind === 'record') {
+		const newFields: Record<string, Type> = {};
+		for (const k in type.fields)
+			newFields[k] = normalizeListType(type.fields[k]);
+		return { ...type, fields: newFields };
+	}
+	return type;
 }

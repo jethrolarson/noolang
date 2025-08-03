@@ -16,7 +16,8 @@ export const typeAndDecorate = (
 	state: TypeState;
 } => {
 	let state = initialState || createTypeState();
-	if (!initialState) {
+	// Always ensure builtins and stdlib are loaded, regardless of whether initialState was provided
+	if (!initialState || !state.traitRegistry.definitions.size) {
 		state = initializeBuiltins(state);
 		state = loadStdlib(state);
 	}
