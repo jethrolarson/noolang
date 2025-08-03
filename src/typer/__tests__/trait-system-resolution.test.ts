@@ -32,18 +32,18 @@ describe('Constraint Collapse', () => {
 			'(α126 -> α127) -> α128 α126 -> α128 α127 given α128 implements Functor'
 		);
 	});
-	test.skip('map should work with unary trait functions', () => {
+	test('map should work with unary trait functions', () => {
 		const typeString = parseToString('map show [1, 2, 3]');
 
 		expect(typeString).toBe('List String');
 	});
-	test.skip('List with integers should collapse to concrete type', () => {
+	test('List with integers should collapse to concrete type', () => {
 		const typeString = parseToString('map (fn x => x + 1) [1, 2, 3]');
 
 		expect(typeString).toBe('List Float');
 	});
 
-	test.skip('partially applied trait function should collapse to concrete type', () => {
+	test('partially applied trait function should collapse to concrete type', () => {
 		const typeString = parseToString('map (add 1) [1, 2, 3]');
 
 		expect(typeString).toBe('List Float');
@@ -55,25 +55,25 @@ describe('Constraint Collapse', () => {
 		expect(typeString).toBe('Option Float');
 	});
 
-	test.skip('Nested map operations should collapse to concrete type', () => {
+	test('Nested map operations should collapse to concrete type', () => {
 		const typeString = parseToString('map show (map (add 1) [1])');
 
 		expect(typeString).toBe('List String');
 	});
 
-	test.skip('Partial application should preserve constraints', () => {
+	test('Partial application should preserve constraints', () => {
 		const typeString = parseToString('map (fn x => x + 1)');
 
 		expect(typeString).toBe('f Float -> f Float given f implements Functor');
 	});
 
-	test.skip('Pure function should preserve constraints', () => {
+	test('Pure function should preserve constraints', () => {
 		const typeString = parseToString('pure 1');
 
 		expect(typeString).toBe('a Float given a implements Monad');
 	});
 
-	test.skip('Pure function should preserve constraints raw type names', () => {
+	test('Pure function should preserve constraints raw type names', () => {
 		const typeResult = parseAndType('pure 1');
 		const typeString = typeToString(
 			typeResult.type,
@@ -87,7 +87,7 @@ describe('Constraint Collapse', () => {
 });
 
 describe('Complex Constraint Resolution', () => {
-	test.skip('should handle multiple different constraints with partial collapse', () => {
+	test('should handle multiple different constraints with partial collapse', () => {
 		const code = `
 		showAndIncrement = fn x => show (x + 1);
 		result = map showAndIncrement [1, 2, 3]
@@ -100,7 +100,7 @@ describe('Complex Constraint Resolution', () => {
 		expect(typeResult.type.element.name).toBe('String');
 	});
 
-	test.skip('Trait System Phase 3: Constraint Resolution - Advanced Edge Cases - should handle polymorphic functions with constraints', () => {
+	test('Trait System Phase 3: Constraint Resolution - Advanced Edge Cases - should handle polymorphic functions with constraints', () => {
 		const code = `
 		polymorphicMap = fn f list => map f list;
 		result = polymorphicMap (fn x => x + 1) [1, 2, 3]
