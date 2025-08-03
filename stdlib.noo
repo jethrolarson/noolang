@@ -254,10 +254,9 @@ implement Add List (
 );
 
 # Implement Show for Lists (if elements are showable)
-# TODO: This needs constrained types support
-# implement Show (List a) (
-#   show = fn list => concat "[" (concat (join ", " (list_map show list)) "]")
-# );
+implement Show (List a) given a implements Show (
+  show = fn list => concat "[" (concat (join ", " (list_map show list)) "]")
+);
 
 # ========================================
 # Constraint implementations for basic types

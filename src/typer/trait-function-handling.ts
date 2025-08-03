@@ -20,6 +20,8 @@ import {
 	isTraitFunction,
 	getTraitFunctionInfo,
 } from './trait-system';
+import { tryResolveConstraints } from './constraint-resolution';
+import { freshenTypeVariables, freshTypeVariable } from './type-operations';
 
 // Helper function to handle trait function resolution
 export function handleTraitFunctionApplication(
@@ -107,20 +109,78 @@ function handlePartialTraitFunctionApplication(
 	currentState: TypeState,
 	funcResult: TypeResult
 ): TypeResult {
+	// Freshen type variables in the trait function type to avoid conflicts with argument types
+	// Create a mapping from old variable names to fresh ones
+	const mapping = new Map<string, Type>();
+	const freeVars = new Set<string>();
+
+	// Collect all free type variables in the trait function type
+	const collectVars = (type: Type) => {
+		if (type.kind === 'variable') {
+			freeVars.add(type.name);
+		} else if (type.kind === 'function') {
+			type.params.forEach(collectVars);
+			collectVars(type.return);
+		}
+	};
+	collectVars(traitFuncType);
+
+	// Create fresh variables for each free variable
+	let freshState = currentState;
+	for (const varName of freeVars) {
+		const [freshVar, newState] = freshTypeVariable(freshState);
+		mapping.set(varName, freshVar);
+		freshState = newState;
+	}
+
+	const [freshenedTraitFuncType, freshenedState] = freshenTypeVariables(
+		traitFuncType,
+		mapping,
+		freshState
+	);
+
+	// Ensure the freshened type is still a function type
+	if (freshenedTraitFuncType.kind !== 'function') {
+		throw new Error(
+			'Expected function type after freshening trait function type'
+		);
+	}
+
 	// Partial application: return a function type with remaining parameters and constraints
 	// Unify the supplied arguments with the corresponding parameters
-	let partialState = currentState;
+	let partialState = freshenedState;
 	for (let i = 0; i < argTypes.length; i++) {
-		partialState = unify(traitFuncType.params[i], argTypes[i], partialState, {
-			line: expr.location?.start.line || 1,
-			column: expr.location?.start.column || 1,
-		});
+		// Pass constraint context to unification
+		const unificationContext = {
+			reason: 'trait_function_application' as const,
+			operation: `unifying argument ${i + 1}`,
+			hint: `Argument ${i + 1} has type ${typeToString(
+				argTypes[i],
+				partialState.substitution
+			)} but the trait function parameter expects ${typeToString(
+				freshenedTraitFuncType.params[i],
+				partialState.substitution
+			)}.`,
+			constraintContext: freshenedTraitFuncType.constraints || [],
+		};
+
+		partialState = unify(
+			freshenedTraitFuncType.params[i],
+			argTypes[i],
+			partialState,
+			{
+				line: expr.location?.start.line || 1,
+				column: expr.location?.start.column || 1,
+			},
+			unificationContext
+		);
 	}
+
 	// Build the remaining curried function type
 	// For curried functions, we need to handle the case where we've applied one argument
 	// and the return type is still a function
 	const resultType = substitute(
-		traitFuncType.return,
+		freshenedTraitFuncType.return,
 		partialState.substitution
 	);
 	let curriedType: Type = resultType;
@@ -128,24 +188,29 @@ function handlePartialTraitFunctionApplication(
 	const allConstraints: Constraint[] = [];
 
 	// Add trait function constraints (e.g., f implements Functor)
-	if (traitFuncType.constraints && traitFuncType.constraints.length > 0) {
-		const substitutedConstraints = traitFuncType.constraints.map(constraint => {
-			if (constraint.kind === 'implements') {
-				const substitutedVar = substitute(
-					{ kind: 'variable', name: constraint.typeVar },
-					partialState.substitution
-				);
+	if (
+		freshenedTraitFuncType.constraints &&
+		freshenedTraitFuncType.constraints.length > 0
+	) {
+		const substitutedConstraints = freshenedTraitFuncType.constraints.map(
+			constraint => {
+				if (constraint.kind === 'implements') {
+					const substitutedVar = substitute(
+						{ kind: 'variable', name: constraint.typeVar },
+						partialState.substitution
+					);
 
-				if (substitutedVar.kind === 'variable') {
-					return {
-						...constraint,
-						typeVar: substitutedVar.name,
-					};
+					if (substitutedVar.kind === 'variable') {
+						return {
+							...constraint,
+							typeVar: substitutedVar.name,
+						};
+					}
+					return null;
 				}
-				return null;
+				return constraint;
 			}
-			return constraint;
-		});
+		);
 		allConstraints.push(...substitutedConstraints.filter(c => c !== null));
 	}
 
@@ -175,10 +240,29 @@ function handlePartialTraitFunctionApplication(
 
 	// Apply constraints to the result type if it's a function
 	if (resultType.kind === 'function' && allConstraints.length > 0) {
-		curriedType = {
-			...resultType,
-			constraints: (resultType.constraints || []).concat(allConstraints),
-		};
+		// Try to resolve constraints using the argument types
+		const substitutedArgTypes = argTypes.map(argType =>
+			substitute(argType, partialState.substitution)
+		);
+
+		const constraintResult = tryResolveConstraints(
+			resultType,
+			allConstraints,
+			substitutedArgTypes,
+			partialState
+		);
+
+		if (constraintResult) {
+			// Constraints were successfully resolved to a concrete type
+			curriedType = constraintResult.resolvedType;
+			partialState = constraintResult.updatedState;
+		} else {
+			// Could not resolve constraints, preserve them on the return type
+			curriedType = {
+				...resultType,
+				constraints: (resultType.constraints || []).concat(allConstraints),
+			};
+		}
 	}
 	return createTypeResult(curriedType, funcResult.effects, partialState);
 }
@@ -218,6 +302,44 @@ function handleFullTraitFunctionApplication(
 			const funcType = traitImplType.type;
 			let resultState = traitImplType.state;
 
+			// Freshen type variables in the trait implementation type to avoid conflicts
+			// Create a mapping from old variable names to fresh ones
+			const mapping = new Map<string, Type>();
+			const freeVars = new Set<string>();
+
+			// Collect all free type variables in the trait implementation type
+			const collectVars = (type: Type) => {
+				if (type.kind === 'variable') {
+					freeVars.add(type.name);
+				} else if (type.kind === 'function') {
+					type.params.forEach(collectVars);
+					collectVars(type.return);
+				}
+			};
+			collectVars(funcType);
+
+			// Create fresh variables for each free variable
+			let freshState = resultState;
+			for (const varName of freeVars) {
+				const [freshVar, newState] = freshTypeVariable(freshState);
+				mapping.set(varName, freshVar);
+				freshState = newState;
+			}
+
+			const [freshenedFuncType, freshenedState] = freshenTypeVariables(
+				funcType,
+				mapping,
+				freshState
+			);
+			resultState = freshenedState;
+
+			// Ensure the freshened type is still a function type
+			if (freshenedFuncType.kind !== 'function') {
+				throw new Error(
+					'Expected function type after freshening trait implementation type'
+				);
+			}
+
 			// Type arguments first
 			const argResults = expr.args.map(arg => typeExpression(arg, resultState));
 			for (const argResult of argResults) {
@@ -250,13 +372,13 @@ function handleFullTraitFunctionApplication(
 						argTypes[i],
 						resultState.substitution
 					)} but the function parameter expects ${typeToString(
-						funcType.params[i],
+						freshenedFuncType.params[i],
 						resultState.substitution
 					)}.`,
 				};
 
 				resultState = unify(
-					funcType.params[i],
+					freshenedFuncType.params[i],
 					argTypes[i],
 					resultState,
 					{
@@ -268,7 +390,10 @@ function handleFullTraitFunctionApplication(
 			}
 
 			// Return the function's return type with effects
-			let resultType = substitute(funcType.return, resultState.substitution);
+			let resultType = substitute(
+				freshenedFuncType.return,
+				resultState.substitution
+			);
 
 			// Substitute the trait type parameter with the concrete type (e.g., f -> List)
 			const traitDef = currentState.traitRegistry.definitions.get(

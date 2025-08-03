@@ -72,7 +72,9 @@ export function tryResolveConstraints(
 
 			// Check each argument type to see if it implements the required trait
 			for (const argType of argTypes) {
-				const argTypeName = getTypeName(argType);
+				// Apply substitution to get the actual type
+				const substitutedArgType = substitute(argType, state.substitution);
+				const argTypeName = getTypeName(substitutedArgType);
 
 				// Check if we have an implementation of this trait for this argument type
 				let hasImplementation = false;

@@ -96,7 +96,7 @@ const unifyInternal = (
 
 	// Handle function types
 	if (isTypeKind(s1, 'function') && isTypeKind(s2, 'function')) {
-		return unifyFunction(s1, s2, state, location);
+		return unifyFunction(s1, s2, state, location, context);
 	}
 
 	// Handle list types
@@ -379,7 +379,13 @@ function unifyFunction(
 	s1: Type,
 	s2: Type,
 	state: TypeState,
-	location?: { line: number; column: number }
+	location?: { line: number; column: number },
+	context?: {
+		reason?: string;
+		operation?: string;
+		hint?: string;
+		constraintContext?: Constraint[];
+	}
 ): TypeState {
 	if (!isTypeKind(s1, 'function') || !isTypeKind(s2, 'function')) {
 		throw new Error('unifyFunction called with non-function types');
@@ -410,10 +416,35 @@ function unifyFunction(
 
 	// Then unify parameters and return types
 	for (let i = 0; i < s1.params.length; i++) {
-		// NOTE: Legacy constraint merging removed - handled by new trait system
-		currentState = unify(s1.params[i], s2.params[i], currentState, location);
+		// Check for constraint on s1.params[i] (variable with constraint) and s2.params[i] (concrete)
+		const param1 = s1.params[i];
+		const param2 = s2.params[i];
+		// Only check for 'implements' constraints
+		if (
+			param1.kind === 'variable' &&
+			param1.constraints &&
+			param1.constraints.length > 0 &&
+			param2.kind !== 'variable'
+		) {
+			for (const constraint of param1.constraints) {
+				if (constraint.kind === 'implements') {
+					const traitRegistry = state.traitRegistry;
+					const traitImpls = traitRegistry.implementations.get(
+						constraint.interfaceName
+					);
+					const typeName = getTypeName(param2);
+					if (!traitImpls || !typeName || !traitImpls.has(typeName)) {
+						throw new Error(
+							`Type ${typeName} does not implement trait ${constraint.interfaceName} (required by type variable ${param1.name})`
+						);
+					}
+				}
+			}
+		}
+		// Now unify as usual
+		currentState = unify(param1, param2, currentState, location, context);
 	}
-	currentState = unify(s1.return, s2.return, currentState, location);
+	currentState = unify(s1.return, s2.return, currentState, location, context);
 
 	return currentState;
 }
