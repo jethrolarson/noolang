@@ -109,7 +109,7 @@ test('Lexer - Identifiers and Keywords - should tokenize identifiers with unders
 test('Lexer - Identifiers and Keywords - should recognize keywords', () => {
 	const keywords = [
 		'if', 'then', 'else', 'let', 'in', 'fn', 'import', 'mut', 'where',
-		'type', 'match', 'with', 'given', 'is', 'and', 'or', 'implements',
+		'variant', 'match', 'with', 'given', 'is', 'and', 'or', 'implements',
 		'constraint', 'implement'
 	];
 
