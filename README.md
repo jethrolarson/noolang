@@ -4,16 +4,16 @@ An functional, expression-based, LLM-friendly programming language designed for 
 
 ## Features
 - **Expression-based** - everything is an expression
-- **Strong type inference** 
-- **Type Constraints** - expressive constraint system for safe generic programming
-- **Trait system** - constraint definitions and implementations with type-directed dispatch
-- **Functional programming** idioms and patterns
-- **Pipeline and function application operators** (`|>`, `|`, `|?`, `$`) for composition and safe chaining. 
-- **Composable accessors for Records** for immutably reading and writing structured data.
-- **REPL** for interactive development with comprehensive debugging tools
-- **Explicit effects**: Effects are tracked in the type system and visible in function types
-- **Explicit Mutation**: mutable variables require special handling and can only be mutated lexically to increase safety.
-- **Algebraic Data Types (ADTs)**: Complete implementation with type definitions, constructors, pattern matching, built-in Option/Result types, and full support for recursive data structures
+- **Strong type inference** with Hindley-Milner
+- **Trait system** - constraint definitions and implementations
+- **Effect system** - explicit effect tracking in types
+- **Where expressions** - local definitions within expressions
+- **Pipeline operators** (`|>`, `<|`, `|`, `|?`, `$`) for composition
+- **ADTs** - algebraic data types with pattern matching
+- **Records & tuples** - structured data with type safety
+- **REPL** - interactive development environment
+- **VSCode Language Server** - for intellisense and hover types (WIP)
+- **Syntax Highlighting** - for VSCode and other editors
 
 
 ## Installation
@@ -38,6 +38,62 @@ Or run the compiled version:
 ```bash
 npm start
 ```
+
+### CLI Debugging Tools
+
+The CLI provides extensive debugging capabilities for development:
+
+```bash
+# Execute expressions
+npm start -- --eval "1 + 2 * 3"
+npm start -- -e "x = 10; x * 2"
+
+# Debug tokenization
+npm start -- --tokens "fn x => x + 1"
+npm start -- --tokens-file examples/demo.noo
+
+# Debug parsing (AST)
+npm start -- --ast "if x > 0 then x else -x"
+npm start -- --ast-file examples/demo.noo
+
+# Debug type inference
+npm start -- --types "fn x => x + 1"
+npm start -- --types-file examples/demo.noo
+npm start -- --types-detailed "fn x => x + 1"
+npm start -- --types-env "fn x => x + 1"
+npm start -- --type-ast "fn x => x + 1"
+npm start -- --type-ast-file examples/demo.noo
+
+# Run files
+npm start -- examples/demo.noo
+```
+
+#### REPL Debugging Commands
+
+The REPL includes comprehensive debugging tools:
+
+```bash
+# Basic commands
+.help                    # Show help
+.quit                    # Exit REPL
+
+# Environment inspection
+.env                     # Show current environment
+.env-detail              # Show detailed environment with types
+.env-json                # Show environment as JSON
+.clear-env               # Clear environment
+.types                   # Show type environment
+
+# Debugging commands
+.tokens (expr)           # Show tokens for expression
+.tokens-file file.noo    # Show tokens for file
+.ast (expr)              # Show AST for expression
+.ast-file file.noo       # Show AST for file
+.ast-json (expr)         # Show AST as JSON
+```
+
+**Note**: REPL Commands use `.` prefix and parentheses `(expr)` for expressions to avoid conflicts with future type annotations.
+
 
 ### Examples
 
@@ -279,24 +335,63 @@ if condition then value1 else value2
 
 ### Where Expressions
 
-Noolang supports **where expressions** for introducing local definitions within expressions, similar to Haskell's `where` clause. This provides a clean way to define local variables without cluttering the global scope.
-
-#### Basic Where Expressions
+Local definitions within expressions:
 
 ```noolang
-# Simple where expression with one definition
+# Simple where expression
 x + y where (x = 1)
 
-# Multiple definitions separated by semicolons
+# Multiple definitions
 x + y where (x = 1; y = 2)
 
-# Complex expressions in where clauses
+# Complex expressions
 result where (
   x = 10;
   y = 20;
   result = x * y + 5
 )
 ```
+
+### Trait System
+
+Constraint-based polymorphism:
+
+```noolang
+# Define constraint
+constraint Display a ( display : a -> String );
+
+# Implement constraint
+implement Display Float ( display = toString );
+implement Display String ( display = fn s => s );
+
+# Automatic resolution
+display 42              # "42"
+display "hello"         # "hello"
+```
+
+### Effect System
+
+Explicit effect tracking:
+
+```noolang
+# Pure function
+add = fn x y => x + y : (Float) -> (Float) -> Float
+
+# Effectful function
+print = fn msg => ... : String !write
+log = fn msg => ... : String !log
+
+# Effect propagation
+logger = fn x => print x;  # Inherits !write
+logger 42                  # Has !write effect
+```
+
+#### Built-in Effects
+- `!write` - Output operations (print, writeFile)
+- `!log` - Logging operations
+- `!read` - Input operations (readFile)
+- `!rand` - Random generation
+- `!state` - State mutation
 
 #### Where Expressions in Function Bodies
 
@@ -460,13 +555,14 @@ Noolang uses commas as separators for all data structures:
 
 ### Built-in Functions
 
-Noolang provides a comprehensive set of built-in functions organized by category:
+Noolang provides a set of built-in functions organized by category:
 
 #### Arithmetic Operations (Pure)
 - **`+`** - Addition: `Float -> Float -> Float`
 - **`-`** - Subtraction: `Float -> Float -> Float` 
 - **`*`** - Multiplication: `Float -> Float -> Float`
 - **`/`** - Division: `Float -> Float -> Option Float`
+- **`%`** - Modulus: `Float -> Float -> Float`
 
 #### Comparison Operations (Pure)
 - **`==`** - Equality: `a -> a -> Bool` (polymorphic)
@@ -1241,61 +1337,6 @@ TODO add examples
 TODO add examples
 
 
-### CLI Debugging Tools
-
-The CLI provides extensive debugging capabilities for development:
-
-```bash
-# Execute expressions
-npm run start -- --eval "1 + 2 * 3"
-npm run start -- -e "x = 10; x * 2"
-
-# Debug tokenization
-npm run start -- --tokens "fn x => x + 1"
-npm run start -- --tokens-file examples/demo.noo
-
-# Debug parsing (AST)
-npm run start -- --ast "if x > 0 then x else -x"
-npm run start -- --ast-file examples/demo.noo
-
-# Debug type inference
-npm run start -- --types "fn x => x + 1"
-npm run start -- --types-file examples/demo.noo
-npm run start -- --types-detailed "fn x => x + 1"
-npm run start -- --types-env "fn x => x + 1"
-npm run start -- --type-ast "fn x => x + 1"
-npm run start -- --type-ast-file examples/demo.noo
-
-# Run files
-npm run start -- examples/demo.noo
-```
-
-#### REPL Debugging Commands
-
-The REPL includes comprehensive debugging tools:
-
-```bash
-# Basic commands
-.help                    # Show help
-.quit                    # Exit REPL
-
-# Environment inspection
-.env                     # Show current environment
-.env-detail              # Show detailed environment with types
-.env-json                # Show environment as JSON
-.clear-env               # Clear environment
-.types                   # Show type environment
-
-# Debugging commands
-.tokens (expr)           # Show tokens for expression
-.tokens-file file.noo    # Show tokens for file
-.ast (expr)              # Show AST for expression
-.ast-file file.noo       # Show AST for file
-.ast-json (expr)         # Show AST as JSON
-```
-
-**Note**: REPL Commands use `.` prefix and parentheses `(expr)` for expressions to avoid conflicts with future type annotations.
-
 ### Current Implementation Status
 
 - **✅ Constraint System**: Fully implemented with Hindley-Milner style inference
@@ -1345,10 +1386,6 @@ syntaxes/
 npm test
 ```
 
-All 373 tests pass, including parser, evaluator, typer, ADTs, constraints, recursion, effects, and trait system tests. The functional typer is used exclusively.
-
-**Known Issues**: While all unit tests pass, some example files reveal type system limitations with generic ADT constructors and trait function constraint resolution. See `docs/LANGUAGE_WEAKNESSES.md` for details and remediation priorities.
-
 ### Building
 
 ```bash
@@ -1357,25 +1394,16 @@ npm run build
 
 ### Performance Benchmarking
 
-Noolang includes a comprehensive benchmarking system to track performance as language features are added:
-
 ```bash
 npm run benchmark
 ```
 
-This runs three benchmark suites:
-- **Simple**: Basic language features (factorial, fibonacci) 
-- **Medium**: Recursive list operations and higher-order functions
-- **Complex**: Heavy type inference, constraint propagation, and nested computations
+Runs three benchmark suites:
+- **Simple**: Basic language features
+- **Medium**: Recursive list operations
+- **Complex**: Heavy type inference and constraint propagation
 
-Results are automatically saved with git commit tracking to `benchmark-results/` for historical analysis.
-
-**Benchmark files:**
-- `benchmarks/simple.noo` - Basic arithmetic and recursion
-- `benchmarks/medium.noo` - List operations with manual implementations  
-- `benchmarks/complex.noo` - Complex nested functions and record operations
-
-The benchmark runner provides statistical analysis (min/max/avg/median) across multiple runs with warmup phases to eliminate cold start effects.
+Results saved to `benchmark-results/` for historical analysis.
 
 ### VSCode Extension
 
@@ -1387,14 +1415,12 @@ npm run vscode:package  # Create extension package
 
 #### Duck-Typed Records
 
-- **Permissive record unification**: Any record with the required fields matches, regardless of extra fields
-- **Accessors**: Work with any record that has the field, enabling flexible and ergonomic code
-- **Chaining**: Accessor chains and method-chaining patterns are natural and concise
-- **LLM-friendly**: Less rigid type constraints, more natural code generation
+- **Permissive record unification**: Any record with required fields matches
+- **Accessors**: Work with any record that has the field
+- **Chaining**: Accessor chains and method-chaining patterns
+- **LLM-friendly**: Less rigid type constraints
 
 ### Expression-Based Design
-
-Everything in Noolang is an expression, promoting a functional programming style:
 
 - No statements, only expressions
 - Functions are first-class values
@@ -1403,8 +1429,6 @@ Everything in Noolang is an expression, promoting a functional programming style
 
 ### Consistent Data Structures
 
-Noolang uses commas as separators for all data structures for consistency and familiarity:
-
 - **Consistency**: Records, lists, and tuples all use commas
 - **Familiarity**: Matches common programming language conventions
 - **Flexibility**: Whitespace around commas is optional
@@ -1412,34 +1436,29 @@ Noolang uses commas as separators for all data structures for consistency and fa
 
 ### Type System
 
-The type system provides:
-
-- **Type inference** for all expressions using a functional Hindley-Milner engine
+- **Type inference**: Hindley-Milner engine
 - **Primitive types**: Float, String, Bool, List, Record, Unit
 - **Function types**: `(Float Float) -> Float`
-- **Type constraints**: Complete constraint system with automatic propagation and validation
-- **Type annotations** (planned for future versions)
+- **Type constraints**: Complete constraint system
+- **Type annotations**: optional
 
-### Effects (Implemented)
+### Effects
 
-Effects are explicit and fully tracked in the type system:
+Effects are explicit and tracked in the type system:
 
-- **IO operations** are marked with `!read`, `!write`, `!log`
-- **State mutations** are tracked with `!state`
-- **Random operations** are marked with `!rand`
-- **All effects** propagate through function composition automatically
-- **Effect validation** ensures type safety and explicit effect handling
+- **IO operations**: `!read`, `!write`, `!log`
+- **State mutations**: `!state`
+- **Random operations**: `!rand`
+- **Effect propagation**: automatic through function composition
 
 ## Future Features
 
-- **Enhanced type annotations**: Record type syntax `{@name String, @age Number}`
-- **Destructuring patterns**: Pattern-based assignment for tuples and records
-- **JavaScript compilation**: Compile to JavaScript for production use
-- **VSCode Language Server**: LSP integration for intellisense and hover types
-- **Show constraints**: Add `Show` constraint to `print` function for type safety
+- **Enhanced type annotations**: Record type syntax
+- **Destructuring patterns**: Pattern-based assignment
+- **JavaScript compilation**: Compile to JavaScript
+- **VSCode Language Server**: LSP integration
 
 ## Contributing
-**Latest Update**: Noolang now features complete recursive algebraic data type support! Define self-referential data structures like binary trees, linked lists, and complex recursive patterns with full type safety and pattern matching. See `examples/recursive_adts.noo` for comprehensive examples.
 
 Feel free to fork, experiment, and contribute!
 

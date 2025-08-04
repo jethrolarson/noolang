@@ -186,24 +186,12 @@ result4 = notEquals 1 2;     # True
 Constraints are currently embedded in function types and propagated automatically:
 
 ```noolang
-# Built-in functions with constraints
-head : List a -> a given a is Collection
-tail : List a -> List a given a is Collection
-length : List a -> Float given a is Collection
 
-# Constraint propagation works through composition
-compose = fn f g => fn x => f (g x)
-safeHead = compose head  # Constraint 'a is Collection' is preserved
-
-# User-defined constraints with trait system
-constraint Show a ( show : a -> String );
-implement Show Float ( show = intToString );
-showValue = show 42  # Automatically resolves to Float implementation
+# TODO make examples (that aren't the same as the built-in ones)
 ```
 
 #### **Integration with Existing Features**
 
-The trait system works seamlessly with all existing Noolang features:
 
 ```noolang
 # With higher-order functions
@@ -224,9 +212,9 @@ implement Show (Option a) given Show a (
 
 ---
 
-### 🚧 **PLANNED: Constraint Annotations with "and"/"or" Syntax**
+### Constraint Annotations with "and" Syntax**
 
-Noolang will support **explicit constraint annotations** using postfix syntax with logical operators.
+Noolang supports **explicit constraint annotations** using postfix syntax with logical operators.
 
 #### **Proposed Syntax**
 
@@ -240,8 +228,8 @@ Noolang will support **explicit constraint annotations** using postfix syntax wi
 # Single constraint
 id : a -> a given a is Collection
 
-# Multiple constraints with "and"
-map : (a -> b, List a) -> List b given a is Show and b is Eq
+# Multiple constraints with "and" (bad example)
+map : (a -> b) -> List a -> List b given a is Show and b is Eq
 
 # Complex constraint logic with "or"
 flexible : a -> b given 
