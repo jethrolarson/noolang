@@ -9,7 +9,8 @@ An functional, expression-based, LLM-friendly programming language designed for 
 - **Effect system** - explicit effect tracking in types
 - **Where expressions** - local definitions within expressions
 - **Pipeline operators** (`|>`, `<|`, `|`, `|?`, `$`) for composition
-- **ADTs** - algebraic data types with pattern matching
+- **Variants** - algebraic data types with pattern matching
+- **User-defined types** - records, tuples, and union types
 - **Records & tuples** - structured data with type safety
 - **REPL** - interactive development environment
 - **VSCode Language Server** - for intellisense and hover types (WIP)
@@ -97,7 +98,7 @@ The REPL includes comprehensive debugging tools:
 
 ### Examples
 
-**Note**: Some examples in the `examples/` directory have known issues due to current type system limitations. See `docs/LANGUAGE_WEAKNESSES.md` for details. Working examples include `basic.noo`, `adt_demo.noo`, `recursive_adts.noo`, `safe_thrush_demo.noo`, `simple_adt.noo`, and `math_functions.noo`.
+**Note**: Some examples in the `examples/` directory have known issues due to current type system limitations. See `docs/LANGUAGE_WEAKNESSES.md` for details. Working examples include `basic.noo`, `adt_demo.noo`, `recursive_adts.noo`, `safe_thrush_demo.noo`, `simple_adt.noo`, `card_game.noo`, and `math_functions.noo`.
 
 ```noolang
 # Function definition
@@ -161,26 +162,41 @@ mut! counter = counter + 1
 # List operations
 [1, 2, 3] |> tail |> head
 
-# Algebraic Data Types
-type Color = Red | Green | Blue;
+# Variant Types (ADTs)
+variant Color = Red | Green | Blue;
 favorite = Red;
 
-type Option a = Some a | None;
+variant Option a = Some a | None;
 result = match (Some 42) with (Some x => x; None => 0)
 
-# Pattern matching with ADTs
-type Point = Point Float Float;
+# Pattern matching with variants
+variant Point = Point Float Float;
 point = Point 10 20;
 x = match point with (Point x y => x)
 
-# Recursive ADTs (Binary Tree)
-type Tree a = Node a (Tree a) (Tree a) | Leaf;
+# Recursive variants (Binary Tree)
+variant Tree a = Node a (Tree a) (Tree a) | Leaf;
 tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
 sum = fn t => match t with (
     Node value left right => value + (sum left) + (sum right);
     Leaf => 0
 );
 tree_sum = sum tree  # => 15
+
+# User-Defined Types
+type User = {@name String, @age Float, @active Bool};
+type Point = {Float, Float};
+type Response = User | String | Float;
+
+# Creating and using user-defined types
+user = {@name "Alice", @age 30, @active True};
+point = {10.5, 20.3};
+response = user;
+
+# Accessing user-defined types
+userName = user | @name;  # "Alice"
+userAge = user | @age;    # 30
+x_coord = match point with ({x, y} => x);  # 10.5
 
 # Tuple pattern matching
 coordinates = {10, 20, 30};
@@ -695,9 +711,21 @@ readAndPrint = fn filename => (
 
 Effects automatically propagate through function composition and are validated by the type system.
 
-## Algebraic Data Types (ADTs)
+## Type System
 
-Noolang supports **Algebraic Data Types** for creating custom types with constructors and pattern matching. This enables type-safe modeling of complex data structures and provides powerful pattern-based control flow.
+Noolang has a rich type system with two main ways to define custom types:
+
+### Variant Types (ADTs)
+
+**Variant types** are algebraic data types for creating sum types with constructors and pattern matching. Use the `variant` keyword:
+
+### User-Defined Types  
+
+**User-defined types** provide type aliases, records, tuples, and unions using clean syntax. Use the `type` keyword:
+
+## Variant Types (Algebraic Data Types)
+
+Noolang supports **Variant Types** for creating custom types with constructors and pattern matching. This enables type-safe modeling of complex data structures and provides powerful pattern-based control flow.
 
 ### Type Definitions
 
@@ -705,15 +733,15 @@ Define custom types with multiple constructors:
 
 ```noolang
 # Simple enum-like types
-type Color = Red | Green | Blue;
+variant Color = Red | Green | Blue;
 
 # Types with parameters
-type Option a = Some a | None;
-type Result a b = Ok a | Err b;
+variant Option a = Some a | None;
+variant Result a b = Ok a | Err b;
 
 # Types with multiple parameters
-type Point a = Point a a;
-type Shape = Circle Float | Rectangle Float Float;
+variant Point a = Point a a;
+variant Shape = Circle Float | Rectangle Float Float;
 ```
 
 ### Built-in ADTs
@@ -932,7 +960,7 @@ match user_result with (
 
 ### Current Implementation Status
 
-- ✅ **Type definitions**: `type Name = Constructor1 | Constructor2`
+- ✅ **Type definitions**: `variant Name = Constructor1 | Constructor2`
 - ✅ **Pattern matching**: `match expr with (pattern => expr; ...)`  
 - ✅ **Built-in types**: Option and Result types with utility functions
 - ✅ **Constructor functions**: Automatic curried constructor creation
@@ -946,6 +974,127 @@ match user_result with (
 - ✅ **Record patterns**: Partial field matching with nested support
 - ✅ **Mixed patterns**: Constructor + tuple/record pattern combinations
 
+## User-Defined Types
+
+Noolang provides **user-defined types** for creating type aliases, structured data types, and unions with clean, intuitive syntax. Use the `type` keyword to distinguish from variant types.
+
+### Record Types
+
+Define structured data with named fields using `@` accessor syntax:
+
+```noolang
+# Simple record type
+type User = {@name String, @age Float, @active Bool};
+
+# Create record values (same syntax as regular records)
+user = {@name "Alice", @age 30, @active True};
+
+# Access fields using accessor chaining
+userName = user | @name;  # "Alice"
+userAge = user | @age;    # 30
+
+# Parameterized record types
+type Container a = {@value a, @count Float, @metadata String};
+stringContainer = {@value "hello", @count 1, @metadata "test"};
+```
+
+### Tuple Types
+
+Define structured data with positional elements:
+
+```noolang
+# Simple tuple type
+type Point = {Float, Float};
+type Point3D = {Float, Float, Float};
+
+# Create tuple values
+point = {10.5, 20.3};
+point3d = {1.0, 2.0, 3.0};
+
+# Access via pattern matching
+x_coord = match point with ({x, y} => x);  # 10.5
+
+# Parameterized tuple types
+type Pair a b = {a, b};
+stringIntPair = {"hello", 42};
+```
+
+### Union Types
+
+Define types that can be one of several alternatives:
+
+```noolang
+# Simple union type
+type StringOrFloat = String | Float;
+
+# Union with multiple types
+type Response = User | String | Float;
+type ApiResult = {@success Bool, @data String} | {@error String, @code Float};
+
+# Using union types
+response1 = user;           # User value
+response2 = "error";        # String value
+response3 = 404;           # Float value
+
+# Pattern matching with union types (when implemented)
+# result = match response with (
+#   User u => "User: " + (u | @name);
+#   String s => "String: " + s;
+#   Float f => "Number: " + toString f
+# );
+```
+
+### Mixed Examples
+
+Combine records, tuples, and unions for complex data modeling:
+
+```noolang
+# Complex type definitions
+type UserProfile = {@name String, @email String};
+type Coordinates = {Float, Float};
+type UserData = UserProfile | Coordinates | String;
+
+# Card game example
+variant Suit = Spade | Heart | Club | Diamond;
+variant CardNum = Ace | King | Queen | Jack;
+type Card = {CardNum, Suit};              # Tuple of variants
+type Hand = {Card, Card, Card, Card, Card}; # Hand is 5 cards
+type Player = {@name String, @hand Hand};   # Player has name and hand
+
+# Create complex data
+aceOfSpades = {Ace, Spade};
+playerHand = {aceOfSpades, {King, Heart}, {Queen, Club}, {Jack, Diamond}, {Ace, Heart}};
+player = {@name "Alice", @hand playerHand};
+```
+
+### Key Differences: Variant vs Type
+
+```noolang
+# Variants: Sum types with constructors for pattern matching
+variant Color = Red | Green | Blue;
+variant Shape = Circle Float | Rectangle Float Float;
+
+# User-defined types: Records, tuples, and type unions
+type User = {@name String, @age Float};      # Record type
+type Point = {Float, Float};                 # Tuple type  
+type Response = User | String | Float;       # Union type
+
+# Different use cases:
+color = Red;                    # Variant constructor
+user = {@name "Alice", @age 30}; # Record value
+point = {10, 20};               # Tuple value
+```
+
+### Implementation Status
+
+- ✅ **Record types**: Full support with `@` accessor syntax
+- ✅ **Tuple types**: Complete positional element support
+- ✅ **Union types**: Type-level unions (runtime pattern matching coming soon)
+- ✅ **Type parameters**: Generic type definitions with parameters
+- ✅ **Parser**: Smart disambiguation between records and tuples
+- ✅ **Type checking**: Full integration with Hindley-Milner type system
+- ✅ **Clean syntax**: No keyword prefixes, intuitive `@` vs positional distinction
+
 ### Recursive ADTs
 
 **New Feature**: Noolang now supports **recursive algebraic data types**, enabling the definition of self-referential data structures like trees, linked lists, and other recursive patterns.
@@ -956,13 +1105,13 @@ Recursive ADTs can reference themselves in their constructor definitions:
 
 ```noolang
 # Binary Tree
-type Tree a = Node a (Tree a) (Tree a) | Leaf;
+variant Tree a = Node a (Tree a) (Tree a) | Leaf;
 
 # Linked List  
-type LinkedList a = Cons a (LinkedList a) | Nil;
+variant LinkedList a = Cons a (LinkedList a) | Nil;
 
 # JSON-like data structure
-type JsonValue = 
+variant JsonValue = 
     JsonObject (List {String, JsonValue}) |
     JsonArray (List JsonValue) |
     JsonString String |
@@ -1250,7 +1399,7 @@ showAll = map show    # Automatically constrains to Show a => List a -> List Str
 result = [1, 2, 3] |> map show |> joinStrings ", "
 
 # With ADTs and pattern matching
-type Option a = Some a | None;
+variant Option a = Some a | None;
 implement Show (Option a) given Show a (
   show = fn opt => match opt with (
     Some x => "Some(" + show x + ")";
