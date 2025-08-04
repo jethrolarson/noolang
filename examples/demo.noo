@@ -243,7 +243,7 @@ invalid_result = handle_result invalid_parse;
 # ========================================
 
 # Simple enum-like ADT
-type Color = Red | Green | Blue;
+variant Color = Red | Green | Blue;
 favorite_color = Red;
 
 # Pattern matching on custom ADT
@@ -256,7 +256,7 @@ color_to_number = fn color => match color with (
 color_value = color_to_number favorite_color;
 
 # ADT with parameters (using concrete types for now)
-type IntPoint = IntPoint Float Float;
+variant IntPoint = IntPoint Float Float;
 origin = IntPoint 0.0 0.0;
 float_point = IntPoint 1.5 2.7;
 
@@ -272,7 +272,7 @@ float_y = get_y float_point;
 # ========================================
 
 # Multiple constructor ADT
-type Shape a = Circle a | Rectangle a a | Triangle a a a;
+variant Shape a = Circle a | Rectangle a a | Triangle a a a;
 
 circle = Circle 5;
 rectangle = Rectangle 10 20;

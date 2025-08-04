@@ -1825,10 +1825,10 @@ const parseConstructor: C.Parser<ConstructorDefinition> = C.map(
 	})
 );
 
-// --- Type Definition ---
+// --- Variant Definition ---
 const parseTypeDefinition: C.Parser<TypeDefinitionExpression> = C.map(
 	C.seq(
-		C.keyword('type'),
+		C.keyword('variant'),
 		parseTypeName,
 		C.many(C.identifier()),
 		C.operator('='),
@@ -2291,7 +2291,7 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
 const parseSequenceTerm: C.Parser<Expression> = C.choice(
 	// Parse keyword-based expressions first to avoid identifier conflicts
 	parseMatchExpression, // ADT pattern matching (starts with "match")
-	parseTypeDefinition, // ADT type definitions (starts with "type")
+	parseTypeDefinition, // ADT variant definitions (starts with "variant")
 	parseConstraintDefinition, // constraint definitions (starts with "constraint")
 	parseImplementDefinition, // implement definitions (starts with "implement")
 	parseMutableDefinition, // starts with "mut"
@@ -2315,7 +2315,7 @@ const parseSequenceTermWithIf: C.Parser<Expression> = parseSequenceTerm;
 const parseWhereMainExpression: C.Parser<Expression> = C.choice(
 	// Parse keyword-based expressions first to avoid identifier conflicts
 	parseMatchExpression, // ADT pattern matching (starts with "match")
-	parseTypeDefinition, // ADT type definitions (starts with "type")
+	parseTypeDefinition, // ADT variant definitions (starts with "variant")
 	parseConstraintDefinition, // constraint definitions (starts with "constraint")
 	parseImplementDefinition, // implement definitions (starts with "implement")
 	parseMutableDefinition, // starts with "mut"

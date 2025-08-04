@@ -69,7 +69,7 @@ test('pure tuples have no effects', () => {
 
 test('pure pattern matching has no effects', () => {
 	const result = runCode(`
-				type Color = Red | Green | Blue;
+				variant Color = Red | Green | Blue;
 				color = Red;
 				match color with (Red => 1; Green => 2; Blue => 3)
 			`);
@@ -77,7 +77,7 @@ test('pure pattern matching has no effects', () => {
 });
 
 // Test suite: Type System Returns TypeResult with Effects
-test('typeProgram returns TypeResult with type and effects', () => {
+test('typeProgram returns TypeResult with variant and effects', () => {
 	const result = runCode('42');
 	expect(result.typeResult).toHaveProperty('type');
 	expect(result.typeResult).toHaveProperty('effects');
@@ -200,7 +200,7 @@ test('thrush operator with pure functions has no effects', () => {
 // Test suite: Effect Propagation in Pattern Matching
 test('pattern matching with pure cases has no effects', () => {
 	const result = runCode(`
-				type Option a = Some a | None;
+				variant Option a = Some a | None;
 				opt = Some 42;
 				match opt with (
 					Some x => x * 2;
@@ -212,8 +212,8 @@ test('pattern matching with pure cases has no effects', () => {
 
 test('nested pattern matching with pure expressions has no effects', () => {
 	const result = runCode(`
-				type Result a b = Ok a | Err b;
-				type Option a = Some a | None;
+				variant Result a b = Ok a | Err b;
+				variant Option a = Some a | None;
 				
 				result = Ok (Some 42);
 				match result with (

@@ -104,7 +104,7 @@ id = fn x => x;
 # BOOLEAN TYPE
 # ========================================
 
-type Bool = True | False;
+variant Bool = True | False;
 
 # Boolean negation
 not = fn b => match b with (True => False; False => True);
@@ -127,7 +127,7 @@ implement Eq Bool (
 # OPTION TYPE
 # ========================================
 
-type Option a = Some a | None;
+variant Option a = Some a | None;
 
 implement Show (Option a) given a implements Show (
   show = fn opt => match opt with (
@@ -182,7 +182,7 @@ implement Applicative Option (
 # ========================================
 
 # Result type for error handling  
-type Result a b = Ok a | Err b;
+variant Result a b = Ok a | Err b;
 
 implement Show Result (
   show = fn res => match res with (

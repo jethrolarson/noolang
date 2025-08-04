@@ -3,8 +3,8 @@ import { parse } from '../parser';
 import { test, expect } from 'bun:test';
 import { assertTypeDefinitionExpression } from '../../../test/utils';
 
-test('Type Definitions (ADTs) - should parse simple type definition', () => {
-	const lexer = new Lexer('type Bool = True | False');
+test('Type Definitions (ADTs) - should parse simple variant definition', () => {
+	const lexer = new Lexer('variant Bool = True | False');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
@@ -19,8 +19,8 @@ test('Type Definitions (ADTs) - should parse simple type definition', () => {
 	expect(typeDef.constructors[1].args).toEqual([]);
 });
 
-test('Type Definitions (ADTs) - should parse type definition with parameters', () => {
-	const lexer = new Lexer('type Option a = None | Some a');
+test('Type Definitions (ADTs) - should parse variant definition with parameters', () => {
+	const lexer = new Lexer('variant Option a = None | Some a');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
@@ -35,8 +35,8 @@ test('Type Definitions (ADTs) - should parse type definition with parameters', (
 	expect(typeDef.constructors[1].args.length).toBe(1);
 });
 
-test('Type Definitions (ADTs) - should parse type definition with complex constructors', () => {
-	const lexer = new Lexer('type Either a b = Left a | Right b');
+test('Type Definitions (ADTs) - should parse variant definition with complex constructors', () => {
+	const lexer = new Lexer('variant Either a b = Left a | Right b');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
@@ -49,8 +49,8 @@ test('Type Definitions (ADTs) - should parse type definition with complex constr
 	expect(typeDef.constructors[1].name).toBe('Right');
 });
 
-test('Type Definitions (ADTs) - should parse type definition with multiple constructor arguments', () => {
-	const lexer = new Lexer('type Person = Person String Float');
+test('Type Definitions (ADTs) - should parse variant definition with multiple constructor arguments', () => {
+	const lexer = new Lexer('variant Person = Person String Float');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);

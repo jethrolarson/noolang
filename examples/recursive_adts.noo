@@ -6,7 +6,7 @@
 # =============================================================================
 
 # Define a recursive binary tree type
-type Tree a = Node a (Tree a) (Tree a) | Leaf;
+variant Tree a = Node a (Tree a) (Tree a) | Leaf;
 
 # Create sample trees
 numberTree = Node 5 (Node 3 (Node 1 Leaf Leaf) (Node 4 Leaf Leaf)) (Node 7 (Node 6 Leaf Leaf) (Node 9 Leaf Leaf));
@@ -65,7 +65,7 @@ doubledTree = mapTree (multiply 2) numberTree;  # Double all values
 # =============================================================================
 
 # Define a recursive linked list type
-type LinkedList a = Cons a (LinkedList a) | Nil;
+variant LinkedList a = Cons a (LinkedList a) | Nil;
 
 # Create sample lists
 numbers = Cons 1 (Cons 2 (Cons 3 (Cons 4 (Cons 5 Nil))));
@@ -137,7 +137,7 @@ restWords = tail words;                 # => Some (Cons "world" ...)
 # =============================================================================
 
 # Define expression tree for mathematical operations
-type Expr = 
+variant Expr = 
     Add Expr Expr |
     Multiply Expr Expr |
     Subtract Expr Expr |
@@ -182,7 +182,7 @@ divisionString = exprToString divisionExpr;   # => "(10 / (2 + 3))"
 # =============================================================================
 
 # Define a recursive JSON-like data structure
-type JsonValue = 
+variant JsonValue = 
     JsonObject (LinkedList {String, JsonValue}) |
     JsonArray (LinkedList JsonValue) |
     JsonString String |

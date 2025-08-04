@@ -27,7 +27,7 @@ result3 = handle_result success;
 result4 = handle_result failure;
 
 # Custom ADT
-type Color = Red | Green | Blue;
+variant Color = Red | Green | Blue;
 my_color = Red;
 
 color_to_num = fn color => match color with (
