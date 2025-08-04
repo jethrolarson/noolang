@@ -1,6 +1,20 @@
 {
   "agentCanUpdateSnapshot": true,
   "snapshot": "snapshot-20250724-6b669f33-892b-49c5-b763-f7928e750611",
-  "install": "npm install",
-  "start": "npm start"
+  "install": "curl -fsSL https://bun.sh/install | bash && export PATH=\"$HOME/.bun/bin:$PATH\" && bun install",
+  "start": "export PATH=\"$HOME/.bun/bin:$PATH\"",
+  "terminals": [
+    {
+      "name": "Type Check",
+      "command": "export PATH=\"$HOME/.bun/bin:$PATH\" && bun run typecheck:all"
+    },
+    {
+      "name": "Test Watch",
+      "command": "export PATH=\"$HOME/.bun/bin:$PATH\" && bun test --watch"
+    },
+    {
+      "name": "REPL",
+      "command": "export PATH=\"$HOME/.bun/bin:$PATH\" && bun src/cli.ts"
+    }
+  ]
 }
