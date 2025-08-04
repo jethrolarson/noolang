@@ -57,31 +57,34 @@ describe('Where Expressions', () => {
 	});
 
 	// TODO fix where not working in function bodies
-	test.skip('should parse where expression in function body', () => {
+	test('should parse where expression in function body', () => {
 		const lexer = new Lexer('fn x => x where (x = 1)');
 		const tokens = lexer.tokenize();
 		const program = parse(tokens);
 		expect(program.statements.length).toBe(1);
-		const whereExpr = program.statements[0];
-		assertWhereExpression(whereExpr);
-		expect(whereExpr.definitions.length).toBe(1);
-		assertDefinitionExpression(whereExpr.definitions[0]);
-		expect(whereExpr.definitions[0].name).toBe('x');
+		const funcExpr = program.statements[0];
+		assertFunctionExpression(funcExpr);
+		expect(funcExpr.params).toEqual(['x']);
+		assertWhereExpression(funcExpr.body);
+		expect(funcExpr.body.definitions.length).toBe(1);
+		assertDefinitionExpression(funcExpr.body.definitions[0]);
+		expect(funcExpr.body.definitions[0].name).toBe('x');
 	});
 
-	// TODO fix where not working in function bodies
-	test.skip('should parse where expression in function body with multiple definitions', () => {
+	test('should parse where expression in function body with multiple definitions', () => {
 		const lexer = new Lexer('fn x => x where (x = 1; y = 2)');
 		const tokens = lexer.tokenize();
 		const program = parse(tokens);
 		expect(program.statements.length).toBe(1);
-		const whereExpr = program.statements[0];
-		assertWhereExpression(whereExpr);
-		expect(whereExpr.definitions.length).toBe(2);
-		assertDefinitionExpression(whereExpr.definitions[0]);
-		expect(whereExpr.definitions[0].name).toBe('x');
-		assertDefinitionExpression(whereExpr.definitions[1]);
-		expect(whereExpr.definitions[1].name).toBe('y');
+		const funcExpr = program.statements[0];
+		assertFunctionExpression(funcExpr);
+		expect(funcExpr.params).toEqual(['x']);
+		assertWhereExpression(funcExpr.body);
+		expect(funcExpr.body.definitions.length).toBe(2);
+		assertDefinitionExpression(funcExpr.body.definitions[0]);
+		expect(funcExpr.body.definitions[0].name).toBe('x');
+		assertDefinitionExpression(funcExpr.body.definitions[1]);
+		expect(funcExpr.body.definitions[1].name).toBe('y');
 	});
 });
 
