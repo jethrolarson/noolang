@@ -21,6 +21,7 @@ import {
 	type ConstraintExpr,
 	type ConstraintDefinitionExpression,
 	type ImplementDefinitionExpression,
+	type UserDefinedTypeExpression,
 	type Type,
 	type FunctionType,
 	type Constraint,
@@ -28,6 +29,9 @@ import {
 	stringType,
 	boolType,
 	functionType,
+	userDefinedRecordType,
+	userDefinedTupleType,
+	userDefinedUnionType,
 	typeVariable,
 	unknownType,
 	unitType,
@@ -1051,6 +1055,37 @@ export const typeBinary = (
 		unionEffects(leftResult.effects, rightResult.effects),
 		currentState
 	);
+};
+
+// Type inference for user-defined types
+export const typeUserDefinedType = (
+	expr: UserDefinedTypeExpression,
+	state: TypeState
+): TypeResult => {
+	// For now, user-defined types just add a type definition to the environment
+	// The actual type will be constructed when the type is referenced
+	// This is similar to how ADTs work - they define a type that can be used later
+	
+	// Create the user-defined type based on the definition
+	let userType: Type;
+	
+	switch (expr.definition.kind) {
+		case 'record-type':
+			userType = userDefinedRecordType(expr.name, expr.typeParams, expr.definition.fields);
+			break;
+		case 'tuple-type':
+			userType = userDefinedTupleType(expr.name, expr.typeParams, expr.definition.elements);
+			break;
+		case 'union-type':
+			userType = userDefinedUnionType(expr.name, expr.typeParams, expr.definition.types);
+			break;
+	}
+	
+	// Add to environment - user-defined types are type-level definitions
+	// For now, we don't store them in the value environment, just return unit
+	// TODO: Implement proper type environment for user-defined types
+	
+	return createPureTypeResult(unitType(), state);
 };
 
 // Type inference for mutable definitions

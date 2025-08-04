@@ -34,6 +34,14 @@ import {
 	tupleTypeConstructor,
 	type ConstraintExpr,
 	type TypeDefinitionExpression,
+	type UserDefinedTypeExpression,
+	type UserDefinedTypeDefinition,
+	type RecordTypeDefinition,
+	type TupleTypeDefinition,
+	type UnionTypeDefinition,
+	userDefinedRecordType,
+	userDefinedTupleType,
+	userDefinedUnionType,
 	type MatchExpression,
 	type ConstructorDefinition,
 	type Pattern,
@@ -1852,6 +1860,104 @@ const parseTypeDefinition: C.Parser<TypeDefinitionExpression> = C.map(
 	})
 );
 
+// --- User-Defined Type Definition ---
+const parseUserDefinedType: C.Parser<UserDefinedTypeExpression> = C.map(
+	C.seq(
+		C.keyword('type'),
+		parseTypeName,
+		C.many(C.identifier()),
+		C.operator('='),
+		C.lazy(() => parseUserDefinedTypeDefinition)
+	),
+	([
+		typeKeyword,
+		name,
+		typeParams,
+		equals,
+		definition,
+	]): UserDefinedTypeExpression => ({
+		kind: 'user-defined-type',
+		name: name.value,
+		typeParams: typeParams.map(p => p.value),
+		definition: definition as UserDefinedTypeDefinition,
+		location: createLocation(
+			typeKeyword.location.start,
+			equals.location.end
+		),
+	})
+);
+
+// Parse record type definition: record {@field Type, ...}
+const parseRecordTypeDefinition: C.Parser<RecordTypeDefinition> = C.map(
+	C.seq(
+		C.keyword('record'),
+		C.punctuation('{'),
+		C.optional(
+			C.sepBy(
+				C.map(
+					C.seq(
+						C.accessor(),
+						C.lazy(() => parseTypeExpression)
+					),
+					([accessor, type]) => [accessor.value, type] as [string, Type]
+				),
+				C.punctuation(',')
+			)
+		),
+		C.punctuation('}')
+	),
+	([recordKeyword, openBrace, fields, closeBrace]): RecordTypeDefinition => {
+		const fieldObj: { [key: string]: Type } = {};
+		if (fields) {
+			for (const [name, type] of fields) {
+				fieldObj[name] = type;
+			}
+		}
+		return {
+			kind: 'record-type',
+			fields: fieldObj,
+		};
+	}
+);
+
+// Parse tuple type definition: tuple {Type, Type, ...}
+const parseTupleTypeDefinition: C.Parser<TupleTypeDefinition> = C.map(
+	C.seq(
+		C.keyword('tuple'),
+		C.punctuation('{'),
+		C.optional(
+			C.sepBy(
+				C.lazy(() => parseTypeExpression),
+				C.punctuation(',')
+			)
+		),
+		C.punctuation('}')
+	),
+	([tupleKeyword, openBrace, elements, closeBrace]): TupleTypeDefinition => ({
+		kind: 'tuple-type',
+		elements: elements || [],
+	})
+);
+
+// Parse union type definition: Type1 | Type2 | ...
+const parseUnionTypeDefinition: C.Parser<UnionTypeDefinition> = C.map(
+	C.sepBy(
+		C.lazy(() => parseTypeExpression),
+		C.operator('|')
+	),
+	(types: Type[]): UnionTypeDefinition => ({
+		kind: 'union-type',
+		types,
+	})
+);
+
+// Parse user-defined type definition (record, tuple, or union)
+const parseUserDefinedTypeDefinition: C.Parser<UserDefinedTypeDefinition> = C.choice(
+	C.map(parseRecordTypeDefinition, (r): UserDefinedTypeDefinition => r),
+	C.map(parseTupleTypeDefinition, (t): UserDefinedTypeDefinition => t),
+	C.map(parseUnionTypeDefinition, (u): UserDefinedTypeDefinition => u)
+);
+
 // --- Constraint Function ---
 const parseConstraintFunction: C.Parser<ConstraintFunction> = C.map(
 	C.seq(
@@ -2292,6 +2398,7 @@ const parseSequenceTerm: C.Parser<Expression> = C.choice(
 	// Parse keyword-based expressions first to avoid identifier conflicts
 	parseMatchExpression, // ADT pattern matching (starts with "match")
 	parseTypeDefinition, // ADT variant definitions (starts with "variant")
+	parseUserDefinedType, // User-defined types (starts with "type")
 	parseConstraintDefinition, // constraint definitions (starts with "constraint")
 	parseImplementDefinition, // implement definitions (starts with "implement")
 	parseMutableDefinition, // starts with "mut"
@@ -2316,6 +2423,7 @@ const parseWhereMainExpression: C.Parser<Expression> = C.choice(
 	// Parse keyword-based expressions first to avoid identifier conflicts
 	parseMatchExpression, // ADT pattern matching (starts with "match")
 	parseTypeDefinition, // ADT variant definitions (starts with "variant")
+	parseUserDefinedType, // User-defined types (starts with "type")
 	parseConstraintDefinition, // constraint definitions (starts with "constraint")
 	parseImplementDefinition, // implement definitions (starts with "implement")
 	parseMutableDefinition, // starts with "mut"
