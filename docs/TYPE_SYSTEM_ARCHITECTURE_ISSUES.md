@@ -142,14 +142,16 @@ The disconnect between runtime implementation (JS primitives) and type system re
 
 ## Current Status
 
-**Priority: HIGH - Blocking Other Fixes**
+**RESOLVED - Dual Nature Issues Fixed**
 
-These architectural issues may be contributing to current test failures, particularly:
-- Constraint preservation bugs (`pure 1` issue)
-- Type inference inconsistencies
-- Unification failures
+As of the latest implementation:
+- ✅ **Bool dual nature fixed**: Removed 'Bool' from PrimitiveType union, now uses only VariantType
+- ✅ **List dual nature fixed**: Removed 'List' from PrimitiveType union, now uses only ListType
+- ✅ **Special case handling removed**: Eliminated primitive-to-list conversions in substitute.ts
+- ✅ **Constraint resolution updated**: Now creates variant List constructors instead of primitive ones
+- ✅ **All tests passing**: 845 tests pass with the new consistent type representations
 
-Recommendation: Address these fundamental issues before attempting to fix surface-level type system bugs.
+These changes eliminate the fundamental architectural inconsistencies while preserving the native array implementation for performance.
 
 ## Related Files
 

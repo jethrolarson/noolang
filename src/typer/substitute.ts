@@ -93,7 +93,7 @@ const substituteWithCache =
 				const substitutedName = substitution.get(type.name);
 				if (substitutedName) {
 					// The variant name is being substituted
-					if (substitutedName.kind === 'primitive' && substitutedName.name === 'List') {
+					if (substitutedName.kind === 'variant' && substitutedName.name === 'List') {
 						// Special case: substituting with List constructor -> create list type
 						if (type.args.length === 1) {
 							return {
