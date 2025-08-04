@@ -1887,10 +1887,9 @@ const parseUserDefinedType: C.Parser<UserDefinedTypeExpression> = C.map(
 	})
 );
 
-// Parse record type definition: record {@field Type, ...}
+// Parse record type definition: {@field Type, ...}  
 const parseRecordTypeDefinition: C.Parser<RecordTypeDefinition> = C.map(
 	C.seq(
-		C.keyword('record'),
 		C.punctuation('{'),
 		C.optional(
 			C.sepBy(
@@ -1906,7 +1905,7 @@ const parseRecordTypeDefinition: C.Parser<RecordTypeDefinition> = C.map(
 		),
 		C.punctuation('}')
 	),
-	([recordKeyword, openBrace, fields, closeBrace]): RecordTypeDefinition => {
+	([openBrace, fields, closeBrace]): RecordTypeDefinition => {
 		const fieldObj: { [key: string]: Type } = {};
 		if (fields) {
 			for (const [name, type] of fields) {
@@ -1920,10 +1919,9 @@ const parseRecordTypeDefinition: C.Parser<RecordTypeDefinition> = C.map(
 	}
 );
 
-// Parse tuple type definition: tuple {Type, Type, ...}
+// Parse tuple type definition: {Type, Type, ...}
 const parseTupleTypeDefinition: C.Parser<TupleTypeDefinition> = C.map(
 	C.seq(
-		C.keyword('tuple'),
 		C.punctuation('{'),
 		C.optional(
 			C.sepBy(
@@ -1933,7 +1931,7 @@ const parseTupleTypeDefinition: C.Parser<TupleTypeDefinition> = C.map(
 		),
 		C.punctuation('}')
 	),
-	([tupleKeyword, openBrace, elements, closeBrace]): TupleTypeDefinition => ({
+	([openBrace, elements, closeBrace]): TupleTypeDefinition => ({
 		kind: 'tuple-type',
 		elements: elements || [],
 	})
@@ -1951,10 +1949,42 @@ const parseUnionTypeDefinition: C.Parser<UnionTypeDefinition> = C.map(
 	})
 );
 
-// Parse user-defined type definition (record, tuple, or union)
+// Parse structured type definition (record or tuple based on content)
+const parseStructuredTypeDefinition: C.Parser<RecordTypeDefinition | TupleTypeDefinition> = (tokens: Token[]) => {
+	// Look ahead to see if we have accessor syntax (@field) or regular types
+	if (tokens.length === 0) return { success: false, error: 'Unexpected end of input', position: 0 };
+	
+	if (tokens[0].type !== 'PUNCTUATION' || tokens[0].value !== '{') {
+		return { success: false, error: 'Expected {', position: 0 };
+	}
+	
+	// Look ahead to determine if this is a record (has @) or tuple (no @)
+	let i = 1;
+	let hasAccessor = false;
+	let braceCount = 1;
+	
+	while (i < tokens.length && braceCount > 0) {
+		if (tokens[i].type === 'PUNCTUATION') {
+			if (tokens[i].value === '{') braceCount++;
+			else if (tokens[i].value === '}') braceCount--;
+		} else if (tokens[i].type === 'ACCESSOR') {
+			hasAccessor = true;
+			break;
+		}
+		i++;
+	}
+	
+	// Parse as record or tuple based on what we found
+	if (hasAccessor) {
+		return parseRecordTypeDefinition(tokens);
+	} else {
+		return parseTupleTypeDefinition(tokens);
+	}
+};
+
+// Parse user-defined type definition (structured type or union)
 const parseUserDefinedTypeDefinition: C.Parser<UserDefinedTypeDefinition> = C.choice(
-	C.map(parseRecordTypeDefinition, (r): UserDefinedTypeDefinition => r),
-	C.map(parseTupleTypeDefinition, (t): UserDefinedTypeDefinition => t),
+	C.map(parseStructuredTypeDefinition, (s): UserDefinedTypeDefinition => s),
 	C.map(parseUnionTypeDefinition, (u): UserDefinedTypeDefinition => u)
 );
 

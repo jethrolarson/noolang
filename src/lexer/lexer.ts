@@ -157,8 +157,6 @@ export class Lexer {
 			'where',
 			'variant',
 			'type',
-			'record',
-			'tuple',
 			'match',
 			'with',
 			'given',

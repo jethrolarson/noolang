@@ -4,35 +4,35 @@ describe('User-Defined Types', () => {
 	describe('Record Types', () => {
 		test('should define simple record type', () => {
 			expectSuccess(
-				`type User = record {@name String, @age Float}`,
+				`type User = {@name String, @age Float}`,
 				{ tag: "unit" }
 			);
 		});
 
 		test('should define empty record type', () => {
 			expectSuccess(
-				`type Empty = record {}`,
+				`type Empty = {}`,
 				{ tag: "unit" }
 			);
 		});
 
 		test('should define record type with single field', () => {
 			expectSuccess(
-				`type SingleField = record {@value Float}`,
+				`type SingleField = {@value Float}`,
 				{ tag: "unit" }
 			);
 		});
 
 		test('should define record type with multiple fields', () => {
 			expectSuccess(
-				`type Person = record {@name String, @age Float, @active Bool}`,
+				`type Person = {@name String, @age Float, @active Bool}`,
 				{ tag: "unit" }
 			);
 		});
 
 		test('should define parameterized record type', () => {
 			expectSuccess(
-				`type Container a = record {@value a, @count Float}`,
+				`type Container a = {@value a, @count Float}`,
 				{ tag: "unit" }
 			);
 		});
@@ -41,35 +41,35 @@ describe('User-Defined Types', () => {
 	describe('Tuple Types', () => {
 		test('should define simple tuple type', () => {
 			expectSuccess(
-				`type Point = tuple {Float, Float}`,
+				`type Point = {Float, Float}`,
 				{ tag: "unit" }
 			);
 		});
 
 		test('should define empty tuple type', () => {
 			expectSuccess(
-				`type Empty = tuple {}`,
+				`type Empty = {}`,
 				{ tag: "unit" }
 			);
 		});
 
 		test('should define single element tuple type', () => {
 			expectSuccess(
-				`type SingleElement = tuple {String}`,
+				`type SingleElement = {String}`,
 				{ tag: "unit" }
 			);
 		});
 
 		test('should define tuple type with multiple elements', () => {
 			expectSuccess(
-				`type Coordinates = tuple {Float, Float, Float, String}`,
+				`type Coordinates = {Float, Float, Float, String}`,
 				{ tag: "unit" }
 			);
 		});
 
 		test('should define parameterized tuple type', () => {
 			expectSuccess(
-				`type Pair a b = tuple {a, b}`,
+				`type Pair a b = {a, b}`,
 				{ tag: "unit" }
 			);
 		});
@@ -96,13 +96,43 @@ describe('User-Defined Types', () => {
 				{ tag: "unit" }
 			);
 		});
+
+		test('should define union with tuple and record', () => {
+			expectSuccess(
+				`type Mixed = String | {Float, String}`,
+				{ tag: "unit" }
+			);
+		});
+	});
+
+	describe('Your Original Examples', () => {
+		test('should support your first example', () => {
+			expectSuccess(
+				`type User = {@name String, @age Float}`,
+				{ tag: "unit" }
+			);
+		});
+
+		test('should support your second example', () => {
+			expectSuccess(
+				`type Foo = String | {Float, String}`,
+				{ tag: "unit" }
+			);
+		});
+
+		test('should support complex mixed types', () => {
+			expectSuccess(
+				`type Complex = String | {Float, Float}`,
+				{ tag: "unit" }
+			);
+		});
 	});
 
 	describe('Complex Combinations', () => {
 		test('should define multiple user-defined types', () => {
 			expectSuccess(`
-				type User = record {@name String, @age Float};
-				type Point = tuple {Float, Float};
+				type User = {@name String, @age Float};
+				type Point = {Float, Float};
 				type Response = String | Float;
 				"all types defined"
 			`, "all types defined");
@@ -111,30 +141,32 @@ describe('User-Defined Types', () => {
 		test('should mix user-defined types with variants', () => {
 			expectSuccess(`
 				variant Color = Red | Green | Blue;
-				type User = record {@name String};
+				type User = {@name String};
 				"mixed successfully"
 			`, "mixed successfully");
 		});
 
-		test('should handle nested type definitions', () => {
+		test('should handle complex nesting', () => {
 			expectSuccess(`
-				type User = record {@name String, @age Float};
-				"nested types defined"
-			`, "nested types defined");
+				type UserRecord = {@name String, @age Float};
+				type UserTuple = {String, Float};
+				type Mixed = UserRecord | UserTuple | String;
+				"complex nesting defined"
+			`, "complex nesting defined");
 		});
 	});
 
 	describe('Type Parameters', () => {
 		test('should handle single type parameter', () => {
 			expectSuccess(
-				`type Container a = record {@value a}`,
+				`type Container a = {@value a}`,
 				{ tag: "unit" }
 			);
 		});
 
 		test('should handle multiple type parameters', () => {
 			expectSuccess(
-				`type Triple a b c = tuple {a, b, c}`,
+				`type Triple a b c = {a, b, c}`,
 				{ tag: "unit" }
 			);
 		});
@@ -145,12 +177,33 @@ describe('User-Defined Types', () => {
 				{ tag: "unit" }
 			);
 		});
+
+		test('should handle complex type parameter usage', () => {
+			expectSuccess(
+				`type Complex a b = {@left a, @right b}`,
+				{ tag: "unit" }
+			);
+		});
 	});
 
 	describe('Basic Functionality', () => {
 		test('should handle whitespace variations', () => {
 			expectSuccess(
-				`type   Spaced   =   record   {   @name   String   }`,
+				`type   Spaced   =   {   @name   String   }`,
+				{ tag: "unit" }
+			);
+		});
+
+		test('should distinguish records from tuples correctly', () => {
+			// Record - has @ accessors
+			expectSuccess(
+				`type UserRecord = {@name String, @age Float}`,
+				{ tag: "unit" }
+			);
+			
+			// Tuple - no @ accessors  
+			expectSuccess(
+				`type UserTuple = {String, Float}`,
 				{ tag: "unit" }
 			);
 		});
