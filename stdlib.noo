@@ -144,7 +144,14 @@ option_get_or = fn default opt => match opt with (
 # Map over Option (using Monad constraint)
 implement Monad Option (
   bind = fn opt f => match opt with (
-    Some x => f x;
+    Some x => (
+      result = f x;
+      match result with (
+        Some y => result;
+        None => result;
+        _ => Some result  # Auto-wrap non-Option values
+      )
+    );
     None => None
   );
   pure = fn x => Some x
@@ -199,8 +206,15 @@ result_get_or = fn default res => match res with (
 
 # Map over Result value (using Monad constraint) 
 implement Monad Result (
-  bind = fn f res => match res with (
-    Ok x => f x;
+  bind = fn res f => match res with (
+    Ok x => (
+      result = f x;
+      match result with (
+        Ok y => result;
+        Err e => result;
+        _ => Ok result  # Auto-wrap non-Result values
+      )
+    );
     Err e => Err e
   );
   pure = fn x => Ok x
