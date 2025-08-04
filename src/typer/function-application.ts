@@ -18,6 +18,7 @@ import { handleTraitFunctionApplication } from './trait-function-handling';
 import { extractFunctionConstraints } from './constraint-resolution';
 import { handleRegularFunctionApplication } from './regular-function-application';
 import { handleVariableTypeApplication } from './variable-type-handling';
+import { type Constraint } from '../ast';
 
 // Main function application entry point - delegates to specialized handlers
 export const typeApplication = (
@@ -154,30 +155,27 @@ export const typePipeline = (
 
 			// For accessor composition, we want to create a clean constraint structure
 			// The result should be: α has {person: γ} and γ has {city: β}
-			const uniqueConstraints: any[] = [];
+			const uniqueConstraints: Constraint[] = [];
 
 			// Find the person constraint from the first function
 			const personConstraint = firstConstraints.find(
-				c => c.kind === 'has' && (c as any).structure.fields.person
+				c => c.kind === 'has' && c.structure.fields.person
 			);
 
 			if (personConstraint && personConstraint.kind === 'has') {
 				// Get the person field variable
-				const personFieldType = (personConstraint as any).structure.fields
-					.person;
+				const personFieldType = personConstraint.structure.fields.person;
 				if (personFieldType.kind === 'variable') {
 					// Find what field the second accessor is trying to access
 					for (const constraint of secondConstraints) {
 						if (constraint.kind === 'has') {
-							const fieldNames = Object.keys(
-								(constraint as any).structure.fields
-							);
+							const fieldNames = Object.keys(constraint.structure.fields);
 							if (fieldNames.length === 1) {
 								// Create a constraint that the person field has the target field
 								const nestedConstraint = {
 									kind: 'has' as const,
 									typeVar: personFieldType.name,
-									structure: (constraint as any).structure,
+									structure: constraint.structure,
 								};
 								uniqueConstraints.push(nestedConstraint);
 								break; // Only add the first matching constraint

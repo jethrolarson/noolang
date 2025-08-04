@@ -54,6 +54,7 @@ import {
 	isTuple,
 	isCell,
 	createCell,
+	valueToString,
 } from './evaluator-utils';
 
 // Re-export commonly used utilities for backward compatibility
@@ -312,7 +313,7 @@ export class Evaluator {
 							intermediate = this.applyTraitFunctionWithValues(f, [x]);
 						} else {
 							throw new Error(
-								`Invalid function type in composition: ${(f as any).tag}`
+								`Invalid function type in composition: ${(f as Value).tag}`
 							);
 						}
 
@@ -323,7 +324,7 @@ export class Evaluator {
 							return this.applyTraitFunctionWithValues(g, [intermediate]);
 						} else {
 							throw new Error(
-								`Invalid function type in composition: ${(g as any).tag}`
+								`Invalid function type in composition: ${(g as Value).tag}`
 							);
 						}
 					});
@@ -491,11 +492,12 @@ export class Evaluator {
 					return createList(
 						list.values.filter((item: Value) => {
 							const result = applyValueFunction(pred, item);
-							if (isBool(result)) {
-								return boolValue(result);
+							if (!isBool(result)) {
+								throw new Error(
+									`filter: predicate function must return a boolean, got ${result.tag}`
+								);
 							}
-							// For non-boolean results, treat as truthy/falsy
-							return !isUnit(result);
+							return boolValue(result);
 						})
 					);
 				}
@@ -1521,7 +1523,7 @@ export class Evaluator {
 					intermediate = this.applyTraitFunctionWithValues(leftVal, [x]);
 				} else {
 					throw new Error(
-						`Invalid function type in |> composition: ${(leftVal as any).tag}`
+						`Invalid function type in |> composition: ${(leftVal as Value).tag}`
 					);
 				}
 
@@ -1532,7 +1534,7 @@ export class Evaluator {
 					return this.applyTraitFunctionWithValues(rightVal, [intermediate]);
 				} else {
 					throw new Error(
-						`Invalid function type in |> composition: ${(rightVal as any).tag}`
+						`Invalid function type in |> composition: ${(rightVal as Value).tag}`
 					);
 				}
 			});
@@ -1559,7 +1561,7 @@ export class Evaluator {
 					intermediate = this.applyTraitFunctionWithValues(rightVal, [x]);
 				} else {
 					throw new Error(
-						`Invalid function type in <| composition: ${(rightVal as any).tag}`
+						`Invalid function type in <| composition: ${(rightVal as Value).tag}`
 					);
 				}
 
@@ -1570,7 +1572,7 @@ export class Evaluator {
 					return this.applyTraitFunctionWithValues(leftVal, [intermediate]);
 				} else {
 					throw new Error(
-						`Invalid function type in <| composition: ${(leftVal as any).tag}`
+						`Invalid function type in <| composition: ${(leftVal as Value).tag}`
 					);
 				}
 			});
@@ -2406,37 +2408,4 @@ export class Evaluator {
 			);
 		}
 	}
-}
-
-// Move valueToString to a standalone function
-function valueToString(value: Value): string {
-	if (isNumber(value)) {
-		return String(value.value);
-	} else if (isString(value)) {
-		return `"${value.value}"`;
-	} else if (isBool(value)) {
-		return boolValue(value) ? 'True' : 'False';
-	} else if (isList(value)) {
-		return `[${value.values.map(valueToString).join('; ')}]`;
-	} else if (isTuple(value)) {
-		return `{${value.values.map(valueToString).join('; ')}}`;
-	} else if (isRecord(value)) {
-		const fields = Object.entries(value.fields)
-			.map(([k, v]) => `@${k} ${valueToString(v)}`)
-			.join('; ');
-		return `{${fields}}`;
-	} else if (isFunction(value)) {
-		return '<function>';
-	} else if (isNativeFunction(value)) {
-		return `<native:${value.name}>`;
-	} else if (isConstructor(value)) {
-		if (value.args.length === 0) {
-			return value.name;
-		} else {
-			return `${value.name} ${value.args.map(valueToString).join(' ')}`;
-		}
-	} else if (isUnit(value)) {
-		return 'unit';
-	}
-	return '[object Object]';
 }

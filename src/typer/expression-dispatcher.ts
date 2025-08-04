@@ -106,6 +106,6 @@ export const typeExpression = (
 			return typeWhere(expr, state);
 
 		default:
-			throw new Error(`Unknown expression kind: ${(expr as any).kind}`);
+			throw new Error(`Unknown expression kind: ${(expr as Expression).kind}`);
 	}
 };

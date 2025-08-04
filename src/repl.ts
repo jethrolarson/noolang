@@ -3,7 +3,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Lexer } from './lexer/lexer';
 import { parse } from './parser/parser';
-import { Evaluator, type Value, isNativeFunction } from './evaluator/evaluator';
+import { Evaluator } from './evaluator/evaluator';
+import { valueToString } from './evaluator/evaluator-utils';
 import {
 	createTypeState,
 	loadStdlib,
@@ -26,12 +27,12 @@ export interface REPLOutput {
 	error(message: string): void;
 }
 
-// Default console output implementation  
+// Default console output implementation
 export class ConsoleOutput implements REPLOutput {
 	log(message: string): void {
 		console.log(message);
 	}
-	
+
 	error(message: string): void {
 		console.error(message);
 	}
@@ -159,18 +160,6 @@ export class REPLCore {
 				this.output.error(colorize.error(`Error: ${errorMessage}`));
 			}
 			return { success: false, error: errorMessage };
-		}
-	}
-
-	private valueToString(value: Value): string {
-		if (typeof value === 'function') {
-			return '<function>';
-		} else if (isNativeFunction(value)) {
-			return `<native:${value.name}>`;
-		} else if (Array.isArray(value)) {
-			return `[${value.map(this.valueToString).join(', ')}]`;
-		} else {
-			return String(value);
 		}
 	}
 
@@ -329,7 +318,7 @@ export class REPLCore {
 				: 'unknown';
 
 			envObj[name] = {
-				value: this.valueToString(value),
+				value: valueToString(value),
 				type: typeStr,
 			};
 		}

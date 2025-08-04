@@ -105,11 +105,12 @@ const substituteTypeParameters = (
 	recursiveType: Type
 ): Type => {
 	switch (type.kind) {
-		case 'variable':
+		case 'variable': {
 			// Replace type parameters with their mapped variables
 			const mappedVar = typeVarMap.get(type.name);
 			return mappedVar || type;
-			
+		}
+
 		case 'variant':
 			// Handle recursive references to the type being defined
 			if (type.name === recursiveName) {
@@ -118,35 +119,72 @@ const substituteTypeParameters = (
 			// Recursively process type arguments
 			return {
 				...type,
-				args: type.args.map(arg => substituteTypeParameters(arg, typeVarMap, recursiveName, recursiveType))
+				args: type.args.map(arg =>
+					substituteTypeParameters(
+						arg,
+						typeVarMap,
+						recursiveName,
+						recursiveType
+					)
+				),
 			};
-			
+
 		case 'function':
 			return {
 				...type,
-				params: type.params.map(param => substituteTypeParameters(param, typeVarMap, recursiveName, recursiveType)),
-				return: substituteTypeParameters(type.return, typeVarMap, recursiveName, recursiveType)
+				params: type.params.map(param =>
+					substituteTypeParameters(
+						param,
+						typeVarMap,
+						recursiveName,
+						recursiveType
+					)
+				),
+				return: substituteTypeParameters(
+					type.return,
+					typeVarMap,
+					recursiveName,
+					recursiveType
+				),
 			};
-			
+
 		case 'list':
 			return {
 				...type,
-				element: substituteTypeParameters(type.element, typeVarMap, recursiveName, recursiveType)
+				element: substituteTypeParameters(
+					type.element,
+					typeVarMap,
+					recursiveName,
+					recursiveType
+				),
 			};
-			
-		case 'record':
+
+		case 'record': {
 			const newFields: { [key: string]: Type } = {};
 			for (const [key, fieldType] of Object.entries(type.fields)) {
-				newFields[key] = substituteTypeParameters(fieldType, typeVarMap, recursiveName, recursiveType);
+				newFields[key] = substituteTypeParameters(
+					fieldType,
+					typeVarMap,
+					recursiveName,
+					recursiveType
+				);
 			}
 			return { ...type, fields: newFields };
-			
+		}
+
 		case 'tuple':
 			return {
 				...type,
-				elements: type.elements.map(elem => substituteTypeParameters(elem, typeVarMap, recursiveName, recursiveType))
+				elements: type.elements.map(elem =>
+					substituteTypeParameters(
+						elem,
+						typeVarMap,
+						recursiveName,
+						recursiveType
+					)
+				),
 			};
-			
+
 		default:
 			return type;
 	}

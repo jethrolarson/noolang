@@ -82,9 +82,9 @@ export const createFalse = (): Value => ({
 export const createBool = (value: boolean): Value =>
 	createConstructor(value ? 'True' : 'False', []);
 
-export const isBool = (
-	value: Value
-): value is { tag: 'constructor'; name: 'True' | 'False'; args: [] } =>
+type BoolValue = { tag: 'constructor'; name: 'True' | 'False'; args: [] };
+
+export const isBool = (value: Value): value is BoolValue =>
 	value.tag === 'constructor' &&
 	(value.name === 'True' || value.name === 'False');
 
@@ -94,15 +94,12 @@ export const boolValue = (value: Value): boolean => {
 	throw new Error(`Expected Bool constructor, got ${value.tag}`);
 };
 
-export const isList = (
-	value: Value
-): value is { tag: 'list'; values: Value[] } => value.tag === 'list';
+export const isList = (value: Value): value is ListValue =>
+	value.tag === 'list';
 
 export const createList = (values: Value[]): Value => ({ tag: 'list', values });
 
-export const isRecord = (
-	value: Value
-): value is { tag: 'record'; fields: { [key: string]: Value } } =>
+export const isRecord = (value: Value): value is RecordValue =>
 	value.tag === 'record';
 
 export const createRecord = (fields: { [key: string]: Value }): Value => ({
@@ -146,23 +143,20 @@ export const createNativeFunction = (
 	},
 });
 
-export const isTuple = (
-	value: Value
-): value is { tag: 'tuple'; values: Value[] } => value.tag === 'tuple';
+export const isTuple = (value: Value): value is TupleValue =>
+	value.tag === 'tuple';
 
 export const createTuple = (values: Value[]): TupleValue => ({
 	tag: 'tuple',
 	values,
 });
 
-export const isUnit = (value: Value): value is { tag: 'unit' } =>
+export const isUnit = (value: Value): value is UnitValue =>
 	value.tag === 'unit';
 
 export const createUnit = (): UnitValue => ({ tag: 'unit' });
 
-export const isConstructor = (
-	value: Value
-): value is { tag: 'constructor'; name: string; args: Value[] } =>
+export const isConstructor = (value: Value): value is ConstructorValue =>
 	value.tag === 'constructor';
 
 export const createConstructor = (
@@ -177,3 +171,35 @@ export const createConstructor = (
 export const isTraitFunctionValue = (
 	value: Value
 ): value is TraitFunctionValue => value.tag === 'trait-function';
+
+export function valueToString(value: Value): string {
+	if (isNumber(value)) {
+		return String(value.value);
+	} else if (isString(value)) {
+		return `"${value.value}"`;
+	} else if (isList(value)) {
+		return `[${value.values.map(valueToString).join('; ')}]`;
+	} else if (isTuple(value)) {
+		return `{${value.values.map(valueToString).join('; ')}}`;
+	} else if (isRecord(value)) {
+		const fields = Object.entries(value.fields)
+			.map(([k, v]) => `@${k} ${valueToString(v)}`)
+			.join('; ');
+		return `{${fields}}`;
+	} else if (isFunction(value)) {
+		return '<function>';
+	} else if (isNativeFunction(value)) {
+		return `<native:${value.name}>`;
+	} else if (isBool(value)) {
+		return boolValue(value) ? 'True' : 'False';
+	} else if (isConstructor(value)) {
+		if (value.args.length === 0) {
+			return value.name;
+		} else {
+			return `${value.name} ${value.args.map(valueToString).join(' ')}`;
+		}
+	} else if (isUnit(value)) {
+		return 'unit';
+	}
+	return 'No way to stringify this value is defined';
+}
