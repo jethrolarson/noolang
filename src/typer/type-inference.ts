@@ -1062,30 +1062,59 @@ export const typeUserDefinedType = (
 	expr: UserDefinedTypeExpression,
 	state: TypeState
 ): TypeResult => {
-	// For now, user-defined types just add a type definition to the environment
-	// The actual type will be constructed when the type is referenced
-	// This is similar to how ADTs work - they define a type that can be used later
-	
+	const { name, typeParams, definition } = expr;
+
+	// Create stable type variables for the user-defined type's parameters
+	const typeVarMap = new Map<string, Type>();
+	for (const param of typeParams) {
+		typeVarMap.set(param, typeVariable(param));
+	}
+
 	// Create the user-defined type based on the definition
 	let userType: Type;
 	
-	switch (expr.definition.kind) {
+	switch (definition.kind) {
 		case 'record-type':
-			userType = userDefinedRecordType(expr.name, expr.typeParams, expr.definition.fields);
+			// Convert to a standard record type
+			userType = {
+				kind: 'record',
+				fields: Object.entries(definition.fields).map(([name, type]) => ({
+					name,
+					type
+				}))
+			};
 			break;
 		case 'tuple-type':
-			userType = userDefinedTupleType(expr.name, expr.typeParams, expr.definition.elements);
+			// Convert to a standard tuple type
+			userType = {
+				kind: 'tuple',
+				elements: definition.elements
+			};
 			break;
 		case 'union-type':
-			userType = userDefinedUnionType(expr.name, expr.typeParams, expr.definition.types);
+			// For single-type unions (type aliases), store the underlying type directly
+			if (definition.types.length === 1) {
+				userType = definition.types[0];
+			} else {
+				// Convert to a standard union type
+				userType = {
+					kind: 'union',
+					types: definition.types
+				};
+			}
 			break;
 	}
 	
-	// Add to environment - user-defined types are type-level definitions
-	// For now, we don't store them in the value environment, just return unit
-	// TODO: Implement proper type environment for user-defined types
+	// Add the user-defined type to the environment so it can be referenced by name
+	const envWithType = new Map(state.environment);
+	envWithType.set(name, {
+		type: userType,
+		quantifiedVars: typeParams,
+	});
 	
-	return createPureTypeResult(unitType(), state);
+	const newState = { ...state, environment: envWithType };
+	
+	return createPureTypeResult(unitType(), newState);
 };
 
 // Type inference for mutable definitions
@@ -1316,6 +1345,62 @@ export const typeWhere = (
 	);
 };
 
+// Resolve type references in user-defined types
+const resolveTypeReferences = (type: Type, environment: Map<string, { type: Type; quantifiedVars: string[] }>): Type => {
+	if (type.kind === 'primitive' || type.kind === 'variant') {
+		// Check if this is a reference to a user-defined type
+		const typeDef = environment.get(type.name);
+		if (typeDef) {
+			// Resolve to the underlying type
+			return typeDef.type;
+		}
+	}
+	
+	// For complex types, recursively resolve references
+	switch (type.kind) {
+		case 'user-defined-record':
+		case 'user-defined-tuple':
+		case 'user-defined-union':
+			// These shouldn't exist anymore, but handle them just in case
+			const typeDef = environment.get(type.name);
+			if (typeDef) {
+				return typeDef.type;
+			}
+			break;
+		case 'record':
+			return {
+				...type,
+				fields: type.fields.map(field => ({
+					...field,
+					type: resolveTypeReferences(field.type, environment)
+				}))
+			};
+		case 'tuple':
+			return {
+				...type,
+				elements: type.elements.map(element => resolveTypeReferences(element, environment))
+			};
+		case 'union':
+			return {
+				...type,
+				types: type.types.map(t => resolveTypeReferences(t, environment))
+			};
+		case 'list':
+			return {
+				...type,
+				element: resolveTypeReferences(type.element, environment)
+			};
+		case 'function':
+			return {
+				...type,
+				input: resolveTypeReferences(type.input, environment),
+				output: resolveTypeReferences(type.output, environment)
+			};
+		default:
+			return type;
+	}
+};
+
 // Type inference for typed expressions
 export const typeTyped = (
 	expr: TypedExpression,
@@ -1323,7 +1408,9 @@ export const typeTyped = (
 ): TypeResult => {
 	// For typed expressions, validate that the explicit type matches the inferred type
 	const inferredResult = typeExpression(expr.expression, state);
-	const explicitType = expr.type;
+	
+	// Resolve type references in the explicit type annotation
+	const explicitType = resolveTypeReferences(expr.type, state.environment);
 
 	const newState = unify(
 		inferredResult.type,

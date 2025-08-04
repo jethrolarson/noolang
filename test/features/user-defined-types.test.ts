@@ -209,3 +209,45 @@ describe('User-Defined Types', () => {
 		});
 	});
 });
+
+describe('Type Alias Functionality', () => {
+    test('simple type alias should work for type annotations', () => {
+        const code = `
+            type Foo = String;
+            x = "hello" : Foo;
+            x
+        `;
+        expectSuccess(code, "hello");
+    });
+
+    test('union type alias should work for type annotations', () => {
+        const code = `
+            type StringOrFloat = String | Float;
+            x = "hello" : StringOrFloat;
+            y = 42 : StringOrFloat;
+            {x, y}
+        `;
+        expectSuccess(code, { tag: "tuple", elements: ["hello", 42] });
+    });
+
+    test('complex type alias should be usable in function signatures', () => {
+        const code = `
+            type User = {@name String, @age Float};
+            createUser = fn name age => {@name name, @age age} : User;
+            user = createUser "Alice" 30;
+            user | @name
+        `;
+        expectSuccess(code, "Alice");
+    });
+
+    test('nested type aliases should resolve correctly', () => {
+        const code = `
+            type Name = String;
+            type Age = Float;
+            type User = {@name Name, @age Age};
+            user = {@name "Bob", @age 25} : User;
+            user | @age
+        `;
+        expectSuccess(code, 25);
+    });
+});
