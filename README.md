@@ -11,6 +11,7 @@ An functional, expression-based, LLM-friendly programming language designed for 
 - **Pipeline operators** (`|>`, `<|`, `|`, `|?`, `$`) for composition
 - **ADTs** - algebraic data types with pattern matching
 - **Records & tuples** - structured data with type safety
+- **Destructuring patterns** - ergonomic data extraction and import spreading
 - **REPL** - interactive development environment
 - **VSCode Language Server** - for intellisense and hover types (WIP)
 - **Syntax Highlighting** - for VSCode and other editors
@@ -127,6 +128,10 @@ add 1 2
 # Where expressions for local definitions
 x + y where (x = 1; y = 2)  # => 3
 
+# Destructuring for clean data extraction
+{x, y} = {10, 20}; x + y  # => 30
+{@name, @age} = {@name "Alice", @age 30}; name  # => "Alice"
+
 # because nesting can get confusing fast noolang includes a few helpful opperators for reducing the need for parens such as the `|` operator:
 2 | add 3 | add 2
 
@@ -204,6 +209,20 @@ result = match data with (
     Some _ => 0;
     None => -1
 )
+
+# Destructuring patterns for data extraction
+{x, y} = {10, 20}
+{@name, @age} = {@name "Bob", @age 25}
+{@name userName, @age} = {@name "Alice", @age 30}  # Renaming
+
+# Nested destructuring
+{outer, {inner, rest}} = {1, {2, 3}}
+{@user {@name, @age}} = {@user {@name "Charlie", @age 35}}
+{@coords {x, y}, @metadata {@name author}} = {@coords {5, 10}, @metadata {@name "Dave"}}
+
+# Import spreading with destructuring  
+{@add, @multiply} = import "math_module"
+{@square sq, @cube cb} = import "power_module"  # With renaming
 ```
 
 ## Language Syntax
@@ -529,6 +548,51 @@ mutation_demo = (
   counter
 )
 ```
+
+### Destructuring Patterns
+
+Noolang supports comprehensive destructuring for tuples and records, enabling ergonomic data extraction and import spreading:
+
+```noolang
+# Basic tuple destructuring
+{x, y} = {10, 20}           # x = 10, y = 20
+
+# Basic record destructuring
+{@name, @age} = {@name "Alice", @age 30}  # name = "Alice", age = 30
+
+# Record destructuring with renaming
+{@name userName, @age userAge} = {@name "Bob", @age 25}  # userName = "Bob", userAge = 25
+
+# Nested tuple destructuring
+{outer, {inner, rest}} = {1, {2, 3}}  # outer = 1, inner = 2, rest = 3
+
+# Nested record destructuring
+{@user {@name, @age}} = {@user {@name "Charlie", @age 35}}  # name = "Charlie", age = 35
+
+# Complex mixed patterns
+{@coords {x, y}, @metadata {@name author}} = {
+  @coords {10, 20}, 
+  @metadata {@name "Dave"}
+}  # x = 10, y = 20, author = "Dave"
+
+# Import spreading with destructuring
+{@add, @multiply} = import "math_module"  # Extract functions from module
+{@square sq, @cube cb} = import "power_module"  # Extract with renaming
+
+# Works in where expressions
+result where (
+  {x, y} = {5, 10};
+  {@name} = {@name "Test"};
+  result = x + y
+)
+```
+
+**Design Principles:**
+- **Safety First**: Only supports destructuring for statically-known structures
+- **No List Destructuring**: Lists have variable length, making patterns unsafe
+- **Immutable Bindings**: Creates new immutable variable bindings
+- **Type Safety**: Full static analysis and error detection
+- **Clear Syntax**: LLM-friendly and predictable patterns
 
 ### Data Structure Syntax
 
@@ -945,6 +1009,8 @@ match user_result with (
 - ✅ **Tuple patterns**: Full destructuring with literal/variable mixing
 - ✅ **Record patterns**: Partial field matching with nested support
 - ✅ **Mixed patterns**: Constructor + tuple/record pattern combinations
+- ✅ **Destructuring patterns**: Complete tuple and record destructuring with nesting
+- ✅ **Import spreading**: Destructuring imports with renaming support
 
 ### Recursive ADTs
 
@@ -1454,7 +1520,6 @@ Effects are explicit and tracked in the type system:
 ## Future Features
 
 - **Enhanced type annotations**: Record type syntax
-- **Destructuring patterns**: Pattern-based assignment
 - **JavaScript compilation**: Compile to JavaScript
 - **VSCode Language Server**: LSP integration
 
