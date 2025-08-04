@@ -1474,7 +1474,7 @@ export class Evaluator {
 						this.traitRegistry
 					);
 					if (result) {
-						return this.ensureMonadicResult(result, left);
+						return result;
 					}
 				} catch (_e) {
 					// Fall through to legacy lookup

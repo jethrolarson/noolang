@@ -9,8 +9,8 @@ describe('Operator Functionality', () => {
 		expectSuccess(`[1, 2, 3] | list_map show`, ['1', '2', '3']);
 	});
 
-	// currently |? is hardcoded to Option
-	test.skip('|? operator with Result type - safe thrush for monads', () => {
+	// |? operator now works with all monads through the trait system
+	test('|? operator with Result type - safe thrush for monads', () => {
 		expectSuccess(
 			`
         result = Ok 5 |? (fn x => x * 2);
@@ -117,12 +117,12 @@ describe('Operator Functionality', () => {
 		);
 	});
 
-	// Failing because result is `Option Option Float` when it should be `Option Float`
-	test.skip('safe thrush with Option type', () => {
+	// Fixed: safeDivide corrected to not double-wrap since / already returns Option
+	test('safe thrush with Option type', () => {
 		expectSuccess(
 			`
-        safeDivide = fn x y => if y == 0 then None else Some (x / y);
-        result = Some 10 |? safeDivide 2;
+        safeDivide = fn x y => if y == 0 then None else (x / y);
+        result = Some 10 |? (fn x => safeDivide x 2);
         match result with (Some x => x; None => 0)
     `,
 			5
