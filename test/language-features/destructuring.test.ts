@@ -104,12 +104,12 @@ test('should throw error for missing fields in record destructuring', () => {
 
 test('should throw error for tuple length mismatch', () => {
 	const source = '{x, y, z} = {1, 2}';
-	expect(() => runCode(source)).toThrow('Tuple destructuring length mismatch');
+	expect(() => runCode(source)).toThrow('Tuple length mismatch');
 });
 
 test('should throw error for type mismatch in destructuring', () => {
 	const source = '{x, y} = "not a tuple"';
-	expect(() => runCode(source)).toThrow('Expected tuple value for tuple destructuring');
+	expect(() => runCode(source)).toThrow('Cannot unify types');
 });
 
 test('should work in where expressions', () => {

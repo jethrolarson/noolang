@@ -1270,6 +1270,14 @@ export const typeWhere = (
 				quantifiedVars: [],
 			});
 			currentState = { ...currentState, environment: whereEnv };
+		} else if ((def as TupleDestructuringExpression).kind === 'tuple-destructuring') {
+			const tupleResult = typeTupleDestructuring(def as TupleDestructuringExpression, currentState);
+			currentState = tupleResult.state;
+			whereEnv = currentState.environment;
+		} else if ((def as RecordDestructuringExpression).kind === 'record-destructuring') {
+			const recordResult = typeRecordDestructuring(def as RecordDestructuringExpression, currentState);
+			currentState = recordResult.state;
+			whereEnv = currentState.environment;
 		}
 	}
 

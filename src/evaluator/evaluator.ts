@@ -1931,6 +1931,10 @@ export class Evaluator {
 				} else if (def.kind === 'mutable-definition') {
 					const value = this.evaluateExpression(def.value);
 					this.environment.set(def.name, createCell(value));
+				} else if (def.kind === 'tuple-destructuring') {
+					this.evaluateTupleDestructuring(def);
+				} else if (def.kind === 'record-destructuring') {
+					this.evaluateRecordDestructuring(def);
 				}
 			}
 			// Evaluate the main expression
