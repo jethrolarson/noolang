@@ -2271,7 +2271,7 @@ const parseMatchExpression: C.Parser<MatchExpression> = C.map(
 // --- Where Expression ---
 const parseWhereExpression: C.Parser<WhereExpression> = C.map(
 	C.seq(
-		C.lazy(() => parseSequenceTermWithIfExceptRecord), // Main expression (no records to avoid circular dependency)
+		C.lazy(() => parseWhereMainExpression), // Main expression (excludes lambda to avoid precedence issues)
 		C.keyword('where'),
 		C.punctuation('('),
 		C.sepBy(parseWhereDefinition, C.punctuation(';')),
@@ -2301,42 +2301,37 @@ const parseSequenceTerm: C.Parser<Expression> = C.choice(
 	// Then parse identifier-based expressions (including destructuring)
 	parseDefinitionWithType, // allow definitions with type annotations (includes destructuring)
 	parseDefinition, // fallback to regular definitions
-	parseWhereExpression,
+	parseWhereExpression, // where expressions (must come before lambda to avoid precedence issues)
+	parseLambdaExpression, // lambda expressions (moved after where)
 	parseThrush, // full expression hierarchy (includes all primaries and type annotations)
 	parseRecord,
-	parseThrush,
-	parseLambdaExpression
+	parseThrush
 );
 
-// Version without records to avoid circular dependency
-const parseSequenceTermExceptRecord: C.Parser<Expression> = C.choice(
-	// Parse keyword-based expressions first
-	parseMatchExpression, // ADT pattern matching
-	parseTypeDefinition, // ADT type definitions
-	parseConstraintDefinition, // constraint definitions
-	parseImplementDefinition, // implement definitions
-	parseMutableDefinition,
-	parseMutation,
-	parseImportExpression,
-	// Then identifier-based expressions (including destructuring)
-	parseDefinition, // Regular definitions (includes destructuring)
-	parseThrush,
-	parseLambdaExpression,
+// parseSequenceTerm now includes parseIfExpression
+const parseSequenceTermWithIf: C.Parser<Expression> = parseSequenceTerm;
+
+// Version for where clause main expressions - excludes lambda to avoid precedence issues
+const parseWhereMainExpression: C.Parser<Expression> = C.choice(
+	// Parse keyword-based expressions first to avoid identifier conflicts
+	parseMatchExpression, // ADT pattern matching (starts with "match")
+	parseTypeDefinition, // ADT type definitions (starts with "type")
+	parseConstraintDefinition, // constraint definitions (starts with "constraint")
+	parseImplementDefinition, // implement definitions (starts with "implement")
+	parseMutableDefinition, // starts with "mut"
+	parseMutation, // starts with "mut!"
+	parseImportExpression, // starts with "import"
+	parseIfAfterDollar, // if expressions (starts with "if")
+	// Then parse identifier-based expressions (including destructuring)
+	parseDefinitionWithType, // allow definitions with type annotations (includes destructuring)
+	parseDefinition, // fallback to regular definitions
+	parseThrush, // full expression hierarchy (includes all primaries and type annotations)
 	parseNumber,
 	parseString,
 	parseIdentifier,
 	parseList,
 	parseAccessor,
 	parseParenExpr
-);
-
-// parseSequenceTerm now includes parseIfExpression
-const parseSequenceTermWithIf: C.Parser<Expression> = parseSequenceTerm;
-
-// Version with if but without records to avoid circular dependency
-const parseSequenceTermWithIfExceptRecord: C.Parser<Expression> = C.choice(
-	parseSequenceTermExceptRecord,
-	parseIfExpression
 );
 
 // --- Parse record structure for constraints ---

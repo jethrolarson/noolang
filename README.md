@@ -68,6 +68,9 @@ add 1 2
 ((add 1) 2)
 # in javascript this could be seen as `const add = x => y => x + y; add(1)(2);`
 
+# Where expressions for local definitions
+x + y where (x = 1; y = 2)  # => 3
+
 # because nesting can get confusing fast noolang includes a few helpful opperators for reducing the need for parens such as the `|` operator:
 2 | add 3 | add 2
 
@@ -91,6 +94,9 @@ user = { @name "Alice", @age 30 }
 
 # Recursion
 factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1))
+
+# Where expressions in functions
+fn x => x * 2 where (x = 5)  # => 10
 
 # Mutation
 mut counter = 0;
@@ -270,6 +276,111 @@ reduce (+) 0 $ map (fn x => x * x) $ filter (fn x => x % 2 == 0) $ [1, 2, 3, 4, 
 ```noolang
 if condition then value1 else value2
 ```
+
+### Where Expressions
+
+Noolang supports **where expressions** for introducing local definitions within expressions, similar to Haskell's `where` clause. This provides a clean way to define local variables without cluttering the global scope.
+
+#### Basic Where Expressions
+
+```noolang
+# Simple where expression with one definition
+x + y where (x = 1)
+
+# Multiple definitions separated by semicolons
+x + y where (x = 1; y = 2)
+
+# Complex expressions in where clauses
+result where (
+  x = 10;
+  y = 20;
+  result = x * y + 5
+)
+```
+
+#### Where Expressions in Function Bodies
+
+Where expressions work seamlessly within function bodies:
+
+```noolang
+# Function with where clause
+fn x => x * 2 where (x = 5)
+
+# Complex function with multiple where definitions
+fn input => 
+  if input > 0 then positive else negative 
+  where (
+    positive = input * 2;
+    negative = input - 10
+  )
+
+# Where expressions with nested logic
+fn x => 
+  if x > 0 then x * 2 else 0 
+  where (x = 5)
+```
+
+#### Where Expressions with Mutable Definitions
+
+Where expressions support both regular and mutable definitions:
+
+```noolang
+# Regular definitions in where clause
+result where (
+  x = 1;
+  y = 2;
+  result = x + y
+)
+
+# Mutable definitions in where clause
+result where (
+  mut counter = 0;
+  mut! counter = counter + 1;
+  result = counter
+)
+```
+
+#### Where Expressions with Complex Types
+
+Where expressions work with all Noolang data structures:
+
+```noolang
+# With records
+user_info where (
+  user = { @name "Alice", @age 30 };
+  user_info = user | @name + " is " + toString (user | @age) + " years old"
+)
+
+# With lists
+sum_squares where (
+  numbers = [1, 2, 3, 4, 5];
+  squares = map (fn x => x * x) numbers;
+  sum_squares = reduce (+) 0 squares
+)
+
+# With pattern matching
+safe_head where (
+  list = [1, 2, 3];
+  safe_head = match list with (
+    [] => None;
+    [head, ...] => Some head
+  )
+)
+```
+
+#### Where Expression Semantics
+
+- **Scope**: Definitions in the where clause are only visible to the main expression
+- **Evaluation**: Where expressions evaluate the main expression in the context of the where definitions
+- **Return Value**: The result of the main expression is returned
+- **Environment**: Where clauses create a new lexical scope for their definitions
+
+#### Benefits of Where Expressions
+
+1. **Local Scope**: Keep temporary variables local to the expression
+2. **Readability**: Break complex expressions into readable parts
+3. **Reusability**: Define intermediate values that can be used multiple times
+4. **Functional Style**: Maintain functional programming principles with local state
 
 ### Records and Accessors
 
