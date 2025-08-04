@@ -1078,10 +1078,7 @@ export const typeUserDefinedType = (
 			// Convert to a standard record type
 			userType = {
 				kind: 'record',
-				fields: Object.entries(definition.fields).map(([name, type]) => ({
-					name,
-					type
-				}))
+				fields: definition.fields  // definition.fields is already { [key: string]: Type }
 			};
 			break;
 		case 'tuple-type':
@@ -1347,12 +1344,20 @@ export const typeWhere = (
 
 // Resolve type references in user-defined types
 const resolveTypeReferences = (type: Type, environment: Map<string, { type: Type; quantifiedVars: string[] }>): Type => {
+	if (!type) {
+		return type;
+	}
+	
 	if (type.kind === 'primitive' || type.kind === 'variant') {
 		// Check if this is a reference to a user-defined type
 		const typeDef = environment.get(type.name);
 		if (typeDef) {
 			// Resolve to the underlying type
-			return typeDef.type;
+			const resolvedType = typeDef.type;
+			if (!resolvedType) {
+				return type;
+			}
+			return resolvedType;
 		}
 	}
 	
@@ -1368,12 +1373,13 @@ const resolveTypeReferences = (type: Type, environment: Map<string, { type: Type
 			}
 			break;
 		case 'record':
+			const resolvedFields: { [key: string]: Type } = {};
+			for (const [fieldName, fieldType] of Object.entries(type.fields)) {
+				resolvedFields[fieldName] = resolveTypeReferences(fieldType, environment);
+			}
 			return {
 				...type,
-				fields: type.fields.map(field => ({
-					...field,
-					type: resolveTypeReferences(field.type, environment)
-				}))
+				fields: resolvedFields
 			};
 		case 'tuple':
 			return {
@@ -1383,7 +1389,13 @@ const resolveTypeReferences = (type: Type, environment: Map<string, { type: Type
 		case 'union':
 			return {
 				...type,
-				types: type.types.map(t => resolveTypeReferences(t, environment))
+				types: type.types.map(t => {
+					const resolved = resolveTypeReferences(t, environment);
+					if (!resolved) {
+						return t;
+					}
+					return resolved;
+				})
 			};
 		case 'list':
 			return {
