@@ -8,6 +8,8 @@ import {
 	type DefinitionExpression,
 	type TupleDestructuringExpression,
 	type RecordDestructuringExpression,
+	type TupleDestructuringPattern,
+	type RecordDestructuringPattern,
 	type MutableDefinitionExpression,
 	type MutationExpression,
 	type ImportExpression,
@@ -1431,6 +1433,88 @@ export const typeImplementDefinition = (
 	return createTypeResult(unitType(), allEffects, currentState);
 };
 
+// Helper types for nested destructuring
+type NestedTupleResult = {
+	tupleType: Type;
+	bindings: { name: string; type: Type }[];
+};
+
+type NestedRecordResult = {
+	recordType: Type;
+	bindings: { name: string; type: Type }[];
+};
+
+// Helper function to type nested tuple patterns
+const typeNestedTuplePattern = (
+	pattern: TupleDestructuringPattern, 
+	state: TypeState
+): [NestedTupleResult, TypeState] => {
+	let currentState = state;
+	const elementTypes: Type[] = [];
+	const bindings: { name: string; type: Type }[] = [];
+
+	for (const element of pattern.elements) {
+		if (element.kind === 'variable') {
+			const [elementType, newState] = freshTypeVariable(currentState);
+			currentState = newState;
+			elementTypes.push(elementType);
+			bindings.push({ name: element.name, type: elementType });
+		} else if (element.kind === 'nested-tuple') {
+			const [nestedResult, newState] = typeNestedTuplePattern(element.pattern, currentState);
+			currentState = newState;
+			elementTypes.push(nestedResult.tupleType);
+			bindings.push(...nestedResult.bindings);
+		} else if (element.kind === 'nested-record') {
+			const [nestedResult, newState] = typeNestedRecordPattern(element.pattern, currentState);
+			currentState = newState;
+			elementTypes.push(nestedResult.recordType);
+			bindings.push(...nestedResult.bindings);
+		} else {
+			throw new Error(`Unknown destructuring element kind: ${(element as any).kind}`);
+		}
+	}
+
+	return [{ tupleType: tupleType(elementTypes), bindings }, currentState];
+};
+
+// Helper function to type nested record patterns
+const typeNestedRecordPattern = (
+	pattern: RecordDestructuringPattern,
+	state: TypeState
+): [NestedRecordResult, TypeState] => {
+	let currentState = state;
+	const fieldTypes: { [key: string]: Type } = {};
+	const bindings: { name: string; type: Type }[] = [];
+
+	for (const field of pattern.fields) {
+		if (field.kind === 'shorthand') {
+			const [fieldType, newState] = freshTypeVariable(currentState);
+			currentState = newState;
+			fieldTypes[field.fieldName] = fieldType;
+			bindings.push({ name: field.fieldName, type: fieldType });
+		} else if (field.kind === 'rename') {
+			const [fieldType, newState] = freshTypeVariable(currentState);
+			currentState = newState;
+			fieldTypes[field.fieldName] = fieldType;
+			bindings.push({ name: field.localName, type: fieldType });
+		} else if (field.kind === 'nested-tuple') {
+			const [nestedResult, newState] = typeNestedTuplePattern(field.pattern, currentState);
+			currentState = newState;
+			fieldTypes[field.fieldName] = nestedResult.tupleType;
+			bindings.push(...nestedResult.bindings);
+		} else if (field.kind === 'nested-record') {
+			const [nestedResult, newState] = typeNestedRecordPattern(field.pattern, currentState);
+			currentState = newState;
+			fieldTypes[field.fieldName] = nestedResult.recordType;
+			bindings.push(...nestedResult.bindings);
+		} else {
+			throw new Error(`Unknown record destructuring field kind: ${(field as any).kind}`);
+		}
+	}
+
+	return [{ recordType: recordType(fieldTypes), bindings }, currentState];
+};
+
 // Type inference for tuple destructuring
 export const typeTupleDestructuring = (
 	expr: TupleDestructuringExpression,
@@ -1444,7 +1528,7 @@ export const typeTupleDestructuring = (
 
 	// Create fresh type variables for each destructured element
 	const elementTypes: Type[] = [];
-	const elementNames: string[] = [];
+	const allBindings: { name: string; type: Type }[] = [];
 	
 	// Extract variable names and create types for them
 	for (const element of expr.pattern.elements) {
@@ -1452,10 +1536,21 @@ export const typeTupleDestructuring = (
 			const [elementType, newState] = freshTypeVariable(currentState);
 			currentState = newState;
 			elementTypes.push(elementType);
-			elementNames.push(element.name);
+			allBindings.push({ name: element.name, type: elementType });
+		} else if (element.kind === 'nested-tuple') {
+			// Handle nested tuple destructuring
+			const [nestedResult, newState] = typeNestedTuplePattern(element.pattern, currentState);
+			currentState = newState;
+			elementTypes.push(nestedResult.tupleType);
+			allBindings.push(...nestedResult.bindings);
+		} else if (element.kind === 'nested-record') {
+			// Handle nested record destructuring  
+			const [nestedResult, newState] = typeNestedRecordPattern(element.pattern, currentState);
+			currentState = newState;
+			elementTypes.push(nestedResult.recordType);
+			allBindings.push(...nestedResult.bindings);
 		} else {
-			// TODO: Handle nested destructuring
-			throw new Error('Nested tuple destructuring not yet implemented');
+			throw new Error(`Unknown destructuring element kind: ${(element as any).kind}`);
 		}
 	}
 
@@ -1469,13 +1564,13 @@ export const typeTupleDestructuring = (
 	);
 
 	// Add all destructured variables to environment
-	for (let i = 0; i < elementNames.length; i++) {
+	for (const binding of allBindings) {
 		const scheme = generalize(
-			elementTypes[i],
+			binding.type,
 			currentState.environment,
 			currentState.substitution
 		);
-		const finalEnv = mapSet(currentState.environment, elementNames[i], scheme);
+		const finalEnv = mapSet(currentState.environment, binding.name, scheme);
 		currentState = { ...currentState, environment: finalEnv };
 	}
 
@@ -1518,9 +1613,32 @@ export const typeRecordDestructuring = (
 				fieldName: field.fieldName,
 				type: fieldType
 			});
+		} else if (field.kind === 'nested-tuple') {
+			const [nestedResult, newState] = typeNestedTuplePattern(field.pattern, currentState);
+			currentState = newState;
+			fieldTypes[field.fieldName] = nestedResult.tupleType;
+			// Add all nested bindings
+			for (const binding of nestedResult.bindings) {
+				localBindings.push({
+					localName: binding.name,
+					fieldName: field.fieldName,
+					type: binding.type
+				});
+			}
+		} else if (field.kind === 'nested-record') {
+			const [nestedResult, newState] = typeNestedRecordPattern(field.pattern, currentState);
+			currentState = newState;
+			fieldTypes[field.fieldName] = nestedResult.recordType;
+			// Add all nested bindings
+			for (const binding of nestedResult.bindings) {
+				localBindings.push({
+					localName: binding.name,
+					fieldName: field.fieldName,
+					type: binding.type
+				});
+			}
 		} else {
-			// TODO: Handle nested destructuring
-			throw new Error('Nested record destructuring not yet implemented');
+			throw new Error(`Unknown record destructuring field kind: ${(field as any).kind}`);
 		}
 	}
 

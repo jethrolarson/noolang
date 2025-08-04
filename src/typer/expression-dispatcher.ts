@@ -21,6 +21,7 @@ import {
 	typeTyped,
 	typeConstrained,
 	typeWhere,
+	typeImport,
 } from './type-inference';
 import { typeApplication, typePipeline } from './function-application';
 import { typeMatch, typeTypeDefinition } from './pattern-matching';
@@ -75,6 +76,9 @@ export const typeExpression = (
 
 		case 'mutation':
 			return typeMutation(expr, state);
+
+		case 'import':
+			return typeImport(expr, state);
 
 		case 'unit':
 			// {} should be polymorphic - it can unify with unit, empty tuples, and empty records
