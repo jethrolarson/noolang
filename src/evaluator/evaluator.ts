@@ -13,6 +13,8 @@ import type {
 	DefinitionExpression,
 	TupleDestructuringExpression,
 	RecordDestructuringExpression,
+	TupleDestructuringPattern,
+	RecordDestructuringPattern,
 	ImportExpression,
 	RecordExpression,
 	AccessorExpression,
@@ -1017,13 +1019,96 @@ export class Evaluator {
 
 			if (element.kind === 'variable') {
 				this.environment.set(element.name, elementValue);
+			} else if (element.kind === 'nested-tuple') {
+				// Handle nested tuple destructuring
+				if (elementValue.tag !== 'tuple') {
+					throw new Error(`Expected tuple value for nested tuple destructuring at position ${i}, got ${elementValue.tag}`);
+				}
+				
+				this.extractTupleElements(element.pattern, elementValue);
+			} else if (element.kind === 'nested-record') {
+				// Handle nested record destructuring
+				if (elementValue.tag !== 'record') {
+					throw new Error(`Expected record value for nested record destructuring at position ${i}, got ${elementValue.tag}`);
+				}
+				
+				this.extractRecordFields(element.pattern, elementValue);
 			} else {
-				// TODO: Handle nested destructuring
-				throw new Error('Nested tuple destructuring not yet implemented');
+				throw new Error(`Unknown destructuring element kind: ${(element as any).kind}`);
 			}
 		}
 
 		return value;
+	}
+
+	private extractTupleElements(pattern: TupleDestructuringPattern, tupleValue: any): void {
+		// Check that the number of pattern elements matches tuple elements
+		if (pattern.elements.length !== tupleValue.values.length) {
+			throw new Error(
+				`Nested tuple destructuring length mismatch: pattern has ${pattern.elements.length} elements but value has ${tupleValue.values.length}`
+			);
+		}
+
+		// Bind each pattern element to its corresponding value
+		for (let i = 0; i < pattern.elements.length; i++) {
+			const element = pattern.elements[i];
+			const elementValue = tupleValue.values[i];
+
+			if (element.kind === 'variable') {
+				this.environment.set(element.name, elementValue);
+			} else if (element.kind === 'nested-tuple') {
+				if (elementValue.tag !== 'tuple') {
+					throw new Error(`Expected tuple value for nested tuple destructuring at position ${i}, got ${elementValue.tag}`);
+				}
+				this.extractTupleElements(element.pattern, elementValue);
+			} else if (element.kind === 'nested-record') {
+				if (elementValue.tag !== 'record') {
+					throw new Error(`Expected record value for nested record destructuring at position ${i}, got ${elementValue.tag}`);
+				}
+				this.extractRecordFields(element.pattern, elementValue);
+			} else {
+				throw new Error(`Unknown destructuring element kind: ${(element as any).kind}`);
+			}
+		}
+	}
+
+	private extractRecordFields(pattern: RecordDestructuringPattern, recordValue: any): void {
+		// Bind each pattern field to its corresponding value
+		for (const field of pattern.fields) {
+			if (field.kind === 'shorthand') {
+				// @name -> name
+				if (!(field.fieldName in recordValue.fields)) {
+					throw new Error(`Field '${field.fieldName}' not found in record`);
+				}
+				this.environment.set(field.fieldName, recordValue.fields[field.fieldName]);
+			} else if (field.kind === 'rename') {
+				// @name userName -> userName
+				if (!(field.fieldName in recordValue.fields)) {
+					throw new Error(`Field '${field.fieldName}' not found in record`);
+				}
+				this.environment.set(field.localName, recordValue.fields[field.fieldName]);
+			} else if (field.kind === 'nested-tuple') {
+				if (!(field.fieldName in recordValue.fields)) {
+					throw new Error(`Field '${field.fieldName}' not found in record`);
+				}
+				const fieldValue = recordValue.fields[field.fieldName];
+				if (fieldValue.tag !== 'tuple') {
+					throw new Error(`Expected tuple value for nested tuple destructuring in field '${field.fieldName}', got ${fieldValue.tag}`);
+				}
+				this.extractTupleElements(field.pattern, fieldValue);
+			} else if (field.kind === 'nested-record') {
+				if (!(field.fieldName in recordValue.fields)) {
+					throw new Error(`Field '${field.fieldName}' not found in record`);
+				}
+				const fieldValue = recordValue.fields[field.fieldName];
+				if (fieldValue.tag !== 'record') {
+					throw new Error(`Expected record value for nested record destructuring in field '${field.fieldName}', got ${fieldValue.tag}`);
+				}
+				this.extractRecordFields(field.pattern, fieldValue);
+			} else {
+				throw new Error(`Unknown record destructuring field kind: ${(field as any).kind}`);
+			}
+		}
 	}
 
 	private evaluateRecordDestructuring(
@@ -1037,25 +1122,8 @@ export class Evaluator {
 			throw new Error('Expected record value for record destructuring');
 		}
 
-		// Bind each pattern field to its corresponding value
-		for (const field of expr.pattern.fields) {
-			if (field.kind === 'shorthand') {
-				// @name -> name
-				if (!(field.fieldName in value.fields)) {
-					throw new Error(`Field '${field.fieldName}' not found in record`);
-				}
-				this.environment.set(field.fieldName, value.fields[field.fieldName]);
-			} else if (field.kind === 'rename') {
-				// @name userName -> userName
-				if (!(field.fieldName in value.fields)) {
-					throw new Error(`Field '${field.fieldName}' not found in record`);
-				}
-				this.environment.set(field.localName, value.fields[field.fieldName]);
-			} else {
-				// TODO: Handle nested destructuring
-				throw new Error('Nested record destructuring not yet implemented');
-			}
-		}
+		// Use the helper method to extract fields
+		this.extractRecordFields(expr.pattern, value);
 
 		return value;
 	}
@@ -1865,6 +1933,10 @@ export class Evaluator {
 				} else if (def.kind === 'mutable-definition') {
 					const value = this.evaluateExpression(def.value);
 					this.environment.set(def.name, createCell(value));
+				} else if (def.kind === 'tuple-destructuring') {
+					this.evaluateTupleDestructuring(def);
+				} else if (def.kind === 'record-destructuring') {
+					this.evaluateRecordDestructuring(def);
 				}
 			}
 			// Evaluate the main expression
