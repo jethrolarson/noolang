@@ -235,31 +235,31 @@ result = (x = 5; y = 10; x + y * 2);
 # More complex example  
 x = 6;
 z = 9;
-calculation = (base = x * 2; helper = z / 3; base + helper)
+calculation = (base = x * 2; helper = 3; base + helper)
 ```
 
 ### Record Operations
 ```noolang
 # Record creation
-person = { @name "Alice", @age 30, @city "NYC" }
+person = { @name "Alice", @age 30, @city "NYC" };
 
 # Field access
-name = person.name
+name = person.name;
 
 # Record with computed fields
-point = { @x 1 + 2, @y 3 * 4 }
+point = { @x 1 + 2, @y 3 * 4 };
+point
 ```
 
 ### Accessor Patterns
 ```noolang
 # Define accessor
-@name = fn record => record.name
+nameAccessor = fn record => record.name;
 
 # Use accessor in pipeline
-person |> @name |> show
-
-# Accessor with records
-{ @getName @name, @getAge @age }
+person = { @name "Alice", @age 30 };
+result = person | nameAccessor;
+result
 ```
 
 ## Type Annotations (Planned)

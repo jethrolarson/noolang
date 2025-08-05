@@ -93,3 +93,5 @@ if (failedBlocks > 0) {
     console.log(`⚠️  ${failedBlocks} examples need fixing`);
     process.exit(1);
 }
+
+console.log("Okay chatbot. Now add this to ci.yml or something so it runs automatically")
