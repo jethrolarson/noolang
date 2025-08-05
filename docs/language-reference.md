@@ -195,7 +195,7 @@ result = 5 | composed             # square (addOne 5) = 36
 
 #### Safe Pipe (`|?`)
 ```noolang
-# Works with Option/Result types and division
+# Works with Option/Result types
 divideByTwo = fn x => x / 2;
 multiplyByThree = fn x => x * 3;
 result = Some 12 |? divideByTwo |? multiplyByThree;

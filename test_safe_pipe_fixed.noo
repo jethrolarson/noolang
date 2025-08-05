@@ -1,5 +1,0 @@
-# Works with Option/Result types and division
-divideByTwo = fn x => x / 2;
-multiplyByThree = fn x => x * 3;
-result = Some 12 |? divideByTwo |? multiplyByThree;
-result
