@@ -102,10 +102,14 @@ export function tryResolveConstraints(
 					// Create a substitution and apply it to the return type
 					const substitution = new Map(state.substitution);
 
-					if (argType.kind === 'list') {
-						// For List types, substitute the type constructor
-						substitution.set(varName, { kind: 'primitive', name: 'List' });
-					} else if (argType.kind === 'variant') {
+									if (argType.kind === 'list') {
+					// For List types, substitute the type constructor variable with List variant
+					substitution.set(varName, {
+						kind: 'variant',
+						name: 'List',
+						args: [], // Empty args since this is just the constructor
+					});
+				} else if (argType.kind === 'variant') {
 						// For variant types, substitute with the constructor
 						substitution.set(varName, {
 							kind: 'variant',

@@ -14,8 +14,8 @@ import { functionApplicationError } from './type-errors';
 import { getTypeName } from './trait-system';
 
 // Valid primitive type names (must match PrimitiveType['name'] union)
-const VALID_PRIMITIVES = new Set(['Float', 'String', 'Bool', 'List'] as const);
-type ValidPrimitiveName = 'Float' | 'String' | 'Bool' | 'List';
+const VALID_PRIMITIVES = new Set(['Float', 'String'] as const);
+type ValidPrimitiveName = 'Float' | 'String';
 
 // Type guard for valid primitive names
 function isValidPrimitiveName(name: string): name is ValidPrimitiveName {
@@ -695,8 +695,9 @@ function tryUnifyConstrainedVariant(
 				if (concreteType.kind === 'list') {
 					// For List types, substitute the type constructor
 					newSubstitution.set(variantType.name, {
-						kind: 'primitive',
+						kind: 'variant',
 						name: 'List',
+						args: [], // Empty args since this is just the constructor
 					});
 
 					// Transform α130 Float -> List Float
@@ -867,8 +868,13 @@ function unifyConstrainedWithConcrete(
 	// we should substitute the type variable with the concrete type constructor
 
 	if (concreteType.kind === 'list') {
-		// For List Float, we substitute the type constructor variable with List
-		newSubstitution.set(resolvedVarName, { kind: 'primitive', name: 'List' });
+		// For List Float, we substitute the type constructor variable with the list type constructor
+		// We need to create a type constructor representation for List
+		newSubstitution.set(resolvedVarName, {
+			kind: 'variant',
+			name: 'List',
+			args: [], // Empty args since this is just the constructor
+		});
 	} else if (concreteType.kind === 'variant') {
 		// For Option Float, Maybe String, etc., we need to substitute with a type constructor
 		// We can't create a primitive with variant name, so we substitute with the variant type itself

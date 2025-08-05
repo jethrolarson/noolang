@@ -72,7 +72,7 @@ export type StructureFieldType = Type | NestedStructureFieldType;
 // Extracted type definitions
 export type PrimitiveType = {
 	kind: 'primitive';
-	name: 'String' | 'Bool' | 'List' | 'Float'; // TODO: Remove List
+	name: 'String' | 'Float'; // Only true primitives - List and Bool removed
 };
 
 export type FunctionType = {
@@ -617,10 +617,7 @@ export const boolType = (): VariantType => ({
 	name: 'Bool',
 	args: [],
 });
-export const listType = (): PrimitiveType => ({
-	kind: 'primitive',
-	name: 'List',
-});
+// listType() removed - use listTypeWithElement() instead
 export const functionType = (
 	params: Type[],
 	returnType: Type,
@@ -671,7 +668,7 @@ export const recordType = (fields: { [key: string]: Type }): RecordType => ({
 
 // Constructor functions for new types
 export const primitiveType = (
-	name: 'Float' | 'String' | 'Bool' | 'List'
+	name: 'Float' | 'String'
 ): PrimitiveType => ({
 	kind: 'primitive',
 	name,
