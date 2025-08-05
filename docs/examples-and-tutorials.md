@@ -142,7 +142,7 @@ pair = {42, "answer"} : {Float, String}
 
 # Typed record
 person = { @name "Alice", @age 30, @active True } 
-  : { @name String, @age Number, @active Bool }
+  : { @name String, @age Float, @active Bool }
 ```
 
 ### Pipeline Type Inference

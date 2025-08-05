@@ -56,7 +56,7 @@ All keywords supported by the lexer ([`src/lexer/lexer.ts:147-176`](../src/lexer
 ### Function Definition  
 - `fn` - Function definition
 
-- `where` - Local definitions within expressions
+- `;` - Expression sequencing for local bindings
 
 ### Type System
 - `type` - Type definitions
@@ -213,13 +213,16 @@ sign = if x > 0 then "positive"
        else "zero"
 ```
 
-### Where Expressions
+### Local Bindings
+
+Local bindings are created using expression sequencing with semicolons:
+
 ```noolang
-# Local definitions
-result = calculation + helper
-where
-  calculation = x * 2 + y
-  helper = z / 3
+# Local bindings using semicolons
+result = x = 5; y = 10; x + y * 2
+
+# More complex example  
+calculation = base = x * 2; helper = z / 3; base + helper
 ```
 
 ### Record Operations
