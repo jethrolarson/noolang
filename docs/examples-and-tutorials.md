@@ -30,7 +30,7 @@ numbers = [1, 2, 3, 4, 5]
 squared = map (fn x => x * x) numbers  # [1, 4, 9, 16, 25]
 
 # Records
-person = { name = "Alice", age = 30 }
+person = { @name "Alice", @age 30 }
 
 # Accessing fields
 name = person.name         # "Alice"
@@ -84,7 +84,7 @@ empty_list = []
 number_list = [1, 2, 3, 4, 5]
 
 # Records with named fields
-person = { name = "Alice", age = 30, city = "Wonderland" }
+person = { @name "Alice", @age 30, @city "Wonderland" }
 
 # Field access
 person_name = person.name
@@ -141,8 +141,8 @@ strings = ["hello", "world"] : List String
 pair = {42, "answer"} : {Number, String}
 
 # Typed record
-person = { name = "Alice"; age = 30; active = true } 
-  : { name : String; age : Number; active : Bool }
+person = { @name "Alice", @age 30, @active true } 
+  : { @name String, @age Number, @active Bool }
 ```
 
 ### Pipeline Type Inference
