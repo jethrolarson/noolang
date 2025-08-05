@@ -1371,7 +1371,7 @@ const resolveTypeReferences = (type: Type, environment: Map<string, { type: Type
 			if (typeDef) {
 				return typeDef.type;
 			}
-			break;
+			return type; // fallback if no type definition found
 		case 'record':
 			const resolvedFields: { [key: string]: Type } = {};
 			for (const [fieldName, fieldType] of Object.entries(type.fields)) {
@@ -1405,8 +1405,8 @@ const resolveTypeReferences = (type: Type, environment: Map<string, { type: Type
 		case 'function':
 			return {
 				...type,
-				input: resolveTypeReferences(type.input, environment),
-				output: resolveTypeReferences(type.output, environment)
+				params: type.params.map(param => resolveTypeReferences(param, environment)),
+				return: resolveTypeReferences(type.return, environment)
 			};
 		default:
 			return type;
