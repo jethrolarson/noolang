@@ -359,8 +359,11 @@ Create a function that converts Celsius to Fahrenheit:
 
 ```noolang
 # Temperature conversion using |? with division
-celsiusToFahrenheit = fn celsius => 
-  celsius * 9 |? (/ 5) |? (+ 32);
+celsiusToFahrenheit = fn celsius => (
+  divideBy5 = fn x => x / 5;
+  add32 = fn x => x + 32;
+  Some (celsius * 9) |? divideBy5 |? add32
+);
 
 # Test cases  
 test1 = celsiusToFahrenheit 0;     # Some 32.0
