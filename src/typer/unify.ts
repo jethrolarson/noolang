@@ -695,8 +695,9 @@ function tryUnifyConstrainedVariant(
 				if (concreteType.kind === 'list') {
 					// For List types, substitute the type constructor
 					newSubstitution.set(variantType.name, {
-						kind: 'primitive',
+						kind: 'variant',
 						name: 'List',
+						args: [], // Empty args since this is just the constructor
 					});
 
 					// Transform α130 Float -> List Float

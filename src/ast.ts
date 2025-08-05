@@ -611,7 +611,7 @@ export const recordType = (fields: { [key: string]: Type }): RecordType => ({
 
 // Constructor functions for new types
 export const primitiveType = (
-	name: 'Float' | 'String' | 'Bool' | 'List'
+	name: 'Float' | 'String'
 ): PrimitiveType => ({
 	kind: 'primitive',
 	name,
