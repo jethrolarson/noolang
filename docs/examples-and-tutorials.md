@@ -124,13 +124,13 @@ Advanced type system features:
 
 ```noolang
 # Function with explicit type
-add_func = fn x y => x + y : Number -> Number -> Number
+add_func = fn x y => x + y : Float -> Float -> Float
 
 # Polymorphic function
 identity = fn x => x : a -> a
 
 # Lists with types
-numbers = [1, 2, 3, 4, 5] : List Number
+numbers = [1, 2, 3, 4, 5] : List Float
 strings = ["hello", "world"] : List String
 ```
 
@@ -138,7 +138,7 @@ strings = ["hello", "world"] : List String
 
 ```noolang
 # Typed tuple
-pair = {42, "answer"} : {Number, String}
+pair = {42, "answer"} : {Float, String}
 
 # Typed record
 person = { @name "Alice", @age 30, @active True } 

@@ -76,7 +76,7 @@ All keywords supported by the lexer ([`src/lexer/lexer.ts:147-176`](../src/lexer
 - `and` `or` - Logical conjunction/disjunction
 
 ### Type Names
-- `Float` `Number` `String` `Unit` `List` - Built-in type names
+- `Float` `String` `Unit` `List` - Built-in type names
 
 ## Operators
 
@@ -192,7 +192,7 @@ someValue |? (/ 2) |? (* 3)    # Division returns Option Float
 # If any step returns None/Error, chain short-circuits
 
 # Example with parsing
-userInput |? parseNumber |? (+ 10) |? show
+userInput |? parseFloat |? (+ 10) |? show
 ```
 
 #### Dollar Operator (`$`)
@@ -252,11 +252,11 @@ While type inference handles most cases, explicit annotations will be supported:
 
 ```noolang
 # Function with type annotation
-add : Number -> Number -> Number
+add : Float -> Float -> Float
 add = fn x y => x + y
 
 # Variable with type
-count : Number = 42
+count : Float = 42
 ```
 
 ## Comments
@@ -315,8 +315,8 @@ head [1, 2, 3]      # Some 1
 head []             # None
 
 # Result types for error handling (built-in)
-parseResult = parseNumber "42"    # Ok 42
-parseError = parseNumber "abc"    # Err "Invalid number"
+parseResult = parseFloat "42"    # Ok 42
+parseError = parseFloat "abc"    # Err "Invalid number"
 ```
 
 ## Next Steps
