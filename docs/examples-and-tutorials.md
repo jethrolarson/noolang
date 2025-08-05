@@ -214,10 +214,10 @@ variant Maybe a (
   None
 )
 
-# Use in functions
-safeDivide = fn x y => 
-  if y == 0 then None
-  else Some (x / y)
+# Use in functions (division already returns Option)
+checkAge = fn age =>
+  if age >= 18 then Some "Adult"
+  else None
 
 # Pattern matching (when implemented)
 getValue = fn maybe default => match maybe with
@@ -275,7 +275,8 @@ add "hello " "world"  # Strings: "hello world"
 # Other arithmetic
 subtract 10 3    # 7
 multiply 4 5     # 20
-divide 10 2      # Some 5.0 (returns Option for safety)
+10 / 2           # Some 5.0 (division returns Option for safety)
+10 / 0           # None (handles division by zero)
 ```
 
 ### List Operations
@@ -349,39 +350,41 @@ Detailed error information...
 
 ### Exercise 1: Basic Functions
 
-Create a function that computes the area of a circle:
+Create a function that converts Celsius to Fahrenheit:
 
 ```noolang
 # TODO: Implement this
-circleArea = fn radius => # your code here
+celsiusToFahrenheit = fn celsius => # your code here
 
 # Test cases
-test1 = circleArea 1    # Should be ~3.14159
-test2 = circleArea 2    # Should be ~12.56636
+test1 = celsiusToFahrenheit 0     # Should be 32
+test2 = celsiusToFahrenheit 100   # Should be 212
 ```
 
 ### Exercise 2: List Processing
 
-Implement a function that finds the maximum element in a list:
+Implement a function that finds the last element in a list:
 
 ```noolang
-# TODO: Implement this
-maximum = fn list => # your code here
+# TODO: Implement this (hint: use length and list indexing)
+last = fn list => # your code here
 
 # Test
-result = maximum [3, 1, 4, 1, 5, 9, 2, 6]  # Should be 9
+result = last [3, 1, 4, 1, 5, 9, 2, 6]  # Should be Some 6
+empty = last []                          # Should be None
 ```
 
 ### Exercise 3: Higher-Order Functions
 
-Create a function that applies a function to each element and sums the results:
+Create a function that counts elements in a list that satisfy a predicate:
 
 ```noolang
-# TODO: Implement this
-mapSum = fn f list => # your code here
+# TODO: Implement this (hint: use filter and length)
+count = fn predicate list => # your code here
 
 # Test
-result = mapSum (fn x => x * x) [1, 2, 3, 4]  # Should be 30
+result = count (fn x => x > 5) [1, 6, 3, 8, 2, 9]  # Should be 3
+even = count (fn x => (x % 2) == 0) [1, 2, 3, 4, 5, 6]  # Should be 3
 ```
 
 ### Solutions

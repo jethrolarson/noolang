@@ -187,9 +187,12 @@ composed = addOne |> square    # fn x => square (addOne x)
 
 #### Safe Pipe (`|?`)
 ```noolang
-# Works with Option/Result types
-someValue |? safeDivide 2 |? multiply 3
+# Works with Option/Result types (using built-in division)
+someValue |? (/ 2) |? (* 3)    # Division returns Option Float
 # If any step returns None/Error, chain short-circuits
+
+# Example with parsing
+userInput |? parseNumber |? (+ 10) |? show
 ```
 
 #### Dollar Operator (`$`)
@@ -300,20 +303,20 @@ From highest to lowest precedence (based on parser implementation):
 
 ## Error Expressions
 
-The language includes robust error handling patterns:
+The language includes robust error handling with built-in types:
 
 ```noolang
-# Result types for error handling
-divide : Number -> Number -> Result Number String
-divide = fn x y => 
-  if y == 0 then Error "Division by zero"
-  else Ok (x / y)
+# Division already returns Option Float for safety
+result1 = 10 / 2    # Some 5.0
+result2 = 10 / 0    # None
 
-# Option types for nullable values  
-head : List a -> Option a
-head = fn list =>
-  if isEmpty list then None
-  else Some (first list)
+# Option types for nullable values (built-in)
+head [1, 2, 3]      # Some 1
+head []             # None
+
+# Result types for error handling (built-in)
+parseResult = parseNumber "42"    # Ok 42
+parseError = parseNumber "abc"    # Err "Invalid number"
 ```
 
 ## Next Steps
