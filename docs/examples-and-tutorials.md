@@ -15,22 +15,22 @@ The simplest introduction to Noolang syntax:
 
 ```noolang
 # Simple arithmetic
-result = 2 + 3 * 4         # 14
+result = 2 + 3 * 4;         # 14
 
 # Function definition and application
-double = fn x => x * 2
-doubled = double 10        # 20
+double = fn x => x * 2;
+doubled = double 10;        # 20
 
 # Recursion (factorial)
-factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1))
-fact_5 = factorial 5       # 120
+factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1));
+fact_5 = factorial 5;       # 120
 
 # Lists and higher-order functions
-numbers = [1, 2, 3, 4, 5]
-squared = map (fn x => x * x) numbers  # [1, 4, 9, 16, 25]
+numbers = [1, 2, 3, 4, 5];
+squared = map (fn x => x * x) numbers;  # [1, 4, 9, 16, 25]
 
 # Records
-person = { @name "Alice", @age 30 }
+person = { @name "Alice", @age 30 };
 
 # Accessing fields
 name = person.name         # "Alice"
@@ -45,9 +45,9 @@ A complete showcase of Noolang features covering:
 ### 1. Literals and Basic Types
 
 ```noolang
-number_literal = 42
-string_literal = "Hello, Noolang!"
-boolean_literal = true
+number_literal = 42;
+string_literal = "Hello, Noolang!";
+boolean_literal = true;
 unit_literal = {}           # Empty record/unit value
 ```
 
@@ -55,12 +55,12 @@ unit_literal = {}           # Empty record/unit value
 
 ```noolang
 # All functions are automatically curried
-add_func = fn a b => a + b
-add_ten = add_func 10       # Partial application
-result = add_ten 5          # 15
+add_func = fn a b => a + b;
+add_ten = add_func 10;       # Partial application
+result = add_ten 5;          # 15
 
 # Functions are first-class values
-multiply_func = fn a b => a * b
+multiply_func = fn a b => a * b;
 product = multiply_func 6 7  # 42
 ```
 
@@ -68,7 +68,7 @@ product = multiply_func 6 7  # 42
 
 ```noolang
 # Factorial
-factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1))
+factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1));
 
 # Fibonacci
 fibonacci = fn n => 
@@ -80,18 +80,18 @@ fibonacci = fn n =>
 
 ```noolang
 # Lists
-empty_list = []
-number_list = [1, 2, 3, 4, 5]
+empty_list = [];
+number_list = [1, 2, 3, 4, 5];
 
 # Records with named fields
-person = { @name "Alice", @age 30, @city "Wonderland" }
+person = { @name "Alice", @age 30, @city "Wonderland" };
 
 # Field access
-person_name = person.name
-person_age = person | @age   # Using pipe with accessor
+person_name = person.name;
+person_age = person | @age;   # Using pipe with accessor
 
 # Tuples (positional fields)
-point = {10, 20}            # Anonymous tuple
+point = {10, 20};            # Anonymous tuple
 coordinates = point.0       # Access first element
 ```
 
@@ -102,13 +102,13 @@ coordinates = point.0       # Access first element
 result = [1, 2, 3, 4, 5] 
   | map (fn x => x * 2)
   | filter (fn x => x > 4)
-  | head
+  | head;
 
 # Function composition (|>)
-double = fn x => x * 2
-addOne = fn x => x + 1
-composed = addOne |> double     # Compose functions
-value = 10 | composed           # Apply: double (addOne 10) = 22
+double = fn x => x * 2;
+addOne = fn x => x + 1;
+composed = addOne |> double;     # Compose functions
+value = 10 | composed;           # Apply: double (addOne 10) = 22
 
 # Reverse composition (<|)
 composed_reverse = double <| addOne  # Same as addOne |> double
