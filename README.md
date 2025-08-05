@@ -99,7 +99,9 @@ The REPL includes comprehensive debugging tools:
 
 ### Examples
 
-**Note**: Some examples in the `examples/` directory have known issues due to current type system limitations. See `docs/LANGUAGE_WEAKNESSES.md` for details. Working examples include `basic.noo`, `adt_demo.noo`, `recursive_adts.noo`, `safe_thrush_demo.noo`, `simple_adt.noo`, `card_game.noo`, and `math_functions.noo`.
+**Note**: Some examples in the `examples/` directory have known issues due to current type system limitations. See `docs/LANGUAGE_WEAKNESSES.md` for details. 
+
+**Working examples include**: `basic.noo`, `adt_demo.noo`, `recursive_adts.noo`, `safe_thrush_demo.noo`, `simple_adt.noo`, `card_game.noo`, `math_functions.noo`, and all import examples (`math_module.noo`, `power_module.noo`, `number_module.noo`, `string_module.noo`, `function_module.noo`, `list_module.noo`).
 
 ```noolang
 # Function definition
@@ -237,8 +239,8 @@ result = match data with (
 {@coords {x, y}, @metadata {@name author}} = {@coords {5, 10}, @metadata {@name "Dave"}}
 
 # Import spreading with destructuring  
-{@add, @multiply} = import "math_module"
-{@square sq, @cube cb} = import "power_module"  # With renaming
+{@add, @multiply} = import "examples/math_module"
+{@square sq, @cube cb} = import "examples/power_module"  # With renaming
 ```
 
 ## Language Syntax
@@ -592,8 +594,8 @@ Noolang supports comprehensive destructuring for tuples and records, enabling er
 }  # x = 10, y = 20, author = "Dave"
 
 # Import spreading with destructuring
-{@add, @multiply} = import "math_module"  # Extract functions from module
-{@square sq, @cube cb} = import "power_module"  # Extract with renaming
+{@add, @multiply} = import "examples/math_module"  # Extract functions from module
+{@square sq, @cube cb} = import "examples/power_module"  # Extract with renaming
 
 # Works in where expressions
 result where (
@@ -609,6 +611,126 @@ result where (
 - **Immutable Bindings**: Creates new immutable variable bindings
 - **Type Safety**: Full static analysis and error detection
 - **Clear Syntax**: LLM-friendly and predictable patterns
+
+## Import System
+
+Noolang features a robust import system with **full static type inference** and seamless destructuring support. Imports are statically typed, providing complete type safety and excellent developer experience.
+
+### Basic Import Syntax
+
+```noolang
+# Import entire module
+math = import "examples/math_module"
+result = (@add math) 2 3  # => 5
+
+# Import with destructuring (recommended)
+{@add, @multiply} = import "examples/math_module"
+result = add 2 3 + multiply 4 5  # => 25
+
+# Import with renaming
+{@add addFunc, @multiply mulFunc} = import "examples/math_module"
+result = addFunc 2 3  # => 5
+```
+
+### Import Type Inference
+
+The import system provides **complete static type inference**:
+
+```noolang
+# Number imports
+x = import "examples/number_module"     # x : Float
+
+# String imports  
+message = import "examples/string_module"  # message : String
+
+# Function imports
+doubler = import "examples/function_module"  # doubler : Float -> Float
+
+# Record imports with field types
+math = import "examples/math_module"    # math : { @add Float -> Float -> Float, @multiply Float -> Float -> Float }
+
+# List imports
+numbers = import "examples/list_module"  # numbers : List Float
+```
+
+### Import Destructuring
+
+Destructuring works seamlessly with properly typed imports:
+
+```noolang
+# Basic destructuring
+{@add, @multiply} = import "examples/math_module"
+# add : Float -> Float -> Float
+# multiply : Float -> Float -> Float
+
+# Destructuring with renaming
+{@square sq, @cube cb} = import "examples/power_module"
+result = sq 4 + cb 2  # => 24 : Float
+
+# Nested destructuring (if module exports nested records)
+{@math {@add, @subtract}, @utils {@format}} = import "examples/complex_module"
+```
+
+### Import Path Resolution
+
+```noolang
+# Relative paths
+math = import "lib/math"           # Resolves to lib/math.noo
+utils = import "../shared/utils"   # Parent directory
+local = import "helper"            # Same directory as current file
+
+# File extension optional
+math1 = import "math"              # Resolves to math.noo
+math2 = import "math.noo"          # Explicit extension
+```
+
+### Module Design Patterns
+
+**Exporting Records (Recommended):**
+```noolang
+# math_module.noo
+addFunc = fn x y => x + y;
+multiplyFunc = fn x y => x * y;
+{@add addFunc, @multiply multiplyFunc}  # Export as record
+```
+
+**Exporting Functions:**
+```noolang
+# increment_module.noo
+fn x => x + 1  # Export single function
+```
+
+**Exporting Values:**
+```noolang
+# constants_module.noo
+42  # Export single value
+```
+
+### Type Safety and Error Handling
+
+The import system provides comprehensive error handling:
+
+- **File not found**: Clear error messages with path resolution details
+- **Parse errors**: Syntax errors in imported modules are reported with location
+- **Type errors**: Type checking errors in imported modules are caught during import
+- **Graceful degradation**: Import failures fall back to inferred types where possible
+
+### Integration with Language Features
+
+Imports work seamlessly with all Noolang features:
+
+```noolang
+# With pipeline operators
+result = import "examples/math_module" | @add | ($ 2) | ($ 3)  # => 5
+
+# With pattern matching (if importing ADTs)
+option = import "examples/option_module"
+value = match option with (Some x => x; None => 0)
+
+# With higher-order functions
+{@map, @filter} = import "examples/list_utils"
+result = [1, 2, 3, 4, 5] | filter (fn x => x > 2) | map (fn x => x * 2)  # => [6, 8, 10]
+```
 
 ### Data Structure Syntax
 

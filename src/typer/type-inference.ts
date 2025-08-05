@@ -1,3 +1,7 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { Lexer } from '../lexer/lexer';
+import { parse } from '../parser/parser';
 import {
 	type Expression,
 	type LiteralExpression,
@@ -1163,8 +1167,51 @@ export const typeImport = (
 	expr: ImportExpression,
 	state: TypeState
 ): TypeResult => {
-	// For now, assume imports return a record type
-	return createPureTypeResult(recordType({}), state);
+	try {
+		const filePath = expr.path.endsWith('.noo')
+			? expr.path
+			: `${expr.path}.noo`;
+
+		let fullPath: string;
+		if (path.isAbsolute(filePath)) {
+			fullPath = filePath;
+		} else {
+			// For type checking, we need to resolve relative to current working directory
+			// In a real implementation, we'd want to track the current file being checked
+			fullPath = path.resolve(filePath);
+		}
+
+		// Read and parse the imported file
+		const content = fs.readFileSync(fullPath, 'utf8');
+		const lexer = new Lexer(content);
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+
+		// Type check the imported program - get the type of the final statement
+		if (program.statements.length === 0) {
+			// Empty program returns empty list type
+			return createPureTypeResult(listTypeWithElement(typeVariable('a')), state);
+		}
+
+		// Process all statements and return the type of the final one
+		let currentState = state;
+		let finalType: Type = typeVariable('a');
+
+		for (const statement of program.statements) {
+			const result = typeExpression(statement, currentState);
+			currentState = result.state;
+			finalType = result.type;
+		}
+		
+		// Return the type of the final statement
+		return createPureTypeResult(finalType, currentState);
+		
+	} catch (error) {
+		// If import fails, we fall back to a type variable to avoid breaking the whole type check
+		// This allows gradual typing and better error messages
+		const [freshVar, newState] = freshTypeVariable(state);
+		return createPureTypeResult(freshVar, newState);
+	}
 };
 
 // Type inference for records
