@@ -26,8 +26,8 @@
 
 ### Booleans
 ```noolang
-true
-false
+True
+False
 ```
 
 ### Lists
@@ -55,7 +55,7 @@ All keywords supported by the lexer ([`src/lexer/lexer.ts:147-176`](../src/lexer
 
 ### Function Definition  
 - `fn` - Function definition
-- `let` `in` - Local bindings
+
 - `where` - Local definitions within expressions
 
 ### Type System

@@ -47,7 +47,7 @@ A complete showcase of Noolang features covering:
 ```noolang
 number_literal = 42;
 string_literal = "Hello, Noolang!";
-boolean_literal = true;
+boolean_literal = True;
 unit_literal = {}           # Empty record/unit value
 ```
 
@@ -141,7 +141,7 @@ strings = ["hello", "world"] : List String
 pair = {42, "answer"} : {Number, String}
 
 # Typed record
-person = { @name "Alice", @age 30, @active true } 
+person = { @name "Alice", @age 30, @active True } 
   : { @name String, @age Number, @active Bool }
 ```
 
