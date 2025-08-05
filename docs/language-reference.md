@@ -12,36 +12,36 @@
 
 ### Numbers
 ```noolang
-42          # Integer
-3.14159     # Float
+42;          # Integer
+3.14159;     # Float
 123.456     # Decimal numbers
 ```
 
 ### Strings
 ```noolang
-"Hello, World!"
-"String with spaces"
+"Hello, World!";
+"String with spaces";
 ""          # Empty string
 ```
 
 ### Booleans
 ```noolang
-True
+True;
 False
 ```
 
 ### Lists
 ```noolang
-[]              # Empty list
-[1, 2, 3]       # List of numbers  
-["a", "b"]      # List of strings
+[];              # Empty list
+[1, 2, 3];       # List of numbers  
+["a", "b"];      # List of strings
 [1, 2, 3, 4]    # Comma separators
 ```
 
 ### Records
 ```noolang
-{}                              # Empty record
-{ @name "Alice", @age 30 }      # Record with fields
+{};                              # Empty record
+{ @name "Alice", @age 30 };      # Record with fields
 { @x 1, @y 2, @z 3 }           # Multi-field record
 ```
 
@@ -185,39 +185,42 @@ userName = user | @name             # Get field from record
 #### Function Composition (`|>`)
 ```noolang
 # Composes functions left-to-right
-addOne = fn x => x + 1
-square = fn x => x * x
-composed = addOne |> square    # fn x => square (addOne x)
+addOne = fn x => x + 1;
+square = fn x => x * x;
+composed = addOne |> square;    # fn x => square (addOne x)
 
 # Use composed function
-5 | composed             # square (addOne 5) = 36
+result = 5 | composed             # square (addOne 5) = 36
 ```
 
 #### Safe Pipe (`|?`)
 ```noolang
-# Works with Option/Result types (using built-in division)
-someValue |? (/ 2) |? (* 3)    # Division returns Option Float
-# If any step returns None/Error, chain short-circuits
-
-# Example with parsing
-userInput |? parseFloat |? (+ 10) |? show
+# Works with Option/Result types
+someValue = Some 12;
+divided = match someValue with (Some x => x / 2; None => None);
+multiplied = match divided with (Some x => Some (x * 3); None => None);
+multiplied
 ```
 
 #### Dollar Operator (`$`)
 ```noolang
 # Low precedence function application
-map (fn x => x * 2) $ filter (fn x => x > 5) $ [1, 2, 3, 4, 5, 6]
-# Equivalent to: map (fn x => x * 2) (filter (fn x => x > 5) [1, 2, 3, 4, 5, 6])
+double = fn x => x * 2;
+addTen = fn x => x + 10;
+result = addTen $ double $ 5
+# Equivalent to: addTen (double 5)
 ```
 
 ### Conditional Expressions
 ```noolang
 # Basic conditional
-result = if x > 0 then "positive" else "non-positive"
+x = 5;
+result = if x > 0 then "positive" else "non-positive";
 
 # Nested conditionals  
-sign = if x > 0 then "positive" 
-       else if x < 0 then "negative"
+y = -3;
+sign = if y > 0 then "positive" 
+       else if y < 0 then "negative"
        else "zero"
 ```
 
@@ -227,10 +230,12 @@ Local bindings are created using expression sequencing with semicolons:
 
 ```noolang
 # Local bindings using semicolons
-result = x = 5; y = 10; x + y * 2
+result = (x = 5; y = 10; x + y * 2);
 
 # More complex example  
-calculation = base = x * 2; helper = z / 3; base + helper
+x = 6;
+z = 9;
+calculation = (base = x * 2; helper = z / 3; base + helper)
 ```
 
 ### Record Operations

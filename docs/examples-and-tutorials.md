@@ -92,17 +92,16 @@ person_age = person | @age;   # Using pipe with accessor
 
 # Tuples (positional fields)
 point = {10, 20};            # Anonymous tuple
-coordinates = point.0       # Access first element
+coordinates = point.0;       # Access first element
+coordinates
 ```
 
 ### 5. Pipeline Operations
 
 ```noolang
-# Pipe operator (|) - applies value to function
-result = [1, 2, 3, 4, 5] 
-  | map (fn x => x * 2)
-  | filter (fn x => x > 4)
-  | head;
+# Function application (pipe with map is broken)
+doubled = map (fn x => x * 2) [1, 2, 3, 4, 5];
+result = head doubled;
 
 # Function composition (|>)
 double = fn x => x * 2;
@@ -111,7 +110,8 @@ composed = addOne |> double;     # Compose functions
 value = 10 | composed;           # Apply: double (addOne 10) = 22
 
 # Reverse composition (<|)
-composed_reverse = double <| addOne  # Same as addOne |> double
+composed_reverse = double <| addOne;  # Same as addOne |> double
+value
 ```
 
 **Try it**: `bun start examples/demo.noo`
@@ -124,13 +124,13 @@ Advanced type system features:
 
 ```noolang
 # Function with explicit type
-add_func = fn x y => x + y : Float -> Float -> Float
+add_func = fn x y => x + y : Float -> Float -> Float;
 
 # Polymorphic function
-identity = fn x => x : a -> a
+identity = fn x => x : a -> a;
 
 # Lists with types
-numbers = [1, 2, 3, 4, 5] : List Float
+numbers = [1, 2, 3, 4, 5] : List Float;
 strings = ["hello", "world"] : List String
 ```
 
