@@ -198,8 +198,8 @@ Environment:
   factorial: <function> : Number -> Number
 
 noo> # Pipeline example
-noo> [1; 2; 3; 4; 5] |> map (fn x => x * x) |> filter (fn x => x > 10)
-[16; 25] : List Number
+noo> [1, 2, 3, 4, 5] | map (fn x => x * x) | filter (fn x => x > 10)
+[16, 25] : List Number
 ```
 
 ## Missing REPL Command
