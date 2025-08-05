@@ -32,7 +32,7 @@ const mockFs = {
 	},
 };
 
-test.skip('should import from same directory', () => {
+test('should import from same directory', () => {
 	const testCode = `
       math = import "math_functions";
       (@mathAdd math) 2 3
@@ -51,7 +51,7 @@ test.skip('should import from same directory', () => {
 	expect(result.finalResult).toEqual({ tag: 'number', value: 5 });
 });
 
-test.skip('should import from parent directory', () => {
+test('should import from parent directory', () => {
 	const testCode = `
       math = import "../math_functions";
       (@mathAdd math) 10 20
@@ -70,7 +70,7 @@ test.skip('should import from parent directory', () => {
 	expect(result.finalResult).toEqual({ tag: 'number', value: 30 });
 });
 
-test.skip('should handle absolute paths', () => {
+test('should handle absolute paths', () => {
 	const testCode = `
       math = import "/absolute/path/math_functions";
       (@mathAdd math) 5 10
@@ -89,7 +89,7 @@ test.skip('should handle absolute paths', () => {
 	expect(result.finalResult).toEqual({ tag: 'number', value: 15 });
 });
 
-test.skip('should fall back to current working directory when no file path provided', () => {
+test('should fall back to current working directory when no file path provided', () => {
 	const testCode = `
       math = import "math_functions";
       (@mathAdd math) 3 7
