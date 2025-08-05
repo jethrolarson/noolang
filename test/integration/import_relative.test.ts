@@ -1,7 +1,8 @@
+import { test, expect } from 'bun:test';
 import { Lexer } from '../../src/lexer/lexer';
 import { parse } from '../../src/parser/parser';
 import { Evaluator } from '../../src/evaluator/evaluator';
-import { test, expect } from 'bun:test';
+import { createTraitRegistry } from '../../src/typer/trait-system';
 
 // Test suite: File-relative imports
 const mockFs = {
@@ -39,7 +40,10 @@ test('should import from same directory', () => {
 	const lexer = new Lexer(testCode);
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	const evaluator = new Evaluator({ fs: mockFs as any });
+	const evaluator = new Evaluator({ 
+		fs: mockFs as any,
+		traitRegistry: createTraitRegistry()
+	});
 	const result = evaluator.evaluateProgram(
 		program,
 		'/test/dir/test_file.noo'
@@ -55,7 +59,10 @@ test('should import from parent directory', () => {
 	const lexer = new Lexer(testCode);
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	const evaluator = new Evaluator({ fs: mockFs as any });
+	const evaluator = new Evaluator({ 
+		fs: mockFs as any,
+		traitRegistry: createTraitRegistry()
+	});
 	const result = evaluator.evaluateProgram(
 		program,
 		'/test/dir/subdir/test_file.noo'
@@ -71,7 +78,10 @@ test('should handle absolute paths', () => {
 	const lexer = new Lexer(testCode);
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	const evaluator = new Evaluator({ fs: mockFs as any });
+	const evaluator = new Evaluator({ 
+		fs: mockFs as any,
+		traitRegistry: createTraitRegistry()
+	});
 	const result = evaluator.evaluateProgram(
 		program,
 		'/test/dir/test_file.noo'
@@ -87,7 +97,10 @@ test('should fall back to current working directory when no file path provided',
 	const lexer = new Lexer(testCode);
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	const evaluator = new Evaluator({ fs: mockFs as any });
+	const evaluator = new Evaluator({ 
+		fs: mockFs as any,
+		traitRegistry: createTraitRegistry()
+	});
 	const result = evaluator.evaluateProgram(program); // No file path
 	expect(result.finalResult).toEqual({ tag: 'number', value: 10 });
 });
