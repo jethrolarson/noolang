@@ -19,8 +19,8 @@ Clone the repository and install dependencies:
 ```bash
 git clone <repository-url>
 cd noolang
-npm install
-npm run build
+bun install
+bun run build
 ```
 
 ## Running Noolang
@@ -30,7 +30,7 @@ npm run build
 Start the interactive development environment:
 
 ```bash
-npm start
+bun start
 ```
 
 This launches the Noolang REPL where you can experiment with the language interactively.
@@ -40,7 +40,7 @@ This launches the Noolang REPL where you can experiment with the language intera
 Execute a Noolang file:
 
 ```bash
-npm start examples/basic.noo
+bun start examples/basic.noo
 ```
 
 ### Quick Evaluation
@@ -48,8 +48,8 @@ npm start examples/basic.noo
 Evaluate expressions directly:
 
 ```bash
-npm start --eval "1 + 2 * 3"
-npm start -e "x = 10; x * 2"
+bun start --eval "1 + 2 * 3"
+bun start -e "x = 10; x * 2"
 ```
 
 ## Your First Noolang Program

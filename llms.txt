@@ -126,11 +126,11 @@ This documentation follows a progressive disclosure pattern:
 ## Quick Reference
 
 ### Essential Commands
-- `npm start` - Launch interactive REPL
-- `npm start examples/demo.noo` - Run comprehensive demo
-- `npm start --eval "expression"` - Evaluate expression directly
-- `npm start --types "expression"` - Show type information
-- `npm test` - Run complete test suite
+- `bun start` - Launch interactive REPL
+- `bun start examples/demo.noo` - Run comprehensive demo
+- `bun start --eval "expression"` - Evaluate expression directly
+- `bun start --types "expression"` - Show type information
+- `bun test` - Run complete test suite
 
 ### Key Files for LLM Understanding
 - [Language Reference](docs/language-reference.md) - Complete syntax guide

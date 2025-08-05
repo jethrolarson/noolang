@@ -24,16 +24,16 @@ git clone <repository-url>
 cd noolang
 
 # Install dependencies
-npm install
+bun install
 
 # Build the project
-npm run build
+bun run build
 
 # Run tests
-npm test
+bun test
 
 # Start development REPL
-npm start
+bun start
 ```
 
 ## Architecture Overview
@@ -188,35 +188,35 @@ From [`package.json:6-30`](../package.json#L6-L30):
 
 #### Building
 ```bash
-npm run build           # Compile TypeScript to JavaScript
-npm run typecheck       # Check types without building
+bun run build           # Compile TypeScript to JavaScript
+bun run typecheck       # Check types without building
 ```
 
 #### Testing
 ```bash
-npm test               # Run all tests
-npm run test:watch     # Run tests in watch mode  
-npm run test:bail      # Stop on first test failure
-npm run test:all       # Run all test suites (including LSP)
+bun test               # Run all tests
+bun run test:watch     # Run tests in watch mode  
+bun run test:bail      # Stop on first test failure
+bun run test:all       # Run all test suites (including LSP)
 ```
 
 #### Development
 ```bash
-npm start              # Run CLI/REPL
-npm start:debug        # Run with debugger attached
-npm start:debug-brk    # Run with debugger breakpoint
+bun start              # Run CLI/REPL
+bun start:debug        # Run with debugger attached
+bun start:debug-brk    # Run with debugger breakpoint
 ```
 
 #### Code Quality
 ```bash
-npm run lint           # Check code style
-npm run lint:fix       # Fix linting issues automatically
+bun run lint           # Check code style
+bun run lint:fix       # Fix linting issues automatically
 ```
 
 #### Performance
 ```bash
-npm run benchmark      # Run performance benchmarks
-npm run benchmark:repl # Benchmark REPL performance
+bun run benchmark      # Run performance benchmarks
+bun run benchmark:repl # Benchmark REPL performance
 ```
 
 ### Testing Strategy
@@ -276,7 +276,7 @@ touch test/features/loops/basic-loops.test.ts
 # Edit src/evaluator/evaluator.ts: add loop evaluation
 
 # 7. Test and iterate
-npm test test/features/loops/
+bun test test/features/loops/
 ```
 
 #### 2. Built-in Functions
@@ -303,26 +303,26 @@ For type system enhancements:
 
 **Debug Parser Issues**:
 ```bash
-npm start --tokens "problematic syntax"
-npm start --ast "problematic syntax"
+bun start --tokens "problematic syntax"
+bun start --ast "problematic syntax"
 ```
 
 **Debug Type Issues**:
 ```bash
-npm start --types "expression with type issues"
-npm start --types-detailed "complex expression"
+bun start --types "expression with type issues"
+bun start --types-detailed "complex expression"
 ```
 
 **Debug Runtime Issues**:
 ```bash
-npm start --eval "expression"
+bun start --eval "expression"
 # Or use REPL with .error-detail
 ```
 
 **Performance Investigation**:
 ```bash
-npm run benchmark
-time npm start --types-file large_file.noo
+bun run benchmark
+time bun start --types-file large_file.noo
 ```
 
 #### Development REPL
@@ -330,7 +330,7 @@ time npm start --types-file large_file.noo
 Use the REPL for rapid development:
 
 ```bash
-npm start
+bun start
 ```
 
 ```
@@ -366,11 +366,11 @@ noo> .types (newFeature)
 #### Benchmarking
 ```bash
 # Run built-in benchmarks
-npm run benchmark
+bun run benchmark
 
 # Profile specific operations
-time npm start examples/large_example.noo
-time npm start --types-file examples/complex_types.noo
+time bun start examples/large_example.noo
+time bun start --types-file examples/complex_types.noo
 ```
 
 #### Memory Usage
@@ -386,10 +386,10 @@ time npm start --types-file examples/complex_types.noo
 ### Release Process
 
 #### Pre-release Checklist
-1. All tests pass: `npm run test:all`
-2. Type checking passes: `npm run typecheck`
-3. Linting passes: `npm run lint`
-4. Benchmarks are stable: `npm run benchmark`
+1. All tests pass: `bun run test:all`
+2. Type checking passes: `bun run typecheck`
+3. Linting passes: `bun run lint`
+4. Benchmarks are stable: `bun run benchmark`
 5. Documentation is updated
 6. Examples work correctly
 
@@ -441,10 +441,10 @@ The VS Code integration is work-in-progress:
 
 ```bash
 # Build the language server
-npm run test:lsp-build
+bun run test:lsp-build
 
 # Test the language server
-npm run test:lsp
+bun run test:lsp
 ```
 
 ### Benchmarking and Performance
@@ -453,10 +453,10 @@ Monitor performance regression:
 
 ```bash
 # Run benchmarks
-npm run benchmark
+bun run benchmark
 
 # Profile memory usage
-npm start --inspect examples/large_file.noo
+bun start --inspect examples/large_file.noo
 ```
 
 ### Cross-platform Considerations

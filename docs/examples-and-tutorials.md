@@ -36,7 +36,7 @@ person = { name = "Alice"; age = 30 }
 name = person.name         # "Alice"
 ```
 
-**Try it**: `npm start examples/basic.noo`
+**Try it**: `bun start examples/basic.noo`
 
 ## Comprehensive Language Tour ([`examples/demo.noo`](../examples/demo.noo))
 
@@ -111,7 +111,7 @@ value = 10 | add 5 | multiply 2  # ((10 + 5) * 2) = 30
 result = head <| filter (fn x => x > 4) <| map (fn x => x * 2) <| [1; 2; 3; 4; 5]
 ```
 
-**Try it**: `npm start examples/demo.noo`
+**Try it**: `bun start examples/demo.noo`
 
 ## Type System Examples ([`examples/type_system_demo.noo`](../examples/type_system_demo.noo))
 
@@ -156,7 +156,7 @@ pipeline_result = 3 |> addOne |> square
 mapped_pipeline = numbers |> map addOne |> map square
 ```
 
-**Try it**: `npm start --types-file examples/type_system_demo.noo`
+**Try it**: `bun start --types-file examples/type_system_demo.noo`
 
 ## Trait System Examples ([`examples/trait_system_demo.noo`](../examples/trait_system_demo.noo))
 
@@ -198,7 +198,7 @@ demo_basic = (
 )
 ```
 
-**Try it**: `npm start examples/trait_system_demo.noo`
+**Try it**: `bun start examples/trait_system_demo.noo`
 
 ## Algebraic Data Types ([`examples/adt_demo.noo`](../examples/adt_demo.noo))
 
@@ -222,7 +222,7 @@ getValue = fn maybe default => match maybe with
   | None => default
 ```
 
-**Try it**: `npm start examples/adt_demo.noo`
+**Try it**: `bun start examples/adt_demo.noo`
 
 ## Advanced Examples
 
@@ -290,7 +290,7 @@ filter (fn x => x > 2) [1; 2; 3; 4]  # [3; 4]
 ### Exploring Types
 
 ```bash
-npm start
+bun start
 ```
 
 ```
@@ -389,4 +389,4 @@ Check the test files in [`test/`](../test/) for comprehensive examples and solut
 
 - **Deep dive**: Read [Type System Guide](type-system-guide.md) for advanced type features
 - **Build tools**: Check [Development Guide](development-guide.md) for contributing
-- **Performance**: Run `npm run benchmark` to see performance characteristics
+- **Performance**: Run `bun run benchmark` to see performance characteristics

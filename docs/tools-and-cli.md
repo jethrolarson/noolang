@@ -15,12 +15,12 @@ The `noo` command provides extensive debugging and execution capabilities.
 
 ```bash
 # Run a Noolang file
-npm start examples/demo.noo
-npm start path/to/file.noo
+bun start examples/demo.noo
+bun start path/to/file.noo
 
 # Evaluate expressions directly  
-npm start --eval "1 + 2 * 3"
-npm start -e "x = 10; x * 2"
+bun start --eval "1 + 2 * 3"
+bun start -e "x = 10; x * 2"
 ```
 
 ### Debugging Commands
@@ -30,47 +30,47 @@ All debugging commands from [`src/cli.ts:13-29`](../src/cli.ts#L13-L29):
 #### Tokenization Analysis
 ```bash
 # Show tokens for an expression
-npm start --tokens "fn x => x + 1"
-npm start --tokens "{ @add fn x y => x + y }"
+bun start --tokens "fn x => x + 1"
+bun start --tokens "{ @add fn x y => x + y }"
 
 # Show tokens for a file
-npm start --tokens-file examples/demo.noo
-npm start --tokens-file stdlib.noo
+bun start --tokens-file examples/demo.noo
+bun start --tokens-file stdlib.noo
 ```
 
 #### AST (Abstract Syntax Tree) Analysis
 ```bash
 # Show AST for an expression
-npm start --ast "if x > 0 then x else -x"
-npm start --ast "add = fn x y => x + y"
+bun start --ast "if x > 0 then x else -x"
+bun start --ast "add = fn x y => x + y"
 
 # Show AST for a file
-npm start --ast-file examples/basic.noo
-npm start --ast-file examples/type_system_demo.noo
+bun start --ast-file examples/basic.noo
+bun start --ast-file examples/type_system_demo.noo
 ```
 
 #### Type System Analysis
 ```bash
 # Basic type information
-npm start --types "fn x => x + 1"
-npm start --types-file examples/demo.noo
+bun start --types "fn x => x + 1"
+bun start --types-file examples/demo.noo
 
 # Detailed type information with inference steps
-npm start --types-detailed "fn x => x + 1"
+bun start --types-detailed "fn x => x + 1"
 
 # Show type environment after evaluation
-npm start --types-env "add = fn x y => x + y"
+bun start --types-env "add = fn x y => x + y"
 
 # Show typed AST (AST annotated with types)
-npm start --type-ast "fn x => x + 1"
-npm start --type-ast-file examples/demo.noo
+bun start --type-ast "fn x => x + 1"
+bun start --type-ast-file examples/demo.noo
 ```
 
 #### Symbol Analysis
 ```bash
 # Get type information for specific symbol in file
-npm start --symbol-type examples/demo.noo functionName
-npm start --symbol-type stdlib.noo add
+bun start --symbol-type examples/demo.noo functionName
+bun start --symbol-type stdlib.noo add
 ```
 
 ### Complete CLI Options
@@ -79,27 +79,27 @@ From [`src/cli.ts:13-29`](../src/cli.ts#L13-L29):
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `<file>` | Execute file | `npm start demo.noo` |
-| `--eval <expr>` | Evaluate expression | `npm start --eval "1 + 2"` |
-| `-e <expr>` | Short form of --eval | `npm start -e "add 5 3"` |
-| `--tokens <expr>` | Show tokens | `npm start --tokens "x + y"` |
-| `--ast <expr>` | Show AST | `npm start --ast "fn x => x"` |
-| `--tokens-file <file>` | File tokens | `npm start --tokens-file demo.noo` |
-| `--ast-file <file>` | File AST | `npm start --ast-file demo.noo` |
-| `--types <expr>` | Type information | `npm start --types "fn x => x"` |
-| `--types-file <file>` | File types | `npm start --types-file demo.noo` |
-| `--types-detailed <expr>` | Detailed typing | `npm start --types-detailed "add"` |
-| `--types-env <expr>` | Type environment | `npm start --types-env "x = 5"` |
-| `--type-ast <expr>` | Typed AST | `npm start --type-ast "fn x => x"` |
-| `--type-ast-file <file>` | File typed AST | `npm start --type-ast-file demo.noo` |
-| `--symbol-type <file> <symbol>` | Symbol type | `npm start --symbol-type demo.noo myFunc` |
+| `<file>` | Execute file | `bun start demo.noo` |
+| `--eval <expr>` | Evaluate expression | `bun start --eval "1 + 2"` |
+| `-e <expr>` | Short form of --eval | `bun start -e "add 5 3"` |
+| `--tokens <expr>` | Show tokens | `bun start --tokens "x + y"` |
+| `--ast <expr>` | Show AST | `bun start --ast "fn x => x"` |
+| `--tokens-file <file>` | File tokens | `bun start --tokens-file demo.noo` |
+| `--ast-file <file>` | File AST | `bun start --ast-file demo.noo` |
+| `--types <expr>` | Type information | `bun start --types "fn x => x"` |
+| `--types-file <file>` | File types | `bun start --types-file demo.noo` |
+| `--types-detailed <expr>` | Detailed typing | `bun start --types-detailed "add"` |
+| `--types-env <expr>` | Type environment | `bun start --types-env "x = 5"` |
+| `--type-ast <expr>` | Typed AST | `bun start --type-ast "fn x => x"` |
+| `--type-ast-file <file>` | File typed AST | `bun start --type-ast-file demo.noo` |
+| `--symbol-type <file> <symbol>` | Symbol type | `bun start --symbol-type demo.noo myFunc` |
 
 ## Interactive REPL
 
 Start the REPL with:
 
 ```bash
-npm start
+bun start
 ```
 
 ### REPL Commands
@@ -220,13 +220,13 @@ noo> [1; 2; 3; 4; 5] |> map (fn x => x * x) |> filter (fn x => x > 10)
 
 ```bash
 # Check if function types are inferred correctly
-npm start --types "map = fn f list => # implementation"
+bun start --types "map = fn f list => # implementation"
 
 # See detailed type inference steps
-npm start --types-detailed "complex_function arg1 arg2"
+bun start --types-detailed "complex_function arg1 arg2"
 
 # Examine type environment after definitions
-npm start --types-env "
+bun start --types-env "
   add = fn x y => x + y;
   multiply = fn x y => x * y;
   combine = fn x => add x (multiply x 2)
@@ -246,13 +246,13 @@ When you encounter errors:
 
 ```bash
 # Compare parsing performance
-time npm start --ast-file large_file.noo
+time bun start --ast-file large_file.noo
 
 # Benchmark type inference
-time npm start --types-file complex_types.noo
+time bun start --types-file complex_types.noo
 
 # Test execution performance  
-time npm start performance_test.noo
+time bun start performance_test.noo
 ```
 
 ## VS Code Integration
@@ -272,7 +272,7 @@ While the VS Code Language Server is work-in-progress, you can:
 # Batch type checking
 for file in examples/*.noo; do
   echo "Checking $file..."
-  npm start --types-file "$file" || echo "Type error in $file"
+  bun start --types-file "$file" || echo "Type error in $file"
 done
 ```
 
@@ -280,7 +280,7 @@ done
 
 ```bash
 # Test specific functions
-npm start --eval "
+bun start --eval "
   import 'mymodule.noo';
   testResult = myFunction testInput;
   assert (testResult == expectedOutput)
@@ -291,10 +291,10 @@ npm start --eval "
 
 Additional tools for Noolang development:
 
-- **Test Suite**: `npm test` - Run all tests
-- **Type Checking**: `npm run typecheck` - TypeScript validation
-- **Linting**: `npm run lint` - Code style checking
-- **Benchmarking**: `npm run benchmark` - Performance testing
+- **Test Suite**: `bun test` - Run all tests
+- **Type Checking**: `bun run typecheck` - TypeScript validation
+- **Linting**: `bun run lint` - Code style checking
+- **Benchmarking**: `bun run benchmark` - Performance testing
 
 ## Next Steps
 
