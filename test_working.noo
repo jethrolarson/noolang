@@ -1,0 +1,5 @@
+numbers = [1, 2, 3];
+result = numbers 
+  | map (fn x => x * 2)
+  | show;
+result

@@ -58,17 +58,17 @@ bun start -e "x = 10; x * 2"
 
 ```noolang
 # Numbers and arithmetic
-42
-1 + 2 * 3
+42;
+1 + 2 * 3;
 
 # Strings
-"Hello, World!"
+"Hello, World!";
 
 # Function definition
-add = fn x y => x + y
+addTwo = fn x y => x + y;
 
 # Function application
-add 5 3
+addTwo 5 3
 ```
 
 ### Pipeline Operations
@@ -76,14 +76,14 @@ add 5 3
 Noolang excels at data transformation pipelines:
 
 ```noolang
-# Pipe operator for data flow
-[1, 2, 3, 4] | map (fn x => x * 2) | filter (fn x => x > 4)
+# Function application
+doubled = map (fn x => x * 2) [1, 2, 3, 4];
 
 # Function composition
-double = fn x => x * 2
-addOne = fn x => x + 1
-composed = addOne |> double
-5 | composed              # Apply composed function
+double = fn x => x * 2;
+addOne = fn x => x + 1;
+composed = addOne |> double;
+result = 5 | composed              # Apply composed function
 ```
 
 ### Type System

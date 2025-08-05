@@ -1,0 +1,9 @@
+# Pipe operator for data flow
+result = [1, 2, 3, 4] | (map (fn x => x * 2));
+
+# Function composition
+double = fn x => x * 2;
+addOne = fn x => x + 1;
+composed = addOne |> double;
+finalResult = 5 | composed;             # Apply composed function
+finalResult
