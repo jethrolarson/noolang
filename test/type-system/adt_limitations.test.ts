@@ -5,8 +5,8 @@ import { runCode } from '../utils';
 test.skip('should work when ADTs are used sequentially without list_map (requires Phase 3 @field syntax)', () => {
 	// This shows that the issue is specifically with list_map + multiple ADTs
 	const result = runCode(`
-        type Color = Red | Green | Blue;
-        type Shape a = Circle a | Rectangle a a | Triangle a a a;
+        variant Color = Red | Green | Blue;
+        variant Shape a = Circle a | Rectangle a a | Triangle a a a;
         color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
         calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
         color_result = color_to_number Red;
@@ -23,14 +23,14 @@ test.skip('should work when ADTs are used sequentially without list_map (require
 	});
 });
 
-test('should demonstrate that the type unification issue is now fixed', () => {
+test('should demonstrate that the variant unification issue is now fixed', () => {
 	// The issue was in the type system when it tried to unify
 	// type variables that had been associated with different ADT types
 	// This is now fixed with proper let-polymorphism for list_map
 	expect(() =>
 		runCode(`
-        type Color = Red | Green | Blue;
-        type Shape a = Circle a | Rectangle a a | Triangle a a a;
+        variant Color = Red | Green | Blue;
+        variant Shape a = Circle a | Rectangle a a | Triangle a a a;
         # This works fine - no type unification issues
         colors = [Red, Green, Blue];
         shapes = [Circle 3, Rectangle 5 4];
@@ -45,10 +45,10 @@ test('should demonstrate that the type unification issue is now fixed', () => {
 	).toBeTruthy();
 });
 
-test('should work with separate type definitions', () => {
+test('should work with separate variant definitions', () => {
 	// Workaround 1: Define ADTs in separate programs
 	const result1 = runCode(`
-        type Color = Red | Green | Blue;
+        variant Color = Red | Green | Blue;
         colors = [Red, Green, Blue];
         color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
         list_map color_to_number colors
@@ -60,8 +60,8 @@ test('should work with separate type definitions', () => {
 test.skip('should work with manual iteration instead of list_map (requires Phase 3 @field syntax)', () => {
 	// Workaround 2: Use manual iteration instead of list_map
 	const result = runCode(`
-        type Color = Red | Green | Blue;
-        type Shape a = Circle a | Rectangle a a | Triangle a a a;
+        variant Color = Red | Green | Blue;
+        variant Shape a = Circle a | Rectangle a a | Triangle a a a;
         color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
         calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
         # Manual iteration instead of list_map

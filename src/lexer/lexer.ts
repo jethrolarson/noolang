@@ -155,6 +155,7 @@ export class Lexer {
 			'mut',
 			'mut!',
 			'where',
+			'variant',
 			'type',
 			'match',
 			'with',

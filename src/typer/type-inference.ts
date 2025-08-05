@@ -23,6 +23,7 @@ import {
 	type ConstraintExpr,
 	type ConstraintDefinitionExpression,
 	type ImplementDefinitionExpression,
+	type UserDefinedTypeExpression,
 	type Type,
 	type FunctionType,
 	type Constraint,
@@ -30,6 +31,9 @@ import {
 	stringType,
 	boolType,
 	functionType,
+	userDefinedRecordType,
+	userDefinedTupleType,
+	userDefinedUnionType,
 	typeVariable,
 	unknownType,
 	unitType,
@@ -1055,6 +1059,63 @@ export const typeBinary = (
 	);
 };
 
+// Type inference for user-defined types
+export const typeUserDefinedType = (
+	expr: UserDefinedTypeExpression,
+	state: TypeState
+): TypeResult => {
+	const { name, typeParams, definition } = expr;
+
+	// Create stable type variables for the user-defined type's parameters
+	const typeVarMap = new Map<string, Type>();
+	for (const param of typeParams) {
+		typeVarMap.set(param, typeVariable(param));
+	}
+
+	// Create the user-defined type based on the definition
+	let userType: Type;
+	
+	switch (definition.kind) {
+		case 'record-type':
+			// Convert to a standard record type
+			userType = {
+				kind: 'record',
+				fields: definition.fields  // definition.fields is already { [key: string]: Type }
+			};
+			break;
+		case 'tuple-type':
+			// Convert to a standard tuple type
+			userType = {
+				kind: 'tuple',
+				elements: definition.elements
+			};
+			break;
+		case 'union-type':
+			// For single-type unions (type aliases), store the underlying type directly
+			if (definition.types.length === 1) {
+				userType = definition.types[0];
+			} else {
+				// Convert to a standard union type
+				userType = {
+					kind: 'union',
+					types: definition.types
+				};
+			}
+			break;
+	}
+	
+	// Add the user-defined type to the environment so it can be referenced by name
+	const envWithType = new Map(state.environment);
+	envWithType.set(name, {
+		type: userType,
+		quantifiedVars: typeParams,
+	});
+	
+	const newState = { ...state, environment: envWithType };
+	
+	return createPureTypeResult(unitType(), newState);
+};
+
 // Type inference for mutable definitions
 export const typeMutableDefinition = (
 	expr: MutableDefinitionExpression,
@@ -1291,6 +1352,77 @@ export const typeWhere = (
 	);
 };
 
+// Resolve type references in user-defined types
+const resolveTypeReferences = (type: Type, environment: Map<string, { type: Type; quantifiedVars: string[] }>): Type => {
+	if (!type) {
+		return type;
+	}
+	
+	if (type.kind === 'primitive' || type.kind === 'variant') {
+		// Check if this is a reference to a user-defined type
+		const typeDef = environment.get(type.name);
+		if (typeDef) {
+			// Resolve to the underlying type
+			const resolvedType = typeDef.type;
+			if (!resolvedType) {
+				return type;
+			}
+			return resolvedType;
+		}
+	}
+	
+	// For complex types, recursively resolve references
+	switch (type.kind) {
+		case 'user-defined-record':
+		case 'user-defined-tuple':
+		case 'user-defined-union':
+			// These shouldn't exist anymore, but handle them just in case
+			const typeDef = environment.get(type.name);
+			if (typeDef) {
+				return typeDef.type;
+			}
+			return type; // fallback if no type definition found
+		case 'record':
+			const resolvedFields: { [key: string]: Type } = {};
+			for (const [fieldName, fieldType] of Object.entries(type.fields)) {
+				resolvedFields[fieldName] = resolveTypeReferences(fieldType, environment);
+			}
+			return {
+				...type,
+				fields: resolvedFields
+			};
+		case 'tuple':
+			return {
+				...type,
+				elements: type.elements.map(element => resolveTypeReferences(element, environment))
+			};
+		case 'union':
+			return {
+				...type,
+				types: type.types.map(t => {
+					const resolved = resolveTypeReferences(t, environment);
+					if (!resolved) {
+						return t;
+					}
+					return resolved;
+				})
+			};
+		case 'list':
+			return {
+				...type,
+				element: resolveTypeReferences(type.element, environment)
+			};
+		case 'function':
+			return {
+				...type,
+				params: type.params.map(param => resolveTypeReferences(param, environment)),
+				return: resolveTypeReferences(type.return, environment)
+			};
+		default:
+			return type;
+	}
+};
+
 // Type inference for typed expressions
 export const typeTyped = (
 	expr: TypedExpression,
@@ -1298,7 +1430,9 @@ export const typeTyped = (
 ): TypeResult => {
 	// For typed expressions, validate that the explicit type matches the inferred type
 	const inferredResult = typeExpression(expr.expression, state);
-	const explicitType = expr.type;
+	
+	// Resolve type references in the explicit type annotation
+	const explicitType = resolveTypeReferences(expr.type, state.environment);
 
 	const newState = unify(
 		inferredResult.type,

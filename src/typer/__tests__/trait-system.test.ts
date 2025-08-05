@@ -311,7 +311,7 @@ describe('Trait System', () => {
 
 		test('Consolidated Tests - Phase 1: Core Infrastructure - Type System Integration - should work with existing ADT system', () => {
 			const code = `
-		type CustomOption a = CustomSome a | CustomNone;
+		variant CustomOption a = CustomSome a | CustomNone;
 		constraint TestShow a ( testShow: a -> String );
 		implement TestShow (CustomOption a) ( testShow = fn opt => "custom" );
 		test = CustomSome 42
@@ -414,7 +414,7 @@ describe('Trait System', () => {
 			expect(typeResult.type.element.name).toBe('Float');
 		});
 
-		test('should not break existing type inference', () => {
+		test('should not break existing variant inference', () => {
 			const code = `
         simpleFunction = fn x => x + 1;
         result = simpleFunction 42
@@ -613,7 +613,7 @@ describe('Trait System', () => {
 	});
 
 	describe('Utility Tests', () => {
-		test('Consolidated Tests - Type Name Resolution - should correctly identify type names for resolution', () => {
+		test('Consolidated Tests - Type Name Resolution - should correctly identify variant names for resolution', () => {
 			expect(getTypeName(floatType())).toBe('Float');
 			expect(getTypeName(stringType())).toBe('String');
 			expect(getTypeName(boolType())).toBe('Bool');

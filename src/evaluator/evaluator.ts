@@ -19,6 +19,7 @@ import type {
 	RecordExpression,
 	AccessorExpression,
 	TypeDefinitionExpression,
+	UserDefinedTypeExpression,
 	MatchExpression,
 	Pattern,
 	WhereExpression,
@@ -1229,6 +1230,8 @@ export class Evaluator {
 				return this.evaluateExpression(expr.expression);
 			case 'type-definition':
 				return this.evaluateTypeDefinition(expr as TypeDefinitionExpression);
+			case 'user-defined-type':
+				return this.evaluateUserDefinedType(expr as UserDefinedTypeExpression);
 			case 'match':
 				return this.evaluateMatch(expr as MatchExpression);
 			case 'constraint-definition':
@@ -2270,6 +2273,15 @@ export class Evaluator {
 		}
 
 		// Type definitions evaluate to unit
+		return createUnit();
+	}
+
+	private evaluateUserDefinedType(expr: UserDefinedTypeExpression): Value {
+		// User-defined types are type-level definitions, similar to ADTs
+		// They don't create runtime values, but could define type constructors
+		// For now, they just evaluate to unit like type definitions
+		// TODO: Implement type constructor functions for user-defined types
+		
 		return createUnit();
 	}
 

@@ -140,7 +140,7 @@ describe('Evaluator', () => {
 		}).toThrow();
 	});
 
-	test('should handle type errors in arithmetic', () => {
+	test('should handle variant errors in arithmetic', () => {
 		expect(() => {
 			runCode('"hello" + 5');
 		}).toThrow();
@@ -429,7 +429,7 @@ describe('Evaluator', () => {
 
 	test('Additional Coverage - should handle constructor pattern matching', () => {
 		const result = runCode(`
-        type MyType = A | B Float;
+        variant MyType = A | B Float;
         value = B 42;
         match value with (
           A => 0;
@@ -442,7 +442,7 @@ describe('Evaluator', () => {
 	test('Additional Coverage - should throw error when no pattern matches', () => {
 		expect(() =>
 			runCode(`
-        type Color = Red | Blue;
+        variant Color = Red | Blue;
         value = Red;
         match value with (
           Blue => "blue"
@@ -498,7 +498,7 @@ describe('Evaluator', () => {
 
 	test('Additional Coverage - should convert constructor without args to string', () => {
 		const result = runCode(`
-        type Color = Red | Green | Blue;
+        variant Color = Red | Green | Blue;
         toString Red
       `);
 		expect(result.finalValue).toBe('Red');
@@ -506,7 +506,7 @@ describe('Evaluator', () => {
 
 	test('Additional Coverage - should convert constructor with args to string', () => {
 		const result = runCode(`
-        type Option a = Some a | None;
+        variant Option a = Some a | None;
         toString (Some 42)
       `);
 		expect(result.finalValue).toBe('Some 42');
@@ -578,7 +578,7 @@ describe('Evaluator', () => {
 
 	test('Additional Coverage - should handle nullary constructors', () => {
 		const result = runCode(`
-        type Color = Red | Green | Blue;
+        variant Color = Red | Green | Blue;
         Red
       `);
 		assertConstructorValue(result.evalResult.finalResult);
@@ -588,7 +588,7 @@ describe('Evaluator', () => {
 
 	test('Additional Coverage - should handle constructor with arguments', () => {
 		const result = runCode(`
-        type Point = Point Float Float;
+        variant Point = Point Float Float;
         Point 10 20
       `);
 		assertConstructorValue(result.evalResult.finalResult);
@@ -598,7 +598,7 @@ describe('Evaluator', () => {
 
 	test('Additional Coverage - should handle curried constructor application', () => {
 		const result = runCode(`
-        type Point = Point Float Float;
+        variant Point = Point Float Float;
         partialPoint = Point 10;
         partialPoint 20
       `);

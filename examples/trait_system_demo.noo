@@ -87,7 +87,7 @@ pipeline_demo = (
 # 10. INTEGRATION WITH EXISTING FEATURES
 
 # With ADTs (once pattern matching is available)
-type Option a = Some a | None;
+variant Option a = Some a | None;
 
 # Show implementation for Option
 implement Show (Option a) given a implements Show (

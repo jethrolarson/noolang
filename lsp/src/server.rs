@@ -251,7 +251,7 @@ impl LanguageServer for Backend {
                     } else if completion == "fn" || completion == "if" || 
                               completion == "then" || completion == "else" ||
                               completion == "match" || completion == "with" ||
-                              completion == "type" || completion == "mut" ||
+                              completion == "variant" || completion == "mut" ||
                               completion == "constraint" || completion == "implement" {
                         CompletionItemKind::KEYWORD
                     } else {

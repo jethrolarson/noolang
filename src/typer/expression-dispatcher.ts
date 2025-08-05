@@ -12,6 +12,7 @@ import {
 	typeTuple,
 	typeAccessor,
 	typeDefinition,
+	typeUserDefinedType,
 	typeTupleDestructuring,
 	typeRecordDestructuring,
 	typeMutableDefinition,
@@ -87,6 +88,9 @@ export const typeExpression = (
 
 		case 'type-definition':
 			return typeTypeDefinition(expr, state);
+			
+		case 'user-defined-type':
+			return typeUserDefinedType(expr, state);
 
 		case 'constraint-definition':
 			return typeConstraintDefinition(expr, state);

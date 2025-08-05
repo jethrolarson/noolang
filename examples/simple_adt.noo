@@ -1,7 +1,7 @@
 # Simple ADT Demo - Core Working Features
 
 # Define a simple ADT
-type Color = Red | Green | Blue;
+variant Color = Red | Green | Blue;
 
 # Create values
 red = Red;

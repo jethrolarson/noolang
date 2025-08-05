@@ -46,7 +46,7 @@ describe('Operator Functionality', () => {
 	test('operators with ADT pattern matching', () => {
 		expectSuccess(
 			`
-        type Point a = Point a a;
+        variant Point a = Point a a;
         getX = fn point => match point with (Point x y => x);
         points = [Point 1 2, Point 3 4];
         result = points | list_map $ getX;

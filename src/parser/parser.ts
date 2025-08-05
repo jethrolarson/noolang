@@ -34,6 +34,14 @@ import {
 	tupleTypeConstructor,
 	type ConstraintExpr,
 	type TypeDefinitionExpression,
+	type UserDefinedTypeExpression,
+	type UserDefinedTypeDefinition,
+	type RecordTypeDefinition,
+	type TupleTypeDefinition,
+	type UnionTypeDefinition,
+	userDefinedRecordType,
+	userDefinedTupleType,
+	userDefinedUnionType,
 	type MatchExpression,
 	type ConstructorDefinition,
 	type Pattern,
@@ -1825,10 +1833,10 @@ const parseConstructor: C.Parser<ConstructorDefinition> = C.map(
 	})
 );
 
-// --- Type Definition ---
+// --- Variant Definition ---
 const parseTypeDefinition: C.Parser<TypeDefinitionExpression> = C.map(
 	C.seq(
-		C.keyword('type'),
+		C.keyword('variant'),
 		parseTypeName,
 		C.many(C.identifier()),
 		C.operator('='),
@@ -1850,6 +1858,134 @@ const parseTypeDefinition: C.Parser<TypeDefinitionExpression> = C.map(
 			constructors[constructors.length - 1]?.location.end || equals.location.end
 		),
 	})
+);
+
+// --- User-Defined Type Definition ---
+const parseUserDefinedType: C.Parser<UserDefinedTypeExpression> = C.map(
+	C.seq(
+		C.keyword('type'),
+		parseTypeName,
+		C.many(C.identifier()),
+		C.operator('='),
+		C.lazy(() => parseUserDefinedTypeDefinition)
+	),
+	([
+		typeKeyword,
+		name,
+		typeParams,
+		equals,
+		definition,
+	]): UserDefinedTypeExpression => ({
+		kind: 'user-defined-type',
+		name: name.value,
+		typeParams: typeParams.map(p => p.value),
+		definition: definition as UserDefinedTypeDefinition,
+		location: createLocation(
+			typeKeyword.location.start,
+			equals.location.end
+		),
+	})
+);
+
+// Parse record type definition: {@field Type, ...}  
+const parseRecordTypeDefinition: C.Parser<RecordTypeDefinition> = C.map(
+	C.seq(
+		C.punctuation('{'),
+		C.optional(
+			C.sepBy(
+				C.map(
+					C.seq(
+						C.accessor(),
+						C.lazy(() => parseTypeExpression)
+					),
+					([accessor, type]) => [accessor.value, type] as [string, Type]
+				),
+				C.punctuation(',')
+			)
+		),
+		C.punctuation('}')
+	),
+	([openBrace, fields, closeBrace]): RecordTypeDefinition => {
+		const fieldObj: { [key: string]: Type } = {};
+		if (fields) {
+			for (const [name, type] of fields) {
+				fieldObj[name] = type;
+			}
+		}
+		return {
+			kind: 'record-type',
+			fields: fieldObj,
+		};
+	}
+);
+
+// Parse tuple type definition: {Type, Type, ...}
+const parseTupleTypeDefinition: C.Parser<TupleTypeDefinition> = C.map(
+	C.seq(
+		C.punctuation('{'),
+		C.optional(
+			C.sepBy(
+				C.lazy(() => parseTypeExpression),
+				C.punctuation(',')
+			)
+		),
+		C.punctuation('}')
+	),
+	([openBrace, elements, closeBrace]): TupleTypeDefinition => ({
+		kind: 'tuple-type',
+		elements: elements || [],
+	})
+);
+
+// Parse union type definition: Type1 | Type2 | ...
+const parseUnionTypeDefinition: C.Parser<UnionTypeDefinition> = C.map(
+	C.sepBy(
+		C.lazy(() => parseTypeExpression),
+		C.operator('|')
+	),
+	(types: Type[]): UnionTypeDefinition => ({
+		kind: 'union-type',
+		types,
+	})
+);
+
+// Parse structured type definition (record or tuple based on content)
+const parseStructuredTypeDefinition: C.Parser<RecordTypeDefinition | TupleTypeDefinition> = (tokens: Token[]) => {
+	// Look ahead to see if we have accessor syntax (@field) or regular types
+	if (tokens.length === 0) return { success: false, error: 'Unexpected end of input', position: 0 };
+	
+	if (tokens[0].type !== 'PUNCTUATION' || tokens[0].value !== '{') {
+		return { success: false, error: 'Expected {', position: 0 };
+	}
+	
+	// Look ahead to determine if this is a record (has @) or tuple (no @)
+	let i = 1;
+	let hasAccessor = false;
+	let braceCount = 1;
+	
+	while (i < tokens.length && braceCount > 0) {
+		if (tokens[i].type === 'PUNCTUATION') {
+			if (tokens[i].value === '{') braceCount++;
+			else if (tokens[i].value === '}') braceCount--;
+		} else if (tokens[i].type === 'ACCESSOR') {
+			hasAccessor = true;
+			break;
+		}
+		i++;
+	}
+	
+	// Parse as record or tuple based on what we found
+	if (hasAccessor) {
+		return parseRecordTypeDefinition(tokens);
+	} else {
+		return parseTupleTypeDefinition(tokens);
+	}
+};
+
+// Parse user-defined type definition (structured type or union)
+const parseUserDefinedTypeDefinition: C.Parser<UserDefinedTypeDefinition> = C.choice(
+	C.map(parseStructuredTypeDefinition, (s): UserDefinedTypeDefinition => s),
+	C.map(parseUnionTypeDefinition, (u): UserDefinedTypeDefinition => u)
 );
 
 // --- Constraint Function ---
@@ -2291,7 +2427,8 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
 const parseSequenceTerm: C.Parser<Expression> = C.choice(
 	// Parse keyword-based expressions first to avoid identifier conflicts
 	parseMatchExpression, // ADT pattern matching (starts with "match")
-	parseTypeDefinition, // ADT type definitions (starts with "type")
+	parseTypeDefinition, // ADT variant definitions (starts with "variant")
+	parseUserDefinedType, // User-defined types (starts with "type")
 	parseConstraintDefinition, // constraint definitions (starts with "constraint")
 	parseImplementDefinition, // implement definitions (starts with "implement")
 	parseMutableDefinition, // starts with "mut"
@@ -2315,7 +2452,8 @@ const parseSequenceTermWithIf: C.Parser<Expression> = parseSequenceTerm;
 const parseWhereMainExpression: C.Parser<Expression> = C.choice(
 	// Parse keyword-based expressions first to avoid identifier conflicts
 	parseMatchExpression, // ADT pattern matching (starts with "match")
-	parseTypeDefinition, // ADT type definitions (starts with "type")
+	parseTypeDefinition, // ADT variant definitions (starts with "variant")
+	parseUserDefinedType, // User-defined types (starts with "type")
 	parseConstraintDefinition, // constraint definitions (starts with "constraint")
 	parseImplementDefinition, // implement definitions (starts with "implement")
 	parseMutableDefinition, // starts with "mut"

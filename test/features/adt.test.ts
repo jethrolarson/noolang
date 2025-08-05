@@ -64,7 +64,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Custom ADT Definition - should define simple ADT', () => {
 		const result = runCode(`
-		type Color = Red | Green | Blue;
+		variant Color = Red | Green | Blue;
 		Red
 	`);
 
@@ -77,7 +77,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Custom ADT Definition - should pattern match on custom ADT', () => {
 		const result = runCode(`
-		type Color = Red | Green | Blue;
+		variant Color = Red | Green | Blue;
 		
 		colorToString = fn color => match color with (
 			Red => "red";
@@ -93,7 +93,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Custom ADT Definition - should define ADT with parameters', () => {
 		const result = runCode(`
-		type Box a = Empty | Full a;
+		variant Box a = Empty | Full a;
 		Full 42
 	`);
 
@@ -106,7 +106,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Custom ADT Definition - should handle ADT with single parameter', () => {
 		const result = runCode(`
-		type Wrapper = Wrap Float;
+		variant Wrapper = Wrap Float;
 		Wrap 42
 	`);
 
@@ -120,14 +120,14 @@ describe('Algebraic Data Types', () => {
 	test.skip('should not allow shadowing built in types', () => {
 		expect(() =>
 			runCode(`
-		type List a = Cons a (List a) | Nil;
+		variant List a = Cons a (List a) | Nil;
 	`)
 		).toThrow('Shadowing built in type List');
 	});
 
 	test('Pattern Matching - should handle recursive ADTs', () => {
 		const result = runCode(`
-		type Lyst a = Cons a (Lyst a) | Nil;
+		variant Lyst a = Cons a (Lyst a) | Nil;
 		Cons 1 (Cons 2 Nil);
 	`);
 
@@ -150,7 +150,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Pattern Matching - should handle complex pattern matching with variables', () => {
 		const result = runCode(`
-		type Result a b = Ok a | Error b;
+		variant Result a b = Ok a | Error b;
 		
 		unwrap = fn result => match result with (
 			Ok value => value;
@@ -165,7 +165,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Pattern Matching - should match on ADT with multiple parameters', () => {
 		const result = runCode(`
-		type Point = Point Float Float;
+		variant Point = Point Float Float;
 		
 		getX = fn point => match point with (
 			Point x y => x
@@ -179,8 +179,8 @@ describe('Algebraic Data Types', () => {
 
 	test('Pattern Matching - should handle nested pattern matching', () => {
 		const result = runCode(`
-		type Inner = InnerValue Float;
-		type Outer = OuterValue Inner;
+		variant Inner = InnerValue Float;
+		variant Outer = OuterValue Inner;
 		
 		getValue = fn outer => match outer with (
 			OuterValue inner => match inner with (
@@ -196,7 +196,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Type Inference - should infer ADT types correctly', () => {
 		const result = runCode(`
-		type Maybe a = Just a | Nothing;
+		variant Maybe a = Just a | Nothing;
 		Just 42
 	`);
 
@@ -210,7 +210,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Type Inference - should handle polymorphic ADTs', () => {
 		const result = runCode(`
-		type Container a = Container a;
+		variant Container a = Container a;
 		
 		makeContainer = fn value => Container value;
 		
@@ -229,7 +229,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Function Integration - should work with functions that return ADTs', () => {
 		const result = runCode(`
-		type Status = Success | Failure;
+		variant Status = Success | Failure;
 		
 		checkNumber = fn x => if x > 0 then Success else Failure;
 		
@@ -245,7 +245,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Function Integration - should work with functions that take ADTs as parameters', () => {
 		const result = runCode(`
-		type Status = Success | Failure;
+		variant Status = Success | Failure;
 		
 		statusToNumber = fn status => match status with (
 			Success => 1;
@@ -260,7 +260,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Function Integration - should work with list_map and ADTs', () => {
 		const result = runCode(`
-		type Status = Success | Failure;
+		variant Status = Success | Failure;
 		
 		statusToNumber = fn status => match status with (
 			Success => 1;
@@ -283,8 +283,8 @@ describe('Algebraic Data Types', () => {
 
 	test('Multiple ADTs - should handle multiple ADT definitions in the same program - TODO: Fix ADT pattern matching', () => {
 		const result = runCode(`
-		type Color = Red | Green | Blue;
-		type Size = Small | Medium | Large;
+		variant Color = Red | Green | Blue;
+		variant Size = Small | Medium | Large;
 		
 		item = {Red, Small};
 		item
@@ -301,8 +301,8 @@ describe('Algebraic Data Types', () => {
 
 	test('Multiple ADTs - should handle pattern matching on different ADTs separately - TODO: Fix ADT pattern matching', () => {
 		const result = runCode(`
-		type Color = Red | Green | Blue;
-		type Size = Small | Medium | Large;
+		variant Color = Red | Green | Blue;
+		variant Size = Small | Medium | Large;
 		
 		colorToString = fn color => match color with (Red => "red"; Green => "green"; Blue => "blue");
 		sizeToString = fn size => match size with (Small => "small"; Medium => "medium"; Large => "large");
@@ -315,8 +315,8 @@ describe('Algebraic Data Types', () => {
 
 	test('Multiple ADTs - should now work with list_map and multiple ADTs (polymorphism fixed)', () => {
 		const result = runCode(`
-		type Color = Red | Green | Blue;
-		type Status = Success | Failure;
+		variant Color = Red | Green | Blue;
+		variant Status = Success | Failure;
 		
 		colorToStatus = fn color => match color with (
 			Red => Failure;
@@ -340,7 +340,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Edge Cases - should handle ADT constructors with no parameters - TODO: Fix parser for types with same name as constructor', () => {
 		const result = runCode(`
-		type U = U;
+		variant U = U;
 		U
 	`);
 
@@ -353,7 +353,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Edge Cases - should handle ADT with same name as constructor - TODO: Fix parser for types with same name as constructor', () => {
 		const result = runCode(`
-		type U = U;
+		variant U = U;
 		
 		isU = fn x => match x with (
 			U => True
@@ -371,8 +371,8 @@ describe('Algebraic Data Types', () => {
 
 	test.skip('Complex Scenarios - should work when shapes are processed separately', () => {
 		const result = runCode(`
-		type Color = Red | Green | Blue;
-		type Shape a = Circle a | Rectangle a a | Triangle a a a;
+		variant Color = Red | Green | Blue;
+		variant Shape a = Circle a | Rectangle a a | Triangle a a a;
 		shapes = [Circle 3, Rectangle 5 4];
 		calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
 		areas = list_map calculate_area shapes;
@@ -390,7 +390,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Generic Constructors - should handle Point with generic parameters (issue fix)', () => {
 		const result = runCode(`
-		type Point a = Point a a;
+		variant Point a = Point a a;
 		origin = Point 0.0 0.0;
 		origin
 	`);
@@ -407,7 +407,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Generic Constructors - should handle Shape with multiple constructors (issue fix)', () => {
 		const result = runCode(`
-		type Shape a = Circle a | Rectangle a a;
+		variant Shape a = Circle a | Rectangle a a;
 		circle = Circle 5.0;
 		circle
 	`);
@@ -421,7 +421,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Generic Constructors - should handle partial application of generic constructors', () => {
 		const result = runCode(`
-		type Point a = Point a a;
+		variant Point a = Point a a;
 		makeOrigin = Point 0.0;
 		point = makeOrigin 0.0;
 		point
@@ -440,7 +440,7 @@ describe('Algebraic Data Types', () => {
 	// New Recursive ADT Tests
 	test('Recursive ADT - Binary Tree construction and pattern matching', () => {
 		const result = runCode(`
-		type Tree a = Node a (Tree a) (Tree a) | Leaf;
+		variant Tree a = Node a (Tree a) (Tree a) | Leaf;
 
 		tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
 
@@ -457,7 +457,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Recursive ADT - LinkedList with pattern matching', () => {
 		const result = runCode(`
-		type LinkedList a = Cons a (LinkedList a) | Nil;
+		variant LinkedList a = Cons a (LinkedList a) | Nil;
 
 		sum = fn lst => match lst with (
 			Cons h t => h + (sum t);
@@ -473,7 +473,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Recursive ADT - List operations with proper recursion', () => {
 		const result = runCode(`
-		type MyList a = Cons a (MyList a) | Nil;
+		variant MyList a = Cons a (MyList a) | Nil;
 
 		length = fn lst => match lst with (
 			Cons h t => 1 + (length t);
@@ -489,7 +489,7 @@ describe('Algebraic Data Types', () => {
 
 	test('Recursive ADT - Nested pattern matching', () => {
 		const result = runCode(`
-		type Tree a = Node a (Tree a) (Tree a) | Leaf;
+		variant Tree a = Node a (Tree a) (Tree a) | Leaf;
 
 		sumTree = fn t => match t with (
 			Node value left right => value + (sumTree left) + (sumTree right);

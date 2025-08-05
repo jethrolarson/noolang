@@ -141,7 +141,7 @@ fn test_adt_navigation() {
     let bridge = TypeScriptBridge::new();
     
     let content = r#"
-type Option a = Some a | None;
+variant Option a = Some a | None;
 unwrap = fn opt => match opt with (
   Some x => x;
   None => 0

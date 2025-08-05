@@ -24,7 +24,7 @@ describe('Pattern Matching Failures', () => {
 	test('should handle parametric ADT pattern matching', () => {
 		// FIXME: Currently fails with "Pattern expects constructor but got α"
 		const code = `
-      type Point a = Point a a;
+      variant Point a = Point a a;
       get_x = fn point => match point with (Point x y => x);
       origin = Point 0 0;
       get_x origin
@@ -62,7 +62,7 @@ describe('Pattern Matching Failures', () => {
 	test('should handle complex Shape pattern matching', () => {
 		// FIXME: Currently fails with "Pattern expects constructor but got α"
 		const code = `
-      type Shape = Circle Float | Rectangle Float Float;
+      variant Shape = Circle Float | Rectangle Float Float;
       calculate_area = fn shape => match shape with (
         Circle radius => radius * radius * 3;
         Rectangle width height => width * height

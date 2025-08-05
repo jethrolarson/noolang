@@ -129,6 +129,28 @@ export type ConstrainedType = {
 	constraints: Map<string, Constraint[]>; // variable name -> constraints
 };
 
+// User-defined types for type system
+export type UserDefinedRecordType = {
+	kind: 'user-defined-record';
+	name: string;
+	typeParams: string[];
+	fields: { [fieldName: string]: Type };
+};
+
+export type UserDefinedTupleType = {
+	kind: 'user-defined-tuple';
+	name: string;
+	typeParams: string[];
+	elements: Type[];
+};
+
+export type UserDefinedUnionType = {
+	kind: 'user-defined-union';
+	name: string;
+	typeParams: string[];
+	types: Type[];
+};
+
 export type Type =
 	| PrimitiveType
 	| FunctionType
@@ -141,7 +163,10 @@ export type Type =
 	| ADTType
 	| UnitType
 	| UnknownType
-	| ConstrainedType;
+	| ConstrainedType
+	| UserDefinedRecordType
+	| UserDefinedTupleType
+	| UserDefinedUnionType;
 
 // Expressions
 export type Expression =
@@ -167,6 +192,7 @@ export type Expression =
 	| ListExpression
 	| WhereExpression
 	| TypeDefinitionExpression
+	| UserDefinedTypeExpression
 	| MatchExpression
 	| ConstraintDefinitionExpression
 	| ImplementDefinitionExpression
@@ -383,6 +409,37 @@ export interface TypeDefinitionExpression {
 	constructors: ConstructorDefinition[];
 	type?: Type;
 	location: Location;
+}
+
+// User-defined type definition
+export interface UserDefinedTypeExpression {
+	kind: 'user-defined-type';
+	name: string;
+	typeParams: string[]; // Type parameters like 'a' in User a
+	definition: UserDefinedTypeDefinition;
+	type?: Type;
+	location: Location;
+}
+
+// User-defined type definitions
+export type UserDefinedTypeDefinition =
+	| RecordTypeDefinition
+	| TupleTypeDefinition  
+	| UnionTypeDefinition;
+
+export interface RecordTypeDefinition {
+	kind: 'record-type';
+	fields: { [fieldName: string]: Type };
+}
+
+export interface TupleTypeDefinition {
+	kind: 'tuple-type';
+	elements: Type[];
+}
+
+export interface UnionTypeDefinition {
+	kind: 'union-type';
+	types: Type[];
 }
 
 // Pattern in pattern matching
@@ -774,4 +831,38 @@ export const constrainedFunctionType = (
 	return: returnType,
 	effects,
 	constraints,
+});
+
+// User-defined type constructors
+export const userDefinedRecordType = (
+	name: string,
+	typeParams: string[],
+	fields: { [fieldName: string]: Type }
+): UserDefinedRecordType => ({
+	kind: 'user-defined-record',
+	name,
+	typeParams,
+	fields,
+});
+
+export const userDefinedTupleType = (
+	name: string,
+	typeParams: string[],
+	elements: Type[]
+): UserDefinedTupleType => ({
+	kind: 'user-defined-tuple',
+	name,
+	typeParams,
+	elements,
+});
+
+export const userDefinedUnionType = (
+	name: string,
+	typeParams: string[],
+	types: Type[]
+): UserDefinedUnionType => ({
+	kind: 'user-defined-union',
+	name,
+	typeParams,
+	types,
 });

@@ -9,7 +9,7 @@ import { initializeBuiltins } from '../builtins';
 test('Stdlib Parsing Regression Tests - should parse the problematic implement statement from line 81', () => {
 	// Isolate the exact code that's failing from around line 81
 	const problematicCode = `
-type Option a = Some a | None;
+variant Option a = Some a | None;
 
 implement Show (Option a) given a implements Show (
   show = fn opt => match opt with (
@@ -28,7 +28,7 @@ implement Show (Option a) given a implements Show (
 
 test('Stdlib Parsing Regression Tests - should handle another complex implement statement', () => {
 	const complexCode = `
-type List a = Nil | Cons a (List a);
+variant List a = Nil | Cons a (List a);
 
 implement Functor List (
   map = fn f list => match list with (
@@ -45,9 +45,9 @@ implement Functor List (
 	expect(program.statements.length).toBe(1);
 });
 
-test('Stdlib Parsing Regression Tests - should parse simple type definition', () => {
+test('Stdlib Parsing Regression Tests - should parse simple variant definition', () => {
 	const simpleCode = `
-type Option a = Some a | None;
+variant Option a = Some a | None;
     `;
 
 	const lexer = new Lexer(simpleCode);
@@ -73,7 +73,7 @@ test('Stdlib Parsing Regression Tests - should parse stdlib without errors', () 
 	expect(program.statements.length > 0).toBeTruthy();
 });
 
-test('Stdlib Parsing Regression Tests - should handle type state initialization', () => {
+test('Stdlib Parsing Regression Tests - should handle variant state initialization', () => {
 	const typeState = createTypeState();
 	initializeBuiltins(typeState);
 

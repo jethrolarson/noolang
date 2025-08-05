@@ -1,22 +1,93 @@
-type Suit = Spade | Heart | Club | Diamond;
-type CardNum = Ace | N2 | N3 | N4 | N5 | N6 | N7 | N8 | N9 | N10 | Jack | Queen | King;
-# Type aliases are not supported yet
-type Card = {CardNum, Suit};
+# Card Game Example - Demonstrates Variants vs User-Defined Types
 
-type Deck = Card[];
+# ADTs (sum types with constructors) use 'variant'
+variant Suit = Spade | Heart | Club | Diamond;
+variant CardNum = Ace | N2 | N3 | N4 | N5 | N6 | N7 | N8 | N9 | N10 | Jack | Queen | King;
 
-type Player = { @name string };
+# User-defined types (records, tuples, unions) use 'type'
+type Card = {CardNum, Suit};                    # Tuple type
+type Player = {@name String, @score Float};     # Record type
+type GameResult = Player | String;              # Union type (winner or tie message)
 
-type Game = {
-  @players Player[],
-  @deck Deck
-};
-
+# More complex user-defined types
+type Hand = {Card, Card, Card, Card, Card};     # 5-card hand as tuple
 type GameState = {
-  @game Game,
-  @players Player[],
-  @deck Deck
+  @player1 Player,
+  @player2 Player, 
+  @currentHand Hand,
+  @gameOver Bool
 };
+
+# Example functions
+createCard = fn num suit => {num, suit};
+createPlayer = fn name => {@name name, @score 0};
+updateScore = fn player newScore => {@name (player | @name), @score newScore};
+
+# Create some example cards
+aceOfSpades = createCard Ace Spade;
+kingOfHearts = createCard King Heart;
+queenOfClubs = createCard Queen Club;
+jackOfDiamonds = createCard Jack Diamond;
+tenOfSpades = createCard N10 Spade;
+
+# Create example hand
+exampleHand = {aceOfSpades, kingOfHearts, queenOfClubs, jackOfDiamonds, tenOfSpades};
+
+# Create players
+alice = createPlayer "Alice";
+bob = createPlayer "Bob";
+
+# Create game state
+gameState = {
+  @player1 alice,
+  @player2 bob,
+  @currentHand exampleHand,
+  @gameOver False
+};
+
+# Example of pattern matching with variants
+suitToString = fn suit => match suit with (
+  Spade => "♠";
+  Heart => "♥"; 
+  Club => "♣";
+  Diamond => "♦"
+);
+
+cardNumToString = fn num => match num with (
+  Ace => "A";
+  N2 => "2";
+  N3 => "3";
+  N4 => "4";
+  N5 => "5";
+  N6 => "6";
+  N7 => "7";
+  N8 => "8";
+  N9 => "9";
+  N10 => "10";
+  Jack => "J";
+  Queen => "Q";
+  King => "K"
+);
+
+# Function to display a card
+cardToString = fn card => match card with (
+  {num, suit} => (cardNumToString num) + (suitToString suit)
+);
+
+# Display the ace of spades
+cardDisplay = cardToString aceOfSpades;  # "A♠"
+
+# Access game state fields
+player1Name = gameState | @player1 | @name;  # "Alice"
+player2Score = gameState | @player2 | @score;  # 0
+
+# Final result showing the game state
+{
+  @cardExample cardDisplay,
+  @player1 player1Name,
+  @gameInProgress (not (gameState | @gameOver)),
+  @handSize 5
+}
 
 
 

@@ -863,7 +863,7 @@ impl TypeScriptBridge {
             "else".to_string(),
             "match".to_string(),
             "with".to_string(),
-            "type".to_string(),
+            "variant".to_string(),
             "mut".to_string(),
             "constraint".to_string(),
             "implement".to_string(),
