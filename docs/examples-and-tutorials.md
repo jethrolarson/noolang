@@ -31,10 +31,7 @@ squared = map (fn x => x * x) numbers;  # [1, 4, 9, 16, 25]
 
 # Records
 person = { @name "Alice", @age 30 };
-
-# Accessing fields
-name = person.name;         # "Alice"
-name
+person
 ```
 
 **Try it**: `bun start examples/basic.noo`
@@ -86,15 +83,7 @@ number_list = [1, 2, 3, 4, 5];
 
 # Records with named fields
 person = { @name "Alice", @age 30, @city "Wonderland" };
-
-# Field access
-person_name = person.name;
-person_age = person | @age;   # Using pipe with accessor
-
-# Tuples (positional fields)
-point = {10, 20};            # Anonymous tuple
-coordinates = point.0;       # Access first element
-coordinates
+person
 ```
 
 ### 5. Pipeline Operations
@@ -151,13 +140,13 @@ person
 
 ```noolang
 # Types are inferred through pipelines
-addOne = fn x => x + 1 : Float -> Float;
-square = fn x => x * x : Float -> Float;
+addOne = fn x => x + 1;
+square = fn x => x * x;
 
-# Type: Float  
+# Function composition
 pipeline_result = 3 | (addOne |> square);
 
-# Type: List Float
+# List operations
 numbers = [1, 2, 3];
 composed = addOne |> square;
 mapped_pipeline = map composed numbers;
@@ -175,8 +164,8 @@ Constraint-based polymorphism:
 ```noolang
 # Constraint systems are implemented but syntax differs
 # See stdlib.noo for actual constraint definitions
-# Example of using built-in equality
-result = equals 1 1;  # Uses built-in Eq constraint
+# Example of using built-in Show constraint
+result = show 42;  # Uses built-in Show constraint
 result
 ```
 
@@ -198,10 +187,10 @@ result
 intValue = show 42;           # Uses Show Float
 stringValue = show "hello";   # Uses Show String
 
-# Comparison examples
-intEquals = equals 1 1;       # Uses Eq Float
-stringEquals = equals "a" "a"; # Uses Eq String
-stringEquals
+# Show for different types
+boolValue = show True;        # Uses Show Bool
+listValue = show [1, 2, 3];   # Uses Show List
+listValue
 ```
 
 **Try it**: `bun start examples/trait_system_demo.noo`

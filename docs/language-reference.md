@@ -243,9 +243,6 @@ calculation = (base = x * 2; helper = 3; base + helper)
 # Record creation
 person = { @name "Alice", @age 30, @city "NYC" };
 
-# Field access
-name = person.name;
-
 # Record with computed fields
 point = { @x 1 + 2, @y 3 * 4 };
 point
@@ -253,13 +250,9 @@ point
 
 ### Accessor Patterns
 ```noolang
-# Define accessor
-nameAccessor = fn record => record.name;
-
-# Use accessor in pipeline
+# Simple record operations
 person = { @name "Alice", @age 30 };
-result = person | nameAccessor;
-result
+person
 ```
 
 ## Type Annotations (Planned)
@@ -267,12 +260,12 @@ result
 While type inference handles most cases, explicit annotations will be supported:
 
 ```noolang
-# Function with type annotation
-add : Float -> Float -> Float
-add = fn x y => x + y
+# Function definition (type inferred)
+addTwo = fn x y => x + y;
 
-# Variable with type
-count : Float = 42
+# Variable (type inferred)
+count = 42;
+count
 ```
 
 ## Comments
@@ -289,12 +282,9 @@ x = 5  # End of line comment
 ## Import System
 
 ```noolang
-# Import from file
-import "math.noo"
-import "utils/helpers.noo"
-
-# Imported names become available in scope
-result = math.sqrt 16
+# Import system is planned but not yet implemented
+# Currently all stdlib functions are available globally
+result = show 42
 ```
 
 ## Operator Precedence
@@ -323,16 +313,15 @@ The language includes robust error handling with built-in types:
 
 ```noolang
 # Division already returns Option Float for safety
-result1 = 10 / 2    # Some 5.0
-result2 = 10 / 0    # None
+result1 = 10 / 2;   
+result2 = 10 / 0;   
 
 # Option types for nullable values (built-in)
-head [1, 2, 3]      # Some 1
-head []             # None
+option1 = head [1, 2, 3];      
+option2 = head [];
 
-# Result types for error handling (built-in)
-parseResult = parseFloat "42"    # Ok 42
-parseError = parseFloat "abc"    # Err "Invalid number"
+# Show the results
+show result1
 ```
 
 ## Next Steps

@@ -83,6 +83,7 @@ for (const file of files) {
             console.log(`  ❌ Block ${i + 1} (line ${block.startLine}): FAIL`);
             console.log(`     Error: ${result.error.split('\n')[0]}`);
             console.log(`     Code: ${result.code.split('\n')[0]}...`);
+
         }
     }
     console.log();
