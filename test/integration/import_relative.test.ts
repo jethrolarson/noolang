@@ -1,54 +1,26 @@
 import { test, expect } from 'bun:test';
-import { Lexer } from '../../src/lexer/lexer';
-import { parse } from '../../src/parser/parser';
-import { Evaluator } from '../../src/evaluator/evaluator';
-import { createTraitRegistry } from '../../src/typer/trait-system';
-
-// Test suite: File-relative imports
-const mockFs = {
-	readFileSync: (filePath: unknown) => {
-		if (typeof filePath === 'string' && filePath.includes('stdlib.noo')) {
-			return '# Noolang Standard Library\n# This file defines the global default environment\n';
-		}
-		if (
-			typeof filePath === 'string' &&
-			filePath.includes('math_functions.noo')
-		) {
-			return '{ @mathAdd fn x y => x + y, @mathMultiply fn x y => x * y }';
-		}
-		throw new Error(`File not found: ${filePath}`);
-	},
-	existsSync: (filePath: unknown) => {
-		if (typeof filePath === 'string' && filePath.includes('stdlib.noo')) {
-			return true;
-		}
-		if (
-			typeof filePath === 'string' &&
-			filePath.includes('math_functions.noo')
-		) {
-			return true;
-		}
-		return false;
-	},
-};
+import { runCode } from '../utils';
+import * as fs from 'fs';
+import * as path from 'path';
 
 test('should import from same directory', () => {
-	const testCode = `
+	// Create temporary math_functions.noo file
+	const mathModuleContent = '{ @mathAdd fn x y => x + y, @mathMultiply fn x y => x * y }';
+	fs.writeFileSync('math_functions.noo', mathModuleContent);
+	
+	try {
+		const testCode = `
       math = import "math_functions";
       (@mathAdd math) 2 3
     `;
-	const lexer = new Lexer(testCode);
-	const tokens = lexer.tokenize();
-	const program = parse(tokens);
-	const evaluator = new Evaluator({ 
-		fs: mockFs as any,
-		traitRegistry: createTraitRegistry()
-	});
-	const result = evaluator.evaluateProgram(
-		program,
-		'/test/dir/test_file.noo'
-	);
-	expect(result.finalResult).toEqual({ tag: 'number', value: 5 });
+		const result = runCode(testCode);
+		expect(result.finalValue).toEqual(5);
+	} finally {
+		// Clean up
+		if (fs.existsSync('math_functions.noo')) {
+			fs.unlinkSync('math_functions.noo');
+		}
+	}
 });
 
 test('should import from parent directory', () => {

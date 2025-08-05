@@ -1,0 +1,5 @@
+
+		add_fn = fn x y => x + y;
+		multiply_fn = fn x y => x * y;
+		{@add add_fn, @multiply multiply_fn}
+	
