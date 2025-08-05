@@ -1,0 +1,318 @@
+# Noolang Language Reference
+
+> Complete reference for Noolang syntax, operators, and language constructs.
+
+## Source Code References
+- **Lexer**: [`src/lexer/lexer.ts`](../src/lexer/lexer.ts) - Token definitions and parsing
+- **Parser**: [`src/parser/`](../src/parser/) - Syntax parsing and AST construction  
+- **AST**: [`src/ast.ts`](../src/ast.ts) - Abstract syntax tree node definitions
+- **Tests**: [`src/lexer/__tests__/`](../src/lexer/__tests__/) - Comprehensive language feature tests
+
+## Literals
+
+### Numbers
+```noolang
+42          # Integer
+3.14159     # Float
+123.456     # Decimal numbers
+```
+
+### Strings
+```noolang
+"Hello, World!"
+"String with spaces"
+""          # Empty string
+```
+
+### Booleans
+```noolang
+true
+false
+```
+
+### Lists
+```noolang
+[]              # Empty list
+[1; 2; 3]       # List of numbers  
+["a"; "b"]      # List of strings
+[1; 2; 3; 4]    # Semicolon separators
+```
+
+### Records
+```noolang
+{}                              # Empty record
+{ name = "Alice"; age = 30 }    # Record with fields
+{ x = 1; y = 2; z = 3 }        # Multi-field record
+```
+
+## Keywords
+
+All keywords supported by the lexer ([`src/lexer/lexer.ts:147-176`](../src/lexer/lexer.ts#L147-L176)):
+
+### Control Flow
+- `if` `then` `else` - Conditional expressions
+- `match` `with` - Pattern matching (planned)
+
+### Function Definition  
+- `fn` - Function definition
+- `let` `in` - Local bindings
+- `where` - Local definitions within expressions
+
+### Type System
+- `type` - Type definitions
+- `variant` - Algebraic data type definitions
+- `constraint` - Trait/constraint definitions
+- `implement` `implements` - Trait implementations
+- `given` `is` `has` - Constraint expressions
+
+### Effects & Mutation
+- `mut` - Mutable variable declaration
+- `mut!` - Special mutation syntax
+
+### Imports
+- `import` - Module imports
+
+### Logical Operators
+- `and` `or` - Logical conjunction/disjunction
+
+### Type Names
+- `Float` `Number` `String` `Unit` `List` - Built-in type names
+
+## Operators
+
+All operators from the lexer ([`src/lexer/lexer.ts:191-211`](../src/lexer/lexer.ts#L191-L211)):
+
+### Pipeline Operators
+```noolang
+|>    # Forward application: x |> f ≡ f x
+<|    # Reverse application: f <| x ≡ f x  
+|     # Thrush operator: x | f ≡ f x
+|?    # Safe thrush for Option/Result types
+$     # Low-precedence application: f $ x ≡ f x
+```
+
+### Arithmetic Operators
+```noolang
++     # Addition
+-     # Subtraction  
+*     # Multiplication
+/     # Division
+%     # Modulus
+```
+
+### Comparison Operators
+```noolang
+==    # Equality
+!=    # Inequality
+<     # Less than
+>     # Greater than
+<=    # Less than or equal
+>=    # Greater than or equal
+```
+
+### Assignment & Arrows
+```noolang
+=     # Assignment/binding
+=>    # Function arrow (lambda)
+->    # Type arrow
+```
+
+## Punctuation
+
+Special characters ([`src/lexer/lexer.ts:237-242`](../src/lexer/lexer.ts#L237-L242)):
+
+```noolang
+( )   # Parentheses for grouping
+[ ]   # List literals
+{ }   # Record literals  
+;     # List/sequence separators
+,     # Parameter separators
+.     # Record field access
+@     # Accessor prefix
+#     # Comments
+```
+
+## Expressions
+
+### Function Definition
+```noolang
+# Simple function
+add = fn x y => x + y
+
+# Single parameter
+double = fn x => x * 2
+
+# No parameters  
+getMessage = fn => "Hello!"
+
+# Higher-order function
+map = fn f list => # ... implementation
+```
+
+### Function Application
+```noolang
+# Direct application
+add 5 3
+
+# Partial application
+add5 = add 5
+add5 10     # Results in 15
+
+# Multiple arguments
+createPerson "Alice" 30 "Engineer"
+```
+
+### Pipeline Operators in Detail
+
+#### Forward Application (`|>`)
+```noolang
+# Traditional: f(g(h(x)))
+# Pipeline: x |> h |> g |> f
+[1; 2; 3] |> map double |> filter positive |> head
+```
+
+#### Thrush Operator (`|`)
+```noolang
+# Single value transformation
+5 | add 3 | multiply 2    # ((5 + 3) * 2) = 16
+
+# Great for fluent interfaces
+user | setName "Alice" | setAge 30 | save
+```
+
+#### Safe Thrush (`|?`)
+```noolang
+# Works with Option/Result types
+someValue |? safeDivide 2 |? multiply 3
+# If any step returns None/Error, chain short-circuits
+```
+
+#### Dollar Operator (`$`)
+```noolang
+# Low precedence function application
+map $ filter positive $ [1; -2; 3; -4]
+# Equivalent to: map (filter positive [1; -2; 3; -4])
+```
+
+### Conditional Expressions
+```noolang
+# Basic conditional
+result = if x > 0 then "positive" else "non-positive"
+
+# Nested conditionals  
+sign = if x > 0 then "positive" 
+       else if x < 0 then "negative"
+       else "zero"
+```
+
+### Where Expressions
+```noolang
+# Local definitions
+result = calculation + helper
+where
+  calculation = x * 2 + y
+  helper = z / 3
+```
+
+### Record Operations
+```noolang
+# Record creation
+person = { name = "Alice"; age = 30; city = "NYC" }
+
+# Field access
+name = person.name
+
+# Record with computed fields
+point = { x = 1 + 2; y = 3 * 4 }
+```
+
+### Accessor Patterns
+```noolang
+# Define accessor
+@name = fn record => record.name
+
+# Use accessor in pipeline
+person |> @name |> show
+
+# Accessor with records
+{ getName = @name; getAge = @age }
+```
+
+## Type Annotations (Planned)
+
+While type inference handles most cases, explicit annotations will be supported:
+
+```noolang
+# Function with type annotation
+add : Number -> Number -> Number
+add = fn x y => x + y
+
+# Variable with type
+count : Number = 42
+```
+
+## Comments
+
+```noolang
+# Single line comment
+x = 5  # End of line comment
+
+# Comments can contain any text
+# TODO: implement feature
+# NOTE: this is important
+```
+
+## Import System
+
+```noolang
+# Import from file
+import "math.noo"
+import "utils/helpers.noo"
+
+# Imported names become available in scope
+result = math.sqrt 16
+```
+
+## Operator Precedence
+
+From highest to lowest precedence (based on parser implementation):
+
+1. Function application (left-associative)
+2. Unary operators (`-`)  
+3. Multiplicative (`*`, `/`, `%`)
+4. Additive (`+`, `-`)
+5. Comparison (`<`, `>`, `<=`, `>=`, `==`, `!=`)
+6. Logical (`and`, `or`)
+7. Pipeline (`|>`, `<|`, `|`, `|?`)
+8. Dollar operator (`$`) - lowest precedence
+
+## Whitespace and Layout
+
+- Whitespace is generally ignored between tokens
+- Newlines can separate expressions  
+- Indentation is not significant (unlike Python/Haskell)
+- Semicolons separate list elements
+
+## Error Expressions
+
+The language includes robust error handling patterns:
+
+```noolang
+# Result types for error handling
+divide : Number -> Number -> Result Number String
+divide = fn x y => 
+  if y == 0 then Error "Division by zero"
+  else Ok (x / y)
+
+# Option types for nullable values  
+head : List a -> Option a
+head = fn list =>
+  if isEmpty list then None
+  else Some (first list)
+```
+
+## Next Steps
+
+- **Type System**: Read [Type System Guide](type-system-guide.md) for details on inference and constraints
+- **Standard Library**: See [`stdlib.noo`](../stdlib.noo) for built-in functions and traits
+- **Examples**: Check [Examples & Tutorials](examples-and-tutorials.md) for practical usage patterns
