@@ -14,7 +14,7 @@ const mockFs = {
 			typeof filePath === 'string' &&
 			filePath.includes('math_functions.noo')
 		) {
-			return '{ @add fn x y => x + y, @multiply fn x y => x * y }';
+			return '{ @mathAdd fn x y => x + y, @mathMultiply fn x y => x * y }';
 		}
 		throw new Error(`File not found: ${filePath}`);
 	},
@@ -35,7 +35,7 @@ const mockFs = {
 test('should import from same directory', () => {
 	const testCode = `
       math = import "math_functions";
-      (@add math) 2 3
+      (@mathAdd math) 2 3
     `;
 	const lexer = new Lexer(testCode);
 	const tokens = lexer.tokenize();
@@ -54,7 +54,7 @@ test('should import from same directory', () => {
 test('should import from parent directory', () => {
 	const testCode = `
       math = import "../math_functions";
-      (@add math) 10 20
+      (@mathAdd math) 10 20
     `;
 	const lexer = new Lexer(testCode);
 	const tokens = lexer.tokenize();
@@ -73,7 +73,7 @@ test('should import from parent directory', () => {
 test('should handle absolute paths', () => {
 	const testCode = `
       math = import "/absolute/path/math_functions";
-      (@add math) 5 10
+      (@mathAdd math) 5 10
     `;
 	const lexer = new Lexer(testCode);
 	const tokens = lexer.tokenize();
@@ -92,7 +92,7 @@ test('should handle absolute paths', () => {
 test('should fall back to current working directory when no file path provided', () => {
 	const testCode = `
       math = import "math_functions";
-      (@add math) 3 7
+      (@mathAdd math) 3 7
     `;
 	const lexer = new Lexer(testCode);
 	const tokens = lexer.tokenize();
