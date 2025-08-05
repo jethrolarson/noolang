@@ -1,4 +1,5 @@
-import { runCode, expectSuccess, parseAndType } from '../utils';
+import { test,  describe } from 'bun:test';
+import { expectSuccess } from '../utils';
 
 describe('User-Defined Types', () => {
 	describe('Record Types', () => {
