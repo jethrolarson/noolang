@@ -83,7 +83,7 @@ All keywords supported by the lexer ([`src/lexer/lexer.ts:147-176`](../src/lexer
 All operators from the lexer ([`src/lexer/lexer.ts:191-211`](../src/lexer/lexer.ts#L191-L211)):
 
 ### Pipeline Operators
-```noolang
+```
 |     # Pipe (thrush): x | f ≡ f x (applies value to function)
 |>    # Function composition: f |> g ≡ fn x => g (f x)
 <|    # Reverse composition: g <| f ≡ fn x => g (f x)  
@@ -91,8 +91,8 @@ All operators from the lexer ([`src/lexer/lexer.ts:191-211`](../src/lexer/lexer.
 $     # Low-precedence application: f $ x ≡ f x
 ```
 
-### Arithmetic Operators
-```noolang
+### Arithmetic Operators  
+```
 +     # Addition
 -     # Subtraction  
 *     # Multiplication
@@ -101,7 +101,7 @@ $     # Low-precedence application: f $ x ≡ f x
 ```
 
 ### Comparison Operators
-```noolang
+```
 ==    # Equality
 !=    # Inequality
 <     # Less than
@@ -111,7 +111,7 @@ $     # Low-precedence application: f $ x ≡ f x
 ```
 
 ### Assignment & Arrows
-```noolang
+```
 =     # Assignment/binding
 =>    # Function arrow (lambda)
 ->    # Type arrow
@@ -121,12 +121,12 @@ $     # Low-precedence application: f $ x ≡ f x
 
 Special characters ([`src/lexer/lexer.ts:237-242`](../src/lexer/lexer.ts#L237-L242)):
 
-```noolang
+```
 ( )   # Parentheses for grouping
 [ ]   # List literals
 { }   # Record literals  
-;     # List/sequence separators
-,     # Parameter separators
+;     # Expression sequencing
+,     # Field/parameter separators
 .     # Record field access
 @     # Accessor prefix
 #     # Comments
