@@ -1,8 +1,0 @@
-# Function application
-doubled = map (fn x => x * 2) [1, 2, 3, 4];
-
-# Function composition
-double = fn x => x * 2;
-addOne = fn x => x + 1;
-composed = addOne |> double;
-result = 5 | composed              # Apply composed function

@@ -1,3 +1,0 @@
-flip = fn f => fn x y => f y x;
-mapFlipped = flip map;
-[1, 2, 3] | mapFlipped (fn x => x * 2)
