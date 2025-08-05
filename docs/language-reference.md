@@ -195,11 +195,10 @@ result = 5 | composed             # square (addOne 5) = 36
 
 #### Safe Pipe (`|?`)
 ```noolang
-# Works with Option/Result types
-someValue = Some 12;
-divided = match someValue with (Some x => x / 2; None => None);
-multiplied = match divided with (Some x => Some (x * 3); None => None);
-multiplied
+# Works with Option/Result types and division
+someValue = 12;
+result = someValue |? (/ 2) |? (* 3);    # Division and multiplication with Option chaining
+result
 ```
 
 #### Dollar Operator (`$`)

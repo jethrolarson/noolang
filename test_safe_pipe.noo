@@ -1,0 +1,4 @@
+# Works with Option/Result types and division
+someValue = 12;
+result = someValue |? (/ 2) |? (* 3);    # Division and multiplication with Option chaining
+result

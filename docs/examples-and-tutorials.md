@@ -358,12 +358,13 @@ Detailed error information...
 Create a function that converts Celsius to Fahrenheit:
 
 ```noolang
-# Temperature conversion
-celsiusToFahrenheit = fn celsius => celsius * 1.8 + 32.0;
+# Temperature conversion using |? with division
+celsiusToFahrenheit = fn celsius => 
+  celsius * 9 |? (/ 5) |? (+ 32);
 
 # Test cases  
-test1 = celsiusToFahrenheit 0.0;     # 32.0
-test2 = celsiusToFahrenheit 100.0;   # 212.0
+test1 = celsiusToFahrenheit 0;     # Some 32.0
+test2 = celsiusToFahrenheit 100;   # Some 212.0
 test2
 ```
 
