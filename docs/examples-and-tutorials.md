@@ -26,8 +26,8 @@ factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1))
 fact_5 = factorial 5       # 120
 
 # Lists and higher-order functions
-numbers = [1; 2; 3; 4; 5]
-squared = map (fn x => x * x) numbers  # [1; 4; 9; 16; 25]
+numbers = [1, 2, 3, 4, 5]
+squared = map (fn x => x * x) numbers  # [1, 4, 9, 16, 25]
 
 # Records
 person = { name = "Alice"; age = 30 }
@@ -81,7 +81,7 @@ fibonacci = fn n =>
 ```noolang
 # Lists
 empty_list = []
-number_list = [1; 2; 3; 4; 5]
+number_list = [1, 2, 3, 4, 5]
 
 # Records with named fields
 person = { name = "Alice"; age = 30; city = "Wonderland" }
@@ -91,24 +91,27 @@ person_name = person.name
 person_age = person | @age   # Using pipe with accessor
 
 # Tuples (positional fields)
-point = {10; 20}            # Anonymous tuple
+point = {10, 20}            # Anonymous tuple
 coordinates = point.0       # Access first element
 ```
 
 ### 5. Pipeline Operations
 
 ```noolang
-# Forward pipeline (|>)
-result = [1; 2; 3; 4; 5] 
-  |> map (fn x => x * 2)
-  |> filter (fn x => x > 4)
-  |> head
+# Pipe operator (|) - applies value to function
+result = [1, 2, 3, 4, 5] 
+  | map (fn x => x * 2)
+  | filter (fn x => x > 4)
+  | head
 
-# Thrush operator (|)
-value = 10 | add 5 | multiply 2  # ((10 + 5) * 2) = 30
+# Function composition (|>)
+double = fn x => x * 2
+addOne = fn x => x + 1
+composed = addOne |> double     # Compose functions
+value = 10 | composed           # Apply: double (addOne 10) = 22
 
-# Reverse pipeline (<|)
-result = head <| filter (fn x => x > 4) <| map (fn x => x * 2) <| [1; 2; 3; 4; 5]
+# Reverse composition (<|)
+composed_reverse = double <| addOne  # Same as addOne |> double
 ```
 
 **Try it**: `bun start examples/demo.noo`
@@ -127,15 +130,15 @@ add_func = fn x y => x + y : Number -> Number -> Number
 identity = fn x => x : a -> a
 
 # Lists with types
-numbers = [1; 2; 3; 4; 5] : List Number
-strings = ["hello"; "world"] : List String
+numbers = [1, 2, 3, 4, 5] : List Number
+strings = ["hello", "world"] : List String
 ```
 
 ### Records and Tuples with Types
 
 ```noolang
 # Typed tuple
-pair = {42; "answer"} : {Number; String}
+pair = {42, "answer"} : {Number, String}
 
 # Typed record
 person = { name = "Alice"; age = 30; active = true } 
@@ -149,11 +152,11 @@ person = { name = "Alice"; age = 30; active = true }
 addOne = fn x => x + 1 : Number -> Number
 square = fn x => x * x : Number -> Number
 
-# Type: Number
-pipeline_result = 3 |> addOne |> square
+# Type: Number  
+pipeline_result = 3 | (addOne |> square)
 
 # Type: List Number
-mapped_pipeline = numbers |> map addOne |> map square
+mapped_pipeline = numbers | map (addOne |> square)
 ```
 
 **Try it**: `bun start --types-file examples/type_system_demo.noo`
@@ -207,7 +210,7 @@ Pattern matching and variant types:
 ```noolang
 # Define a variant type
 variant Maybe a (
-  Some a;
+  Some a,
   None
 )
 
@@ -279,10 +282,10 @@ divide 10 2      # Some 5.0 (returns Option for safety)
 
 ```noolang
 # Built-in list functions
-head [1; 2; 3]        # Some 1
-tail [1; 2; 3]        # [2; 3]
-map (fn x => x * 2) [1; 2; 3]  # [2; 4; 6]
-filter (fn x => x > 2) [1; 2; 3; 4]  # [3; 4]
+head [1, 2, 3]        # Some 1
+tail [1, 2, 3]        # [2, 3]
+map (fn x => x * 2) [1, 2, 3]  # [2, 4, 6]
+filter (fn x => x > 2) [1, 2, 3, 4]  # [3, 4]
 ```
 
 ## Interactive Learning with REPL
@@ -366,7 +369,7 @@ Implement a function that finds the maximum element in a list:
 maximum = fn list => # your code here
 
 # Test
-result = maximum [3; 1; 4; 1; 5; 9; 2; 6]  # Should be 9
+result = maximum [3, 1, 4, 1, 5, 9, 2, 6]  # Should be 9
 ```
 
 ### Exercise 3: Higher-Order Functions
@@ -378,7 +381,7 @@ Create a function that applies a function to each element and sums the results:
 mapSum = fn f list => # your code here
 
 # Test
-result = mapSum (fn x => x * x) [1; 2; 3; 4]  # Should be 30
+result = mapSum (fn x => x * x) [1, 2, 3, 4]  # Should be 30
 ```
 
 ### Solutions

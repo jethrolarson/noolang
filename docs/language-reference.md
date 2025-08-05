@@ -33,9 +33,9 @@ false
 ### Lists
 ```noolang
 []              # Empty list
-[1; 2; 3]       # List of numbers  
-["a"; "b"]      # List of strings
-[1; 2; 3; 4]    # Semicolon separators
+[1, 2, 3]       # List of numbers  
+["a", "b"]      # List of strings
+[1, 2, 3, 4]    # Comma separators
 ```
 
 ### Records
@@ -84,10 +84,10 @@ All operators from the lexer ([`src/lexer/lexer.ts:191-211`](../src/lexer/lexer.
 
 ### Pipeline Operators
 ```noolang
-|>    # Forward application: x |> f ≡ f x
-<|    # Reverse application: f <| x ≡ f x  
-|     # Thrush operator: x | f ≡ f x
-|?    # Safe thrush for Option/Result types
+|     # Pipe (thrush): x | f ≡ f x (applies value to function)
+|>    # Function composition: f |> g ≡ fn x => g (f x)
+<|    # Reverse composition: g <| f ≡ fn x => g (f x)  
+|?    # Safe pipe for Option/Result types
 $     # Low-precedence application: f $ x ≡ f x
 ```
 
@@ -164,23 +164,28 @@ createPerson "Alice" 30 "Engineer"
 
 ### Pipeline Operators in Detail
 
-#### Forward Application (`|>`)
+#### Pipe Operator (`|`)
 ```noolang
-# Traditional: f(g(h(x)))
-# Pipeline: x |> h |> g |> f
-[1; 2; 3] |> map double |> filter positive |> head
+# Applies value to function (thrush)
+5 | add 3 | multiply 2    # multiply 2 (add 3 5) = 16
+
+# Data transformation chains
+[1, 2, 3] | map double | filter positive | head
+user | @name             # Get field from record
 ```
 
-#### Thrush Operator (`|`)
+#### Function Composition (`|>`)
 ```noolang
-# Single value transformation
-5 | add 3 | multiply 2    # ((5 + 3) * 2) = 16
+# Composes functions left-to-right
+addOne = fn x => x + 1
+square = fn x => x * x
+composed = addOne |> square    # fn x => square (addOne x)
 
-# Great for fluent interfaces
-user | setName "Alice" | setAge 30 | save
+# Use composed function
+5 | composed             # square (addOne 5) = 36
 ```
 
-#### Safe Thrush (`|?`)
+#### Safe Pipe (`|?`)
 ```noolang
 # Works with Option/Result types
 someValue |? safeDivide 2 |? multiply 3
@@ -190,8 +195,8 @@ someValue |? safeDivide 2 |? multiply 3
 #### Dollar Operator (`$`)
 ```noolang
 # Low precedence function application
-map $ filter positive $ [1; -2; 3; -4]
-# Equivalent to: map (filter positive [1; -2; 3; -4])
+map (fn x => x * 2) $ filter (fn x => x > 5) $ [1, 2, 3, 4, 5, 6]
+# Equivalent to: map (fn x => x * 2) (filter (fn x => x > 5) [1, 2, 3, 4, 5, 6])
 ```
 
 ### Conditional Expressions

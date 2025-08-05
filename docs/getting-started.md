@@ -76,11 +76,14 @@ add 5 3
 Noolang excels at data transformation pipelines:
 
 ```noolang
-# Left-to-right data flow
-[1; 2; 3; 4] |> map (fn x => x * 2) |> filter (fn x => x > 4)
+# Pipe operator for data flow
+[1, 2, 3, 4] | map (fn x => x * 2) | filter (fn x => x > 4)
 
-# Thrush operator for single values
-5 | add 3 | multiply 2
+# Function composition
+double = fn x => x * 2
+addOne = fn x => x + 1
+composed = addOne |> double
+5 | composed              # Apply composed function
 ```
 
 ### Type System
@@ -90,7 +93,7 @@ Types are inferred automatically:
 ```noolang
 # The type system figures out these types
 identity = fn x => x              # 'a -> 'a
-numbers = [1; 2; 3]              # List Number
+numbers = [1, 2, 3]              # List Number
 greeting = "Hello"               # String
 ```
 
