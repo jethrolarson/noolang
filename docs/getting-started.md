@@ -92,8 +92,8 @@ Types are inferred automatically:
 
 ```noolang
 # The type system figures out these types
-identity = fn x => x              # 'a -> 'a
-numbers = [1, 2, 3]              # List Number
+identity = fn x => x;              # 'a -> 'a
+numbers = [1, 2, 3];              # List Float
 greeting = "Hello"               # String
 ```
 

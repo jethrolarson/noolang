@@ -137,29 +137,31 @@ Special characters ([`src/lexer/lexer.ts:237-242`](../src/lexer/lexer.ts#L237-L2
 ### Function Definition
 ```noolang
 # Simple function
-add = fn x y => x + y
+addTwo = fn x y => x + y;
 
 # Single parameter
-double = fn x => x * 2
+double = fn x => x * 2;
 
 # No parameters  
-getMessage = fn => "Hello!"
+getMessage = fn => "Hello!";
 
 # Higher-order function
-map = fn f list => # ... implementation
+myMap = fn f list => map f list
 ```
 
 ### Function Application
 ```noolang
 # Direct application
-add 5 3
+addTwo = fn x y => x + y;
+result1 = addTwo 5 3;
 
 # Partial application
-add5 = add 5
-add5 10     # Results in 15
+add5 = addTwo 5;
+result2 = add5 10;     # Results in 15
 
 # Multiple arguments
-createPerson "Alice" 30 "Engineer"
+createPerson = fn name age job => { @name name, @age age, @job job };
+person = createPerson "Alice" 30 "Engineer"
 ```
 
 ### Pipeline Operators in Detail
@@ -167,11 +169,17 @@ createPerson "Alice" 30 "Engineer"
 #### Pipe Operator (`|`)
 ```noolang
 # Applies value to function (thrush)
-5 | add 3 | multiply 2    # multiply 2 (add 3 5) = 16
+addThree = fn x => x + 3;
+multiplyTwo = fn x => x * 2;
+5 | addThree | multiplyTwo;    # multiplyTwo (addThree 5) = 16
 
-# Data transformation chains
-[1, 2, 3] | map double | filter positive | head
-user | @name             # Get field from record
+# Data transformation with function application (pipe with map is broken)
+doubled = map (fn x => x * 2) [1, 2, 3];
+result = head doubled;
+
+# Field access with pipe
+user = { @name "Alice", @age 30 };
+userName = user | @name             # Get field from record
 ```
 
 #### Function Composition (`|>`)
