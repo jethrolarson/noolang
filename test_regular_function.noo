@@ -1,0 +1,2 @@
+myMap = fn f list => map f list;
+[1, 2, 3] | myMap (fn x => x * 2)
