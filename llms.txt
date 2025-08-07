@@ -1,0 +1,140 @@
+# Noolang Documentation
+
+> A functional, expression-based, LLM-friendly programming language designed for linear, declarative code with explicit effects and strong type inference.
+
+This documentation covers all aspects of Noolang, from basic syntax to advanced type system features and language implementation details.
+
+## Recent Development
+
+- [Current Progress](docs-wip/PROGRESS.md): Development status, completed features, and roadmap
+- [Language Weaknesses](docs-wip/LANGUAGE_WEAKNESSES.md): Known limitations and areas for improvement
+
+## Getting Started
+
+- [Getting Started Guide](docs/getting-started.md): Installation, setup, and first steps with Noolang
+- [Language Reference](docs/language-reference.md): Complete syntax reference with operators and constructs
+- [Examples & Tutorials](docs/examples-and-tutorials.md): Practical examples and hands-on learning
+- [Tools & CLI Guide](docs/tools-and-cli.md): REPL commands, CLI debugging, and development tools
+
+## Language Documentation
+
+- [Type System Guide](docs/type-system.md): Complete guide to type inference, constraints, and polymorphism
+- [Trait System Design](docs-wip/TRAIT_SYSTEM_DESIGN.md): Constraint-based polymorphism and trait implementations (WIP)
+- [Pattern Matching Design](docs-wip/PATTERN_MATCHING_DESIGN.md): Pattern matching system design and usage patterns (WIP)
+- [Operator Overloading Plan](docs-wip/OPERATOR_OVERLOADING_PLAN.md): Planned operator overloading system (WIP)
+- [Constraint Resolution](docs-wip/DEPTH_FIRST_CONSTRAINT_PLAN.md): Type constraint resolution algorithm details (WIP)
+
+## Advanced Topics
+
+- [Accessor Composition](docs-wip/ACCESSOR_COMPOSITION_FLOW.md): Data access composition patterns and flow control
+- [Advanced Introspection](docs-wip/ADVANCED_INTROSPECTION_IDEAS.md): Language introspection and metaprogramming features
+- [Development Guide](docs/development-guide.md): Contributing, architecture, and building from source
+
+## Source Code
+
+### Core Language Implementation
+- [Lexer](src/lexer/lexer.ts): Tokenization and lexical analysis with 47+ keywords and operators
+- [Lexer Tests](src/lexer/__tests__/lexer.test.ts): Comprehensive lexical analysis test coverage
+- [Parser](src/parser/): Recursive descent parser with operator precedence and error recovery
+- [Parser Tests](src/parser/__tests__/): Complete parsing test suite with edge cases
+- [AST Definitions](src/ast.ts): Abstract syntax tree node definitions and type annotations
+
+### Type System
+- [Type Checker](src/typer/): Hindley-Milner type inference with constraint resolution
+- [Type Definitions](src/typer/types.ts): Core type system types and interfaces
+- [Built-in Types](src/typer/builtins.ts): Built-in type implementations and primitives
+- [Type Helpers](src/typer/helpers.ts): Utility functions for type operations
+- [Type Tests](src/typer/__tests__/): Type inference and constraint resolution tests
+
+### Evaluation & Runtime
+- [Evaluator](src/evaluator/evaluator.ts): Expression evaluation engine with closure support
+- [Evaluator Utils](src/evaluator/evaluator-utils.ts): Runtime utility functions and value operations
+- [Evaluator Tests](src/evaluator/__tests__/): Runtime behavior and evaluation tests
+- [Effect System](src/effects.ts): Effect tracking and inference implementation
+
+### Interactive Tools
+- [REPL](src/repl.ts): Interactive development environment with debugging commands
+- [CLI](src/cli.ts): Command-line interface with extensive debugging capabilities
+- [Colors](src/colors.ts): Terminal color output for enhanced readability
+- [Formatting](src/format.ts): Value formatting and pretty-printing utilities
+
+### Utilities & Support
+- [Error Handling](src/errors.ts): Error types, reporting, and debugging support
+- [Build Configuration](package.json): Build scripts, dependencies, and development tools
+- [TypeScript Config](tsconfig.json): TypeScript compilation settings
+- [ESLint Config](eslint.config.js): Code style and quality configuration
+
+## Examples & Standard Library
+
+### Example Programs
+- [Basic Examples](examples/basic.noo): Simple language feature demonstrations
+- [Comprehensive Demo](examples/demo.noo): Complete language tour with all major features
+- [Type System Demo](examples/type_system_demo.noo): Advanced type system features and annotations
+- [Trait System Demo](examples/trait_system_demo.noo): Constraint-based polymorphism examples
+- [ADT Demo](examples/adt_demo.noo): Algebraic data types and pattern matching
+- [Pattern Matching Demo](examples/pattern_matching_demo.noo): Advanced pattern matching examples
+- [Card Game](examples/card_game.noo): Complex application demonstrating real-world usage
+- [Recursive ADTs](examples/recursive_adts.noo): Complex recursive data structures and algorithms
+
+### Standard Library
+- [Standard Library](stdlib.noo): Built-in functions, traits, and type implementations
+- [Math Functions](examples/math_functions.noo): Mathematical operations and utilities
+- [Constraint Examples](examples/constraints_demo.noo): Trait system usage patterns
+
+## Test Suite
+
+### Type System Tests
+- [Type System Tests](test/type-system/): Comprehensive type inference and constraint tests
+- [ADT Limitations](test/type-system/adt_limitations.uvu.ts): Known algebraic data type limitations
+- [Constraint Bug Tests](test/type-system/constraint-bug.test.ts): Constraint resolution edge cases
+
+### Language Feature Tests
+- [Operator Tests](test/features/operators/): Pipeline operators, dollar operator, and precedence
+- [Effects Tests](test/features/effects/): Effect system tracking and inference
+- [Language Features](test/language-features/): Core language functionality tests
+
+### Integration Tests
+- [REPL Tests](scripts/test-repl-automation.ts): Interactive environment testing
+- [CLI Tests](scripts/simple-repl-test.js): Command-line interface validation
+
+## Development & Build
+
+### Development Tools
+- [Development Scripts](scripts/): Build automation and testing utilities
+- [Benchmark Suite](benchmark.js): Performance testing and optimization analysis
+- [Test Reports](test-reports/): Test coverage and quality metrics
+
+### Language Server (WIP)
+- [LSP Implementation](lsp/): Language Server Protocol for VS Code integration
+- [Syntax Highlighting](): Editor support and syntax highlighting definitions
+
+### Build & CI
+- [GitHub Actions](.github/): Continuous integration and automated testing
+- [Git Configuration](.gitignore): Version control exclusions and patterns
+- [Prettier Config](.prettierrc.js): Code formatting standards
+
+## Documentation Structure
+
+This documentation follows a progressive disclosure pattern:
+
+1. **Start Here**: [Getting Started](docs/getting-started.md) → [Language Reference](docs/language-reference.md)
+2. **Learn by Example**: [Examples & Tutorials](docs/examples-and-tutorials.md) → [Basic Examples](examples/basic.noo)
+3. **Deep Dive**: [Type System](docs/TYPE_SYSTEM.md) → [Trait System](docs/TRAIT_SYSTEM_DESIGN.md)
+4. **Advanced Usage**: [Tools & CLI](docs/tools-and-cli.md) → [Development Guide](docs/development-guide.md)
+5. **Implementation**: [Source Code](src/) → [Tests](test/) → [Examples](examples/)
+
+## Quick Reference
+
+### Essential Commands
+- `bun start` - Launch interactive REPL
+- `bun start examples/demo.noo` - Run comprehensive demo
+- `bun start --eval "expression"` - Evaluate expression directly
+- `bun start --types "expression"` - Show type information
+- `bun test` - Run complete test suite
+
+### Key Files for LLM Understanding
+- [Language Reference](docs/language-reference.md) - Complete syntax guide
+- [Standard Library](stdlib.noo) - Built-in functions and traits  
+- [Comprehensive Demo](examples/demo.noo) - All language features
+- [AST Definitions](src/ast.ts) - Language structure definitions
+- [Type System](src/typer/) - Type inference implementation

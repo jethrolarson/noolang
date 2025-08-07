@@ -1,0 +1,8 @@
+# Type-safe data transformation
+processData = fn items =>
+  map show (map (fn x => x * 2) items);
+
+# Safe property access with records
+getRecord = fn () => { @name "Alice", @age 30 };
+person = getRecord ();
+person
