@@ -18,16 +18,16 @@ This documentation covers all aspects of Noolang, from basic syntax to advanced 
 
 ## Language Documentation
 
-- [Type System Guide](docs/TYPE_SYSTEM.md): Comprehensive type system documentation with Hindley-Milner inference
-- [Trait System Design](docs/TRAIT_SYSTEM_DESIGN.md): Constraint-based polymorphism and trait implementations
-- [Pattern Matching Design](docs/PATTERN_MATCHING_DESIGN.md): Pattern matching system design and usage patterns
-- [Operator Overloading Plan](docs/OPERATOR_OVERLOADING_PLAN.md): Planned operator overloading system
-- [Constraint Resolution](docs/DEPTH_FIRST_CONSTRAINT_PLAN.md): Type constraint resolution algorithm details
+- [Type System Guide](docs-wip/TYPE_SYSTEM.md): Comprehensive type system documentation with Hindley-Milner inference
+- [Trait System Design](docs-wip/TRAIT_SYSTEM_DESIGN.md): Constraint-based polymorphism and trait implementations
+- [Pattern Matching Design](docs-wip/PATTERN_MATCHING_DESIGN.md): Pattern matching system design and usage patterns
+- [Operator Overloading Plan](docs-wip/OPERATOR_OVERLOADING_PLAN.md): Planned operator overloading system
+- [Constraint Resolution](docs-wip/DEPTH_FIRST_CONSTRAINT_PLAN.md): Type constraint resolution algorithm details
 
 ## Advanced Topics
 
-- [Accessor Composition](docs/ACCESSOR_COMPOSITION_FLOW.md): Data access composition patterns and flow control
-- [Advanced Introspection](docs/ADVANCED_INTROSPECTION_IDEAS.md): Language introspection and metaprogramming features
+- [Accessor Composition](docs-wip/ACCESSOR_COMPOSITION_FLOW.md): Data access composition patterns and flow control
+- [Advanced Introspection](docs-wip/ADVANCED_INTROSPECTION_IDEAS.md): Language introspection and metaprogramming features
 - [Development Guide](docs/development-guide.md): Contributing, architecture, and building from source
 
 ## Source Code
