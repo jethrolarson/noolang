@@ -30,6 +30,8 @@
     "benchmark:repl": "bun run build && node benchmark.js --repl",
     "benchmark:all": "bun run build && node benchmark.js && bun run benchmark:repl",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"*.ts\" \"*.js\" \"*.json\"",
+    "mcp:provider": "bun scripts/mcp-provider.ts",
+    "mcp:probe": "node -e \"(async()=>{const cp=require('node:child_process').spawn('bun',['scripts/mcp-provider.ts']);cp.stdin.write(JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/list',params:{}})+'\\n');cp.stdout.on('data',d=>{console.log(String(d));cp.kill();});})();\"",
     "vscode:package": "vsce package",
     "vscode:publish": "vsce publish"
   },
