@@ -1,0 +1,3 @@
+addFn = fn x y => x + y;
+multiplyFn = fn x y => x * y;
+{@add addFn, @multiply multiplyFn}
