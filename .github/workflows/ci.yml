@@ -217,6 +217,73 @@ jobs:
           lsp/test-*.log
         retention-days: 14
 
+  # Validate documentation examples (all examples in stable docs must pass)
+  documentation-validation:
+    runs-on: ubuntu-latest
+    # Removed dependencies to allow parallel execution with other jobs
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+    
+    - name: Cache Bun dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.bun/install/cache
+          node_modules
+        key: bun-deps-${{ runner.os }}-${{ hashFiles('package.json', 'bun.lockb') }}
+        restore-keys: |
+          bun-deps-${{ runner.os }}-
+    
+    - name: Install dependencies
+      run: bun install
+    
+    - name: Build project
+      run: bun run build
+    
+    - name: Validate all documentation examples
+      run: |
+        echo "🔍 Validating all Noolang examples in stable documentation..."
+        if node validate_examples.js; then
+          echo "✅ All documentation examples passed validation!"
+          echo "DOCS_STATUS=success" >> $GITHUB_ENV
+        else
+          echo "❌ Documentation examples failed validation"
+          echo "::error::Documentation examples are broken - this indicates regressions in core functionality"
+          echo "DOCS_STATUS=failed" >> $GITHUB_ENV
+          exit 1
+        fi
+    
+    - name: Generate documentation validation summary
+      if: always()
+      run: |
+        echo "## Documentation Validation Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [ "$DOCS_STATUS" = "success" ]; then
+          echo "✅ **All documentation examples passed validation!**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This confirms that all user-facing examples in the stable documentation work correctly:" >> $GITHUB_STEP_SUMMARY
+          echo "- [Getting Started](docs/getting-started.md)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Language Reference](docs/language-reference.md)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Examples & Tutorials](docs/examples-and-tutorials.md)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Type System Guide](docs/type-system.md)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Tools & CLI Guide](docs/tools-and-cli.md)" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Documentation validation failed**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This indicates that changes have broken functionality documented in the stable docs." >> $GITHUB_STEP_SUMMARY
+          echo "All examples in `docs/` are expected to work and are tested automatically." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Action required**: Fix the broken examples or update the documentation." >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Note**: Design documents in `docs-wip/` are not validated as they contain experimental features." >> $GITHUB_STEP_SUMMARY
+
   # Validate example files (currently optional due to known type system issues)
   example-validation:
     runs-on: ubuntu-latest
