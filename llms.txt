@@ -6,8 +6,8 @@ This documentation covers all aspects of Noolang, from basic syntax to advanced 
 
 ## Recent Development
 
-- [Current Progress](docs/PROGRESS.md): Development status, completed features, and roadmap
-- [Language Weaknesses](docs/LANGUAGE_WEAKNESSES.md): Known limitations and areas for improvement
+- [Current Progress](docs-wip/PROGRESS.md): Development status, completed features, and roadmap
+- [Language Weaknesses](docs-wip/LANGUAGE_WEAKNESSES.md): Known limitations and areas for improvement
 
 ## Getting Started
 
