@@ -5,6 +5,8 @@
 - Prefer `bun start` for running and debugging; avoid `build` unless explicitly required.
 - After edits, run `bun test` and fix failures before calling the task done.
 - Prefer snake_case for new Noolang code and identifiers.
+- Don't put temp tests in the root directory. Put them in the `temp` directory which is ignored by git.
+- Don't create planning or progress report documents unless explicitly requested. 
 
 - Language-specific guardrails:
   - Do not assume Haskell/F# semantics; use `docs/language-reference.md` and `src/lexer/`, `src/parser/` as truth.

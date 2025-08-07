@@ -1,8 +1,0 @@
-# Generic operations on lists
-isEmpty = fn list => match list with (
-  [] => True;
-  _ => False
-);
-
-# Test it
-isEmpty []
