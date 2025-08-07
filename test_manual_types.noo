@@ -1,0 +1,7 @@
+# Function types inferred from body
+double = fn x => x * 2;     
+addTwo = fn x y => x + y;      
+
+# Higher-order functions
+apply = fn f x => f x;
+apply
