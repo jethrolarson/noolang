@@ -1,0 +1,20 @@
+# Workspace rules for this repo (minimal)
+
+- Ramp-up: Read `llms.txt` first. Treat it as the index and follow its links as needed.
+- Do not prioritize `README.md` unless it is linked from `llms.txt` or explicitly requested.
+- Prefer `bun start` for running and debugging; avoid `build` unless explicitly required.
+- After edits, run `bun test` and fix failures before calling the task done.
+- Prefer snake_case for new Noolang code and identifiers.
+
+- Language-specific guardrails:
+  - Do not assume Haskell/F# semantics; use `docs/language-reference.md` and `src/lexer/`, `src/parser/` as truth.
+  - Functions are curried by default. Prefer `fn x y => ...` and calls like `f a b`.
+
+- Verification rules:
+  - Use `bun start --eval "..."` for quick behavioral checks (avoid interactive REPL to prevent hanging).
+  - Run `bun test` before claiming success; include failing outputs if relevant.
+  - Do not claim "production-ready" without evidence from passing tests/checks.
+
+- Critical thinking:
+  - When suggestions seem risky or conflict with docs, call out risks/tradeoffs and propose safer alternatives.
+  - Push back on bad ideas; ask for confirmation before irreversible or high-risk changes.
