@@ -272,6 +272,30 @@ count = 42;
 count
 ```
 
+## Type Names and Shadowing
+
+- Type names are global and cannot be redefined. Defining a `variant` or `type` with a name that already exists is a type error.
+- Built-in syntactic type names (`Float`, `String`, `Unit`, `List`) are always reserved.
+- Standard library ADTs (e.g., `Bool`, `Option`, `Result`) are loaded by default and are treated as existing type names.
+
+Examples:
+
+```noolang
+# Error: built-in shadowing
+variant List a = Cons a (List a) | Nil;  # Shadowing built in type List
+
+# Error: shadowing an existing type name
+variant Option a = Some a | None;        # Type shadowing is not allowed: Option
+
+# Error: duplicate user-defined type
+type User = {@name String};
+type User = {@name String, @age Float};  # Type already defined: User
+```
+
+Notes:
+- Constructors and types share the type namespace for shadowing checks.
+- Value-level shadowing rules are unchanged.
+
 ## Comments
 
 ```noolang

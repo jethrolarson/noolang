@@ -11,6 +11,7 @@ Convert Noolang's hardcoded binary operators (`+`, `-`, `*`, `/`) to proper trai
 - ✅ Trait function resolution works (`add`, `subtract`, `multiply`, `divide`)
 - ✅ Evaluator already falls back to trait functions for complex types
 - ✅ `BinaryExpression` AST preserves user intent
+- ✅ Type checker enforces operator trait constraints on concrete operands (e.g., `"hello" - "world"` is a type error)
 
 ### What's Broken
 - ❌ Operators hardcoded in `builtins.ts` with manual constraint assignment
