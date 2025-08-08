@@ -35,6 +35,21 @@ export const typeTypeDefinition = (
 		throw new Error(`Shadowing built in type ${name}`);
 	}
 
+	// Disallow shadowing any existing type/constructor in current session
+	if (state.protectedTypeNames.has(name)) {
+		throw new Error(`Type shadowing is not allowed: ${name}`);
+	}
+
+	// Also prevent shadowing of any currently-bound uppercase identifier in environment (constructors/types)
+	for (const existingName of state.environment.keys()) {
+		if (
+			existingName === name &&
+			existingName[0] === existingName[0].toUpperCase()
+		) {
+			throw new Error(`Type shadowing is not allowed: ${name}`);
+		}
+	}
+
 	// Create stable type variables for the ADT's type parameters
 	const typeVarMap = new Map<string, Type>();
 	for (const param of typeParams) {

@@ -20,6 +20,21 @@ export const typeAndDecorate = (
 	if (!initialState || !state.traitRegistry.definitions.size) {
 		state = initializeBuiltins(state);
 		state = loadStdlib(state);
+
+		// Populate protected type names to prevent shadowing of any existing types
+		const protectedNames = new Set<string>(state.protectedTypeNames);
+		// From environment: collect keys that represent type constructors or type aliases
+		for (const [name, scheme] of state.environment.entries()) {
+			// Heuristic: treat uppercase-leading identifiers as type names (constructors/variants)
+			if (name && name[0] === name[0].toUpperCase()) {
+				protectedNames.add(name);
+			}
+		}
+		// From ADT registry: add ADT names
+		for (const adtName of state.adtRegistry.keys()) {
+			protectedNames.add(adtName);
+		}
+		state = { ...state, protectedTypeNames: protectedNames };
 	}
 
 	// Process all statements with typeExpression, then decorate the AST

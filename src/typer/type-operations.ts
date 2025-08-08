@@ -354,6 +354,7 @@ export const createTypeState = (): TypeState => ({
 	adtRegistry: new Map(),
 	accessorCache: new Map(),
 	traitRegistry: createTraitRegistry(), // NEW: Simple trait system
+	protectedTypeNames: new Set(),
 });
 
 // Clean substitutions from type state while preserving environment and other state
