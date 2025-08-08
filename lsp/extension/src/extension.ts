@@ -13,10 +13,6 @@ export function activate(context: ExtensionContext) {
 
 	// Get the LSP server path from configuration
 	const config = workspace.getConfiguration('noolang');
-	const serverPath = config.get<string>(
-		'languageServerPath',
-		'./target/release/noolang-lsp'
-	);
 	const enableLSP = config.get<boolean>('enableLanguageServer', true);
 
 	if (!enableLSP) {
@@ -26,28 +22,31 @@ export function activate(context: ExtensionContext) {
 
 	console.log('✅ Noolang LSP is enabled');
 
-	// The server is implemented in Rust
-	// Use absolute path to workspace for the LSP binary
 	const workspaceFolder = workspace.workspaceFolders?.[0]?.uri.fsPath;
-	const serverModule = workspaceFolder
-		? path.join(workspaceFolder, serverPath)
-		: context.asAbsolutePath(serverPath);
+	// Compiled TS server entry inside the extension
+	const serverJs = context.asAbsolutePath(path.join('out', 'server', 'server.js'));
 
 	// Debug logging
 	console.log('LSP Debug Info:');
 	console.log('  Workspace folder:', workspaceFolder);
-	console.log('  Server path config:', serverPath);
-	console.log('  Final server module path:', serverModule);
-	console.log('  File exists:', require('fs').existsSync(serverModule));
+	console.log('  Server JS path:', serverJs);
+	console.log('  Server JS exists:', require('fs').existsSync(serverJs));
+
+	const env = {
+		...process.env,
+		NOOLANG_WORKSPACE: workspaceFolder ?? '',
+		NOOLANG_CLI_PATH: workspaceFolder ? path.join(workspaceFolder, 'dist', 'cli.js') : '',
+	};
 
 	// The debug options for the server
-	const debugOptions = { cwd: context.asAbsolutePath('.') };
+	const debugOptions = { cwd: context.asAbsolutePath('.'), env };
 
-	// Server options for binary command
+	// Server options for node script
 	const serverOptions: { run: Executable; debug: Executable } = {
-		run: { command: serverModule, transport: TransportKind.stdio },
+		run: { command: 'node', args: [serverJs], transport: TransportKind.stdio, options: { env } },
 		debug: {
-			command: serverModule,
+			command: 'node',
+			args: ['--inspect=6009', serverJs],
 			transport: TransportKind.stdio,
 			options: debugOptions,
 		},

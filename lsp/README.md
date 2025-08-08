@@ -30,22 +30,14 @@ lsp/
 ## 🚀 Quick Start
 
 ### Prerequisites
-- [Rust](https://rustup.rs/) (for LSP server)
 - [Node.js](https://nodejs.org/) (for VSCode extension)
 - [TypeScript](https://www.typescriptlang.org/) (for type checking)
 
 ### Build Everything
 ```bash
-# From the lsp/ directory
-
-# 1. Build the LSP server
-cargo build --release
-
-# 2. Build the VSCode extension
-cd extension && npm install && npm run compile && cd ..
-
-# 3. Test the integration
-./test_enhanced_lsp.sh
+# From the lsp/extension directory
+npm install
+npm run compile
 ```
 
 ### Install in VSCode
@@ -53,10 +45,7 @@ cd extension && npm install && npm run compile && cd ..
 # Option 1: Use the install script
 ./install-extension.sh
 
-# Option 2: Install manually
-code --install-extension noolang-0.1.0.vsix
-
-# Option 3: Development mode
+# Option 2: Development mode
 # Open the main workspace (../) in VSCode
 # The extension will automatically activate for .noo files
 ```
@@ -134,8 +123,8 @@ The LSP server bridges to the Noolang TypeScript compiler:
 
 ```
 VSCode Extension (TypeScript)
-    ↓ Enhanced LSP Protocol
-Rust LSP Server (tower-lsp)
+    ↓ LSP Protocol
+TypeScript LSP Server (Node)
     ↓ Position-aware CLI calls
 TypeScript CLI (../dist/cli.js)
     ↓ Rich type information

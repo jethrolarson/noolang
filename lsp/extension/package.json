@@ -34,11 +34,7 @@
     "configuration": {
       "title": "Noolang LSP",
       "properties": {
-        "noolang.languageServerPath": {
-          "type": "string",
-          "default": "./lsp/target/release/noolang-lsp",
-          "description": "Path to the Noolang LSP server binary (relative to workspace root)"
-        },
+
         "noolang.enableLanguageServer": {
           "type": "boolean",
           "default": true,
@@ -49,9 +45,9 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
-  },
+    "compile": "tsc -p ./ && tsc -p ./server",
+    "watch": "tsc -watch -p ./ & tsc -watch -p ./server"
+  }
   "devDependencies": {
     "@types/vscode": "^1.74.0",
     "@types/node": "^16.11.7",
@@ -59,6 +55,7 @@
   },
   "dependencies": {
     "vscode-languageclient": "^8.0.0",
-    "vscode-languageserver": "^8.0.0"
+    "vscode-languageserver": "^8.0.0",
+    "vscode-uri": "^3.0.8"
   }
 }
