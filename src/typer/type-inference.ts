@@ -65,6 +65,8 @@ import {
 import { unify } from './unify';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
+import { tryResolveConstraints, extractFunctionConstraints } from './constraint-resolution';
+import { freeTypeVars } from './type-operations';
 
 import {
 	type TypeState,
@@ -1049,6 +1051,39 @@ export const typeBinary = (
 			)}.`,
 		}
 	);
+
+	// After unification, enforce operator trait constraints strictly (e.g., Numeric for -, *, /)
+	const substitutedOperatorType = substitute(operatorType, currentState.substitution);
+	  if (substitutedOperatorType.kind === 'function') {
+    const { functionConstraints } = extractFunctionConstraints(substitutedOperatorType);
+    if (functionConstraints && functionConstraints.length > 0) {
+      const substitutedArgTypes = [leftResult.type, rightResult.type].map(t =>
+        substitute(t, currentState.substitution)
+      );
+      const constraintResult = tryResolveConstraints(
+        resultType,
+        functionConstraints,
+        substitutedArgTypes,
+        currentState
+      );
+      if (!constraintResult) {
+        // If both operand types are fully concrete (no type variables), then fail hard
+        const hasVars = substitutedArgTypes.some(t => freeTypeVars(t).size > 0);
+        if (!hasVars) {
+          throw new Error(
+            `No implementation found for operator ${expr.operator} with operand types ${typeToString(
+              substitutedArgTypes[0],
+              currentState.substitution
+            )} and ${typeToString(substitutedArgTypes[1], currentState.substitution)}`
+          );
+        }
+        // Otherwise allow constraints to persist for later resolution (polymorphic context)
+      } else {
+        // Update state with any substitutions from constraint resolution
+        currentState = constraintResult.updatedState;
+      }
+    }
+  }
 
 	// Apply substitution to get final result type
 	const substitutedResultType = substitute(
