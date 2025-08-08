@@ -19,7 +19,7 @@ import {
 } from './types';
 import { substitute } from './substitute';
 import { unify } from './unify';
-import { freshTypeVariable } from './type-operations';
+import { freshTypeVariable, isReservedTypeName } from './type-operations';
 import { typeExpression } from './expression-dispatcher';
 import { isTypeKind, typeToString } from './helpers';
 
@@ -31,13 +31,7 @@ export const typeTypeDefinition = (
 	const { name, typeParams, constructors } = expr;
 
 	// Disallow shadowing built-in types and stdlib ADTs
-	const builtInTypeNames = new Set<string>([
-		'Float',
-		'String',
-		'Unit',
-		'List',
-	]);
-	if (builtInTypeNames.has(name)) {
+	if (isReservedTypeName(name)) {
 		throw new Error(`Shadowing built in type ${name}`);
 	}
 

@@ -66,6 +66,7 @@ import { unify } from './unify';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
 import { tryResolveConstraints, extractFunctionConstraints } from './constraint-resolution';
+import { isReservedTypeName } from './type-operations';
 import { freeTypeVars } from './type-operations';
 
 import {
@@ -1105,14 +1106,8 @@ export const typeUserDefinedType = (
 ): TypeResult => {
 	const { name, typeParams, definition } = expr;
 
-	// Disallow shadowing built-in types and stdlib ADTs
-	const builtInTypeNames = new Set<string>([
-		'Float',
-		'String',
-		'Unit',
-		'List',
-	]);
-	if (builtInTypeNames.has(name)) {
+	// Disallow shadowing reserved built-in types
+	if (isReservedTypeName(name)) {
 		throw new Error(`Shadowing built in type ${name}`);
 	}
 
