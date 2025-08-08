@@ -1794,6 +1794,45 @@ Effects are explicit and tracked in the type system:
 - **JavaScript compilation**: Compile to JavaScript
 - **VSCode Language Server**: LSP integration
 
+## MCP (Model Context Protocol) Support
+
+Noolang includes an MCP server that allows AI assistants like Cursor to interact with Noolang code directly.
+
+### Features
+
+The MCP server provides:
+- **Tools**:
+  - `noolang_eval` - Evaluate Noolang expressions
+  - `noolang_typesOf` - Get type information for code
+  - `noolang_runFile` - Run .noo files
+- **Resources**:
+  - Language Reference documentation
+  - Standard Library source
+  - LLM Guide
+
+### Installation in Cursor
+
+1. **Option A: Project Configuration** (already configured)
+   - The `.cursor/mcp.json` file is already set up in this project
+   - Just open the project in Cursor and the MCP server will be available
+
+2. **Option B: Manual Configuration**
+   - Add to your Cursor settings → Tools & MCP → Add Server:
+   ```
+   Name: noolang
+   Command: bun
+   Args: scripts/mcp-provider.ts
+   ```
+
+### Usage
+
+Once installed, you can ask Cursor to:
+- "Evaluate this Noolang code: `[1, 2, 3] |> map (fn x => x * 2)`"
+- "What's the type of this function: `fn x y => x + y`?"
+- "Run the examples/basic.noo file"
+
+The AI assistant will use the MCP tools to execute code and provide results directly in the chat.
+
 ## Contributing
 
 Feel free to fork, experiment, and contribute!
