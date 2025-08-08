@@ -80,6 +80,7 @@ result2 = 10 / 0;        # None
 
 # Working with Option values
 maybeFirst = head [1, 2, 3];  # Some 1
+maybeSecond = at 1 [1, 2, 3]; # Some 2
 maybeEmpty = head [];          # None
 ```
 

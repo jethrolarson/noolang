@@ -442,6 +442,22 @@ export class Evaluator {
 			})
 		);
 
+		// Index accessor for lists only
+		this.environment.set(
+			'at',
+			createNativeFunction('at', (index: Value) => (list: Value) => {
+				if (!isNumber(index)) {
+					throw new Error('at: index must be a number');
+				}
+				if (!isList(list)) {
+					throw new Error('at: container must be a list');
+				}
+				const idx = index.value;
+				if (idx < 0 || idx >= list.values.length) return createConstructor('None', []);
+				return createConstructor('Some', [list.values[idx]]);
+			})
+		);
+
 		// List operations
 		this.environment.set(
 			'tail',

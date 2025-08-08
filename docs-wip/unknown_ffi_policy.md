@@ -31,11 +31,11 @@ result = fs | @readFileSync? |? call_ffi string ["file.txt"] : Result String Str
 
 - **Unknown is inert**: No arithmetic, comparison, function call, `@field`, tuple/record destructuring. Only tag-match and optional accessors are allowed.
 - **Tag-match is pure**: Matching on Unknown by runtime tag (String, Float, Bool, Unit, List, Function, Error, Opaque(kind), RecordTag) performs no property reads/calls and adds no effects.
-- **Structural ops are effectful**: The only structural reads/calls are:
-  - `@field? : Unknown -> Option Unknown !ffi`
-  - `at : Float -> (List a | Tuple {..} | Unknown) -> Option a` (pure on native lists/tuples; `!ffi` when input is `Unknown`)
-  - `call    : Unknown -> List Unknown -> Unknown !ffi`
-- **!ffi is non-erasable at use sites**: Any function that uses `@field?`, `index?`, or `call` must declare `!ffi`. Callers inherit `!ffi` transitively.
+- **Structural ops**: The only structural reads/calls are:
+  - `@field? : Unknown -> Option Unknown` (pure; effect depends on provenance)
+  - `at : Float -> (List a | Unknown) -> Option a` (pure on native lists; effect depends on provenance when input is `Unknown`)
+  - `call_ffi : Unknown -> List Unknown -> Unknown !ffi` (always crosses FFI)
+- **!ffi is non-erasable at use sites**: `!ffi` is required when an operation crosses a foreign boundary (e.g., `call_ffi` or adapters). Using `@field?` or `at` on native/Unknown-without-FFI values remains pure. Effects propagate transitively.
 - **No implicit coercion**: Unknown never unifies with concrete types or containers. Only decoders construct typed values.
 - **Branch-local refinement**: Refinements from matches do not escape the branch; outside, the value remains Unknown (and ffi-tainted).
 
@@ -58,15 +58,15 @@ result = fs | @readFileSync? |? call_ffi string ["file.txt"] : Result String Str
 
 #### Effects policy
 
-- **Introduction**: `ffi ...` and `forget x` produce Unknown values marked by provenance (ffi-taint).
+- **Introduction**: `ffi ...` and `forget x` produce Unknown values with provenance (may be ffi-tainted).
 - **Refinement is pure**: Tag matches/checked casts are pure and never clear taint.
-- **Use triggers !ffi**: Property/index access and foreign function calls require `!ffi` at the use site.
+- **Effects depend on provenance**: Property/index access on Unknown is pure unless it crosses a foreign boundary via an adapter; only such boundary crossings require `!ffi`. Foreign function calls via `call_ffi` always require `!ffi`.
 - **Typed manifests do not erase !ffi**: Declarations remove Unknown but must retain declared effects. Only vetted intrinsics may omit `!ffi`.
 - **forget is pure**: `forget : a -> Unknown` introduces Unknown without `!ffi`. Elimination/structure rules remain identical to FFI-origin Unknown.
 
 #### Minimal operational surface
 
-- **Unknown ops**: `@field?`, `at`, `call_ffi` (all `!ffi` when input is `Unknown`).
+- **Unknown ops**: `@field?`, `at`, `call_ffi` (only `call_ffi` always requires `!ffi`; `@field?` and `at` remain pure unless an adapter crosses FFI).
 - **Elimination**: tag-match; `decode`/`guard`.
 - **Chaining**: use `|?` with Option/Result.
 

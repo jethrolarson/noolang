@@ -305,6 +305,15 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a'],
 	});
 
+	  // Index accessor for lists only: Float -> List a -> Option a
+  newEnv.set('at', {
+    type: functionType(
+      [floatType(), listTypeWithElement(typeVariable('a'))],
+      optionType(typeVariable('a'))
+    ),
+    quantifiedVars: ['a'],
+  });
+
 	// Math utilities (pure)
 	newEnv.set('abs', {
 		type: createUnaryFunctionType(floatType(), floatType()),

@@ -280,7 +280,8 @@ result6
 result1 = head [1, 2, 3];        # Some 1
 result2 = map (fn x => x * 2) [1, 2, 3];  # [2, 4, 6]
 result3 = length [1, 2, 3, 4];   # 4
-result3
+result4 = at 1 [10, 20, 30];     # Some 20
+result4
 ```
 
 ## Interactive Learning with REPL
