@@ -257,8 +257,7 @@ describe('Evaluator', () => {
 		expect(result.finalValue).toBe(5);
 	});
 
-	// TODO: Implement imports
-	test.skip('should evaluate basic import', () => {
+	test('should evaluate basic import', () => {
 		const result = runCode('import "test/test_import"');
 		expect(result.finalValue).toBe(42);
 	});

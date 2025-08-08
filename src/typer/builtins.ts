@@ -12,6 +12,7 @@ import {
 	Type,
 	Effect,
 	implementsConstraint,
+	unknownType,
 } from '../ast';
 
 // Helper: Create common function types
@@ -335,6 +336,12 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	});
 	newEnv.set('toString', {
 		type: createUnaryFunctionType(typeVariable('a'), stringType()),
+		quantifiedVars: ['a'],
+	});
+
+	// Unknown utilities (pure)
+	newEnv.set('forget', {
+		type: createUnaryFunctionType(typeVariable('a'), unknownType()),
 		quantifiedVars: ['a'],
 	});
 
