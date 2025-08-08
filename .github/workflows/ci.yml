@@ -62,11 +62,11 @@ jobs:
     - name: Install dependencies
       run: bun install
     
-    - name: TypeScript check - source and test files
-      run: bun run typecheck
+    - name: TypeScript check - core + scripts
+      run: bun run typecheck:all
       
     - name: Report TypeScript status
-      run: echo "✅ TypeScript checking passed for source and test files"
+      run: echo "✅ TypeScript checking passed for core + scripts"
 
   # Run core tests with bun
   core-tests:
@@ -397,15 +397,6 @@ jobs:
         echo "- trait_system_demo.noo - Trait function constraint issues" >> $GITHUB_STEP_SUMMARY
         echo "- generic_safe_thrush_demo.noo - Safe thrush operator with Result monad" >> $GITHUB_STEP_SUMMARY
         echo "- trait_truly_multiline_demo.noo - Type mismatch errors" >> $GITHUB_STEP_SUMMARY
-    
-    - name: Upload example test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: example-validation-results
-        path: |
-          examples/
-        retention-days: 14
 
   # Run benchmarks (can run in parallel with other tests)
   benchmarks:
