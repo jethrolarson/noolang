@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "noolang": {
+      "command": "npx",
+      "args": ["-y", "tsx", "scripts/mcp-provider.ts"]
+    }
+  }
+}
