@@ -1916,9 +1916,11 @@ export class Evaluator {
 
 				// Try field with @ prefix first (new format), then without (legacy format)
 				if (fieldWithAt in record.fields) {
-					return record.fields[fieldWithAt];
+					const val = record.fields[fieldWithAt];
+					return expr.optional ? createConstructor('Some', [val]) : val;
 				} else if (field in record.fields) {
-					return record.fields[field];
+					const val = record.fields[field];
+					return expr.optional ? createConstructor('Some', [val]) : val;
 				}
 			}
 			if (expr.optional) {

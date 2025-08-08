@@ -1263,7 +1263,7 @@ export const typeAccessor = (
 	const funcType = functionType([recordVar], returnType);
 	// Add the constraint to both the parameter type variable (for validation)
 	// and the function type (for display)
-	if (recordVar.kind === 'variable') {
+	if (!expr.optional && recordVar.kind === 'variable') {
 		// For validation: add to the type variable itself
 		recordVar.constraints = [
 			hasStructureConstraint(recordVar.name, {
