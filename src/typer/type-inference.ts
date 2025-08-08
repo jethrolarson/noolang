@@ -1111,19 +1111,25 @@ export const typeUserDefinedType = (
 		throw new Error(`Shadowing built in type ${name}`);
 	}
 
-	// Disallow shadowing any existing type/constructor in current session
-	if (state.protectedTypeNames.has(name)) {
-		throw new Error(`Type shadowing is not allowed: ${name}`);
-	}
-
-	// Also prevent shadowing of any currently-bound uppercase identifier in environment (constructors/types)
-	for (const existingName of state.environment.keys()) {
-		if (
-			existingName === name &&
-			existingName[0] === existingName[0].toUpperCase()
-		) {
+	// If stdlib and builtins are loaded (protected set is non-empty), enforce global no-shadowing
+	const strictShadowing = state.protectedTypeNames && state.protectedTypeNames.size > 0;
+	if (strictShadowing) {
+		if (state.protectedTypeNames.has(name)) {
 			throw new Error(`Type shadowing is not allowed: ${name}`);
 		}
+		for (const existingName of state.environment.keys()) {
+			if (
+				existingName === name &&
+				existingName[0] === existingName[0].toUpperCase()
+			) {
+				throw new Error(`Type shadowing is not allowed: ${name}`);
+			}
+		}
+	}
+
+	// If a type with the same name is already in the environment, error (duplicate definition)
+	if (state.environment.has(name)) {
+		throw new Error(`Type already defined: ${name}`);
 	}
 
 	// Create stable type variables for the user-defined type's parameters
@@ -1172,8 +1178,13 @@ export const typeUserDefinedType = (
 	});
 	
 	const newState = { ...state, environment: envWithType };
-	
-	return createPureTypeResult(unitType(), newState);
+
+	// Add this user-defined type name to protected set to prevent shadowing later
+	const updatedProtected = new Set(newState.protectedTypeNames);
+	updatedProtected.add(name);
+	const finalState = { ...newState, protectedTypeNames: updatedProtected };
+ 
+	return createPureTypeResult(unitType(), finalState);
 };
 
 // Type inference for mutable definitions
