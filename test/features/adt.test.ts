@@ -117,7 +117,7 @@ describe('Algebraic Data Types', () => {
 		});
 	});
 
-	test.skip('should not allow shadowing built in types', () => {
+	test('should not allow shadowing built in types', () => {
 		expect(() =>
 			runCode(`
 		variant List a = Cons a (List a) | Nil;

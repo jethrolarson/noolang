@@ -30,6 +30,17 @@ export const typeTypeDefinition = (
 ): TypeResult => {
 	const { name, typeParams, constructors } = expr;
 
+	// Disallow shadowing built-in types and stdlib ADTs
+	const builtInTypeNames = new Set<string>([
+		'Float',
+		'String',
+		'Unit',
+		'List',
+	]);
+	if (builtInTypeNames.has(name)) {
+		throw new Error(`Shadowing built in type ${name}`);
+	}
+
 	// Create stable type variables for the ADT's type parameters
 	const typeVarMap = new Map<string, Type>();
 	for (const param of typeParams) {
