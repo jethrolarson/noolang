@@ -134,18 +134,22 @@ export class Evaluator {
 	private fs: typeof defaultFs;
 	private path: typeof defaultPath;
 	private traitRegistry: TraitRegistry;
+	private enableTrace: boolean;
 
 	constructor(opts: {
 		fs?: typeof defaultFs;
 		path?: typeof defaultPath;
 		traitRegistry: TraitRegistry;
 		skipStdlib?: boolean;
+		enableTrace?: boolean;
 	}) {
 		this.fs = opts.fs ?? defaultFs;
 		this.path = opts.path ?? defaultPath;
 		this.traitRegistry = opts.traitRegistry;
 		this.environment = new Map();
 		this.environmentStack = [];
+		this.enableTrace =
+			opts.enableTrace ?? (process.env.NOO_DISABLE_TRACE === '1' ? false : true);
 		this.initializeBuiltins();
 
 		if (!opts?.skipStdlib) {
@@ -1097,15 +1101,17 @@ export class Evaluator {
 		for (const statement of program.statements) {
 			const result = this.evaluateExpression(statement);
 
-			// Add to execution trace
-			executionTrace.push({
-				expression: this.expressionToString(statement),
-				result: result,
-				location: {
-					line: statement.location.start.line,
-					column: statement.location.start.column,
-				},
-			});
+			// Add to execution trace (optional)
+			if (this.enableTrace) {
+				executionTrace.push({
+					expression: this.expressionToString(statement),
+					result: result,
+					location: {
+						line: statement.location.start.line,
+						column: statement.location.start.column,
+					},
+				});
+			}
 
 			finalResult = result;
 		}

@@ -22,8 +22,9 @@ function isValidPrimitiveName(name: string): name is ValidPrimitiveName {
 	return VALID_PRIMITIVES.has(name as ValidPrimitiveName);
 }
 
-const unifyCallSources = new Map<string, number>(); // Track where unify calls come from
-const unifyTypePatterns = new Map<string, number>(); // Track what types are being unified
+const ENABLE_UNIFY_PROFILING = process.env.NOO_PROFILE_UNIFY === '1';
+const unifyCallSources = ENABLE_UNIFY_PROFILING ? new Map<string, number>() : null; // Track where unify calls come from
+const unifyTypePatterns = ENABLE_UNIFY_PROFILING ? new Map<string, number>() : null; // Track what types are being unified
 
 const typeToPattern = (t: Type): string => {
 	if (!t) return 'undefined';
@@ -187,11 +188,19 @@ export const unify = (
 	const source = caller.includes('at ')
 		? caller.split('at ')[1].split(' ')[0]
 		: 'unknown';
-	unifyCallSources.set(source, (unifyCallSources.get(source) || 0) + 1);
+	if (ENABLE_UNIFY_PROFILING && unifyCallSources && unifyTypePatterns) {
+		// Track call sources using stack trace (expensive; optional)
+		const stack = new Error().stack || '';
+		const caller = stack.split('\n')[2] || 'unknown';
+		const source = caller.includes('at ')
+			? caller.split('at ')[1].split(' ')[0]
+			: 'unknown';
+		unifyCallSources.set(source, (unifyCallSources.get(source) || 0) + 1);
 
-	// Track type patterns being unified
-	const pattern = `${typeToPattern(t1)} = ${typeToPattern(t2)}`;
-	unifyTypePatterns.set(pattern, (unifyTypePatterns.get(pattern) || 0) + 1);
+		// Track type patterns being unified
+		const pattern = `${typeToPattern(t1)} = ${typeToPattern(t2)}`;
+		unifyTypePatterns.set(pattern, (unifyTypePatterns.get(pattern) || 0) + 1);
+	}
 
 	return unifyInternal(t1, t2, state, location, context);
 };
@@ -379,6 +388,32 @@ function unifyVariable(
 }
 
 const functionUnifyPatterns = new Map<string, number>();
+
+export function getUnifyProfiling(): {
+	callSources: Array<[string, number]>;
+	typePatterns: Array<[string, number]>;
+	functionPatterns: Array<[string, number]>;
+} {
+	return {
+		callSources: unifyCallSources
+			? Array.from(unifyCallSources.entries())
+				.sort((a, b) => b[1] - a[1])
+			: [],
+		typePatterns: unifyTypePatterns
+			? Array.from(unifyTypePatterns.entries())
+				.sort((a, b) => b[1] - a[1])
+			: [],
+		functionPatterns: Array.from(functionUnifyPatterns.entries()).sort(
+			(a, b) => b[1] - a[1]
+		),
+	};
+}
+
+export function resetUnifyProfiling(): void {
+	unifyCallSources?.clear();
+	unifyTypePatterns?.clear();
+	functionUnifyPatterns.clear();
+}
 
 function unifyFunction(
 	s1: Type,

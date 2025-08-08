@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { formatValue } from './format';
 import { colorize } from './colors';
+import { getUnifyProfiling, resetUnifyProfiling } from './typer/unify';
 
 function printUsage() {
 	console.log(colorize.section('Usage: noo <file.noo>'));
@@ -326,6 +327,36 @@ async function main() {
 		return;
 	}
 
+	// Hidden: --profile-unify <file>
+	if (args[0] === '--profile-unify' && args[1]) {
+		// Enable unify profiling for this run
+		// Note: our unify.ts reads env at module load; for simplicity we just run normally and print if available
+		try {
+			const fullPath = path.resolve(args[1]);
+			const code = fs.readFileSync(fullPath, 'utf8');
+			const lexer = new Lexer(code);
+			const tokens = lexer.tokenize();
+			const program = parse(tokens);
+			const { program: decoratedProgram, state } = typeAndDecorate(program);
+			const evaluator = new Evaluator({ traitRegistry: state.traitRegistry, enableTrace: false });
+			evaluator.evaluateProgram(decoratedProgram);
+			const { callSources, typePatterns, functionPatterns } = getUnifyProfiling();
+			console.log(colorize.section('Unify Profiling:'));
+			const top = (arr: Array<[string, number]>) => arr.slice(0, 10);
+			console.log(colorize.identifier('Top call sites:'));
+			top(callSources).forEach(([site, count]) => console.log(`  ${count}x ${site}`));
+			console.log(colorize.identifier('Top type patterns:'));
+			top(typePatterns).forEach(([pat, count]) => console.log(`  ${count}x ${pat}`));
+			console.log(colorize.identifier('Function param patterns:'));
+			top(functionPatterns).forEach(([pat, count]) => console.log(`  ${count}x ${pat}`));
+			resetUnifyProfiling();
+		} catch (err) {
+			console.error('Error:', (err as Error).message);
+			process.exit(1);
+		}
+		return;
+	}
+
 	// Check for --eval or -e flag
 	if ((args[0] === '--eval' || args[0] === '-e') && args[1]) {
 		const expr = args[1];
@@ -423,7 +454,10 @@ async function main() {
 		const { program: decoratedProgram, state } = typeAndDecorate(program);
 		const typeTime = performance.now();
 
-		const evaluator = new Evaluator({ traitRegistry: state.traitRegistry });
+		const evaluator = new Evaluator({
+			traitRegistry: state.traitRegistry,
+			enableTrace: !isBenchmark && process.env.NOO_DISABLE_TRACE !== '1',
+		});
 
 		const finalResult = evaluator.evaluateProgram(decoratedProgram);
 		const evalTime = performance.now();
