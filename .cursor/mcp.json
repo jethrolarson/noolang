@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "noolang": {
+      "command": "bun",
+      "args": ["scripts/mcp-provider.ts"]
+    }
+  }
+}
