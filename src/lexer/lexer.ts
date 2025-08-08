@@ -256,6 +256,12 @@ export class Lexer {
 			field += this.advance();
 		}
 
+		// Optional accessor suffix '?'
+		if (!this.isEOF() && this.peek() === '?') {
+			this.advance();
+			field += '?';
+		}
+
 		return {
 			type: 'ACCESSOR',
 			value: field,

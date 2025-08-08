@@ -254,3 +254,13 @@ test('Constraint Propagation (Functional Typer) - should allow composition when 
 	// head now returns Option List Float instead of List Float
 	expect(typeStr).toBe('Option List Float');
 });
+
+test('Typer - optional accessor returns Option type', () => {
+	const code = `
+	  get = @name?;
+	`;
+	const result = parseAndType(code);
+	const typeStr = typeToString(result.type, result.state.substitution);
+	// Expect something like "{ @name a } -> Option a" (display may vary but should include Option)
+	expect(typeStr.includes('Option')).toBe(true);
+});

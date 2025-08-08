@@ -334,6 +334,7 @@ export interface FieldExpression {
 export interface AccessorExpression {
 	kind: 'accessor';
 	field: string;
+	optional?: boolean;
 	type?: Type;
 	location: Location;
 }
