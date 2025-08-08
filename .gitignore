@@ -99,4 +99,11 @@ Thumbs.db
 test-results/
 playwright-report/
 
+# LSP (VS Code extension) build artifacts
+lsp/extension/out/
+lsp/extension/*.vsix
+
+# Legacy Rust LSP build artifacts (unused)
+lsp/target/
+
  
