@@ -507,10 +507,10 @@ describe('Evaluator', () => {
 
 	test('Additional Coverage - should convert constructor with args to string', () => {
 		const result = runCode(`
-        variant Option a = Some a | None;
-        toString (Some 42)
+        variant Option2 a = Some2 a | None2;
+        toString (Some2 42)
       `);
-		expect(result.finalValue).toBe('Some 42');
+		expect(result.finalValue).toBe('Some2 42');
 	});
 
 	test('Additional Coverage - should handle abs function', () => {

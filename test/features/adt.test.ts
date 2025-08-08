@@ -150,14 +150,14 @@ describe('Algebraic Data Types', () => {
 
 	test('Pattern Matching - should handle complex pattern matching with variables', () => {
 		const result = runCode(`
-		variant Result a b = Ok a | Error b;
+		variant Result2 a b = Ok2 a | Error2 b;
 		
 		unwrap = fn result => match result with (
-			Ok value => value;
-			Error msg => 0
+			Ok2 value => value;
+			Error2 msg => 0
 		);
 		
-		unwrap (Ok 42)
+		unwrap (Ok2 42)
 	`);
 
 		expect(result.finalValue).toEqual(42);

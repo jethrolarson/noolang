@@ -200,7 +200,6 @@ test('thrush operator with pure functions has no effects', () => {
 // Test suite: Effect Propagation in Pattern Matching
 test('pattern matching with pure cases has no effects', () => {
 	const result = runCode(`
-				variant Option a = Some a | None;
 				opt = Some 42;
 				match opt with (
 					Some x => x * 2;
@@ -212,9 +211,6 @@ test('pattern matching with pure cases has no effects', () => {
 
 test('nested pattern matching with pure expressions has no effects', () => {
 	const result = runCode(`
-				variant Result a b = Ok a | Err b;
-				variant Option a = Some a | None;
-				
 				result = Ok (Some 42);
 				match result with (
 					Ok opt => match opt with (Some x => x; None => 0);

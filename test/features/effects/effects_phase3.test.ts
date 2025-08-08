@@ -194,7 +194,6 @@ test('Effects Phase 3 - Effect Propagation in Control Flow - nested conditionals
 test('Effects Phase 3 - Effect Propagation in Pattern Matching - pattern matching with effectful cases propagates effects', () => {
 	expectEffects(
 		`
-				variant Option a = Some a | None;
 				opt = Some 42;
 				match opt with (
 					Some x => (print x; {});
@@ -208,7 +207,6 @@ test('Effects Phase 3 - Effect Propagation in Pattern Matching - pattern matchin
 test('Effects Phase 3 - Effect Propagation in Pattern Matching - pattern matching merges effects from all cases', () => {
 	expectEffects(
 		`
-				variant Result a b = Ok a | Err b;
 				result = Ok 42;
 				match result with (
 					Ok value => print value;
