@@ -34,8 +34,8 @@ result = fs | @readFileSync? |? call_ffi string ["file.txt"] : Result String Str
 - **Structural ops**: The only structural reads/calls are:
   - `@field? : Unknown -> Option Unknown` (pure; effect depends on provenance)
   - `at : Float -> (List a | Unknown) -> Option a` (pure on native lists; effect depends on provenance when input is `Unknown`)
-  - `call_ffi : Unknown -> List Unknown -> Unknown !ffi` (always crosses FFI)
-- **!ffi is non-erasable at use sites**: `!ffi` is required when an operation crosses a foreign boundary (e.g., `call_ffi` or adapters). Using `@field?` or `at` on native/Unknown-without-FFI values remains pure. Effects propagate transitively.
+  - `call_ffi : Schema res -> Unknown -> List Unknown -> Result res (EncodeError | DecodeError) !ffi`
+  - **!ffi is non-erasable at use sites**: Any function that uses `call_ffi` must declare `!ffi`. Callers inherit this requirement `!ffi` and must also declare `!ffi`.
 - **No implicit coercion**: Unknown never unifies with concrete types or containers. Only decoders construct typed values.
 - **Branch-local refinement**: Refinements from matches do not escape the branch; outside, the value remains Unknown (and ffi-tainted).
 
@@ -97,48 +97,49 @@ result = fs | @readFileSync? |? call_ffi string ["file.txt"] : Result String Str
 
 ### Implementation Plan (phased)
 
-1. Parser/Lexer
+1. Parser/Lexer (status)
 
-- Ensure `@field?` postfix recognized.
-- Keep `|?` as existing operator.
+- `@field?` postfix recognized. (DONE)
+- `|?` operator supported. (DONE)
 
-2. Core typing/effects
+2. Core typing/effects (status)
 
-- Add Unknown intro form: `forget : a -> Unknown` (pure).
-- Type `@field?`:
-  - Native record: `{ @k a, ... } -> Option a` (pure)
-  - Unknown: `Unknown -> Option Unknown !ffi`
-- Add `at` function in stdlib types:
-  - `Float -> List a -> Option a` (pure)
-  - `Float -> Tuple {..} -> Option a` (pure)
-  - `Float -> Unknown -> Option Unknown !ffi`
-- Add `call_ffi : Schema res -> Unknown -> List Unknown -> Result res (EncodeError | DecodeError) !ffi`.
+- Unknown intro form: `forget : a -> Unknown` (pure). (PLANNED)
+- `@field?` typing:
+  - Native record: `{ @k a, ... } -> Option a` (pure) (DONE)
+  - Unknown: `Unknown -> Option Unknown !ffi` (PLANNED)
+- `at` function types:
+  - `Float -> List a -> Option a` (pure) (PLANNED)
+  - `Float -> Tuple {..} -> Option a` (pure) (PLANNED)
+  - `Float -> Unknown -> Option Unknown !ffi` (PLANNED)
+- `call_ffi : Schema res -> Unknown -> List Unknown -> Result res (EncodeError | DecodeError) !ffi`. (PLANNED)
 
-3. Evaluator/runtime
+3. Evaluator/runtime (status)
 
-- Implement adapter registry and pure tag detection (no property reads/calls).
-- Implement structural reads for `@field?` on Unknown with `!ffi`.
-- Implement `at` over native and Unknown.
-- Implement `call_ffi` pipeline: encode args, invoke, decode result.
+- Adapter registry and pure tag detection (no property reads/calls). (PLANNED)
+- Structural reads for `@field?` on Unknown with `!ffi`. (PLANNED)
+- `@field?` on native records returns Some/None. (DONE)
+- `at` over native and Unknown. (PLANNED)
+- `call_ffi` pipeline: encode args, invoke, decode result. (PLANNED)
 
-4. Schema/decoder DSL (stdlib)
+4. Schema/decoder DSL (stdlib) (status)
 
-- Define `Schema a` and primitives/combinators.
-- Implement `decode`, `guard` using `@field?`, `at`, and tag checks.
+- Define `Schema a` and primitives/combinators. (PLANNED)
+- Implement `decode`, `guard` using `@field?`, `at`, and tag checks. (PLANNED)
 
-5. Effects propagation and diagnostics
+5. Effects propagation and diagnostics (status)
 
-- Enforce non-erasable `!ffi` at use sites; improve error messages when missing.
-- Surface taint/effects in REPL type displays.
+- Enforce non-erasable `!ffi` at use sites; improve error messages when missing. (PLANNED)
+- Surface taint/effects in REPL type displays. (PLANNED)
 
-6. Tests
+6. Tests (status)
 
-- Parser: `@name?` ok.
-- Typing: Unknown inert; `@field?`/`at` pure vs `!ffi` on Unknown.
-- Evaluator: tag purity; structural ops require `!ffi`.
-- Decoders: success/failure cases; no Unknown in outputs.
-- `call_ffi`: encode errors, decode errors, happy path.
+- Parser: `@name?` ok. (DONE)
+- Typing: Unknown inert; `@field?`/`at` pure vs `!ffi` on Unknown. (PARTIAL: native `@field?` DONE)
+- Evaluator: tag purity; structural ops require `!ffi`. (PLANNED)
+- Decoders: success/failure cases; no Unknown in outputs. (PLANNED)
+- `call_ffi`: encode errors, decode errors, happy path. (PLANNED)
 
-7. Docs
+7. Docs (status)
 
-- Update language reference and README with `@field?`, `at`, `call_ffi`, and schema usage.
+- Update language reference and README with `@field?`, `at`, `call_ffi`, and schema usage. (PLANNED)

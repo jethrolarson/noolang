@@ -619,6 +619,12 @@ export class Evaluator {
 			)
 		);
 
+		// Unknown utilities (pure)
+		this.environment.set(
+			'forget',
+			createNativeFunction('forget', (value: Value) => value)
+		);
+
 		// Record utilities
 		this.environment.set(
 			'hasKey',
