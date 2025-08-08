@@ -163,59 +163,33 @@ jobs:
         restore-keys: |
           bun-deps-${{ runner.os }}-
     
-    - name: Setup Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-    
-    - name: Cache Rust dependencies
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          lsp/target
-        key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', 'lsp/Cargo.toml') }}
-        restore-keys: |
-          rust-${{ runner.os }}-
-    
     - name: Install dependencies
       run: bun install
     
     - name: Build TypeScript project
       run: bun run build
     
-    - name: Build LSP server
+    - name: Build VSCode extension (TS LSP server)
       run: |
-        cd lsp
-        cargo build --release
+        cd lsp/extension
+        npm ci
+        npm run compile
     
-    - name: Run LSP core tests
-      run: |
-        cd lsp
-        chmod +x run_core_tests.sh
-        ./run_core_tests.sh
-    
-    - name: Run LSP comprehensive tests
-      run: |
-        cd lsp
-        cargo test
-    
-    - name: Test LSP integration
-      run: |
-        cd lsp
-        ./test_enhanced_lsp.sh
-    
-    - name: Upload LSP test artifacts
+    - name: Upload LSP server artifact
       uses: actions/upload-artifact@v4
-      if: always()
       with:
-        name: lsp-test-artifacts
+        name: lsp-extension-out
         path: |
-          lsp/target/release/noolang-lsp
-          lsp/test-*.log
+          lsp/extension/out/**
         retention-days: 14
+    
+    - name: LSP checks (TS server)
+      run: |
+        node --version
+        npm --version
+        # Ensure server output exists
+        test -f lsp/extension/out/server/server.js
+        test -f lsp/extension/out/extension.js
 
   # Validate documentation examples (all examples in stable docs must pass)
   documentation-validation:
