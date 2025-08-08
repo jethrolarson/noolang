@@ -33,7 +33,7 @@ result = fs | @readFileSync? |? call_ffi string ["file.txt"] : Result String Str
 - **Tag-match is pure**: Matching on Unknown by runtime tag (String, Float, Bool, Unit, List, Function, Error, Opaque(kind), RecordTag) performs no property reads/calls and adds no effects.
 - **Structural ops**: The only structural reads/calls are:
   - `@field? : Unknown -> Option Unknown` (pure; effect depends on provenance)
-  - `at : Float -> (List a | Tuple {..} | Unknown) -> Option a` (pure on native lists/tuples; effect depends on provenance when input is `Unknown`)
+  - `at : Float -> (List a | Unknown) -> Option a` (pure on native lists; effect depends on provenance when input is `Unknown`)
   - `call_ffi : Unknown -> List Unknown -> Unknown !ffi` (always crosses FFI)
 - **!ffi is non-erasable at use sites**: `!ffi` is required when an operation crosses a foreign boundary (e.g., `call_ffi` or adapters). Using `@field?` or `at` on native/Unknown-without-FFI values remains pure. Effects propagate transitively.
 - **No implicit coercion**: Unknown never unifies with concrete types or containers. Only decoders construct typed values.

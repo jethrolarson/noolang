@@ -442,30 +442,19 @@ export class Evaluator {
 			})
 		);
 
-		// Generic index accessor for lists and tuples
+		// Index accessor for lists only
 		this.environment.set(
 			'at',
-			createNativeFunction('at', (index: Value) => (container: Value) => {
+			createNativeFunction('at', (index: Value) => (list: Value) => {
 				if (!isNumber(index)) {
 					throw new Error('at: index must be a number');
 				}
+				if (!isList(list)) {
+					throw new Error('at: container must be a list');
+				}
 				const idx = index.value;
-				if (idx < 0) return createConstructor('None', []);
-
-				if (isList(container)) {
-					return idx < container.values.length
-						? createConstructor('Some', [container.values[idx]])
-						: createConstructor('None', []);
-				}
-				if (isTuple(container)) {
-					return idx < container.values.length
-						? createConstructor('Some', [container.values[idx]])
-						: createConstructor('None', []);
-				}
-				if (isUnit(container)) {
-					return createConstructor('None', []);
-				}
-				throw new Error('at: container must be a list or tuple');
+				if (idx < 0 || idx >= list.values.length) return createConstructor('None', []);
+				return createConstructor('Some', [list.values[idx]]);
 			})
 		);
 

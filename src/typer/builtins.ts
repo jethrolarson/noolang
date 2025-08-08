@@ -305,15 +305,14 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a'],
 	});
 
-	// Generic index accessor: Float -> container -> Option a
-	// NOTE: Precise typing for tuples is not yet expressible; runtime handles both lists and tuples.
-	newEnv.set('at', {
-		type: functionType(
-			[floatType(), typeVariable('container')],
-			optionType(typeVariable('a'))
-		),
-		quantifiedVars: ['a', 'container'],
-	});
+	  // Index accessor for lists only: Float -> List a -> Option a
+  newEnv.set('at', {
+    type: functionType(
+      [floatType(), listTypeWithElement(typeVariable('a'))],
+      optionType(typeVariable('a'))
+    ),
+    quantifiedVars: ['a'],
+  });
 
 	// Math utilities (pure)
 	newEnv.set('abs', {
