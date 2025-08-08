@@ -262,6 +262,14 @@ test('Lexer - Accessors - should handle @ followed by non-identifier', () => {
 	]);
 });
 
+test('Lexer - Accessors - should tokenize optional accessor', () => {
+	const tokens = getTokenValues('@field?');
+	expect(tokens).toEqual([
+		{ type: 'ACCESSOR', value: 'field?' },
+		{ type: 'EOF', value: '' },
+	]);
+});
+
 test('Lexer - Comments - should skip single-line comments', () => {
 	const codeWithComments = `
 		# this is a comment

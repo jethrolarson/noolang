@@ -1909,17 +1909,23 @@ export class Evaluator {
 
 	private evaluateAccessor(expr: AccessorExpression): Value {
 		// Return a function that takes a record and returns the field value
-		return createNativeFunction(`@${expr.field}`, (record: Value): Value => {
+		return createNativeFunction(`@${expr.field}${expr.optional ? '?' : ''}`, (record: Value): Value => {
 			if (isRecord(record)) {
 				const field = expr.field;
 				const fieldWithAt = `@${field}`;
 
 				// Try field with @ prefix first (new format), then without (legacy format)
 				if (fieldWithAt in record.fields) {
-					return record.fields[fieldWithAt];
+					const val = record.fields[fieldWithAt];
+					return expr.optional ? createConstructor('Some', [val]) : val;
 				} else if (field in record.fields) {
-					return record.fields[field];
+					const val = record.fields[field];
+					return expr.optional ? createConstructor('Some', [val]) : val;
 				}
+			}
+			if (expr.optional) {
+				// None constructor when not found
+				return createConstructor('None', []);
 			}
 			throw new Error(`Field '${expr.field}' not found in record`);
 		});
@@ -2090,7 +2096,7 @@ export class Evaluator {
 					)
 					.join(', ')} }`;
 			case 'accessor':
-				return `@${expr.field}`;
+				return `@${expr.field}${expr.optional ? '?' : ''}`;
 			case 'where':
 				return `${this.expressionToString(expr.main)} where (${expr.definitions
 					.map(d => this.expressionToString(d))

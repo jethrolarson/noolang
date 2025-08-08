@@ -1240,22 +1240,30 @@ export const typeAccessor = (
 ): TypeResult => {
 	// Check cache first
 	const fieldName = expr.field;
-	const cachedType = state.accessorCache.get(fieldName);
+	const cacheKey = expr.optional ? `${fieldName}?` : fieldName;
+	const cachedType = state.accessorCache.get(cacheKey);
 	if (cachedType) {
 		return createPureTypeResult(cachedType, state);
 	}
 
 	// Accessors return functions that take any record with the required field and return the field type
 	// @bar should have type {bar: a, ...} -> a (allows extra fields)
+	// @bar? should have type {bar: a, ...} -> Option a
 	// Use a fresh type variable for the field type
 	const [fieldType, nextState] = freshTypeVariable(state);
 	// Create a simple type variable for the record (no constraints on the variable itself)
 	const [recordVar, finalState] = freshTypeVariable(nextState);
+
+	// If optional, wrap return type in Option
+	const returnType = expr.optional
+		? variantType('Option', [fieldType])
+		: fieldType;
+
 	// Create a function type with constraints attached to both places
-	const funcType = functionType([recordVar], fieldType);
+	const funcType = functionType([recordVar], returnType);
 	// Add the constraint to both the parameter type variable (for validation)
 	// and the function type (for display)
-	if (recordVar.kind === 'variable') {
+	if (!expr.optional && recordVar.kind === 'variable') {
 		// For validation: add to the type variable itself
 		recordVar.constraints = [
 			hasStructureConstraint(recordVar.name, {
@@ -1271,10 +1279,10 @@ export const typeAccessor = (
 		];
 	}
 
-	// Cache the result for future use
+	// Cache the result for future use (keyed by optional flag)
 	const resultState = {
 		...finalState,
-		accessorCache: new Map(finalState.accessorCache).set(fieldName, funcType),
+		accessorCache: new Map(finalState.accessorCache).set(cacheKey, funcType),
 	};
 
 	return createPureTypeResult(funcType, resultState);

@@ -199,6 +199,17 @@ test('Parser - should parse accessor', () => {
 	expect(accessor.field).toBe('name');
 });
 
+test('Parser - should parse optional accessor', () => {
+	const lexer = new Lexer('@name?');
+	const tokens = lexer.tokenize();
+	const program = parse(tokens);
+	expect(program.statements.length).toBe(1);
+	const accessor = program.statements[0];
+	assertAccessorExpression(accessor);
+	expect(accessor.field).toBe('name');
+	expect(accessor.optional).toBe(true);
+});
+
 test('Parser - should parse function with unit parameter', () => {
 	const lexer = new Lexer('fn {} => 42');
 	const tokens = lexer.tokenize();

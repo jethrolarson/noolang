@@ -2,6 +2,7 @@ import {
 	runCode,
 	assertNumberValue,
 	assertConstructorValue,
+	assertStringValue,
 } from '../../../test/utils';
 import { describe, test, expect } from 'bun:test';
 import { createNumber } from '../evaluator';
@@ -625,5 +626,36 @@ describe('Evaluator', () => {
         f 10
       `);
 		expect(result.finalValue).toBe(11);
+	});
+
+	test('should evaluate optional accessor on present field returns Some', () => {
+		const result = runCode(
+			'user = { @name "Alice" }; get = @name?; get user'
+		);
+		assertConstructorValue(result.evalResult.finalResult);
+		expect(result.evalResult.finalResult.name).toBe('Some');
+		const arg0 = result.evalResult.finalResult.args[0];
+		assertStringValue(arg0);
+		expect(arg0.value).toBe('Alice');
+		// And final type should be Option String
+		expect(result.finalType.includes('Option')).toBe(true);
+	});
+
+	test('should evaluate optional accessor on missing field returns None', () => {
+		const result = runCode(
+			'user = { @name "Alice" }; get = @age?; get user'
+		);
+		expect(result.evalResult.finalResult).toEqual({ tag: 'constructor', name: 'None', args: [] });
+		expect(result.finalType.includes('Option')).toBe(true);
+	});
+
+	test('non-optional accessor on missing field should throw', () => {
+		let threw = false;
+		try {
+			runCode('user = { @name "Alice" }; get = @age; get user');
+		} catch (_e) {
+			threw = true;
+		}
+		expect(threw).toBe(true);
 	});
 });

@@ -650,7 +650,8 @@ const parseAccessor = C.map(
 	C.accessor(),
 	(token): AccessorExpression => ({
 		kind: 'accessor',
-		field: token.value,
+		field: token.value.endsWith('?') ? token.value.slice(0, -1) : token.value,
+		optional: token.value.endsWith('?'),
 		location: token.location,
 	})
 );
@@ -658,7 +659,7 @@ const parseAccessor = C.map(
 // --- Record Parsing ---
 const parseRecordFieldName = C.map(
 	C.accessor(),
-	token => token.value // Just get the field name without @
+	token => token.value.endsWith('?') ? token.value.slice(0, -1) : token.value // Just get the field name without @ and without optional marker
 );
 
 // Parse an expression that stops at @ (accessor tokens) or semicolon
