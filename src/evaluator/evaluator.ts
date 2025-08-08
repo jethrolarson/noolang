@@ -442,6 +442,33 @@ export class Evaluator {
 			})
 		);
 
+		// Generic index accessor for lists and tuples
+		this.environment.set(
+			'at',
+			createNativeFunction('at', (index: Value) => (container: Value) => {
+				if (!isNumber(index)) {
+					throw new Error('at: index must be a number');
+				}
+				const idx = index.value;
+				if (idx < 0) return createConstructor('None', []);
+
+				if (isList(container)) {
+					return idx < container.values.length
+						? createConstructor('Some', [container.values[idx]])
+						: createConstructor('None', []);
+				}
+				if (isTuple(container)) {
+					return idx < container.values.length
+						? createConstructor('Some', [container.values[idx]])
+						: createConstructor('None', []);
+				}
+				if (isUnit(container)) {
+					return createConstructor('None', []);
+				}
+				throw new Error('at: container must be a list or tuple');
+			})
+		);
+
 		// List operations
 		this.environment.set(
 			'tail',
