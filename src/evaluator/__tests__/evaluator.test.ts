@@ -2,6 +2,7 @@ import {
 	runCode,
 	assertNumberValue,
 	assertConstructorValue,
+	assertStringValue,
 } from '../../../test/utils';
 import { describe, test, expect } from 'bun:test';
 import { createNumber } from '../evaluator';
@@ -634,7 +635,7 @@ describe('Evaluator', () => {
 		assertConstructorValue(result.evalResult.finalResult);
 		expect(result.evalResult.finalResult.name).toBe('Some');
 		const arg0 = result.evalResult.finalResult.args[0];
-		expect(arg0.tag).toBe('string');
+		assertStringValue(arg0);
 		expect(arg0.value).toBe('Alice');
 		// And final type should be Option String
 		expect(result.finalType.includes('Option')).toBe(true);
