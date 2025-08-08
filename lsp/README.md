@@ -6,21 +6,16 @@ This directory contains the complete Language Server Protocol implementation for
 
 ```
 lsp/
-├── src/                          # Rust LSP server source code
-│   ├── main.rs                   # LSP server entry point
-│   ├── server.rs                 # Main LSP server implementation
-│   └── parser.rs                 # TypeScript CLI bridge and parsing
-├── extension/                    # VSCode extension
-│   ├── src/                      # Extension TypeScript source
+├── extension/                    # VSCode extension (client + TS LSP server)
+│   ├── src/                      # Extension client TypeScript source
+│   ├── server/                   # TypeScript LSP server source
+│   │   └── src/server.ts         # LSP server implementation
 │   ├── package.json              # Extension manifest and dependencies
-│   └── out/                      # Compiled extension (after npm run compile)
-├── target/                       # Rust build artifacts
-│   └── release/noolang-lsp       # LSP server binary (after cargo build --release)
+│   └── out/                      # Compiled extension and server
 ├── syntaxes/                     # Syntax highlighting definitions
 ├── test-*.noo                    # Test Noolang files for LSP testing
 ├── *.sh                          # Testing and demonstration scripts
 ├── *.md                          # Documentation files
-├── Cargo.toml                    # Rust project configuration
 ├── .vscodeignore                 # VSCode extension packaging exclusions
 ├── language-configuration.json   # Language configuration for VSCode
 ├── install-extension.sh          # Extension installation script

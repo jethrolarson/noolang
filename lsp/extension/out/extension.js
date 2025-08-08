@@ -1,7 +1,30 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deactivate = exports.activate = void 0;
-const path = require("path");
+const path = __importStar(require("path"));
 const vscode_1 = require("vscode");
 const node_1 = require("vscode-languageclient/node");
 let client;
@@ -9,32 +32,33 @@ function activate(context) {
     console.log('🎯 Noolang LSP Extension ACTIVATED!');
     // Get the LSP server path from configuration
     const config = vscode_1.workspace.getConfiguration('noolang');
-    const serverPath = config.get('languageServerPath', './target/release/noolang-lsp');
     const enableLSP = config.get('enableLanguageServer', true);
     if (!enableLSP) {
         console.log('❌ Noolang LSP is disabled');
         return;
     }
     console.log('✅ Noolang LSP is enabled');
-    // The server is implemented in Rust
-    // Use absolute path to workspace for the LSP binary
     const workspaceFolder = vscode_1.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const serverModule = workspaceFolder
-        ? path.join(workspaceFolder, serverPath)
-        : context.asAbsolutePath(serverPath);
+    // Compiled TS server entry inside the extension
+    const serverJs = context.asAbsolutePath(path.join('out', 'server', 'server.js'));
     // Debug logging
     console.log('LSP Debug Info:');
     console.log('  Workspace folder:', workspaceFolder);
-    console.log('  Server path config:', serverPath);
-    console.log('  Final server module path:', serverModule);
-    console.log('  File exists:', require('fs').existsSync(serverModule));
+    console.log('  Server JS path:', serverJs);
+    console.log('  Server JS exists:', require('fs').existsSync(serverJs));
+    const env = {
+        ...process.env,
+        NOOLANG_WORKSPACE: workspaceFolder ?? '',
+        NOOLANG_CLI_PATH: workspaceFolder ? path.join(workspaceFolder, 'dist', 'cli.js') : '',
+    };
     // The debug options for the server
-    const debugOptions = { cwd: context.asAbsolutePath('.') };
-    // Server options for binary command
+    const debugOptions = { cwd: context.asAbsolutePath('.'), env };
+    // Server options for node script
     const serverOptions = {
-        run: { command: serverModule, transport: node_1.TransportKind.stdio },
+        run: { command: 'node', args: [serverJs], transport: node_1.TransportKind.stdio, options: { env } },
         debug: {
-            command: serverModule,
+            command: 'node',
+            args: ['--inspect=6009', serverJs],
             transport: node_1.TransportKind.stdio,
             options: debugOptions,
         },

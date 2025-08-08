@@ -1,3 +1,8 @@
+# Note
+# The LSP server is now implemented in TypeScript under `lsp/extension/server`.
+# Any references to Rust (tower-lsp/cargo) in this document are legacy.
+# Use: cd lsp/extension && npm install && npm run compile
+
 # Noolang LSP Implementation Status
 
 ## ✅ Completed Features

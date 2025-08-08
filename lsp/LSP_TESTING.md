@@ -1,3 +1,11 @@
+# Note
+# The Rust LSP has been replaced by a TypeScript LSP server embedded in the VS Code extension.
+# The cargo-based instructions below are legacy. Use these instead:
+#
+# Build and test the TS LSP server:
+#   cd lsp/extension && npm install && npm run compile
+# Open the workspace in VS Code and a .noo file to activate the server.
+
 # Testing Noolang LSP in VSCode
 
 This guide explains how to test the Language Server Protocol (LSP) implementation for Noolang in VSCode.
@@ -201,6 +209,6 @@ export RUST_LOG=debug
 ## Resources
 
 - [LSP Specification](https://microsoft.github.io/language-server-protocol/)
-- [tower-lsp Documentation](https://docs.rs/tower-lsp/)
+- [vscode-languageserver (Node) Documentation](https://www.npmjs.com/package/vscode-languageserver)
 - [VSCode Extension API](https://code.visualstudio.com/api)
-- [Rust LSP Examples](https://github.com/rust-analyzer/rust-analyzer)
+- [TypeScript LSP Examples](https://code.visualstudio.com/api/language-extensions/language-server-extension-guide)

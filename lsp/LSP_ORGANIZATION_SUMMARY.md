@@ -1,3 +1,8 @@
+# Update
+# The LSP server is now TypeScript (Node) within `lsp/extension/server`.
+# Rust `Cargo.toml` and binaries are legacy and no longer used by the extension.
+# Build via: cd lsp/extension && npm install && npm run compile
+
 # LSP Organization Summary
 
 ## 📁 Files Moved to `lsp/` Directory
