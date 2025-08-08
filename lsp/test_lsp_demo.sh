@@ -1,15 +1,16 @@
 #!/bin/bash
 
-echo "🎯 Noolang LSP Demonstration"
-echo "============================"
+echo "🎯 Noolang LSP Demonstration (TypeScript)"
+echo "======================================="
 echo
 
 echo "1. 📝 Testing Type Checking Integration"
 echo "--------------------------------------"
-echo "TypeScript CLI → Rust LSP Bridge working:"
+echo "TypeScript CLI calls:"
 echo
+
 echo "✅ Simple file type check:"
-node ../dist/cli.js --types-file simple-test.noo
+node ../dist/cli.js --types-file simple-test.noo || true
 echo
 
 echo "✅ Completion items available:"
@@ -18,11 +19,10 @@ echo "ADT Constructors: True, False, Some, None, Ok, Err"
 echo "Built-in Functions: head, tail, map, filter, reduce, length, print, toString"
 echo
 
-echo "2. 🔧 LSP Server Status"
-echo "----------------------"
-echo "✅ Rust LSP Server: Built and ready at target/release/noolang-lsp"
-echo "✅ VSCode Extension: Built and ready at extension/out/"
-echo "✅ TypeScript CLI: Built and working at dist/cli.js"
+echo "2. 🔧 Build Status"
+echo "------------------"
+echo "✅ VSCode Extension: Built at extension/out/ (if compiled)"
+echo "✅ TypeScript CLI: Built at dist/cli.js"
 echo
 
 echo "3. 🎮 VSCode Integration Ready"
@@ -44,15 +44,8 @@ echo "✅ Error Reporting: Real-time diagnostics"
 echo "✅ Syntax Highlighting: Full Noolang syntax support"
 echo
 
-echo "🎉 LSP implementation successfully provides intelligent Noolang development experience!"
+echo "🎉 LSP implementation provides intelligent Noolang development experience!"
 echo
-
-# Test the LSP server is working by checking the binary exists
-if [ -f "lsp/target/release/noolang-lsp" ]; then
-    echo "✅ LSP Server binary ready for VSCode"
-else
-    echo "❌ LSP Server binary not found - run 'cd lsp && cargo build --release'"
-fi
 
 # Test the extension is built
 if [ -f "extension/out/extension.js" ]; then

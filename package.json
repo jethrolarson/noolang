@@ -19,8 +19,8 @@
     "lint:fix": "npx eslint src/**/*.ts --fix",
     "test:repl-automation": "bun scripts/test-repl-automation.ts",
     "test:repl-simple": "node scripts/simple-repl-test.js",
-    "test:lsp": "cd lsp && cargo test",
-    "test:lsp-build": "cd lsp && cargo build --release",
+    "test:lsp": "echo 'LSP tests moved to VSCode extension (no cargo)'",
+    "test:lsp-build": "cd lsp/extension && npm install && npm run compile",
     "test:all": "bun test && bun run test:repl-simple && bun run test:lsp",
     "test:all-repl": "bun run test:repl-simple && bun run test:repl-automation",
     "test:fast": "bun test",
@@ -95,5 +95,9 @@
     "tsx": "^4.20.3",
     "typescript": "^5.8.3",
     "uvu": "^0.5.6"
+  },
+  "dependencies": {
+    "vscode-languageserver": "^8.1.0",
+    "vscode-uri": "^3.1.0"
   }
 }

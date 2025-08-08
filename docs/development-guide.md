@@ -440,11 +440,11 @@ time bun start --types-file examples/complex_types.noo
 The VS Code integration is work-in-progress:
 
 ```bash
-# Build the language server
-bun run test:lsp-build
+# Build the language server (TypeScript)
+cd lsp/extension && npm install && npm run compile
 
-# Test the language server
-bun run test:lsp
+# Use VS Code to test the language server
+# Open the workspace in VS Code and open any .noo file
 ```
 
 ### Benchmarking and Performance

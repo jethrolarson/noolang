@@ -1,13 +1,5 @@
 #!/bin/bash
+set -e
 
-# Build the LSP
-cargo build
-
-# Test initialization
-echo "Testing LSP initialization..."
-echo 'Content-Length: 116
-
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":123,"rootUri":"file:///tmp","capabilities":{}}}' | cargo run
-
-echo ""
-echo "LSP test completed!" 
+echo "[DEPRECATED] E2E script for Rust LSP is obsolete."
+echo "Build TS LSP server: cd lsp/extension && npm install && npm run compile" 
