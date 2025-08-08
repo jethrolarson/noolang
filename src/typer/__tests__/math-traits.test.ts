@@ -60,8 +60,7 @@ test('Unified Math Trait System (Float-only) - Numeric Trait (supports Float for
 	expect(result.type).toEqual(floatType());
 });
 
-// TODO this should type error as there are no implementations of the trait for string
-test.skip('Unified Math Trait System (Float-only) - Numeric Trait (supports Float for -, *, /) - should prohibit using wrong operators', () => {
+test('Unified Math Trait System (Float-only) - Numeric Trait (supports Float for -, *, /) - should prohibit using wrong operators', () => {
 	expect(() => parseAndType('"hello" - "world"')).toThrow();
 	expect(() => parseAndType('"hello" * "world"')).toThrow();
 });
@@ -112,9 +111,7 @@ test('Unified Math Trait System (Float-only) - Type Safety - should accept all F
 	expect(result.type).toEqual(floatType());
 });
 
-test('Unified Math Trait System (Float-only) - Type Safety - should allow string numeric operations through type-checking', () => {
-    // These operations pass type-checking but fail at runtime
-    // This is the current behavior of the constraint system
+test('Unified Math Trait System (Float-only) - Type Safety - should reject string numeric operations at type-check time', () => {
     const operations = [
         '"hello" - "world"',
         '"hello" * "world"',
@@ -124,7 +121,7 @@ test('Unified Math Trait System (Float-only) - Type Safety - should allow string
     operations.forEach(code => {
         const tokens = new Lexer(code).tokenize();
         const program = parse(tokens);
-        expect(() => typeAndDecorate(program)).not.toThrow();
+        expect(() => typeAndDecorate(program)).toThrow();
     });
 });
 

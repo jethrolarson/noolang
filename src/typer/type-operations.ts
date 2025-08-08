@@ -354,6 +354,7 @@ export const createTypeState = (): TypeState => ({
 	adtRegistry: new Map(),
 	accessorCache: new Map(),
 	traitRegistry: createTraitRegistry(), // NEW: Simple trait system
+	protectedTypeNames: new Set(),
 });
 
 // Clean substitutions from type state while preserving environment and other state
@@ -363,3 +364,13 @@ export const cleanSubstitutions = (state: TypeState): TypeState => ({
 	substitution: new Map(), // Clear substitutions but keep environment
 	constraints: [], // Clear constraints as well
 });
+
+// Centralized reserved type names (cannot be shadowed by user-defined types or variants)
+export const RESERVED_TYPE_NAMES: ReadonlySet<string> = new Set([
+  'Float',
+  'String',
+  'Unit',
+  'List',
+]);
+
+export const isReservedTypeName = (name: string): boolean => RESERVED_TYPE_NAMES.has(name);

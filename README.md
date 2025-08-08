@@ -9,7 +9,7 @@ An functional, expression-based, LLM-friendly programming language designed for 
 - **Effect system** - explicit effect tracking in types
 - **Where expressions** - local definitions within expressions
 - **Pipeline operators** (`|>`, `<|`, `|`, `|?`, `$`) for composition
-- **Variants** - algebraic data types with pattern matching
+- **Variants** - algebraic data types with pattern matching (type shadowing is disallowed)
 - **User-defined types** - records, tuples, and union types
 - **Records & tuples** - structured data with type safety
 - **Destructuring patterns** - ergonomic data extraction and import spreading

@@ -85,7 +85,11 @@ The FFI system revealed a dependency chain that requires foundational features:
     ➡ []     : unknown
   ```
 - The way we're doing testing using assertions is really hard for me to understand. We should switch to declarative form like expect(type).toEqual(expect.objectContaining(foo))
-- Shadowing built in types should be prohibited 
+- ✅ Shadowing built in types prohibited (generalized to all type names)
   ```
-  type List a = Cons a (List a) | Nil;
+  # Errors now:
+  variant List a = Cons a (List a) | Nil;   # Shadowing built in type List
+  variant Option a = Some a | None;         # Type shadowing is not allowed: Option
+  type User = {@name String};
+  type User = {@name String, @age Float};   # Type already defined: User
   ```

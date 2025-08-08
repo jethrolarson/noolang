@@ -65,6 +65,9 @@ import {
 import { unify } from './unify';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
+import { tryResolveConstraints, extractFunctionConstraints } from './constraint-resolution';
+import { isReservedTypeName } from './type-operations';
+import { freeTypeVars } from './type-operations';
 
 import {
 	type TypeState,
@@ -1050,6 +1053,39 @@ export const typeBinary = (
 		}
 	);
 
+	// After unification, enforce operator trait constraints strictly (e.g., Numeric for -, *, /)
+	const substitutedOperatorType = substitute(operatorType, currentState.substitution);
+	  if (substitutedOperatorType.kind === 'function') {
+    const { functionConstraints } = extractFunctionConstraints(substitutedOperatorType);
+    if (functionConstraints && functionConstraints.length > 0) {
+      const substitutedArgTypes = [leftResult.type, rightResult.type].map(t =>
+        substitute(t, currentState.substitution)
+      );
+      const constraintResult = tryResolveConstraints(
+        resultType,
+        functionConstraints,
+        substitutedArgTypes,
+        currentState
+      );
+      if (!constraintResult) {
+        // If both operand types are fully concrete (no type variables), then fail hard
+        const hasVars = substitutedArgTypes.some(t => freeTypeVars(t).size > 0);
+        if (!hasVars) {
+          throw new Error(
+            `No implementation found for operator ${expr.operator} with operand types ${typeToString(
+              substitutedArgTypes[0],
+              currentState.substitution
+            )} and ${typeToString(substitutedArgTypes[1], currentState.substitution)}`
+          );
+        }
+        // Otherwise allow constraints to persist for later resolution (polymorphic context)
+      } else {
+        // Update state with any substitutions from constraint resolution
+        currentState = constraintResult.updatedState;
+      }
+    }
+  }
+
 	// Apply substitution to get final result type
 	const substitutedResultType = substitute(
 		resultType,
@@ -1069,6 +1105,32 @@ export const typeUserDefinedType = (
 	state: TypeState
 ): TypeResult => {
 	const { name, typeParams, definition } = expr;
+
+	// Disallow shadowing reserved built-in types
+	if (isReservedTypeName(name)) {
+		throw new Error(`Shadowing built in type ${name}`);
+	}
+
+	// If stdlib and builtins are loaded (protected set is non-empty), enforce global no-shadowing
+	const strictShadowing = state.protectedTypeNames && state.protectedTypeNames.size > 0;
+	if (strictShadowing) {
+		if (state.protectedTypeNames.has(name)) {
+			throw new Error(`Type shadowing is not allowed: ${name}`);
+		}
+		for (const existingName of state.environment.keys()) {
+			if (
+				existingName === name &&
+				existingName[0] === existingName[0].toUpperCase()
+			) {
+				throw new Error(`Type shadowing is not allowed: ${name}`);
+			}
+		}
+	}
+
+	// If a type with the same name is already in the environment, error (duplicate definition)
+	if (state.environment.has(name)) {
+		throw new Error(`Type already defined: ${name}`);
+	}
 
 	// Create stable type variables for the user-defined type's parameters
 	const typeVarMap = new Map<string, Type>();
@@ -1116,8 +1178,13 @@ export const typeUserDefinedType = (
 	});
 	
 	const newState = { ...state, environment: envWithType };
-	
-	return createPureTypeResult(unitType(), newState);
+
+	// Add this user-defined type name to protected set to prevent shadowing later
+	const updatedProtected = new Set(newState.protectedTypeNames);
+	updatedProtected.add(name);
+	const finalState = { ...newState, protectedTypeNames: updatedProtected };
+ 
+	return createPureTypeResult(unitType(), finalState);
 };
 
 // Type inference for mutable definitions

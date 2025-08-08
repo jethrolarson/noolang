@@ -19,7 +19,7 @@ import {
 } from './types';
 import { substitute } from './substitute';
 import { unify } from './unify';
-import { freshTypeVariable } from './type-operations';
+import { freshTypeVariable, isReservedTypeName } from './type-operations';
 import { typeExpression } from './expression-dispatcher';
 import { isTypeKind, typeToString } from './helpers';
 
@@ -29,6 +29,34 @@ export const typeTypeDefinition = (
 	state: TypeState
 ): TypeResult => {
 	const { name, typeParams, constructors } = expr;
+
+	// Disallow shadowing built-in types and stdlib ADTs
+	if (isReservedTypeName(name)) {
+		throw new Error(`Shadowing built in type ${name}`);
+	}
+
+	// If stdlib and builtins are loaded (protected set is non-empty), enforce global no-shadowing
+	const strictShadowing = state.protectedTypeNames && state.protectedTypeNames.size > 0;
+	if (strictShadowing) {
+		// Disallow shadowing any existing type/constructor in current session
+		if (state.protectedTypeNames.has(name)) {
+			throw new Error(`Type shadowing is not allowed: ${name}`);
+		}
+		// Also prevent shadowing of any currently-bound uppercase identifier in environment (constructors/types)
+		for (const existingName of state.environment.keys()) {
+			if (
+				existingName === name &&
+				existingName[0] === existingName[0].toUpperCase()
+			) {
+				throw new Error(`Type shadowing is not allowed: ${name}`);
+			}
+		}
+	}
+
+	// If ADT already exists in registry, always error (duplicate definition)
+	if (state.adtRegistry.has(name)) {
+		throw new Error(`Type already defined: ${name}`);
+	}
 
 	// Create stable type variables for the ADT's type parameters
 	const typeVarMap = new Map<string, Type>();
@@ -92,6 +120,11 @@ export const typeTypeDefinition = (
 	});
 
 	currentState = { ...currentState, adtRegistry: finalRegistry };
+
+	// Add this ADT name to protected type names to prevent shadowing later
+	const updatedProtected = new Set(currentState.protectedTypeNames);
+	updatedProtected.add(name);
+	currentState = { ...currentState, protectedTypeNames: updatedProtected };
 
 	// Type definitions have unit type
 	return createPureTypeResult(unitType(), currentState);
