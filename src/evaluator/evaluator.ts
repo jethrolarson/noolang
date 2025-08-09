@@ -86,6 +86,24 @@ import { formatValue } from '../format';
 import { Lexer } from '../lexer/lexer';
 import { parse } from '../parser/parser';
 
+// Optional evaluation profiler
+const EVAL_PROFILING = process.env.NOO_PROFILE_EVAL === '1';
+const evalProfile: Record<string, { count: number; ns: bigint }> = {};
+const profNow = () => (typeof process !== 'undefined' && process.hrtime ? process.hrtime.bigint() : BigInt(0));
+const profStart = (label: string) => (EVAL_PROFILING ? { label, t: profNow() } : null);
+const profEnd = (h: { label: string; t: bigint } | null) => {
+	if (!EVAL_PROFILING || !h) return;
+	const dt = profNow() - h.t;
+	const stat = (evalProfile[h.label] = evalProfile[h.label] || { count: 0, ns: BigInt(0) });
+	stat.count += 1;
+	stat.ns += dt;
+};
+const profInc = (label: string) => {
+	if (!EVAL_PROFILING) return;
+	const stat = (evalProfile[label] = evalProfile[label] || { count: 0, ns: BigInt(0) });
+	stat.count += 1;
+};
+
 export type ExecutionStep = {
 	expression: string;
 	result: Value;
@@ -111,9 +129,13 @@ const flattenStatements = (expr: Expression): Expression[] => {
 
 // Helper function to apply any kind of function (regular, native, or trait functions)
 function applyValueFunction(func: Value, arg: Value): Value {
+	const h = profStart('apply');
 	if (isFunction(func) || isNativeFunction(func)) {
-		return func.fn(arg);
+		const res = func.fn(arg);
+		profEnd(h);
+		return res;
 	}
+	profEnd(h);
 	throw new Error(
 		`Cannot apply argument to non-function: ${func?.tag || 'unknown'}`
 	);
@@ -484,25 +506,29 @@ export class Evaluator {
 			'list_map',
 			createNativeFunction('list_map', (func: Value) => (list: Value) => {
 				if (isList(list)) {
+					const h = profStart('list_map');
 					if (isFunction(func) || isNativeFunction(func)) {
-						return createList(
+						const mapped = createList(
 							list.values.map((item: Value) => applyValueFunction(func, item))
 						);
+						profEnd(h);
+						return mapped;
 					} else if (isTraitFunctionValue(func)) {
-						// For trait functions, we need to resolve them for each item
-						// Use the trait registry to resolve the function for each item's type
-						return createList(
+						const result = createList(
 							list.values.map((item: Value) => {
-								// Resolve the trait function for this specific type
-								const resolved = this.resolveTraitFunctionWithArgs(
+								const inner = profStart('trait:map_item');
+								const out = this.resolveTraitFunctionWithArgs(
 									func.name,
 									[item],
 									func.traitRegistry
 								);
-
-								return resolved;
+								profEnd(inner);
+								if (out) return out;
+								throw new Error('map: failed to resolve trait function');
 							})
 						);
+						profEnd(h);
+						return result;
 					}
 				}
 				throw new Error(createHOFError('list_map', ['a function', 'a list']));
@@ -512,9 +538,12 @@ export class Evaluator {
 			'filter',
 			createNativeFunction('filter', (pred: Value) => (list: Value) => {
 				if ((isFunction(pred) || isNativeFunction(pred)) && isList(list)) {
-					return createList(
+					const h = profStart('filter');
+					const filtered = createList(
 						list.values.filter((item: Value) => {
+							const inner = profStart('filter:pred');
 							const result = applyValueFunction(pred, item);
+							profEnd(inner);
 							if (!isBool(result)) {
 								throw new Error(
 									`filter: predicate function must return a boolean, got ${result.tag}`
@@ -523,6 +552,8 @@ export class Evaluator {
 							return boolValue(result);
 						})
 					);
+					profEnd(h);
+					return filtered;
 				}
 				throw new Error(
 					createHOFError('filter', ['a predicate function', 'a list'])
@@ -535,15 +566,23 @@ export class Evaluator {
 				'reduce',
 				(func: Value) => (initial: Value) => (list: Value) => {
 					if ((isFunction(func) || isNativeFunction(func)) && isList(list)) {
-						return list.values.reduce((acc: Value, item: Value) => {
+						const h = profStart('reduce');
+						const out = list.values.reduce((acc: Value, item: Value) => {
+							const s1 = profStart('reduce:step1');
 							const partial = applyValueFunction(func, acc);
+							profEnd(s1);
 							if (isFunction(partial) || isNativeFunction(partial)) {
-								return applyValueFunction(partial, item);
+								const s2 = profStart('reduce:step2');
+								const v = applyValueFunction(partial, item);
+								profEnd(s2);
+								return v;
 							}
 							throw new Error(
 								'reduce function must return a function after first argument'
 							);
 						}, initial);
+						profEnd(h);
+						return out;
 					}
 					throw new Error(
 						createHOFError('reduce', ['a function', 'initial value', 'a list'])
@@ -990,6 +1029,16 @@ export class Evaluator {
 			}
 
 			finalResult = result;
+		}
+
+		// Print profiling summary if enabled
+		if (EVAL_PROFILING) {
+			const entries = Object.entries(evalProfile).map(([k, v]) => ({ key: k, count: v.count, ms: Number(v.ns) / 1_000_000 }));
+			entries.sort((a, b) => b.ms - a.ms);
+			console.log('\n\x1b[36mEvaluation Profiling\x1b[0m');
+			for (const { key, count, ms } of entries) {
+				console.log(`  ${key.padEnd(30)} ${ms.toFixed(2)}ms\t(${count}x)`);
+			}
 		}
 
 		return {
@@ -1541,6 +1590,7 @@ export class Evaluator {
 			// Handle thrush operator
 			const left = this.evaluateExpression(expr.left);
 			const right = this.evaluateExpression(expr.right);
+			profInc('op:|');
 
 			if (isFunction(right)) {
 				return right.fn(left);
@@ -1589,6 +1639,7 @@ export class Evaluator {
 			// Handle dollar operator (low precedence function application)
 			const left = this.evaluateExpression(expr.left);
 			const right = this.evaluateExpression(expr.right);
+			profInc('op:$');
 
 			if (isFunction(left) || isNativeFunction(left)) {
 				return left.fn(right);
@@ -1605,6 +1656,7 @@ export class Evaluator {
 			const leftVal = isCell(left) ? left.value : left;
 			const right = this.evaluateExpression(expr.right);
 			const rightVal = isCell(right) ? right.value : right;
+			profInc('op:|>');
 
 			if (!isAnyFunction(leftVal) || !isAnyFunction(rightVal)) {
 				throw new Error(
@@ -1643,6 +1695,7 @@ export class Evaluator {
 			const leftVal = isCell(left) ? left.value : left;
 			const right = this.evaluateExpression(expr.right);
 			const rightVal = isCell(right) ? right.value : right;
+			profInc('op:<|');
 
 			if (!isAnyFunction(leftVal) || !isAnyFunction(rightVal)) {
 				throw new Error(
@@ -1684,12 +1737,18 @@ export class Evaluator {
 
 			// Special handling for arithmetic operators - use primitive operations for basic types
 			if (expr.operator === '+') {
+				const h = profStart('arith:+');
 				if (isNumber(leftVal) && isNumber(rightVal)) {
-					return createNumber(leftVal.value + rightVal.value);
+					const res = createNumber(leftVal.value + rightVal.value);
+					profEnd(h);
+					return res;
 				}
 				if (isString(leftVal) && isString(rightVal)) {
-					return createString(leftVal.value + rightVal.value);
+					const res = createString(leftVal.value + rightVal.value);
+					profEnd(h);
+					return res;
 				}
+				profEnd(h);
 				// For complex types, try trait resolution
 				if (this.isTraitFunction('add')) {
 					try {
@@ -1709,9 +1768,13 @@ export class Evaluator {
 			}
 
 			if (expr.operator === '-') {
+				const h = profStart('arith:-');
 				if (isNumber(leftVal) && isNumber(rightVal)) {
-					return createNumber(leftVal.value - rightVal.value);
+					const res = createNumber(leftVal.value - rightVal.value);
+					profEnd(h);
+					return res;
 				}
+				profEnd(h);
 				// For complex types, try trait resolution
 				if (this.isTraitFunction('subtract')) {
 					try {
@@ -1731,9 +1794,13 @@ export class Evaluator {
 			}
 
 			if (expr.operator === '*') {
+				const h = profStart('arith:*');
 				if (isNumber(leftVal) && isNumber(rightVal)) {
-					return createNumber(leftVal.value * rightVal.value);
+					const res = createNumber(leftVal.value * rightVal.value);
+					profEnd(h);
+					return res;
 				}
+				profEnd(h);
 				// For complex types, try trait resolution
 				if (this.isTraitFunction('multiply')) {
 					try {
@@ -1753,14 +1820,24 @@ export class Evaluator {
 			}
 
 			if (expr.operator === '/') {
+				const h = profStart('arith:/');
 				if (isNumber(leftVal) && isNumber(rightVal)) {
 					if (rightVal.value === 0) {
-						return createConstructor('None', []); // None for division by zero
+						profEnd(h);
+						const error = createError(
+							'RuntimeError',
+							'Division by zero',
+							undefined,
+							`${leftVal.value} / ${rightVal.value}`,
+							'Check that the divisor is not zero before dividing'
+						);
+						throw error;
 					}
-					return createConstructor('Some', [
-						createNumber(leftVal.value / rightVal.value),
-					]); // Some(result)
+					const res = createNumber(leftVal.value / rightVal.value);
+					profEnd(h);
+					return res;
 				}
+				profEnd(h);
 				// For complex types, try trait resolution
 				if (this.isTraitFunction('divide')) {
 					try {
@@ -1780,14 +1857,24 @@ export class Evaluator {
 			}
 
 			if (expr.operator === '%') {
+				const h = profStart('arith:%');
 				if (isNumber(leftVal) && isNumber(rightVal)) {
 					if (rightVal.value === 0) {
-						return createConstructor('None', []); // None for modulo by zero
+						profEnd(h);
+						const error = createError(
+							'RuntimeError',
+							'Division by zero',
+							undefined,
+							`${leftVal.value} % ${rightVal.value}`,
+							'Check that the divisor is not zero before dividing'
+						);
+						throw error;
 					}
-					return createConstructor('Some', [
-						createNumber(leftVal.value % rightVal.value),
-					]); // Some(result)
+					const res = createNumber(leftVal.value % rightVal.value);
+					profEnd(h);
+					return res;
 				}
+				profEnd(h);
 				// For complex types, try trait resolution
 				if (this.isTraitFunction('modulus')) {
 					try {

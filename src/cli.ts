@@ -9,7 +9,6 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { formatValue } from './format';
 import { colorize } from './colors';
-// Profiling helpers removed
 
 function printUsage() {
 	console.log(colorize.section('Usage: noo <file.noo>'));
