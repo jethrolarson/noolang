@@ -199,16 +199,6 @@ count                        # count: Float
 - Standard library ADTs (e.g., `Bool`, `Option`, `Result`) are considered existing type names.
 - Duplicate user-defined type names in the same program/session are errors.
 
-Error examples:
-
-```noolang
-variant List a = Cons a (List a) | Nil;   # Shadowing built in type List
-variant Option a = Some a | None;         # Type shadowing is not allowed: Option
-
-type User = {@name String};
-type User = {@name String, @age Float};   # Type already defined: User
-```
-
 ## Working with the Type System
 
 ### REPL Type Inspection
