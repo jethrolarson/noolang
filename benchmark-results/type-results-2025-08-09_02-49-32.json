@@ -1,0 +1,101 @@
+{
+  "timestamp": "2025-08-09T02:49:32.588Z",
+  "type_benchmarks": [
+    {
+      "benchmark": "simple",
+      "phase": "type",
+      "min": "68.1",
+      "max": "78.0",
+      "avg": "72.8",
+      "median": "71.9",
+      "runs": [
+        "68.1",
+        "68.7",
+        "71.9",
+        "77.2",
+        "78.0"
+      ],
+      "status": "warning"
+    },
+    {
+      "benchmark": "medium",
+      "phase": "type",
+      "min": "64.3",
+      "max": "76.0",
+      "avg": "67.7",
+      "median": "66.4",
+      "runs": [
+        "64.3",
+        "65.4",
+        "66.4",
+        "66.5",
+        "76.0"
+      ],
+      "status": "warning"
+    },
+    {
+      "benchmark": "complex",
+      "phase": "type",
+      "min": "66.3",
+      "max": "67.3",
+      "avg": "66.9",
+      "median": "67.0",
+      "runs": [
+        "66.3",
+        "66.9",
+        "67.0",
+        "67.1",
+        "67.3"
+      ],
+      "status": "warning"
+    },
+    {
+      "benchmark": "micro_records_named",
+      "phase": "type",
+      "min": "65.0",
+      "max": "65.9",
+      "avg": "65.3",
+      "median": "65.1",
+      "runs": [
+        "65.0",
+        "65.0",
+        "65.1",
+        "65.2",
+        "65.9"
+      ],
+      "status": "failed"
+    },
+    {
+      "benchmark": "micro_constraints_map",
+      "phase": "type",
+      "min": "65.5",
+      "max": "65.6",
+      "avg": "65.6",
+      "median": "65.6",
+      "runs": [
+        "65.5",
+        "65.5",
+        "65.6",
+        "65.6",
+        "65.6"
+      ],
+      "status": "warning"
+    },
+    {
+      "benchmark": "micro_variants_match",
+      "phase": "type",
+      "min": "65.6",
+      "max": "66.4",
+      "avg": "65.9",
+      "median": "65.8",
+      "runs": [
+        "65.6",
+        "65.8",
+        "65.8",
+        "65.9",
+        "66.4"
+      ],
+      "status": "failed"
+    }
+  ]
+}
