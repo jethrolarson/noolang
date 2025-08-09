@@ -35,7 +35,7 @@ result = fs | @readFileSync? |? call_ffi string ["file.txt"] : Result String Str
   - `@field? : Unknown -> Option Unknown` (pure; effect depends on provenance)
   - `at : Float -> (List a | Unknown) -> Option a` (pure on native lists; effect depends on provenance when input is `Unknown`)
   - `call_ffi : Schema res -> Unknown -> List Unknown -> Result res (EncodeError | DecodeError) !ffi`
-  - **!ffi is non-erasable at use sites**: Any function that uses `call_ffi` must declare `!ffi`. Callers inherit this requirement `!ffi` and must also declare `!ffi`.
+  - **!ffi is non-erasable at use sites**: Any function that uses `call_ffi` must declare `!ffi`. Callers inherit this requirement and must also declare `!ffi`.
 - **No implicit coercion**: Unknown never unifies with concrete types or containers. Only decoders construct typed values.
 - **Branch-local refinement**: Refinements from matches do not escape the branch; outside, the value remains Unknown (and ffi-tainted).
 
@@ -109,8 +109,7 @@ result = fs | @readFileSync? |? call_ffi string ["file.txt"] : Result String Str
   - Native record: `{ @k a, ... } -> Option a` (pure) (DONE)
   - Unknown: `Unknown -> Option Unknown !ffi` (PLANNED)
 - `at` function types:
-  - `Float -> List a -> Option a` (pure) (PLANNED)
-  - `Float -> Tuple {..} -> Option a` (pure) (PLANNED)
+  - `Float -> List a -> Option a` (pure) (DONE)
   - `Float -> Unknown -> Option Unknown !ffi` (PLANNED)
 - `call_ffi : Schema res -> Unknown -> List Unknown -> Result res (EncodeError | DecodeError) !ffi`. (PLANNED)
 
@@ -119,7 +118,7 @@ result = fs | @readFileSync? |? call_ffi string ["file.txt"] : Result String Str
 - Adapter registry and pure tag detection (no property reads/calls). (PLANNED)
 - Structural reads for `@field?` on Unknown with `!ffi`. (PLANNED)
 - `@field?` on native records returns Some/None. (DONE)
-- `at` over native and Unknown. (PLANNED)
+- `at` over native lists (DONE) and Unknown (PLANNED).
 - `call_ffi` pipeline: encode args, invoke, decode result. (PLANNED)
 
 4. Schema/decoder DSL (stdlib) (status)

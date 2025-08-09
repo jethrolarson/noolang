@@ -585,16 +585,25 @@ export const typeFunction = (
 		expr.params
 	);
 
-	// 4. Build function type based on whether body is constrained
+	// 4. Substitute parameter types with current substitutions to detect monomorphic cases
+	const substitutedParamTypes = paramTypes.map(t =>
+		substitute(t, currentState.substitution)
+	);
+
+	// 5. Build function type based on whether body is constrained, using substituted params
 	const funcType =
 		expr.body.kind === 'constrained'
 			? handleConstrainedFunctionBody(
 					expr,
-					paramTypes,
+					substitutedParamTypes,
 					bodyResult,
 					implicitConstraints
 				)
-			: buildNormalFunctionType(paramTypes, bodyResult, implicitConstraints);
+			: buildNormalFunctionType(
+					substitutedParamTypes,
+					bodyResult,
+					implicitConstraints
+				);
 
 	return createTypeResult(funcType, bodyResult.effects, currentState);
 };

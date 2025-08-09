@@ -21,6 +21,7 @@ import {
 import { substitute } from './substitute';
 import { unify } from './unify';
 import { typeExpression } from './expression-dispatcher';
+import { Expression } from '../ast';
 import { tryResolveConstraints } from './constraint-resolution';
 import { handleComposeConstraintPropagation } from './function-composition';
 
@@ -33,6 +34,12 @@ export function handleRegularFunctionApplication(
 	currentState: TypeState,
 	allEffects: Set<Effect>
 ): TypeResult {
+	// Helper: get leftmost root function variable name
+	const getRootFuncName = (e: Expression): string | null => {
+		if (e.kind === 'variable') return e.name;
+		if (e.kind === 'application') return getRootFuncName(e.func);
+		return null;
+	};
 	if (argTypes.length > actualFuncType.params.length) {
 		throwTypeError(
 			location =>
@@ -51,7 +58,23 @@ export function handleRegularFunctionApplication(
 	}
 
 	// Unify each argument with the corresponding parameter type
+	let skipOptionUnknownForAt = false;
+	const rootName = getRootFuncName(expr.func);
 	for (let i = 0; i < argTypes.length; i++) {
+		// Special-case: allow at idx Unknown -> Option Unknown by skipping unification
+		const expectedParam = substitute(
+			actualFuncType.params[i],
+			currentState.substitution
+		);
+		const actualArg = substitute(argTypes[i], currentState.substitution);
+		if (
+			rootName === 'at' &&
+			expectedParam.kind === 'list' &&
+			actualArg.kind === 'unknown'
+		) {
+			skipOptionUnknownForAt = true;
+			continue;
+		}
 		// Pass constraint context to unification if we have function constraints
 		const unificationContext = {
 			reason: 'function_application' as const,
@@ -80,15 +103,38 @@ export function handleRegularFunctionApplication(
 	}
 
 	// Apply substitution to get the return type
-	const returnType = substitute(
-		actualFuncType.return,
-		currentState.substitution
-	);
+	let returnType = substitute(actualFuncType.return, currentState.substitution);
 
 	// Add function's effects to the collected effects
 	allEffects = unionEffects(allEffects, actualFuncType.effects);
 
 	if (argTypes.length === actualFuncType.params.length) {
+		// SPECIAL CASES for Unknown support
+		// 1) Optional accessor applied to Unknown should yield Option Unknown
+		if (
+			expr.func.kind === 'accessor' &&
+			expr.func.optional === true &&
+			argTypes.length >= 1
+		) {
+			const substitutedArg = substitute(argTypes[0], currentState.substitution);
+			if (substitutedArg.kind === 'unknown') {
+				returnType = {
+					kind: 'variant',
+					name: 'Option',
+					args: [{ kind: 'unknown' }],
+				};
+			}
+		}
+
+		// 2) at index on Unknown container should yield Option Unknown
+		if (skipOptionUnknownForAt) {
+			returnType = {
+				kind: 'variant',
+				name: 'Option',
+				args: [{ kind: 'unknown' }],
+			};
+		}
+
 		// Full application - return the return type
 
 		// CONSTRAINT COLLAPSE FIX: Instead of blindly preserving constraints,
@@ -125,7 +171,7 @@ export function handleRegularFunctionApplication(
 					// For non-function types, create a constrained type to preserve the constraints
 					// This handles cases like `map f list` returning `f b given f implements Functor`
 					const constraintMap = new Map<string, Constraint[]>();
-					
+
 					// Group constraints by type variable
 					for (const constraint of functionConstraints) {
 						if (constraint.kind === 'implements') {
@@ -135,7 +181,7 @@ export function handleRegularFunctionApplication(
 							constraintMap.set(typeVar, existing);
 						}
 					}
-					
+
 					if (constraintMap.size > 0) {
 						finalReturnType = {
 							kind: 'constrained',
@@ -160,12 +206,12 @@ export function handleRegularFunctionApplication(
 	} else {
 		// Partial application - return a function with remaining parameters
 		const remainingParams = actualFuncType.params.slice(argTypes.length);
-		
+
 		// Apply substitution to remaining parameters to preserve unification results
 		const substitutedRemainingParams = remainingParams.map(param =>
 			substitute(param, currentState.substitution)
 		);
-		
+
 		const partialFunctionType = functionType(
 			substitutedRemainingParams,
 			returnType,
