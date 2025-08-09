@@ -750,11 +750,6 @@ Noolang uses commas as separators for all data structures:
 {10, 20}
 ```
 
-**Why commas?** This provides a familiar, consistent syntax across all data structures:
-- `[1, 2, 3]` = list with three elements
-- `{ @name "Alice", @age 30 }` = record with two fields
-- `{1, 2, 3}` = tuple with three elements
-
 ### Built-in Functions
 
 Noolang provides a set of built-in functions organized by category:
