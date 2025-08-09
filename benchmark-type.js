@@ -56,11 +56,10 @@ const MICRO_BENCHMARKS = [
   {
     name: 'micro_variants_match',
     code: `
-      variant Result = Ok a | Err String;
-      v = Ok 42;
+      v = Some 42;
       handle = fn r => match r with (
-        Ok x => x;
-        Err m => 0
+        Some x => x;
+        None => 0
       );
       handle v;
     `,
