@@ -1156,16 +1156,19 @@ const parseApplication: C.Parser<Expression> = tokens => {
 	const appResult = C.map(
 		C.seq(parseUnary, C.many(parseUnary)),
 		([func, args]) => {
-			let result = func;
-			for (const arg of args) {
-				result = {
+			// Fast path: no args
+			if (args.length === 0) return func;
+			// Build left-associative chain with minimal wrapping
+			let current: Expression = func;
+			for (let i = 0; i < args.length; i++) {
+				current = {
 					kind: 'application',
-					func: result,
-					args: [arg],
-					location: result.location,
+					func: current,
+					args: [args[i]],
+					location: current.location,
 				};
 			}
-			return result;
+			return current;
 		}
 	)(tokens);
 
@@ -1188,8 +1191,10 @@ const parseMultiplicative: C.Parser<Expression> = tokens => {
 			)
 		),
 		([left, rest]) => {
+			if (rest.length === 0) return left;
 			let result = left;
-			for (const [op, right] of rest) {
+			for (let i = 0; i < rest.length; i++) {
+				const [op, right] = rest[i];
 				result = {
 					kind: 'binary',
 					operator: op.value as '*' | '/' | '%',
@@ -1218,8 +1223,10 @@ const parseAdditive: C.Parser<Expression> = tokens => {
 			)
 		),
 		([left, rest]) => {
+			if (rest.length === 0) return left;
 			let result = left;
-			for (const [op, right] of rest) {
+			for (let i = 0; i < rest.length; i++) {
+				const [op, right] = rest[i];
 				result = {
 					kind: 'binary',
 					operator: op.value as '+' | '-',
