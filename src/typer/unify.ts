@@ -22,28 +22,6 @@ function isValidPrimitiveName(name: string): name is ValidPrimitiveName {
 	return VALID_PRIMITIVES.has(name as ValidPrimitiveName);
 }
 
-const typeToPattern = (t: Type): string => {
-	if (!t) return 'undefined';
-	switch (t.kind) {
-		case 'variable':
-			return `var:${t.name}`;
-		case 'primitive':
-			return `prim:${t.name}`;
-		case 'function':
-			return `fn:${t.params.length}p`;
-		case 'list':
-			return `list`;
-		case 'record':
-			return `rec:${Object.keys(t.fields).length}f`;
-		case 'tuple':
-			return `tup:${t.elements.length}e`;
-		case 'variant':
-			return `var:${t.name}:${t.args.length}a`;
-		default:
-			return t.kind;
-	}
-};
-
 export const unify = (
 	t1: Type,
 	t2: Type,
