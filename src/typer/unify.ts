@@ -739,7 +739,7 @@ function tryUnifyConstrainedVariant(
 	return null; // No constraint resolution possible
 }
 
-// PHASE 3: Constraint resolution during unification
+// Constraint resolution during unification
 function unifyConstrainedWithConcrete(
 	constrainedType: Type & { kind: 'constrained' },
 	concreteType: Type,
