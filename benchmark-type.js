@@ -5,15 +5,25 @@ const path = require('path');
 const { performance } = require('perf_hooks');
 
 // Load compiled modules for type-only measurement
-let Lexer, parse, typeAndDecorate;
+let Lexer, parse, typeAndDecorate, createTypeState, loadStdlib, initializeBuiltins;
 try {
   ({ Lexer } = require('./dist/lexer/lexer.js'));
   ({ parse } = require('./dist/parser/parser.js'));
   ({ typeAndDecorate } = require('./dist/typer/index.js'));
+  ({ createTypeState, loadStdlib } = require('./dist/typer/index.js'));
+  ({ initializeBuiltins } = require('./dist/typer/builtins.js'));
 } catch (e) {
   console.error('Type benchmark requires a build. Please run: bun run build');
   process.exit(1);
 }
+
+// Pre-initialize a baseline type state with builtins + stdlib once
+const BASELINE_STATE = (() => {
+  let s = createTypeState();
+  s = initializeBuiltins(s);
+  s = loadStdlib(s);
+  return s;
+})();
 
 const WARMUP_RUNS = 3;
 const MEASUREMENT_RUNS = 5;
@@ -73,7 +83,7 @@ function typeOnceFromString(code) {
   const tokens = lexer.tokenize();
   const program = parse(tokens);
   const start = performance.now();
-  typeAndDecorate(program);
+  typeAndDecorate(program, BASELINE_STATE);
   const end = performance.now();
   return end - start;
 }
