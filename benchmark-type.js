@@ -34,15 +34,15 @@ const MICRO_BENCHMARKS = [
   {
     name: 'micro_tuples_records',
     code: `
-      buildPair = fn x y => { @0 x, @1 y };
+      buildPair = fn x y => { x, y };
       pair = buildPair 10 20;
-      triple = { @0 1, @1 2, @2 3 };
-      pick0 = fn t => @0 t;
-      pick1 = fn t => @1 t;
-      pick2 = fn t => @2 t;
+      triple = { 1, 2, 3 };
+      pick0 = fn t => match t with ( {a, _} => a );
+      pick1 = fn t => match t with ( {_, b} => b );
+      pick2 = fn t => match t with ( {_, _, c} => c );
       pick0 triple;
     `,
-    description: 'Tuple/record construction and access typing',
+    description: 'Tuple construction and access typing (no numeric record keys)',
     thresholds: { max: 60, warning: 40 },
   },
   {
