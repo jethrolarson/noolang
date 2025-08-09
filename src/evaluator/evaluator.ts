@@ -1977,17 +1977,13 @@ export class Evaluator {
 				const h = profStart('arith:/');
 				if (isNumber(leftVal) && isNumber(rightVal)) {
 					if (rightVal.value === 0) {
+						const res = createConstructor('None', []);
 						profEnd(h);
-						const error = createError(
-							'RuntimeError',
-							'Division by zero',
-							undefined,
-							`${leftVal.value} / ${rightVal.value}`,
-							'Check that the divisor is not zero before dividing'
-						);
-						throw error;
+						return res;
 					}
-					const res = createNumber(leftVal.value / rightVal.value);
+					const res = createConstructor('Some', [
+						createNumber(leftVal.value / rightVal.value),
+					]);
 					profEnd(h);
 					return res;
 				}
@@ -2014,17 +2010,13 @@ export class Evaluator {
 				const h = profStart('arith:%');
 				if (isNumber(leftVal) && isNumber(rightVal)) {
 					if (rightVal.value === 0) {
+						const res = createConstructor('None', []);
 						profEnd(h);
-						const error = createError(
-							'RuntimeError',
-							'Division by zero',
-							undefined,
-							`${leftVal.value} % ${rightVal.value}`,
-							'Check that the divisor is not zero before dividing'
-						);
-						throw error;
+						return res;
 					}
-					const res = createNumber(leftVal.value % rightVal.value);
+					const res = createConstructor('Some', [
+						createNumber(leftVal.value % rightVal.value),
+					]);
 					profEnd(h);
 					return res;
 				}
