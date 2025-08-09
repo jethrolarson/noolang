@@ -15,6 +15,9 @@ export const substitute = (
 		throw new Error('Cannot substitute undefined type');
 	}
 	
+	// Fast path: if substitution is empty, return original type
+	if (substitution.size === 0) return type;
+	
 	let result: Type;
 	// Generate cache key - only for type variables as they're most common
 	if (type.kind === 'variable' && substitution.size < 20) {
@@ -25,14 +28,17 @@ export const substitute = (
 		if (cached) {
 			result = cached;
 		} else {
-			result = substituteWithCache(substitution, new Set())(type);
+			// Reuse a single seen set through the call chain
+			const seen = new Set<string>();
+			result = substituteWithCache(substitution, seen)(type);
 			if (substituteCache.size < 1000) {
 				// Prevent unbounded cache growth
 				substituteCache.set(cacheKey, result);
 			}
 		}
 	} else {
-		result = substituteWithCache(substitution, new Set())(type);
+		const seen = new Set<string>();
+		result = substituteWithCache(substitution, seen)(type);
 	}
 
 	return result;
@@ -56,45 +62,58 @@ const substituteWithCache =
 				}
 				return type;
 			}
-			case 'function':
-				return {
-					...type,
-					params: type.params.map(substituteWithCache(substitution, seen)),
-					return: substituteWithCache(substitution, seen)(type.return),
-					constraints: type.constraints?.map(c =>
-						substituteConstraint(c, substitution)
-					),
-				};
-			case 'list':
-				return {
-					...type,
-					element: substituteWithCache(substitution, seen)(type.element),
-				};
-			case 'tuple':
-				return {
-					...type,
-					elements: type.elements.map(substituteWithCache(substitution, seen)),
-				};
-			case 'record':
-				return {
-					...type,
-					fields: mapObject(
-						type.fields,
-						substituteWithCache(substitution, seen)
-					),
-				};
-			case 'union':
-				return {
-					...type,
-					types: type.types.map(substituteWithCache(substitution, seen)),
-				};
+			case 'function': {
+				let paramsChanged = false;
+				const newParams = type.params.map(p => {
+					const np = substituteWithCache(substitution, seen)(p);
+					if (np !== p) paramsChanged = true;
+					return np;
+				});
+				const newReturn = substituteWithCache(substitution, seen)(type.return);
+				const constraints = type.constraints?.map(c => substituteConstraint(c, substitution));
+				if (!paramsChanged && newReturn === type.return && (!constraints || constraints === type.constraints)) {
+					return type;
+				}
+				return { ...type, params: newParams, return: newReturn, constraints };
+			}
+			case 'list': {
+				const newElem = substituteWithCache(substitution, seen)(type.element);
+				return newElem === type.element ? type : { ...type, element: newElem };
+			}
+			case 'tuple': {
+				let changed = false;
+				const elems = type.elements.map(e => {
+					const ne = substituteWithCache(substitution, seen)(e);
+					if (ne !== e) changed = true;
+					return ne;
+				});
+				return changed ? { ...type, elements: elems } : type;
+			}
+			case 'record': {
+				let changed = false;
+				const newFields: { [k: string]: Type } = {};
+				for (const k in type.fields) {
+					const v = type.fields[k];
+					const nv = substituteWithCache(substitution, seen)(v);
+					newFields[k] = nv;
+					if (nv !== v) changed = true;
+				}
+				return changed ? { ...type, fields: newFields } : type;
+			}
+			case 'union': {
+				let changed = false;
+				const types = type.types.map(t => {
+					const nt = substituteWithCache(substitution, seen)(t);
+					if (nt !== t) changed = true;
+					return nt;
+				});
+				return changed ? { ...type, types } : type;
+			}
 			case 'variant': {
 				// Check if the variant name itself should be substituted
 				const substitutedName = substitution.get(type.name);
 				if (substitutedName) {
-					// The variant name is being substituted
 					if (substitutedName.kind === 'variant' && substitutedName.name === 'List') {
-						// Special case: substituting with List constructor -> create list type
 						if (type.args.length === 1) {
 							return {
 								kind: 'list',
@@ -102,28 +121,22 @@ const substituteWithCache =
 							};
 						}
 					} else if (substitutedName.kind === 'variant') {
-						// Substituting with another variant constructor
-						return {
-							...type,
-							name: substitutedName.name,
-							args: type.args.map(substituteWithCache(substitution, seen)),
-						};
+						const newArgs = type.args.map(a => substituteWithCache(substitution, seen)(a));
+						return { ...type, name: substitutedName.name, args: newArgs };
 					}
-					// For other substitution types, fall through to normal arg substitution
 				}
-				
-				// Normal case: just substitute the arguments
-				return {
-					...type,
-					args: type.args.map(substituteWithCache(substitution, seen)),
-				};
+				let changed = false;
+				const args = type.args.map(a => {
+					const na = substituteWithCache(substitution, seen)(a);
+					if (na !== a) changed = true;
+					return na;
+				});
+				return changed ? { ...type, args } : type;
 			}
-			case 'constrained':
-				return {
-					...type,
-					baseType: substituteWithCache(substitution, seen)(type.baseType),
-					// Keep constraints as-is for now - they reference type variables by name
-				};
+			case 'constrained': {
+				const base = substituteWithCache(substitution, seen)(type.baseType);
+				return base === type.baseType ? type : { ...type, baseType: base };
+			}
 			default:
 				return type;
 		}
