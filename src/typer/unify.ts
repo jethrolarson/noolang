@@ -341,6 +341,8 @@ function unifyFunction(
 	if (!isTypeKind(s1, 'function') || !isTypeKind(s2, 'function')) {
 		throw new Error('unifyFunction called with non-function types');
 	}
+	const pattern = `${s1.params.length}p_${s2.params.length}p`;
+	// functionUnifyPatterns collection removed
 
 	if (s1.params.length !== s2.params.length)
 		throw new Error(
@@ -357,40 +359,16 @@ function unifyFunction(
 
 	let currentState = state;
 
-	// First, propagate function-level constraints to the relevant type variables
-	// NOTE: Legacy constraint propagation removed - handled by new trait system
-
-	// Then unify parameters and return types
+	// Then unify parameters and return types (skip by-ref equal)
 	for (let i = 0; i < s1.params.length; i++) {
-		// Check for constraint on s1.params[i] (variable with constraint) and s2.params[i] (concrete)
 		const param1 = s1.params[i];
 		const param2 = s2.params[i];
-		// Only check for 'implements' constraints
-		if (
-			param1.kind === 'variable' &&
-			param1.constraints &&
-			param1.constraints.length > 0 &&
-			param2.kind !== 'variable'
-		) {
-			for (const constraint of param1.constraints) {
-				if (constraint.kind === 'implements') {
-					const traitRegistry = state.traitRegistry;
-					const traitImpls = traitRegistry.implementations.get(
-						constraint.interfaceName
-					);
-					const typeName = getTypeName(param2);
-					if (!traitImpls || !typeName || !traitImpls.has(typeName)) {
-						throw new Error(
-							`Type ${typeName} does not implement trait ${constraint.interfaceName} (required by type variable ${param1.name})`
-						);
-					}
-				}
-			}
-		}
-		// Now unify as usual
+		if (param1 === param2) continue;
 		currentState = unify(param1, param2, currentState, location, context);
 	}
-	currentState = unify(s1.return, s2.return, currentState, location, context);
+	if (s1.return !== s2.return) {
+		currentState = unify(s1.return, s2.return, currentState, location, context);
+	}
 
 	return currentState;
 }
@@ -404,6 +382,7 @@ function unifyList(
 	if (!isTypeKind(s1, 'list') || !isTypeKind(s2, 'list')) {
 		throw new Error('unifyList called with non-list types');
 	}
+	if (s1.element === s2.element) return state;
 	return unify(s1.element, s2.element, state, location);
 }
 
@@ -428,12 +407,10 @@ function unifyTuple(
 		);
 	let currentState = state;
 	for (let i = 0; i < s1.elements.length; i++) {
-		currentState = unify(
-			s1.elements[i],
-			s2.elements[i],
-			currentState,
-			location
-		);
+		const e1 = s1.elements[i];
+		const e2 = s2.elements[i];
+		if (e1 === e2) continue;
+		currentState = unify(e1, e2, currentState, location);
 	}
 	return currentState;
 }
@@ -474,10 +451,13 @@ function unifyVariant(
 		);
 	}
 
-	// Unify corresponding type arguments
+	// Unify corresponding type arguments (skip by-ref equal)
 	let currentState = state;
 	for (let i = 0; i < s1.args.length; i++) {
-		currentState = unify(s1.args[i], s2.args[i], currentState, location);
+		const a1 = s1.args[i];
+		const a2 = s2.args[i];
+		if (a1 === a2) continue;
+		currentState = unify(a1, a2, currentState, location);
 	}
 	return currentState;
 }
@@ -491,6 +471,7 @@ function unifyRecord(
 	if (!isTypeKind(s1, 'record') || !isTypeKind(s2, 'record')) {
 		throw new Error('unifyRecord called with non-record types');
 	}
+	if (s1.fields === (s2 as any).fields) return state;
 	const keys1 = Object.keys(s1.fields);
 	let currentState = state;
 	for (const key of keys1) {
@@ -504,12 +485,10 @@ function unifyRecord(
 					)
 				)
 			);
-		currentState = unify(
-			s1.fields[key],
-			s2.fields[key],
-			currentState,
-			location
-		);
+		const f1 = s1.fields[key];
+		const f2 = s2.fields[key];
+		if (f1 === f2) continue;
+		currentState = unify(f1, f2, currentState, location);
 	}
 	return currentState;
 }
