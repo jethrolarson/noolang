@@ -44,7 +44,7 @@ const typeToPattern = (t: Type): string => {
 	}
 };
 
-const unifyInternal = (
+export const unify = (
 	t1: Type,
 	t2: Type,
 	state: TypeState,
@@ -160,8 +160,6 @@ const unifyInternal = (
 		)
 	);
 };
-
-export const unify =  unifyInternal;
 
 function unifyUnion(
 	s1: Type,
