@@ -22,10 +22,6 @@ function isValidPrimitiveName(name: string): name is ValidPrimitiveName {
 	return VALID_PRIMITIVES.has(name as ValidPrimitiveName);
 }
 
-const ENABLE_UNIFY_PROFILING = process.env.NOO_PROFILE_UNIFY === '1';
-const unifyCallSources = ENABLE_UNIFY_PROFILING ? new Map<string, number>() : null; // Track where unify calls come from
-const unifyTypePatterns = ENABLE_UNIFY_PROFILING ? new Map<string, number>() : null; // Track what types are being unified
-
 const typeToPattern = (t: Type): string => {
 	if (!t) return 'undefined';
 	switch (t.kind) {
@@ -170,40 +166,7 @@ const unifyInternal = (
 	);
 };
 
-export const unify = (
-	t1: Type,
-	t2: Type,
-	state: TypeState,
-	location?: { line: number; column: number },
-	context?: {
-		reason?: string;
-		operation?: string;
-		hint?: string;
-		constraintContext?: Constraint[];
-	}
-): TypeState => {
-	// Track call sources using stack trace
-	const stack = new Error().stack || '';
-	const caller = stack.split('\n')[2] || 'unknown';
-	const source = caller.includes('at ')
-		? caller.split('at ')[1].split(' ')[0]
-		: 'unknown';
-	if (ENABLE_UNIFY_PROFILING && unifyCallSources && unifyTypePatterns) {
-		// Track call sources using stack trace (expensive; optional)
-		const stack = new Error().stack || '';
-		const caller = stack.split('\n')[2] || 'unknown';
-		const source = caller.includes('at ')
-			? caller.split('at ')[1].split(' ')[0]
-			: 'unknown';
-		unifyCallSources.set(source, (unifyCallSources.get(source) || 0) + 1);
-
-		// Track type patterns being unified
-		const pattern = `${typeToPattern(t1)} = ${typeToPattern(t2)}`;
-		unifyTypePatterns.set(pattern, (unifyTypePatterns.get(pattern) || 0) + 1);
-	}
-
-	return unifyInternal(t1, t2, state, location, context);
-};
+export const unify =  unifyInternal;
 
 function unifyUnion(
 	s1: Type,
@@ -387,34 +350,6 @@ function unifyVariable(
 	return newState;
 }
 
-const functionUnifyPatterns = new Map<string, number>();
-
-export function getUnifyProfiling(): {
-	callSources: Array<[string, number]>;
-	typePatterns: Array<[string, number]>;
-	functionPatterns: Array<[string, number]>;
-} {
-	return {
-		callSources: unifyCallSources
-			? Array.from(unifyCallSources.entries())
-				.sort((a, b) => b[1] - a[1])
-			: [],
-		typePatterns: unifyTypePatterns
-			? Array.from(unifyTypePatterns.entries())
-				.sort((a, b) => b[1] - a[1])
-			: [],
-		functionPatterns: Array.from(functionUnifyPatterns.entries()).sort(
-			(a, b) => b[1] - a[1]
-		),
-	};
-}
-
-export function resetUnifyProfiling(): void {
-	unifyCallSources?.clear();
-	unifyTypePatterns?.clear();
-	functionUnifyPatterns.clear();
-}
-
 function unifyFunction(
 	s1: Type,
 	s2: Type,
@@ -430,11 +365,6 @@ function unifyFunction(
 	if (!isTypeKind(s1, 'function') || !isTypeKind(s2, 'function')) {
 		throw new Error('unifyFunction called with non-function types');
 	}
-	const pattern = `${s1.params.length}p_${s2.params.length}p`;
-	functionUnifyPatterns.set(
-		pattern,
-		(functionUnifyPatterns.get(pattern) || 0) + 1
-	);
 
 	if (s1.params.length !== s2.params.length)
 		throw new Error(
