@@ -32,17 +32,15 @@ const FILE_BENCHMARKS = [
 
 const MICRO_BENCHMARKS = [
   {
-    name: 'micro_tuples_records',
+    name: 'micro_records_named',
     code: `
-      buildPair = fn x y => { x, y };
-      pair = buildPair 10 20;
-      triple = { 1, 2, 3 };
-      pick0 = fn t => match t with ( {a, _} => a );
-      pick1 = fn t => match t with ( {_, b} => b );
-      pick2 = fn t => match t with ( {_, _, c} => c );
-      pick0 triple;
+      buildPoint = fn x y => { @x x, @y y };
+      pt = buildPoint 10 20;
+      getX = fn r => match r with ( { @x a, @y _ } => a );
+      getY = fn r => match r with ( { @x _, @y b } => b );
+      { @x getX pt, @y getY pt };
     `,
-    description: 'Tuple construction and access typing (no numeric record keys)',
+    description: 'Record construction and access typing (named fields)',
     thresholds: { max: 60, warning: 40 },
   },
   {
@@ -56,15 +54,18 @@ const MICRO_BENCHMARKS = [
     thresholds: { max: 70, warning: 50 },
   },
   {
-    name: 'micro_nested_functions',
+    name: 'micro_variants_match',
     code: `
-      f = fn a b c => a + b + c;
-      g = fn x => f x 2 3;
-      h = fn y => g (y * 2);
-      h 10;
+      variant Result = Ok a | Err String;
+      v = Ok 42;
+      handle = fn r => match r with (
+        Ok x => x;
+        Err m => 0
+      );
+      handle v;
     `,
-    description: 'Nested function typing',
-    thresholds: { max: 50, warning: 35 },
+    description: 'ADT pattern matching typing',
+    thresholds: { max: 60, warning: 40 },
   },
 ];
 
