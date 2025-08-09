@@ -49,7 +49,7 @@ describe('Constraint Collapse', () => {
 	});
 
 	// Will fix with larger work on operator trait delegation
-	test.skip('operators erase constraints that are resolved', () => {
+	test('operators erase constraints that are resolved', () => {
 		const typeString = parseToString('fn x => x + 1');
 
 		expect(typeString).toBe('Float -> Float');
