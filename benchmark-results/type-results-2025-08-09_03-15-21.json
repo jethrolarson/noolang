@@ -1,0 +1,101 @@
+{
+  "timestamp": "2025-08-09T03:15:21.613Z",
+  "type_benchmarks": [
+    {
+      "benchmark": "simple",
+      "phase": "type",
+      "min": "0.8",
+      "max": "2.7",
+      "avg": "1.2",
+      "median": "0.9",
+      "runs": [
+        "0.8",
+        "0.8",
+        "0.9",
+        "0.9",
+        "2.7"
+      ],
+      "status": "passed"
+    },
+    {
+      "benchmark": "medium",
+      "phase": "type",
+      "min": "0.6",
+      "max": "1.0",
+      "avg": "0.7",
+      "median": "0.7",
+      "runs": [
+        "0.6",
+        "0.6",
+        "0.7",
+        "0.7",
+        "1.0"
+      ],
+      "status": "passed"
+    },
+    {
+      "benchmark": "complex",
+      "phase": "type",
+      "min": "2.2",
+      "max": "2.6",
+      "avg": "2.3",
+      "median": "2.3",
+      "runs": [
+        "2.2",
+        "2.3",
+        "2.3",
+        "2.4",
+        "2.6"
+      ],
+      "status": "passed"
+    },
+    {
+      "benchmark": "micro_records_named",
+      "phase": "type",
+      "min": "0.2",
+      "max": "0.3",
+      "avg": "0.3",
+      "median": "0.3",
+      "runs": [
+        "0.2",
+        "0.2",
+        "0.3",
+        "0.3",
+        "0.3"
+      ],
+      "status": "passed"
+    },
+    {
+      "benchmark": "micro_constraints_map",
+      "phase": "type",
+      "min": "0.2",
+      "max": "0.2",
+      "avg": "0.2",
+      "median": "0.2",
+      "runs": [
+        "0.2",
+        "0.2",
+        "0.2",
+        "0.2",
+        "0.2"
+      ],
+      "status": "passed"
+    },
+    {
+      "benchmark": "micro_variants_match",
+      "phase": "type",
+      "min": "0.1",
+      "max": "0.1",
+      "avg": "0.1",
+      "median": "0.1",
+      "runs": [
+        "0.1",
+        "0.1",
+        "0.1",
+        "0.1",
+        "0.1"
+      ],
+      "status": "passed"
+    }
+  ]
+}

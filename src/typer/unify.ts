@@ -22,32 +22,7 @@ function isValidPrimitiveName(name: string): name is ValidPrimitiveName {
 	return VALID_PRIMITIVES.has(name as ValidPrimitiveName);
 }
 
-const unifyCallSources = new Map<string, number>(); // Track where unify calls come from
-const unifyTypePatterns = new Map<string, number>(); // Track what types are being unified
-
-const typeToPattern = (t: Type): string => {
-	if (!t) return 'undefined';
-	switch (t.kind) {
-		case 'variable':
-			return `var:${t.name}`;
-		case 'primitive':
-			return `prim:${t.name}`;
-		case 'function':
-			return `fn:${t.params.length}p`;
-		case 'list':
-			return `list`;
-		case 'record':
-			return `rec:${Object.keys(t.fields).length}f`;
-		case 'tuple':
-			return `tup:${t.elements.length}e`;
-		case 'variant':
-			return `var:${t.name}:${t.args.length}a`;
-		default:
-			return t.kind;
-	}
-};
-
-const unifyInternal = (
+export const unify = (
 	t1: Type,
 	t2: Type,
 	state: TypeState,
@@ -162,33 +137,6 @@ const unifyInternal = (
 			unificationError(s1, s2, debugContext, location || { line: 1, column: 1 })
 		)
 	);
-};
-
-export const unify = (
-	t1: Type,
-	t2: Type,
-	state: TypeState,
-	location?: { line: number; column: number },
-	context?: {
-		reason?: string;
-		operation?: string;
-		hint?: string;
-		constraintContext?: Constraint[];
-	}
-): TypeState => {
-	// Track call sources using stack trace
-	const stack = new Error().stack || '';
-	const caller = stack.split('\n')[2] || 'unknown';
-	const source = caller.includes('at ')
-		? caller.split('at ')[1].split(' ')[0]
-		: 'unknown';
-	unifyCallSources.set(source, (unifyCallSources.get(source) || 0) + 1);
-
-	// Track type patterns being unified
-	const pattern = `${typeToPattern(t1)} = ${typeToPattern(t2)}`;
-	unifyTypePatterns.set(pattern, (unifyTypePatterns.get(pattern) || 0) + 1);
-
-	return unifyInternal(t1, t2, state, location, context);
 };
 
 function unifyUnion(
@@ -373,8 +321,6 @@ function unifyVariable(
 	return newState;
 }
 
-const functionUnifyPatterns = new Map<string, number>();
-
 function unifyFunction(
 	s1: Type,
 	s2: Type,
@@ -391,10 +337,7 @@ function unifyFunction(
 		throw new Error('unifyFunction called with non-function types');
 	}
 	const pattern = `${s1.params.length}p_${s2.params.length}p`;
-	functionUnifyPatterns.set(
-		pattern,
-		(functionUnifyPatterns.get(pattern) || 0) + 1
-	);
+	// functionUnifyPatterns collection removed
 
 	if (s1.params.length !== s2.params.length)
 		throw new Error(
@@ -411,40 +354,16 @@ function unifyFunction(
 
 	let currentState = state;
 
-	// First, propagate function-level constraints to the relevant type variables
-	// NOTE: Legacy constraint propagation removed - handled by new trait system
-
-	// Then unify parameters and return types
+	// Then unify parameters and return types (skip by-ref equal)
 	for (let i = 0; i < s1.params.length; i++) {
-		// Check for constraint on s1.params[i] (variable with constraint) and s2.params[i] (concrete)
 		const param1 = s1.params[i];
 		const param2 = s2.params[i];
-		// Only check for 'implements' constraints
-		if (
-			param1.kind === 'variable' &&
-			param1.constraints &&
-			param1.constraints.length > 0 &&
-			param2.kind !== 'variable'
-		) {
-			for (const constraint of param1.constraints) {
-				if (constraint.kind === 'implements') {
-					const traitRegistry = state.traitRegistry;
-					const traitImpls = traitRegistry.implementations.get(
-						constraint.interfaceName
-					);
-					const typeName = getTypeName(param2);
-					if (!traitImpls || !typeName || !traitImpls.has(typeName)) {
-						throw new Error(
-							`Type ${typeName} does not implement trait ${constraint.interfaceName} (required by type variable ${param1.name})`
-						);
-					}
-				}
-			}
-		}
-		// Now unify as usual
+		if (param1 === param2) continue;
 		currentState = unify(param1, param2, currentState, location, context);
 	}
-	currentState = unify(s1.return, s2.return, currentState, location, context);
+	if (s1.return !== s2.return) {
+		currentState = unify(s1.return, s2.return, currentState, location, context);
+	}
 
 	return currentState;
 }
@@ -458,6 +377,7 @@ function unifyList(
 	if (!isTypeKind(s1, 'list') || !isTypeKind(s2, 'list')) {
 		throw new Error('unifyList called with non-list types');
 	}
+	if (s1.element === s2.element) return state;
 	return unify(s1.element, s2.element, state, location);
 }
 
@@ -482,12 +402,10 @@ function unifyTuple(
 		);
 	let currentState = state;
 	for (let i = 0; i < s1.elements.length; i++) {
-		currentState = unify(
-			s1.elements[i],
-			s2.elements[i],
-			currentState,
-			location
-		);
+		const e1 = s1.elements[i];
+		const e2 = s2.elements[i];
+		if (e1 === e2) continue;
+		currentState = unify(e1, e2, currentState, location);
 	}
 	return currentState;
 }
@@ -528,10 +446,13 @@ function unifyVariant(
 		);
 	}
 
-	// Unify corresponding type arguments
+	// Unify corresponding type arguments (skip by-ref equal)
 	let currentState = state;
 	for (let i = 0; i < s1.args.length; i++) {
-		currentState = unify(s1.args[i], s2.args[i], currentState, location);
+		const a1 = s1.args[i];
+		const a2 = s2.args[i];
+		if (a1 === a2) continue;
+		currentState = unify(a1, a2, currentState, location);
 	}
 	return currentState;
 }
@@ -545,6 +466,7 @@ function unifyRecord(
 	if (!isTypeKind(s1, 'record') || !isTypeKind(s2, 'record')) {
 		throw new Error('unifyRecord called with non-record types');
 	}
+	if (s1.fields === (s2 as any).fields) return state;
 	const keys1 = Object.keys(s1.fields);
 	let currentState = state;
 	for (const key of keys1) {
@@ -558,12 +480,10 @@ function unifyRecord(
 					)
 				)
 			);
-		currentState = unify(
-			s1.fields[key],
-			s2.fields[key],
-			currentState,
-			location
-		);
+		const f1 = s1.fields[key];
+		const f2 = s2.fields[key];
+		if (f1 === f2) continue;
+		currentState = unify(f1, f2, currentState, location);
 	}
 	return currentState;
 }
@@ -793,7 +713,7 @@ function tryUnifyConstrainedVariant(
 	return null; // No constraint resolution possible
 }
 
-// PHASE 3: Constraint resolution during unification
+// Constraint resolution during unification
 function unifyConstrainedWithConcrete(
 	constrainedType: Type & { kind: 'constrained' },
 	concreteType: Type,
