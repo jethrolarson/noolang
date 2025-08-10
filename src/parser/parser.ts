@@ -880,8 +880,8 @@ const parseLambdaExpression: C.Parser<FunctionExpression | TypedExpression | Con
 		return arrowResult;
 	}
 
-	// Parse the body (use parseSequenceTermWithIf to allow full expressions)
-	const bodyResult = C.lazy(() => parseSequenceTermWithIf)(
+	// Parse the body, allowing in-body type annotations
+	const bodyResult = C.lazy(() => parseExprWithType)(
 		arrowResult.remaining
 	);
 	if (!bodyResult.success) {
