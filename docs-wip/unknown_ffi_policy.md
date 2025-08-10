@@ -92,53 +92,37 @@ result = fs | @readFileSync? |? call_ffi string ["file.txt"] : Result String Str
 
 - Start with Node/browser adapters; keep tag set closed and stable.
 - Prefer one-shot deep decode at boundaries to keep most code pure.
+- **Current Implementation Status**: `forget` introduces `Unknown` at the type level but returns the original value unchanged at runtime. The Unknown type system is fully implemented and tested - `@field?` and `at` work correctly on Unknown values, preserving the underlying data while enforcing type-level restrictions. The Unknown type acts as a safe wrapper that prevents dangerous operations while allowing controlled access through optional accessors.
 
 ---
 
-### Implementation Plan (phased)
+### Implementation Plan (logical order)
 
-1. Parser/Lexer (status)
+**Phase 1: Unknown Type System ✅ COMPLETE**
+- `forget : a -> Unknown` function (DONE)
+- `@field?` typing and runtime for Unknown (DONE) 
+- `at` typing and runtime for Unknown (DONE)
+- Unknown inertness enforcement (DONE)
+- All tests passing (DONE)
 
-- `@field?` postfix recognized. (DONE)
-- `|?` operator supported. (DONE)
+**Phase 2: Schema/Decoder System (NEXT)**
+- Define `Schema a` type and primitives (`string`, `float`, `bool`, `unit`)
+- Implement combinators (`list`, `tuple`, `record`, `union`, `literal`, `enum`, `refine`, `map`)
+- Create `decode : Schema a -> Unknown -> Result a DecodeError !ffi` function
+- Create `guard : Schema a -> Unknown -> Option a !ffi` function
 
-2. Core typing/effects (status)
+**Phase 3: FFI Core Infrastructure**
+- Implement `call_ffi : Schema res -> Unknown -> List Unknown -> Result res (EncodeError | DecodeError) !ffi`
+- Create adapter registry for foreign function calling
+- Implement encode/decode pipeline for arguments and results
 
-- Unknown intro form: `forget : a -> Unknown` (pure). (PLANNED)
-- `@field?` typing:
-  - Native record: `{ @k a, ... } -> Option a` (pure) (DONE)
-  - Unknown: `Unknown -> Option Unknown !ffi` (PLANNED)
-- `at` function types:
-  - `Float -> List a -> Option a` (pure) (DONE)
-  - `Float -> Unknown -> Option Unknown !ffi` (PLANNED)
-- `call_ffi : Schema res -> Unknown -> List Unknown -> Result res (EncodeError | DecodeError) !ffi`. (PLANNED)
+**Phase 4: Effects and Safety**
+- Enforce `!ffi` effect propagation through the type system
+- Ensure Unknown values from FFI boundaries are properly tainted
+- Add runtime safety checks for FFI operations
 
-3. Evaluator/runtime (status)
-
-- Adapter registry and pure tag detection (no property reads/calls). (PLANNED)
-- Structural reads for `@field?` on Unknown with `!ffi`. (PLANNED)
-- `@field?` on native records returns Some/None. (DONE)
-- `at` over native lists (DONE) and Unknown (PLANNED).
-- `call_ffi` pipeline: encode args, invoke, decode result. (PLANNED)
-
-4. Schema/decoder DSL (stdlib) (status)
-
-- Define `Schema a` and primitives/combinators. (PLANNED)
-- Implement `decode`, `guard` using `@field?`, `at`, and tag checks. (PLANNED)
-
-5. Effects propagation and diagnostics (status)
-
-- Enforce non-erasable `!ffi` at use sites; improve error messages when missing. (PLANNED)
-- Surface taint/effects in REPL type displays. (PLANNED)
-
-6. Tests (status)
-
-- Parser: `@name?` ok. (DONE)
-- Typing: Unknown inert; `@field?`/`at` pure vs `!ffi` on Unknown. (PARTIAL: native `@field?` DONE)
-- Evaluator: tag purity; structural ops require `!ffi`. (PLANNED)
-- Decoders: success/failure cases; no Unknown in outputs. (PLANNED)
-- `call_ffi`: encode errors, decode errors, happy path. (PLANNED)
-
-7. Docs (status)
-
-- Update language reference and README with `@field?`, `at`, `call_ffi`, and schema usage. (PLANNED)
+**Phase 5: Integration and Testing**
+- Wire up Node.js/browser adapters
+- End-to-end FFI testing
+- Performance optimization
+- Documentation updates
