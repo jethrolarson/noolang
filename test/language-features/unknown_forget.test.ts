@@ -5,8 +5,9 @@ import { typeToString } from '../../src/typer/helpers';
 describe('Unknown + forget (MVP)', () => {
 	test('forget has type a -> Unknown and forget 42 yields Unknown', () => {
 		const result = parseAndType('forget 42');
-		// typeToString renders Unknown as '?'
-		expect(typeToString(result.type, result.state.substitution)).toBe('?');
+		expect(typeToString(result.type, result.state.substitution)).toBe(
+			'Unknown'
+		);
 		// no effects for pure forget
 		expect(result.effects.size).toBe(0);
 	});

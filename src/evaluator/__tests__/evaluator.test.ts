@@ -75,9 +75,41 @@ describe('Evaluator', () => {
 		expect(result.evalResult.executionTrace.length).toBe(1);
 	});
 
-	test('should evaluate filter function', () => {
-		const result = runCode('filter (fn x => x > 2) [1, 2, 3, 4, 5]');
+	test('should evaluate list_filter function', () => {
+		const result = runCode('list_filter (fn x => x > 2) [1, 2, 3, 4, 5]');
 		expect(result.finalValue).toEqual([3, 4, 5]);
+		expect(result.evalResult.executionTrace.length).toBe(1);
+	});
+
+	test('should evaluate list_any function', () => {
+		const result = runCode('list_any (fn x => x > 3) [1, 2, 3, 4, 5]');
+		expect(result.finalValue).toBe(true);
+		expect(result.evalResult.executionTrace.length).toBe(1);
+	});
+
+	test('should evaluate list_any function with no matches', () => {
+		const result = runCode('list_any (fn x => x > 10) [1, 2, 3, 4, 5]');
+		expect(result.finalValue).toBe(false);
+		expect(result.evalResult.executionTrace.length).toBe(1);
+	});
+
+	test('should evaluate list_find function', () => {
+		const result = runCode('list_find (fn x => x > 3) [1, 2, 3, 4, 5]');
+		expect(result.finalValue).toEqual({
+			tag: 'constructor',
+			name: 'Some',
+			args: [{ tag: 'number', value: 4 }],
+		});
+		expect(result.evalResult.executionTrace.length).toBe(1);
+	});
+
+	test('should evaluate list_find function with no match', () => {
+		const result = runCode('list_find (fn x => x > 10) [1, 2, 3, 4, 5]');
+		expect(result.finalValue).toEqual({
+			tag: 'constructor',
+			name: 'None',
+			args: [],
+		});
 		expect(result.evalResult.executionTrace.length).toBe(1);
 	});
 

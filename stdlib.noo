@@ -121,7 +121,7 @@ implement Eq Bool (
     True => b;
     False => not b
   )
-)
+);
 
 # ========================================
 # OPTION TYPE
@@ -225,6 +225,21 @@ implement Functor Result (
     Ok x => Ok (f x);
     Err e => Err e
   )
+);
+
+map_err = (fn f res => match res with (
+  Ok x => Ok x;
+  Err e => Err (f e)
+)): (b -> c) -> Result a b -> Result a c;
+
+is_ok = fn res => match res with (
+  Ok _ => True;
+  Err _ => False
+);
+
+is_err = fn res => match res with (
+  Ok _ => False;
+  Err _ => True
 );
 
 #implement Eq Result (

@@ -48,7 +48,6 @@ describe('Constraint Collapse', () => {
 		expect(typeString).toBe('List String');
 	});
 
-	// Will fix with larger work on operator trait delegation
 	test('operators erase constraints that are resolved', () => {
 		const typeString = parseToString('fn x => x + 1');
 

@@ -13,6 +13,7 @@ import {
 	Effect,
 	implementsConstraint,
 	unknownType,
+	resultType,
 } from '../ast';
 
 // Helper: Create common function types
@@ -259,7 +260,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		),
 		quantifiedVars: ['a', 'b'],
 	});
-	newEnv.set('filter', {
+	newEnv.set('list_filter', {
 		type: functionType(
 			[
 				functionType([typeVariable('a')], boolType()),
@@ -306,14 +307,59 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a'],
 	});
 
-	  // Index accessor for lists only: Float -> List a -> Option a
-  newEnv.set('at', {
-    type: functionType(
-      [floatType(), listTypeWithElement(typeVariable('a'))],
-      optionType(typeVariable('a'))
-    ),
-    quantifiedVars: ['a'],
-  });
+	// List predicate function: (a -> Bool) -> List a -> Bool
+	newEnv.set('list_any', {
+		type: functionType(
+			[
+				functionType([typeVariable('a')], boolType()),
+				listTypeWithElement(typeVariable('a')),
+			],
+			boolType()
+		),
+		quantifiedVars: ['a'],
+	});
+
+	// List find function: (a -> Bool) -> List a -> Option a
+	newEnv.set('list_find', {
+		type: functionType(
+			[
+				functionType([typeVariable('a')], boolType()),
+				listTypeWithElement(typeVariable('a')),
+			],
+			optionType(typeVariable('a'))
+		),
+		quantifiedVars: ['a'],
+	});
+
+	// Index accessor for lists only: Float -> List a -> Option a
+	newEnv.set('at', {
+		type: functionType(
+			[floatType(), listTypeWithElement(typeVariable('a'))],
+			optionType(typeVariable('a'))
+		),
+		quantifiedVars: ['a'],
+	});
+
+	// Type checking functions for schema validation (pure)
+	newEnv.set('isString', {
+		type: functionType([unknownType()], resultType(stringType(), stringType())),
+		quantifiedVars: [],
+	});
+	newEnv.set('isNumber', {
+		type: functionType([unknownType()], resultType(floatType(), stringType())),
+		quantifiedVars: [],
+	});
+	newEnv.set('isBool', {
+		type: functionType([unknownType()], resultType(boolType(), stringType())),
+		quantifiedVars: [],
+	});
+	newEnv.set('isList', {
+		type: functionType(
+			[unknownType()],
+			resultType(listTypeWithElement(unknownType()), stringType())
+		),
+		quantifiedVars: [],
+	});
 
 	// Math utilities (pure)
 	newEnv.set('abs', {

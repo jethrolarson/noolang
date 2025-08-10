@@ -60,7 +60,7 @@ test('multiple | operators in chain', () => {
 	expectSuccess(
 		`
         result = [1, 2, 3, 4, 5] 
-            | filter (fn x => x > 2) 
+            | list_filter (fn x => x > 2) 
             | list_map (fn x => x * 2) 
             | length;
         result

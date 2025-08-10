@@ -199,7 +199,7 @@ describe('Operator', () => {
 			expectSuccess(
 				`
         double = fn x => x * 2;
-        filterEven = fn list => filter (fn x => match x % 2 with (Some remainder => remainder == 0; None => False)) list;
+        filterEven = fn list => list_filter (fn x => match x % 2 with (Some remainder => remainder == 0; None => False)) list;
         pipeline = filterEven |> list_map double;
         pipeline [1, 2, 3, 4, 5, 6]
     `,
@@ -264,7 +264,7 @@ describe('Operator', () => {
 			expectSuccess(
 				`
         double = fn x => x * 2;
-        filterEven = fn list => filter (fn x => match x % 2 with (Some remainder => remainder == 0; None => False)) list;
+        filterEven = fn list => list_filter (fn x => match x % 2 with (Some remainder => remainder == 0; None => False)) list;
         pipeline = list_map double <| filterEven;
         pipeline [1, 2, 3, 4, 5, 6]
     `,

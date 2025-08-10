@@ -129,6 +129,11 @@ const unifyInternal = (
 		return unifyUnit(s1, s2, state, location);
 	}
 
+	// Handle unknown types
+	if (isTypeKind(s1, 'unknown') && isTypeKind(s2, 'unknown')) {
+		return state; // Unknown types unify with each other
+	}
+
 	// Handle variant types (ADTs like Option, Result, etc.)
 	if (isTypeKind(s1, 'variant') && isTypeKind(s2, 'variant')) {
 		return unifyVariant(s1, s2, state, location);
