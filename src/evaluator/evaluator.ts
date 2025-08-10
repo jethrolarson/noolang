@@ -1633,6 +1633,21 @@ export class Evaluator {
 			return this.evaluateTraitFunctionApplication(funcVal, expr.args);
 		}
 
+		// Single-argument fast path to avoid array allocation and loop overhead
+		if (expr.args.length === 1) {
+			let v = this.evaluateExpression(expr.args[0]);
+			if (isCell(v)) v = v.value;
+			if (isFunction(funcVal)) {
+				return funcVal.fn(v);
+			}
+			if (isNativeFunction(funcVal)) {
+				return funcVal.fn(v);
+			}
+			throw new Error(
+				`Cannot apply non-function: ${typeof funcVal} (${(funcVal as any)?.tag || 'unknown'})`
+			);
+		}
+
 		// Evaluate arguments first to avoid interleaving overhead
 		const argValues: Value[] = new Array(expr.args.length);
 		for (let i = 0; i < expr.args.length; i++) {
@@ -1663,14 +1678,14 @@ export class Evaluator {
 					current = current.fn(argValues[i]);
 				} else {
 					throw new Error(
-						`Cannot apply argument to non-function: ${typeof current} (${current?.tag || 'unknown'})`
+						`Cannot apply argument to non-function: ${typeof current} (${(current as any)?.tag || 'unknown'})`
 					);
 				}
 			}
 			return current;
 		}
 		throw new Error(
-			`Cannot apply non-function: ${typeof funcVal} (${funcVal?.tag || 'unknown'})`
+			`Cannot apply non-function: ${typeof funcVal} (${(funcVal as any)?.tag || 'unknown'})`
 		);
 	}
 
