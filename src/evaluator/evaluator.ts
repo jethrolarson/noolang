@@ -25,6 +25,8 @@ import type {
 	WhereExpression,
 	MutableDefinitionExpression,
 	MutationExpression,
+	DestructuringElement,
+	RecordDestructuringField,
 } from '../ast';
 import type { TraitRegistry } from '../typer/trait-system';
 import {
@@ -58,6 +60,8 @@ import {
 	isCell,
 	createCell,
 	valueToString,
+	type TupleValue,
+	RecordValue,
 } from './evaluator-utils';
 
 // Re-export commonly used utilities for backward compatibility
@@ -82,7 +86,6 @@ export {
 };
 
 import { createError } from '../errors';
-import { formatValue } from '../format';
 import { Lexer } from '../lexer/lexer';
 import { parse } from '../parser/parser';
 
@@ -453,7 +456,8 @@ export class Evaluator {
 					throw new Error('at: container must be a list');
 				}
 				const idx = index.value;
-				if (idx < 0 || idx >= list.values.length) return createConstructor('None', []);
+				if (idx < 0 || idx >= list.values.length)
+					return createConstructor('None', []);
 				return createConstructor('Some', [list.values[idx]]);
 			})
 		);
@@ -505,15 +509,15 @@ export class Evaluator {
 			})
 		);
 		this.environment.set(
-			'filter',
-			createNativeFunction('filter', (pred: Value) => (list: Value) => {
+			'list_filter',
+			createNativeFunction('list_filter', (pred: Value) => (list: Value) => {
 				if ((isFunction(pred) || isNativeFunction(pred)) && isList(list)) {
 					return createList(
 						list.values.filter((item: Value) => {
 							const result = applyValueFunction(pred, item);
 							if (!isBool(result)) {
 								throw new Error(
-									`filter: predicate function must return a boolean, got ${result.tag}`
+									`list_filter: predicate function must return a boolean, got ${result.tag}`
 								);
 							}
 							return boolValue(result);
@@ -521,7 +525,7 @@ export class Evaluator {
 					);
 				}
 				throw new Error(
-					createHOFError('filter', ['a predicate function', 'a list'])
+					createHOFError('list_filter', ['a predicate function', 'a list'])
 				);
 			})
 		);
@@ -569,6 +573,88 @@ export class Evaluator {
 				throw new Error('append requires two lists');
 			})
 		);
+		this.environment.set(
+			'list_any',
+			createNativeFunction('list_any', (pred: Value) => (list: Value) => {
+				if ((isFunction(pred) || isNativeFunction(pred)) && isList(list)) {
+					return createBool(
+						list.values.some((item: Value) => {
+							const result = applyValueFunction(pred, item);
+							if (!isBool(result)) {
+								throw new Error(
+									`list_any: predicate function must return a boolean, got ${result.tag}`
+								);
+							}
+							return boolValue(result);
+						})
+					);
+				}
+				throw new Error(
+					createHOFError('list_any', ['a predicate function', 'a list'])
+				);
+			})
+		);
+
+		this.environment.set(
+			'list_find',
+			createNativeFunction('list_find', (pred: Value) => (list: Value) => {
+				if ((isFunction(pred) || isNativeFunction(pred)) && isList(list)) {
+					const foundItem = list.values.find((item: Value) => {
+						const result = applyValueFunction(pred, item);
+						if (!isBool(result)) {
+							throw new Error(
+								`list_find: predicate function must return a boolean, got ${result.tag}`
+							);
+						}
+						return boolValue(result);
+					});
+					
+					return foundItem !== undefined ? createConstructor('Some', [foundItem]) : createConstructor('None', []);
+				}
+				throw new Error(
+					createHOFError('list_find', ['a predicate function', 'a list'])
+				);
+			})
+		);
+		this.environment.set(
+			'find',
+			createNativeFunction('find', (pred: Value) => (list: Value) => {
+				if ((isFunction(pred) || isNativeFunction(pred)) && isList(list)) {
+					const found = list.values.find((item: Value) => {
+						const result = applyValueFunction(pred, item);
+						if (!isBool(result)) {
+							throw new Error(
+								`find: predicate function must return a boolean, got ${result.tag}`
+							);
+						}
+						return boolValue(result);
+					});
+					return found ? found : createUnit();
+				}
+				throw new Error(
+					createHOFError('find', ['a predicate function', 'a list'])
+				);
+			})
+		);
+		this.environment.set(
+			'zip',
+			createNativeFunction('zip', (list1: Value) => (list2: Value) => {
+				if (isList(list1) && isList(list2)) {
+					const minLength = Math.min(list1.values.length, list2.values.length);
+					const zipped = [];
+					for (let i = 0; i < minLength; i++) {
+						zipped.push(
+							createRecord({
+								'@1': list1.values[i],
+								'@2': list2.values[i],
+							})
+						);
+					}
+					return createList(zipped);
+				}
+				throw new Error('zip requires two lists');
+			})
+		);
 
 		// Math utilities
 		this.environment.set(
@@ -598,9 +684,13 @@ export class Evaluator {
 		// Effectful functions
 		this.environment.set(
 			'print',
-			createNativeFunction('print', (value: Value) => {
-				console.log(formatValue(value));
-				return value; // Return the value that was printed
+			createNativeFunction('print', (message: Value) => {
+				if (isString(message)) {
+					console.log(message.value);
+				} else {
+					console.log(message);
+				}
+				return createUnit();
 			})
 		);
 
@@ -910,6 +1000,40 @@ export class Evaluator {
 				}
 			)
 		);
+
+		// Type checking functions for schema validation (pure)
+		this.environment.set(
+			'isString',
+			createNativeFunction('isString', (value: Value) => {
+				return isString(value)
+					? createConstructor('Ok', [value])
+					: createConstructor('Err', [createString('Expected string')]);
+			})
+		);
+		this.environment.set(
+			'isNumber',
+			createNativeFunction('isNumber', (value: Value) => {
+				return isNumber(value)
+					? createConstructor('Ok', [value])
+					: createConstructor('Err', [createString('Expected number')]);
+			})
+		);
+		this.environment.set(
+			'isBool',
+			createNativeFunction('isBool', (value: Value) => {
+				return isBool(value)
+					? createConstructor('Ok', [value])
+					: createConstructor('Err', [createString('Expected boolean')]);
+			})
+		);
+		this.environment.set(
+			'isList',
+			createNativeFunction('isList', (value: Value) => {
+				return isList(value)
+					? createConstructor('Ok', [value])
+					: createConstructor('Err', [createString('Expected list')]);
+			})
+		);
 	}
 
 	private loadStdlib(): void {
@@ -1045,26 +1169,35 @@ export class Evaluator {
 			} else if (element.kind === 'nested-tuple') {
 				// Handle nested tuple destructuring
 				if (elementValue.tag !== 'tuple') {
-					throw new Error(`Expected tuple value for nested tuple destructuring at position ${i}, got ${elementValue.tag}`);
+					throw new Error(
+						`Expected tuple value for nested tuple destructuring at position ${i}, got ${elementValue.tag}`
+					);
 				}
-				
+
 				this.extractTupleElements(element.pattern, elementValue);
 			} else if (element.kind === 'nested-record') {
 				// Handle nested record destructuring
 				if (elementValue.tag !== 'record') {
-					throw new Error(`Expected record value for nested record destructuring at position ${i}, got ${elementValue.tag}`);
+					throw new Error(
+						`Expected record value for nested record destructuring at position ${i}, got ${elementValue.tag}`
+					);
 				}
-				
+
 				this.extractRecordFields(element.pattern, elementValue);
 			} else {
-				throw new Error(`Unknown destructuring element kind: ${(element as any).kind}`);
+				throw new Error(
+					`Unknown destructuring element kind: ${(element as DestructuringElement).kind}`
+				);
 			}
 		}
 
 		return value;
 	}
 
-	private extractTupleElements(pattern: TupleDestructuringPattern, tupleValue: any): void {
+	private extractTupleElements(
+		pattern: TupleDestructuringPattern,
+		tupleValue: TupleValue
+	): void {
 		// Check that the number of pattern elements matches tuple elements
 		if (pattern.elements.length !== tupleValue.values.length) {
 			throw new Error(
@@ -1081,21 +1214,30 @@ export class Evaluator {
 				this.environment.set(element.name, elementValue);
 			} else if (element.kind === 'nested-tuple') {
 				if (elementValue.tag !== 'tuple') {
-					throw new Error(`Expected tuple value for nested tuple destructuring at position ${i}, got ${elementValue.tag}`);
+					throw new Error(
+						`Expected tuple value for nested tuple destructuring at position ${i}, got ${elementValue.tag}`
+					);
 				}
 				this.extractTupleElements(element.pattern, elementValue);
 			} else if (element.kind === 'nested-record') {
 				if (elementValue.tag !== 'record') {
-					throw new Error(`Expected record value for nested record destructuring at position ${i}, got ${elementValue.tag}`);
+					throw new Error(
+						`Expected record value for nested record destructuring at position ${i}, got ${elementValue.tag}`
+					);
 				}
 				this.extractRecordFields(element.pattern, elementValue);
 			} else {
-				throw new Error(`Unknown destructuring element kind: ${(element as any).kind}`);
+				throw new Error(
+					`Unknown destructuring element kind: ${(element as DestructuringElement).kind}`
+				);
 			}
 		}
 	}
 
-	private extractRecordFields(pattern: RecordDestructuringPattern, recordValue: any): void {
+	private extractRecordFields(
+		pattern: RecordDestructuringPattern,
+		recordValue: RecordValue
+	): void {
 		// Bind each pattern field to its corresponding value
 		for (const field of pattern.fields) {
 			if (field.kind === 'shorthand') {
@@ -1103,20 +1245,28 @@ export class Evaluator {
 				if (!(field.fieldName in recordValue.fields)) {
 					throw new Error(`Field '${field.fieldName}' not found in record`);
 				}
-				this.environment.set(field.fieldName, recordValue.fields[field.fieldName]);
+				this.environment.set(
+					field.fieldName,
+					recordValue.fields[field.fieldName]
+				);
 			} else if (field.kind === 'rename') {
 				// @name userName -> userName
 				if (!(field.fieldName in recordValue.fields)) {
 					throw new Error(`Field '${field.fieldName}' not found in record`);
 				}
-				this.environment.set(field.localName, recordValue.fields[field.fieldName]);
+				this.environment.set(
+					field.localName,
+					recordValue.fields[field.fieldName]
+				);
 			} else if (field.kind === 'nested-tuple') {
 				if (!(field.fieldName in recordValue.fields)) {
 					throw new Error(`Field '${field.fieldName}' not found in record`);
 				}
 				const fieldValue = recordValue.fields[field.fieldName];
 				if (fieldValue.tag !== 'tuple') {
-					throw new Error(`Expected tuple value for nested tuple destructuring in field '${field.fieldName}', got ${fieldValue.tag}`);
+					throw new Error(
+						`Expected tuple value for nested tuple destructuring in field '${field.fieldName}', got ${fieldValue.tag}`
+					);
 				}
 				this.extractTupleElements(field.pattern, fieldValue);
 			} else if (field.kind === 'nested-record') {
@@ -1125,11 +1275,15 @@ export class Evaluator {
 				}
 				const fieldValue = recordValue.fields[field.fieldName];
 				if (fieldValue.tag !== 'record') {
-					throw new Error(`Expected record value for nested record destructuring in field '${field.fieldName}', got ${fieldValue.tag}`);
+					throw new Error(
+						`Expected record value for nested record destructuring in field '${field.fieldName}', got ${fieldValue.tag}`
+					);
 				}
 				this.extractRecordFields(field.pattern, fieldValue);
 			} else {
-				throw new Error(`Unknown record destructuring field kind: ${(field as any).kind}`);
+				throw new Error(
+					`Unknown record destructuring field kind: ${(field as RecordDestructuringField).kind}`
+				);
 			}
 		}
 	}
@@ -1497,7 +1651,7 @@ export class Evaluator {
 						]);
 					} else {
 						throw new Error(
-							`Invalid function type in pipeline: ${(currentComposed as any).tag}`
+							`Invalid function type in pipeline: ${(currentComposed as Value).tag}`
 						);
 					}
 
@@ -1508,7 +1662,7 @@ export class Evaluator {
 						return this.applyTraitFunctionWithValues(nextFunc, [intermediate]);
 					} else {
 						throw new Error(
-							`Invalid function type in pipeline: ${(nextFunc as any).tag}`
+							`Invalid function type in pipeline: ${(nextFunc as Value).tag}`
 						);
 					}
 				});
@@ -1931,26 +2085,29 @@ export class Evaluator {
 
 	private evaluateAccessor(expr: AccessorExpression): Value {
 		// Return a function that takes a record and returns the field value
-		return createNativeFunction(`@${expr.field}${expr.optional ? '?' : ''}`, (record: Value): Value => {
-			if (isRecord(record)) {
-				const field = expr.field;
-				const fieldWithAt = `@${field}`;
+		return createNativeFunction(
+			`@${expr.field}${expr.optional ? '?' : ''}`,
+			(record: Value): Value => {
+				if (isRecord(record)) {
+					const field = expr.field;
+					const fieldWithAt = `@${field}`;
 
-				// Try field with @ prefix first (new format), then without (legacy format)
-				if (fieldWithAt in record.fields) {
-					const val = record.fields[fieldWithAt];
-					return expr.optional ? createConstructor('Some', [val]) : val;
-				} else if (field in record.fields) {
-					const val = record.fields[field];
-					return expr.optional ? createConstructor('Some', [val]) : val;
+					// Try field with @ prefix first (new format), then without (legacy format)
+					if (fieldWithAt in record.fields) {
+						const val = record.fields[fieldWithAt];
+						return expr.optional ? createConstructor('Some', [val]) : val;
+					} else if (field in record.fields) {
+						const val = record.fields[field];
+						return expr.optional ? createConstructor('Some', [val]) : val;
+					}
 				}
+				if (expr.optional) {
+					// None constructor when not found
+					return createConstructor('None', []);
+				}
+				throw new Error(`Field '${expr.field}' not found in record`);
 			}
-			if (expr.optional) {
-				// None constructor when not found
-				return createConstructor('None', []);
-			}
-			throw new Error(`Field '${expr.field}' not found in record`);
-		});
+		);
 	}
 
 	private evaluateWhere(expr: WhereExpression): Value {
@@ -2304,12 +2461,11 @@ export class Evaluator {
 		return createUnit();
 	}
 
-	private evaluateUserDefinedType(expr: UserDefinedTypeExpression): Value {
+	private evaluateUserDefinedType(_expr: UserDefinedTypeExpression): Value {
 		// User-defined types are type-level definitions, similar to ADTs
 		// They don't create runtime values, but could define type constructors
 		// For now, they just evaluate to unit like type definitions
-		// TODO: Implement type constructor functions for user-defined types
-		
+
 		return createUnit();
 	}
 

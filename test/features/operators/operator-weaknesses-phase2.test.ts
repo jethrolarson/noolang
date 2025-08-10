@@ -144,7 +144,7 @@ describe('Operator Functionality', () => {
 		expectSuccess(
 			`
         numbers = [1, 2, 3, 4, 5];
-        result = numbers | filter $ (fn x => x > 2) | list_map $ (fn x => x * 2);
+        result = numbers | list_filter $ (fn x => x > 2) | list_map $ (fn x => x * 2);
         result
     `,
 			[6, 8, 10]

@@ -373,7 +373,7 @@ function typeToString(type: Type): string {
 		case 'unit':
 			return 'unit';
 		case 'unknown':
-			return '?';
+			return 'Unknown';
 		default:
 			return 'unknown';
 	}

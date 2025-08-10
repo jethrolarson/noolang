@@ -544,9 +544,9 @@ export const typeToString = (
 				return `${baseStr} given ${constraintStrs.join(', ')}`;
 			}
 			case 'unknown':
-				return '?';
+				return 'Unknown';
 			default:
-				return 'unknown';
+				return 'Unknown';
 		}
 	}
 

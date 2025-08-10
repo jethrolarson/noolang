@@ -63,7 +63,7 @@ test('Dollar Operator ($) - Precedence with Other Operators - $ has lower preced
 
 test('Dollar Operator ($) - Precedence with Other Operators - $ works with complex expressions', () => {
 	const result = runCode(
-		'list_map (fn x => x * 2) $ filter (fn x => x > 5) $ [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]'
+		'list_map (fn x => x * 2) $ list_filter (fn x => x > 5) $ [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]'
 	);
 	expect(result.finalValue).toEqual([12, 14, 16, 18, 20]);
 });
@@ -114,7 +114,7 @@ test('Dollar Operator ($) - Integration with Other Features - $ with higher-orde
 });
 
 test('Dollar Operator ($) - Integration with Other Features - $ with constraint functions', () => {
-	const result = runCode('(filter $ (fn x => x > 3)) $ [1, 2, 3, 4, 5]');
+	const result = runCode('(list_filter $ (fn x => x > 3)) $ [1, 2, 3, 4, 5]');
 	expect(result.finalValue).toEqual([4, 5]);
 });
 

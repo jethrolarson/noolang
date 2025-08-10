@@ -228,12 +228,12 @@ test('Effects Phase 3 - Higher-order Functions with Effects - map with effectful
 	);
 });
 
-test('Effects Phase 3 - Higher-order Functions with Effects - filter with effectful predicate propagates effects', () => {
+test('Effects Phase 3 - Higher-order Functions with Effects - list_filter with effectful predicate propagates effects', () => {
 	expectEffects(
 		`
 				numbers = [1, 2, 3, 4, 5];
 				effectfulPred = fn x => (print x; x > 2);
-				filter effectfulPred numbers
+				list_filter effectfulPred numbers
 			`,
 		['write']
 	);

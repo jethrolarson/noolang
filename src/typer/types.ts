@@ -178,7 +178,7 @@ const typeToString = (type: Type): string => {
 		case 'unit':
 			return 'Unit';
 		case 'unknown':
-			return '?';
+			return 'Unknown';
 		default:
 			return 'Unknown';
 	}
