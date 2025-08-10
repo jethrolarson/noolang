@@ -833,7 +833,7 @@ const parseParenExpr: C.Parser<Expression> = C.map(
 );
 
 // --- Lambda Expression ---
-const parseLambdaExpression: C.Parser<FunctionExpression> = tokens => {
+const parseLambdaExpression: C.Parser<FunctionExpression | TypedExpression | ConstrainedExpression> = tokens => {
 	// Try to parse fn keyword first
 	const fnResult = C.keyword('fn')(tokens);
 	if (!fnResult.success) {
@@ -888,15 +888,54 @@ const parseLambdaExpression: C.Parser<FunctionExpression> = tokens => {
 		return bodyResult;
 	}
 
+	// Build the function expression first
+	let funcExpr: FunctionExpression = {
+		kind: 'function',
+		params: paramNames,
+		body: bodyResult.value,
+		location: fnResult.value.location,
+	};
+	let rem = bodyResult.remaining;
+
+	// If a type annotation appears immediately after the lambda body,
+	// treat it as annotating the whole function rather than the body.
+	while (rem.length > 0) {
+		const ann = parseTypeAnnotation(rem);
+		if (!ann.success) break;
+		if (ann.value.constraint) {
+			const constrained: ConstrainedExpression = {
+				kind: 'constrained',
+				expression: funcExpr,
+				type: ann.value.type,
+				constraint: ann.value.constraint,
+				location: funcExpr.location,
+			};
+			// After wrapping, further annotations should wrap the previous node
+			funcExpr = constrained as unknown as FunctionExpression; // will be wrapped below if another ann
+			return {
+				success: true,
+				value: constrained,
+				remaining: ann.remaining,
+			};
+		} else {
+			const typed: TypedExpression = {
+				kind: 'typed',
+				expression: funcExpr,
+				type: ann.value.type,
+				location: funcExpr.location,
+			};
+			return {
+				success: true,
+				value: typed,
+				remaining: ann.remaining,
+			};
+		}
+	}
+
 	return {
 		success: true,
-		value: {
-			kind: 'function',
-			params: paramNames,
-			body: bodyResult.value,
-			location: fnResult.value.location,
-		},
-		remaining: bodyResult.remaining,
+		value: funcExpr,
+		remaining: rem,
 	};
 };
 
@@ -1657,7 +1696,7 @@ const parseDefinition: C.Parser<Expression> = tokens => {
 		C.seq(
 			C.identifier(),
 			C.operator('='),
-			C.lazy(() => parseSequenceTermWithIf)
+			C.lazy(() => parseExprWithType)
 		),
 		([name, _equals, value]): DefinitionExpression => {
 			return {
@@ -2615,6 +2654,7 @@ const parseConstraintAnd: C.Parser<ConstraintExpr> = tokens => {
 };
 
 // --- Expression with type annotation (just above semicolon) ---
+// Simplified: rely on lower-precedence parsers to apply postfix type annotations consistently
 const parseExprWithType: C.Parser<Expression> = C.choice(
 	// Expression with type and constraints: expr : type given constraintExpr
 	C.map(

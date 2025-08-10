@@ -261,3 +261,19 @@ test('Top-level definitions with type annotations - parses definition with list 
 	assertPrimitiveType(typed.type.element);
 	expect(typed.type.element.name).toBe('Float');
 });
+
+test('Function type annotation after lambda body binds to the lambda (not the body)', () => {
+	const code = `
+map_err = fn f res => match res with (
+  Ok x => Ok x;
+  Err e => Err (f e)
+) : (b -> c) -> Result a b -> Result a c
+`;
+	const result = parseDefinition(code);
+	expect(result.statements.length).toBe(1);
+	const def = result.statements[0];
+	assertDefinitionExpression(def);
+	// We expect the definition value to be a typed expression wrapping a function
+	assertTypedExpression(def.value);
+	assertFunctionExpression(def.value.expression);
+});
