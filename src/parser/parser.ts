@@ -1795,14 +1795,12 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
 		definitions,
 		_trailingSemicolons,
 		_closeParen,
-	]): WhereExpression => {
-		return {
-			kind: 'where',
-			main,
-			definitions,
-			location: main.location,
-		};
-	}
+	]): WhereExpression => ({
+		kind: 'where',
+		main,
+		definitions,
+		location: main.location,
+	})
 );
 
 // Original choice-based parser for fallback
