@@ -522,16 +522,28 @@ export class Evaluator {
 						profEnd(h);
 						return mapped;
 					} else if (isTraitFunctionValue(func)) {
+						// Cache resolution per type constructor name to avoid repeated lookups
+						const cache = new Map<string, Value>();
 						const out: Value[] = new Array(arr.length);
 						for (let i = 0; i < arr.length; i++) {
+							const item = arr[i];
+							// Build a lightweight key: constructor tag+name for common cases
+							let key = item.tag;
+							if (item.tag === 'constructor') key += `:${item.name}`;
+							const cached = cache.get(key);
+							if (cached) {
+								out[i] = cached;
+								continue;
+							}
 							const inner = profStart('trait:map_item');
 							const resolved = this.resolveTraitFunctionWithArgs(
 								func.name,
-								[arr[i]],
+								[item],
 								func.traitRegistry
 							);
 							profEnd(inner);
 							if (!resolved) throw new Error('map: failed to resolve trait function');
+							cache.set(key, resolved);
 							out[i] = resolved;
 						}
 						const result = createList(out);
