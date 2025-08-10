@@ -888,6 +888,39 @@ const parseLambdaExpression: C.Parser<FunctionExpression | TypedExpression | Con
 		return bodyResult;
 	}
 
+	// If the parsed body itself is a typed/constrained expression whose type is a function,
+	// hoist that annotation to the lambda (so it annotates the function rather than the body).
+	if (
+		(bodyResult.value.kind === 'typed' || bodyResult.value.kind === 'constrained') &&
+		(bodyResult.value.type.kind === 'function')
+	) {
+		const innerBody = bodyResult.value.expression;
+		const funcExpr: FunctionExpression = {
+			kind: 'function',
+			params: paramNames,
+			body: innerBody,
+			location: fnResult.value.location,
+		};
+		if (bodyResult.value.kind === 'typed') {
+			const typed: TypedExpression = {
+				kind: 'typed',
+				expression: funcExpr,
+				type: bodyResult.value.type,
+				location: funcExpr.location,
+			};
+			return { success: true, value: typed, remaining: bodyResult.remaining };
+		} else {
+			const constrained: ConstrainedExpression = {
+				kind: 'constrained',
+				expression: funcExpr,
+				type: bodyResult.value.type,
+				constraint: bodyResult.value.constraint,
+				location: funcExpr.location,
+			};
+			return { success: true, value: constrained, remaining: bodyResult.remaining };
+		}
+	}
+
 	// Build the function expression first
 	let funcExpr: FunctionExpression = {
 		kind: 'function',
