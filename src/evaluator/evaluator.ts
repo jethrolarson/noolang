@@ -1626,59 +1626,52 @@ export class Evaluator {
 	}
 
 	private evaluateApplication(expr: ApplicationExpression): Value {
-		const func = this.evaluateExpression(expr.func);
+		const funcVal = this.evaluateExpression(expr.func);
 
-		// NEW: Handle trait function application
-		if (func.tag === 'trait-function') {
-			return this.evaluateTraitFunctionApplication(func, expr.args);
+		// Handle trait function application
+		if (funcVal.tag === 'trait-function') {
+			return this.evaluateTraitFunctionApplication(funcVal, expr.args);
 		}
 
-		// Only apply the function to the arguments present in the AST
-		const args = expr.args;
+		// Evaluate arguments first to avoid interleaving overhead
+		const argValues: Value[] = new Array(expr.args.length);
+		for (let i = 0; i < expr.args.length; i++) {
+			let v = this.evaluateExpression(expr.args[i]);
+			if (isCell(v)) v = v.value;
+			argValues[i] = v;
+		}
 
-		if (isFunction(func)) {
-			// Handle tagged function application
-			let result: any = func.fn;
-
-			for (const argExpr of args) {
-				let arg = this.evaluateExpression(argExpr);
-				if (isCell(arg)) arg = arg.value;
-				if (typeof result === 'function') {
-					result = result(arg);
+		// Trampoline application loop
+		if (isFunction(funcVal)) {
+			let current: any = funcVal.fn;
+			for (let i = 0; i < argValues.length; i++) {
+				if (typeof current !== 'function') {
+					throw new Error(`Cannot apply argument to non-function: ${typeof current}`);
+				}
+				current = current(argValues[i]);
+			}
+			return current;
+		}
+		if (isNativeFunction(funcVal)) {
+			let current: any = funcVal.fn;
+			for (let i = 0; i < argValues.length; i++) {
+				if (typeof current === 'function') {
+					current = current(argValues[i]);
+				} else if (isFunction(current)) {
+					current = current.fn(argValues[i]);
+				} else if (isNativeFunction(current)) {
+					current = current.fn(argValues[i]);
 				} else {
 					throw new Error(
-						`Cannot apply argument to non-function: ${typeof result}`
+						`Cannot apply argument to non-function: ${typeof current} (${current?.tag || 'unknown'})`
 					);
 				}
 			}
-
-			return result;
-		} else if (isNativeFunction(func)) {
-			// Handle native function application
-			let result: any = func.fn;
-
-			for (const argExpr of args) {
-				let arg = this.evaluateExpression(argExpr);
-				if (isCell(arg)) arg = arg.value;
-				if (typeof result === 'function') {
-					result = result(arg);
-				} else if (isFunction(result)) {
-					result = result.fn(arg);
-				} else if (isNativeFunction(result)) {
-					result = result.fn(arg);
-				} else {
-					throw new Error(
-						`Cannot apply argument to non-function: ${typeof result} (${result?.tag || 'unknown'})`
-					);
-				}
-			}
-
-			return result;
-		} else {
-			throw new Error(
-				`Cannot apply non-function: ${typeof func} (${func?.tag || 'unknown'})`
-			);
+			return current;
 		}
+		throw new Error(
+			`Cannot apply non-function: ${typeof funcVal} (${funcVal?.tag || 'unknown'})`
+		);
 	}
 
 	private evaluatePipeline(expr: PipelineExpression): Value {
