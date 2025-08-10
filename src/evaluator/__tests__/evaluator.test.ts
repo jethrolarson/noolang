@@ -364,6 +364,16 @@ describe('Evaluator', () => {
 		expect(result.finalValue).toBe(3);
 	});
 
+	test('Top-level sequence evaluation - sequence with multiple trailing semicolons', () => {
+		const result = runCode('a = 1; b = 2; a + b;;;;');
+		expect(result.finalValue).toBe(3);
+	});
+
+	test('Trailing semicolons after single expression are ignored', () => {
+		const result = runCode('5;;;;;');
+		expect(result.finalValue).toBe(5);
+	});
+
 	test('duck-typed record accessor chain', () => {
 		const result = runCode(`
       foo = {@bar {@baz fn x => {@qux x}, @extra 42}};

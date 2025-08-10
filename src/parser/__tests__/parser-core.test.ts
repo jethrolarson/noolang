@@ -491,6 +491,7 @@ describe('Parser', () => {
 		assertLiteralExpression(binary.right);
 		expect(binary.right.value).toBe(5);
 	});
+
 	test('should parse % operator', () => {
 		const lexer = new Lexer('10 % 5');
 		const tokens = lexer.tokenize();
@@ -503,5 +504,24 @@ describe('Parser', () => {
 		expect(binary.left.value).toBe(10);
 		assertLiteralExpression(binary.right);
 		expect(binary.right.value).toBe(5);
+	});
+
+	test('should ignore multiple trailing semicolons after an expression', () => {
+		const lexer = new Lexer('5;;;;;');
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		expect(program.statements.length).toBe(1);
+		const literal = program.statements[0];
+		assertLiteralExpression(literal);
+		expect(literal.value).toBe(5);
+	});
+
+	test('sequence final semicolon should be optional', () => {
+		const lexer = new Lexer('x = 5; x;');
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		expect(program.statements.length).toBe(1);
+		const seq = program.statements[0];
+		assertBinaryExpression(seq);
 	});
 });
