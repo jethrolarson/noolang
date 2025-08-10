@@ -548,7 +548,11 @@ multi_typed = fn x => x : Float : Float -> Float
 			assertDefinitionExpression(def);
 			// Outer type annotation
 			assertTypedExpression(def.value);
+<<<<<<< HEAD
 			// Inner type annotation
+=======
+			// Inner type annotation  
+>>>>>>> f591952 (fix function annotations not working)
 			assertTypedExpression(def.value.expression);
 			// Innermost function
 			assertFunctionExpression(def.value.expression.expression);
@@ -589,4 +593,8 @@ import_fn = fn filename =>
 			expect(def.value.expression.body.kind).toBe('import');
 		});
 	});
+<<<<<<< HEAD
 });
+=======
+});
+>>>>>>> f591952 (fix function annotations not working)
