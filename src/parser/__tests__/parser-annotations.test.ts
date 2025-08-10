@@ -277,3 +277,15 @@ map_err = fn f res => match res with (
 	assertTypedExpression(def.value);
 	assertFunctionExpression(def.value.expression);
 });
+
+test('Lambda type annotation after simple body binds to the lambda', () => {
+	const code = `
+add_func = fn x y => x + y : Float -> Float -> Float;
+`;
+	const result = parseDefinition(code);
+	expect(result.statements.length).toBe(1);
+	const def = result.statements[0];
+	assertDefinitionExpression(def);
+	assertTypedExpression(def.value);
+	assertFunctionExpression(def.value.expression);
+});
