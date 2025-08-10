@@ -3,14 +3,16 @@
 > Complete reference for Noolang syntax, operators, and language constructs.
 
 ## Source Code References
+
 - **Lexer**: [`src/lexer/lexer.ts`](../src/lexer/lexer.ts) - Token definitions and parsing
-- **Parser**: [`src/parser/`](../src/parser/) - Syntax parsing and AST construction  
+- **Parser**: [`src/parser/`](../src/parser/) - Syntax parsing and AST construction
 - **AST**: [`src/ast.ts`](../src/ast.ts) - Abstract syntax tree node definitions
 - **Tests**: [`src/lexer/__tests__/`](../src/lexer/__tests__/) - Comprehensive language feature tests
 
 ## Literals
 
 ### Numbers
+
 ```noolang
 42;          # Integer
 3.14159;     # Float
@@ -18,6 +20,7 @@
 ```
 
 ### Strings
+
 ```noolang
 "Hello, World!";
 "String with spaces";
@@ -25,17 +28,23 @@
 ```
 
 ### Booleans
+
 ```noolang
 True;
 False
 ```
 
 ### Lists
+
 ```noolang
 [];              # Empty list
-[1, 2, 3];       # List of numbers  
+[1, 2, 3];       # List of numbers
 ["a", "b"];      # List of strings
+<<<<<<< HEAD
 [1, 2, 3, 4];    # Comma separators
+=======
+[1, 2, 3, 4];    # Comma separators (equivalent to previous examples)
+>>>>>>> 5df6101 (Fix type annotation syntax and update documentation examples)
 
 # Safe element access (index, list) -> Option
 at 0 [10, 20, 30];   # Some 10
@@ -43,6 +52,7 @@ at 3 [10, 20, 30];   # None
 ```
 
 ### Records
+
 ```noolang
 {};                              # Empty record
 { @name "Alice", @age 30 };      # Record with fields
@@ -54,15 +64,18 @@ at 3 [10, 20, 30];   # None
 All keywords supported by the lexer ([`src/lexer/lexer.ts:147-176`](../src/lexer/lexer.ts#L147-L176)):
 
 ### Control Flow
+
 - `if` `then` `else` - Conditional expressions
 - `match` `with` - Pattern matching (planned)
 
-### Function Definition  
+### Function Definition
+
 - `fn` - Function definition
 
 - `;` - Expression sequencing for local bindings
 
 ### Type System
+
 - `type` - Type definitions
 - `variant` - Algebraic data type definitions
 - `constraint` - Trait/constraint definitions
@@ -70,16 +83,20 @@ All keywords supported by the lexer ([`src/lexer/lexer.ts:147-176`](../src/lexer
 - `given` `is` `has` - Constraint expressions
 
 ### Effects & Mutation
+
 - `mut` - Mutable variable declaration
 - `mut!` - Special mutation syntax
 
 ### Imports
+
 - `import` - Module imports
 
 ### Logical Operators
+
 - `and` `or` - Logical conjunction/disjunction
 
 ### Type Names
+
 - `Float` `String` `Unit` `List` - Built-in type names
 
 ## Operators
@@ -87,24 +104,27 @@ All keywords supported by the lexer ([`src/lexer/lexer.ts:147-176`](../src/lexer
 All operators from the lexer ([`src/lexer/lexer.ts:191-211`](../src/lexer/lexer.ts#L191-L211)):
 
 ### Pipeline Operators
+
 ```
 |     # Pipe (thrush): x | f ≡ f x (applies value to function)
 |>    # Function composition: f |> g ≡ fn x => g (f x)
-<|    # Reverse composition: g <| f ≡ fn x => g (f x)  
+<|    # Reverse composition: g <| f ≡ fn x => g (f x)
 |?    # Safe pipe for Option/Result types
 $     # Low-precedence application: f $ x ≡ f x
 ```
 
-### Arithmetic Operators  
+### Arithmetic Operators
+
 ```
 +     # Addition
--     # Subtraction  
+-     # Subtraction
 *     # Multiplication
 /     # Division
 %     # Modulus
 ```
 
 ### Comparison Operators
+
 ```
 ==    # Equality
 !=    # Inequality
@@ -115,6 +135,7 @@ $     # Low-precedence application: f $ x ≡ f x
 ```
 
 ### Assignment & Arrows
+
 ```
 =     # Assignment/binding
 =>    # Function arrow (lambda)
@@ -128,7 +149,7 @@ Special characters ([`src/lexer/lexer.ts:237-242`](../src/lexer/lexer.ts#L237-L2
 ```
 ( )   # Parentheses for grouping
 [ ]   # List literals
-{ }   # Record literals  
+{ }   # Record literals
 ;     # Expression sequencing
 ,     # Field/parameter separators
 .     # Record field access
@@ -139,6 +160,7 @@ Special characters ([`src/lexer/lexer.ts:237-242`](../src/lexer/lexer.ts#L237-L2
 ## Expressions
 
 ### Function Definition
+
 ```noolang
 # Simple function
 addTwo = fn x y => x + y;
@@ -146,7 +168,7 @@ addTwo = fn x y => x + y;
 # Single parameter
 double = fn x => x * 2;
 
-# No parameters  
+# No parameters
 getMessage = fn => "Hello!";
 
 # Higher-order function
@@ -154,6 +176,7 @@ myMap = fn f list => map f list
 ```
 
 ### Function Application
+
 ```noolang
 # Direct application
 addTwo = fn x y => x + y;
@@ -171,6 +194,7 @@ person = createPerson "Alice" 30 "Engineer"
 ### Pipeline Operators in Detail
 
 #### Pipe Operator (`|`)
+
 ```noolang
 # Applies value to function (thrush)
 addThree = fn x => x + 3;
@@ -187,6 +211,7 @@ userName = user | @name             # Get field from record
 ```
 
 #### Function Composition (`|>`)
+
 ```noolang
 # Composes functions left-to-right
 addOne = fn x => x + 1;
@@ -198,6 +223,7 @@ result = 5 | composed             # square (addOne 5) = 36
 ```
 
 #### Safe Pipe (`|?`)
+
 ```noolang
 # Works with Option/Result types
 divideByTwo = fn x => x / 2;
@@ -207,6 +233,7 @@ result
 ```
 
 #### Dollar Operator (`$`)
+
 ```noolang
 # Low precedence function application
 double = fn x => x * 2;
@@ -216,14 +243,15 @@ result = addTen $ double $ 5
 ```
 
 ### Conditional Expressions
+
 ```noolang
 # Basic conditional
 x = 5;
 result = if x > 0 then "positive" else "non-positive";
 
-# Nested conditionals  
+# Nested conditionals
 y = -3;
-sign = if y > 0 then "positive" 
+sign = if y > 0 then "positive"
        else if y < 0 then "negative"
        else "zero"
 ```
@@ -236,13 +264,14 @@ Local bindings are created using expression sequencing with semicolons:
 # Local bindings using semicolons
 result = (x = 5; y = 10; x + y * 2);
 
-# More complex example  
+# More complex example
 x = 6;
 z = 9;
 calculation = (base = x * 2; helper = 3; base + helper)
 ```
 
 ### Record Operations
+
 ```noolang
 # Record creation
 person = { @name "Alice", @age 30, @city "NYC" };
@@ -253,6 +282,7 @@ point
 ```
 
 ### Accessor Patterns
+
 ```noolang
 # Simple record operations
 person = { @name "Alice", @age 30 };
@@ -279,6 +309,7 @@ count
 - Standard library ADTs (e.g., `Bool`, `Option`, `Result`) are loaded by default and are treated as existing type names.
 
 Notes:
+
 - Constructors and types share the type namespace for shadowing checks.
 - Value-level shadowing rules are unchanged.
 
@@ -306,7 +337,7 @@ result = show 42
 From highest to lowest precedence (based on parser implementation):
 
 1. Function application (left-associative)
-2. Unary operators (`-`)  
+2. Unary operators (`-`)
 3. Multiplicative (`*`, `/`, `%`)
 4. Additive (`+`, `-`)
 5. Comparison (`<`, `>`, `<=`, `>=`, `==`, `!=`)
@@ -317,7 +348,7 @@ From highest to lowest precedence (based on parser implementation):
 ## Whitespace and Layout
 
 - Whitespace is generally ignored between tokens
-- Newlines can separate expressions  
+- Newlines can separate expressions
 - Indentation is not significant (unlike Python/Haskell)
 - Semicolons separate list elements
 
@@ -327,11 +358,11 @@ The language includes robust error handling with built-in types:
 
 ```noolang
 # Division already returns Option Float for safety
-result1 = 10 / 2;   
-result2 = 10 / 0;   
+result1 = 10 / 2;
+result2 = 10 / 0;
 
 # Option types for nullable values (built-in)
-option1 = head [1, 2, 3];      
+option1 = head [1, 2, 3];
 option2 = head [];
 
 # Show the results
