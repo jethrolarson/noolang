@@ -1757,6 +1757,8 @@ const parseMatchExpression: C.Parser<MatchExpression> = C.map(
 		C.keyword('with'),
 		C.punctuation('('),
 		C.sepBy(parseMatchCase, C.punctuation(';')),
+		// Allow and ignore trailing semicolons after the last case
+		C.many(C.punctuation(';')),
 		C.punctuation(')')
 	),
 	([
@@ -1765,6 +1767,7 @@ const parseMatchExpression: C.Parser<MatchExpression> = C.map(
 		_with,
 		_openParen,
 		cases,
+		_trailingSemicolons,
 		closeParen,
 	]): MatchExpression => ({
 		kind: 'match',
@@ -1781,9 +1784,11 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
 		C.keyword('where'),
 		C.punctuation('('),
 		C.sepBy(parseWhereDefinition, C.punctuation(';')),
+		// Allow and ignore trailing semicolons after the last definition
+		C.many(C.punctuation(';')),
 		C.punctuation(')')
 	),
-	([main, _where, _openParen, definitions, _closeParen]): WhereExpression => {
+	([main, _where, _openParen, definitions, _trailingSemicolons, _closeParen]): WhereExpression => {
 		return {
 			kind: 'where',
 			main,

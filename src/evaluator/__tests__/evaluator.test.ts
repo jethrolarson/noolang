@@ -374,6 +374,18 @@ describe('Evaluator', () => {
 		expect(result.finalValue).toBe(5);
 	});
 
+	test('Match expression allows trailing semicolons in cases', () => {
+		const code = 'x = True; match x with ( True => 1; False => 0;;;; )';
+		const result = runCode(code);
+		expect(result.finalValue).toBe(1);
+	});
+
+	test('Where expression allows trailing semicolons in definitions', () => {
+		const code = 'x + y where (x = 1; y = 2;;; )';
+		const result = runCode(code);
+		expect(result.finalValue).toBe(3);
+	});
+
 	test('duck-typed record accessor chain', () => {
 		const result = runCode(`
       foo = {@bar {@baz fn x => {@qux x}, @extra 42}};

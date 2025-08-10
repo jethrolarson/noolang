@@ -86,6 +86,27 @@ describe('Where Expressions', () => {
 		assertDefinitionExpression(funcExpr.body.definitions[1]);
 		expect(funcExpr.body.definitions[1].name).toBe('y');
 	});
+
+	test('should allow trailing semicolons in where definitions', () => {
+		const lexer = new Lexer('x + y where ( x = 1; y = 2;;; )');
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		expect(program.statements.length).toBe(1);
+		const whereExpr = program.statements[0];
+		assertWhereExpression(whereExpr);
+		expect(whereExpr.definitions.length).toBe(2);
+	});
+
+	test('should allow trailing semicolons in where definitions inside function body', () => {
+		const lexer = new Lexer('fn x => x where (x = 1; y = 2;;; )');
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		expect(program.statements.length).toBe(1);
+		const funcExpr = program.statements[0];
+		assertFunctionExpression(funcExpr);
+		assertWhereExpression(funcExpr.body);
+		expect(funcExpr.body.definitions.length).toBe(2);
+	});
 });
 
 describe('Mutable Definitions and Mutations', () => {
