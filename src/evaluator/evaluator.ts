@@ -511,26 +511,30 @@ export class Evaluator {
 			createNativeFunction('list_map', (func: Value) => (list: Value) => {
 				if (isList(list)) {
 					const h = profStart('list_map');
+					const arr = list.values;
 					if (isFunction(func) || isNativeFunction(func)) {
-						const mapped = createList(
-							list.values.map((item: Value) => applyValueFunction(func, item))
-						);
+						const f = func;
+						const out: Value[] = new Array(arr.length);
+						for (let i = 0; i < arr.length; i++) {
+							out[i] = f.fn(arr[i]);
+						}
+						const mapped = createList(out);
 						profEnd(h);
 						return mapped;
 					} else if (isTraitFunctionValue(func)) {
-						const result = createList(
-							list.values.map((item: Value) => {
-								const inner = profStart('trait:map_item');
-								const out = this.resolveTraitFunctionWithArgs(
-									func.name,
-									[item],
-									func.traitRegistry
-								);
-								profEnd(inner);
-								if (out) return out;
-								throw new Error('map: failed to resolve trait function');
-							})
-						);
+						const out: Value[] = new Array(arr.length);
+						for (let i = 0; i < arr.length; i++) {
+							const inner = profStart('trait:map_item');
+							const resolved = this.resolveTraitFunctionWithArgs(
+								func.name,
+								[arr[i]],
+								func.traitRegistry
+							);
+							profEnd(inner);
+							if (!resolved) throw new Error('map: failed to resolve trait function');
+							out[i] = resolved;
+						}
+						const result = createList(out);
 						profEnd(h);
 						return result;
 					}
@@ -543,19 +547,22 @@ export class Evaluator {
 			createNativeFunction('list_filter', (pred: Value) => (list: Value) => {
 				if ((isFunction(pred) || isNativeFunction(pred)) && isList(list)) {
 					const h = profStart('filter');
-					const filtered = createList(
-						list.values.filter((item: Value) => {
-							const inner = profStart('filter:pred');
-							const result = applyValueFunction(pred, item);
-							profEnd(inner);
-							if (!isBool(result)) {
-								throw new Error(
-									`list_filter: predicate function must return a boolean, got ${result.tag}`
-								);
-							}
-							return boolValue(result);
-						})
-					);
+					const arr = list.values;
+					const f = pred;
+					const out: Value[] = [];
+					out.length = 0;
+					for (let i = 0; i < arr.length; i++) {
+						const inner = profStart('filter:pred');
+						const res = f.fn(arr[i]);
+						profEnd(inner);
+						if (!isBool(res)) {
+							throw new Error(
+								`filter: predicate function must return a boolean, got ${res.tag}`
+							);
+						}
+						if (boolValue(res)) out.push(arr[i]);
+					}
+					const filtered = createList(out);
 					profEnd(h);
 					return filtered;
 				}
@@ -571,22 +578,25 @@ export class Evaluator {
 				(func: Value) => (initial: Value) => (list: Value) => {
 					if ((isFunction(func) || isNativeFunction(func)) && isList(list)) {
 						const h = profStart('reduce');
-						const out = list.values.reduce((acc: Value, item: Value) => {
+						const arr = list.values;
+						const f = func;
+						let acc: Value = initial;
+						for (let i = 0; i < arr.length; i++) {
 							const s1 = profStart('reduce:step1');
-							const partial = applyValueFunction(func, acc);
+							const partial = f.fn(acc);
 							profEnd(s1);
 							if (isFunction(partial) || isNativeFunction(partial)) {
 								const s2 = profStart('reduce:step2');
-								const v = applyValueFunction(partial, item);
+								acc = partial.fn(arr[i]);
 								profEnd(s2);
-								return v;
+							} else {
+								throw new Error(
+									'reduce function must return a function after first argument'
+								);
 							}
-							throw new Error(
-								'reduce function must return a function after first argument'
-							);
-						}, initial);
+						}
 						profEnd(h);
-						return out;
+						return acc;
 					}
 					throw new Error(
 						createHOFError('reduce', ['a function', 'initial value', 'a list'])
