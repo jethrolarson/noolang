@@ -1943,9 +1943,11 @@ const parseSequence: C.Parser<Expression> = C.map(
 				C.punctuation(';'),
 				C.lazy(() => parseExprWithType)
 			)
-		)
+		),
+		// Allow and ignore any trailing semicolons with no RHS
+		C.many(C.punctuation(';'))
 	),
-	([left, rest]) => {
+	([left, rest, _trailingSemicolons]) => {
 		let result = left;
 		for (const [_op, right] of rest) {
 			result = {
