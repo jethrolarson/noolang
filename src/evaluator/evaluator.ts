@@ -89,23 +89,11 @@ import { createError } from '../errors';
 import { Lexer } from '../lexer/lexer';
 import { parse } from '../parser/parser';
 
-// Optional evaluation profiler
-const EVAL_PROFILING = process.env.NOO_PROFILE_EVAL === '1';
-const evalProfile: Record<string, { count: number; ns: bigint }> = {};
-const profNow = () => (typeof process !== 'undefined' && process.hrtime ? process.hrtime.bigint() : BigInt(0));
-const profStart = (label: string) => (EVAL_PROFILING ? { label, t: profNow() } : null);
-const profEnd = (h: { label: string; t: bigint } | null) => {
-	if (!EVAL_PROFILING || !h) return;
-	const dt = profNow() - h.t;
-	const stat = (evalProfile[h.label] = evalProfile[h.label] || { count: 0, ns: BigInt(0) });
-	stat.count += 1;
-	stat.ns += dt;
-};
-const profInc = (label: string) => {
-	if (!EVAL_PROFILING) return;
-	const stat = (evalProfile[label] = evalProfile[label] || { count: 0, ns: BigInt(0) });
-	stat.count += 1;
-};
+// Evaluation profiling removed (was opt-in); keep no-op stubs to minimize churn
+const EVAL_PROFILING = false;
+const profStart = (_label: string) => null as any;
+const profEnd = (_h: any) => {};
+const profInc = (_label: string) => {};
 
 export type ExecutionStep = {
 	expression: string;
@@ -510,7 +498,6 @@ export class Evaluator {
 			'list_map',
 			createNativeFunction('list_map', (func: Value) => (list: Value) => {
 				if (isList(list)) {
-					const h = profStart('list_map');
 					const arr = list.values;
 					if (isFunction(func) || isNativeFunction(func)) {
 						const f = func;
@@ -519,7 +506,6 @@ export class Evaluator {
 							out[i] = f.fn(arr[i]);
 						}
 						const mapped = createList(out);
-						profEnd(h);
 						return mapped;
 					} else if (isTraitFunctionValue(func)) {
 						// Cache resolution per type constructor name to avoid repeated lookups
@@ -535,19 +521,16 @@ export class Evaluator {
 								out[i] = cached;
 								continue;
 							}
-							const inner = profStart('trait:map_item');
-							const resolved = this.resolveTraitFunctionWithArgs(
+								const resolved = this.resolveTraitFunctionWithArgs(
 								func.name,
 								[item],
 								func.traitRegistry
 							);
-							profEnd(inner);
 							if (!resolved) throw new Error('map: failed to resolve trait function');
 							cache.set(key, resolved);
 							out[i] = resolved;
 						}
 						const result = createList(out);
-						profEnd(h);
 						return result;
 					}
 				}
@@ -558,15 +541,12 @@ export class Evaluator {
 			'list_filter',
 			createNativeFunction('list_filter', (pred: Value) => (list: Value) => {
 				if ((isFunction(pred) || isNativeFunction(pred)) && isList(list)) {
-					const h = profStart('filter');
 					const arr = list.values;
 					const f = pred;
 					const out: Value[] = [];
 					out.length = 0;
 					for (let i = 0; i < arr.length; i++) {
-						const inner = profStart('filter:pred');
 						const res = f.fn(arr[i]);
-						profEnd(inner);
 						if (!isBool(res)) {
 							throw new Error(
 								`filter: predicate function must return a boolean, got ${res.tag}`
@@ -575,7 +555,6 @@ export class Evaluator {
 						if (boolValue(res)) out.push(arr[i]);
 					}
 					const filtered = createList(out);
-					profEnd(h);
 					return filtered;
 				}
 				throw new Error(
@@ -589,25 +568,19 @@ export class Evaluator {
 				'reduce',
 				(func: Value) => (initial: Value) => (list: Value) => {
 					if ((isFunction(func) || isNativeFunction(func)) && isList(list)) {
-						const h = profStart('reduce');
-						const arr = list.values;
+							const arr = list.values;
 						const f = func;
 						let acc: Value = initial;
 						for (let i = 0; i < arr.length; i++) {
-							const s1 = profStart('reduce:step1');
-							const partial = f.fn(acc);
-							profEnd(s1);
-							if (isFunction(partial) || isNativeFunction(partial)) {
-								const s2 = profStart('reduce:step2');
-								acc = partial.fn(arr[i]);
-								profEnd(s2);
+													const partial = f.fn(acc);
+						if (isFunction(partial) || isNativeFunction(partial)) {
+							acc = partial.fn(arr[i]);
 							} else {
 								throw new Error(
 									'reduce function must return a function after first argument'
 								);
 							}
 						}
-						profEnd(h);
 						return acc;
 					}
 					throw new Error(
@@ -1177,15 +1150,6 @@ export class Evaluator {
 			finalResult = result;
 		}
 
-		// Print profiling summary if enabled
-		if (EVAL_PROFILING) {
-			const entries = Object.entries(evalProfile).map(([k, v]) => ({ key: k, count: v.count, ms: Number(v.ns) / 1_000_000 }));
-			entries.sort((a, b) => b.ms - a.ms);
-			console.log('\n\x1b[36mEvaluation Profiling\x1b[0m');
-			for (const { key, count, ms } of entries) {
-				console.log(`  ${key.padEnd(30)} ${ms.toFixed(2)}ms\t(${count}x)`);
-			}
-		}
 
 		return {
 			finalResult,
@@ -1633,20 +1597,6 @@ export class Evaluator {
 			return this.evaluateTraitFunctionApplication(funcVal, expr.args);
 		}
 
-		// Single-argument fast path to avoid array allocation and loop overhead
-		if (expr.args.length === 1) {
-			let v = this.evaluateExpression(expr.args[0]);
-			if (isCell(v)) v = v.value;
-			if (isFunction(funcVal)) {
-				return funcVal.fn(v);
-			}
-			if (isNativeFunction(funcVal)) {
-				return funcVal.fn(v);
-			}
-			throw new Error(
-				`Cannot apply non-function: ${typeof funcVal} (${(funcVal as any)?.tag || 'unknown'})`
-			);
-		}
 
 		// Evaluate arguments first to avoid interleaving overhead
 		const argValues: Value[] = new Array(expr.args.length);
@@ -1656,33 +1606,20 @@ export class Evaluator {
 			argValues[i] = v;
 		}
 
-		// Trampoline application loop
+		// Apply by iterating args; rely on func/native currying semantics
 		if (isFunction(funcVal)) {
-			let current: any = funcVal.fn;
+			let f: any = funcVal;
 			for (let i = 0; i < argValues.length; i++) {
-				if (typeof current !== 'function') {
-					throw new Error(`Cannot apply argument to non-function: ${typeof current}`);
-				}
-				current = current(argValues[i]);
+				f = f.fn(argValues[i]);
 			}
-			return current;
+			return f as Value;
 		}
 		if (isNativeFunction(funcVal)) {
-			let current: any = funcVal.fn;
+			let f: any = funcVal;
 			for (let i = 0; i < argValues.length; i++) {
-				if (typeof current === 'function') {
-					current = current(argValues[i]);
-				} else if (isFunction(current)) {
-					current = current.fn(argValues[i]);
-				} else if (isNativeFunction(current)) {
-					current = current.fn(argValues[i]);
-				} else {
-					throw new Error(
-						`Cannot apply argument to non-function: ${typeof current} (${(current as any)?.tag || 'unknown'})`
-					);
-				}
+				f = f.fn(argValues[i]);
 			}
-			return current;
+			return f as Value;
 		}
 		throw new Error(
 			`Cannot apply non-function: ${typeof funcVal} (${(funcVal as any)?.tag || 'unknown'})`
