@@ -340,7 +340,7 @@ where_fn = fn x =>
 		});
 
 		test('Lambda with if-then-else and type annotation (requires parentheses)', () => {
-			// Due to operator precedence, if-then-else requires parentheses 
+			// Due to operator precedence, if-then-else requires parentheses
 			const code = `
 conditional_fn = fn x => 
   (if x > 0 then x * 2 else x / 2)
@@ -548,7 +548,7 @@ multi_typed = fn x => x : Float : Float -> Float
 			assertDefinitionExpression(def);
 			// Outer type annotation
 			assertTypedExpression(def.value);
-			// Inner type annotation  
+			// Inner type annotation
 			assertTypedExpression(def.value.expression);
 			// Innermost function
 			assertFunctionExpression(def.value.expression.expression);
