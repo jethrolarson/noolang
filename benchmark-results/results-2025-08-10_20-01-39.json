@@ -1,0 +1,54 @@
+{
+  "timestamp": "2025-08-10T20:01:39.516Z",
+  "git_commit": "ceb9757430fdf6c8828accb7ded9744da216d210",
+  "results": [
+    {
+      "benchmark": "simple",
+      "min": "98.1",
+      "max": "104.9",
+      "avg": "101.8",
+      "median": "101.6",
+      "runs": [
+        "98.1",
+        "100.2",
+        "101.6",
+        "104.1",
+        "104.9"
+      ],
+      "phase": "eval",
+      "status": "warning"
+    },
+    {
+      "benchmark": "medium",
+      "min": "98.1",
+      "max": "108.2",
+      "avg": "102.9",
+      "median": "103.3",
+      "runs": [
+        "98.1",
+        "100.0",
+        "103.3",
+        "104.7",
+        "108.2"
+      ],
+      "phase": "eval",
+      "status": "warning"
+    },
+    {
+      "benchmark": "complex",
+      "min": "98.7",
+      "max": "107.2",
+      "avg": "102.2",
+      "median": "99.3",
+      "runs": [
+        "98.7",
+        "99.2",
+        "99.3",
+        "106.6",
+        "107.2"
+      ],
+      "phase": "eval",
+      "status": "warning"
+    }
+  ]
+}
