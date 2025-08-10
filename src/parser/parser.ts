@@ -1788,7 +1788,14 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
 		C.many(C.punctuation(';')),
 		C.punctuation(')')
 	),
-	([main, _where, _openParen, definitions, _trailingSemicolons, _closeParen]): WhereExpression => {
+	([
+		main,
+		_where,
+		_openParen,
+		definitions,
+		_trailingSemicolons,
+		_closeParen,
+	]): WhereExpression => {
 		return {
 			kind: 'where',
 			main,
@@ -2014,7 +2021,6 @@ export const parse = (tokens: Token[]): Program => {
 			`Unexpected token after expression: ${next.type} '${next.value}' at line ${next.location.start.line}, column ${next.location.start.column}`
 		);
 	}
-
 	return {
 		statements: result.value,
 		location: createLocation({ line: 1, column: 1 }, { line: 1, column: 1 }),
