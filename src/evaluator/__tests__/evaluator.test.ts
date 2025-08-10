@@ -375,7 +375,7 @@ describe('Evaluator', () => {
 	});
 
 	test('Match expression allows trailing semicolons in cases', () => {
-		const code = 'x = True; match x with ( True => 1; False => 0;;;; )';
+		const code = 'x = True; match x ( True => 1; False => 0;;;; )';
 		const result = runCode(code);
 		expect(result.finalValue).toBe(1);
 	});
@@ -682,9 +682,7 @@ describe('Evaluator', () => {
 	});
 
 	test('should evaluate optional accessor on present field returns Some', () => {
-		const result = runCode(
-			'user = { @name "Alice" }; get = @name?; get user'
-		);
+		const result = runCode('user = { @name "Alice" }; get = @name?; get user');
 		assertConstructorValue(result.evalResult.finalResult);
 		expect(result.evalResult.finalResult.name).toBe('Some');
 		const arg0 = result.evalResult.finalResult.args[0];
@@ -695,10 +693,12 @@ describe('Evaluator', () => {
 	});
 
 	test('should evaluate optional accessor on missing field returns None', () => {
-		const result = runCode(
-			'user = { @name "Alice" }; get = @age?; get user'
-		);
-		expect(result.evalResult.finalResult).toEqual({ tag: 'constructor', name: 'None', args: [] });
+		const result = runCode('user = { @name "Alice" }; get = @age?; get user');
+		expect(result.evalResult.finalResult).toEqual({
+			tag: 'constructor',
+			name: 'None',
+			args: [],
+		});
 		expect(result.finalType.includes('Option')).toBe(true);
 	});
 
