@@ -833,7 +833,7 @@ const parseParenExpr: C.Parser<Expression> = C.map(
 );
 
 // --- Lambda Expression ---
-const parseLambdaExpression: C.Parser<FunctionExpression> = tokens => {
+const parseLambdaExpression: C.Parser<Expression> = tokens => {
 	// Try to parse fn keyword first
 	const fnResult = C.keyword('fn')(tokens);
 	if (!fnResult.success) {
@@ -880,24 +880,241 @@ const parseLambdaExpression: C.Parser<FunctionExpression> = tokens => {
 		return arrowResult;
 	}
 
-	// Parse the body (use parseSequenceTermWithIf to allow full expressions)
-	const bodyResult = C.lazy(() => parseSequenceTermWithIf)(
-		arrowResult.remaining
-	);
+	// Parse the body without postfix type annotations to prevent them from binding inside the lambda
+	const bodyResult = parseLambdaBody(arrowResult.remaining);
 	if (!bodyResult.success) {
 		return bodyResult;
 	}
 
-	return {
-		success: true,
-		value: {
-			kind: 'function',
-			params: paramNames,
-			body: bodyResult.value,
-			location: fnResult.value.location,
-		},
-		remaining: bodyResult.remaining,
+	const lambda: FunctionExpression = {
+		kind: 'function',
+		params: paramNames,
+		body: bodyResult.value,
+		location: fnResult.value.location,
 	};
+
+	// Apply postfix operators (including type annotations) to the complete lambda
+	return parsePostfixFromResult(lambda, bodyResult.remaining);
+};
+
+// --- Lambda Body Parser ---
+// This creates a parsing hierarchy that handles all expressions but doesn't apply 
+// type annotation postfix operators, preventing them from binding inside lambda bodies
+const parseLambdaBody: C.Parser<Expression> = tokens => {
+	// Handle complex expressions that start with keywords
+	const complexResult = C.choice(
+		parseMatchExpression,
+		parseTypeDefinition,
+		parseUserDefinedType, 
+		parseConstraintDefinition,
+		parseImplementDefinition,
+		parseMutableDefinition,
+		parseMutation,
+		parseImportExpression,
+		parseIfExpression,
+		parseDefinitionWithType,
+		parseDefinition,
+		parseWhereExpression
+	)(tokens);
+	
+	if (complexResult.success) {
+		return complexResult;
+	}
+	
+	// For expressions with operators, recreate the parsing hierarchy without postfix
+	return parseLambdaBodyThrush(tokens);
+};
+
+// Simplified parsing hierarchy for lambda bodies (no postfix type annotations)
+const parseLambdaBodyThrush: C.Parser<Expression> = tokens => {
+	const thrushResult = C.map(
+		C.seq(
+			parseLambdaBodyDollar,
+			C.many(C.seq(C.choice(C.operator('|'), C.operator('|?')), parseLambdaBodyDollar))
+		),
+		([left, rest]) => {
+			let result = left;
+			for (const [op, right] of rest) {
+				result = {
+					kind: 'binary',
+					operator: op.value as '|' | '|?',
+					left: result,
+					right,
+					location: result.location,
+				};
+			}
+			return result;
+		}
+	)(tokens);
+	return thrushResult;
+};
+
+const parseLambdaBodyDollar: C.Parser<Expression> = tokens => {
+	const leftResult = parseLambdaBodyCompose(tokens);
+	if (!leftResult.success) return leftResult;
+
+	if (leftResult.remaining.length > 0 &&
+		leftResult.remaining[0].type === 'OPERATOR' &&
+		leftResult.remaining[0].value === '$') {
+		
+		const remaining = leftResult.remaining.slice(1);
+		const rightResult = parseLambdaBodyDollar(remaining);
+		if (!rightResult.success) return rightResult;
+
+		return {
+			success: true as const,
+			value: {
+				kind: 'binary' as const,
+				operator: '$' as const,
+				left: leftResult.value,
+				right: rightResult.value,
+				location: leftResult.value.location,
+			},
+			remaining: rightResult.remaining,
+		};
+	}
+	return leftResult;
+};
+
+const parseLambdaBodyCompose: C.Parser<Expression> = tokens => {
+	return C.map(
+		C.seq(
+			parseLambdaBodyComparison,
+			C.many(C.seq(C.choice(C.operator('|>'), C.operator('<|')), parseLambdaBodyComparison))
+		),
+		([left, rest]) => {
+			const steps = [left];
+			const operators: ('|>' | '<|')[] = [];
+			for (const [op, right] of rest) {
+				operators.push(op.value as '|>' | '<|');
+				steps.push(right);
+			}
+			
+			if (steps.length > 1) {
+				return {
+					kind: 'pipeline',
+					steps,
+					operators,
+					location: left.location,
+				} as PipelineExpression;
+			}
+			return left;
+		}
+	)(tokens);
+};
+
+const parseLambdaBodyComparison: C.Parser<Expression> = tokens => {
+	return C.map(
+		C.seq(
+			parseLambdaBodyAdditive,
+			C.many(C.seq(
+				C.choice(C.operator('<'), C.operator('>'), C.operator('<='), C.operator('>='), C.operator('=='), C.operator('!=')),
+				parseLambdaBodyAdditive
+			))
+		),
+		([left, rest]) => {
+			let result = left;
+			for (const [op, right] of rest) {
+				result = {
+					kind: 'binary',
+					operator: op.value as '<' | '>' | '<=' | '>=' | '==' | '!=',
+					left: result,
+					right,
+					location: result.location,
+				};
+			}
+			return result;
+		}
+	)(tokens);
+};
+
+const parseLambdaBodyAdditive: C.Parser<Expression> = tokens => {
+	return C.map(
+		C.seq(
+			parseLambdaBodyMultiplicative,
+			C.many(C.seq(C.choice(C.operator('+'), C.operator('-')), parseLambdaBodyMultiplicative))
+		),
+		([left, rest]) => {
+			let result = left;
+			for (const [op, right] of rest) {
+				result = {
+					kind: 'binary',
+					operator: op.value as '+' | '-',
+					left: result,
+					right,
+					location: result.location,
+				};
+			}
+			return result;
+		}
+	)(tokens);
+};
+
+const parseLambdaBodyMultiplicative: C.Parser<Expression> = tokens => {
+	return C.map(
+		C.seq(
+			parseLambdaBodyApplication,
+			C.many(C.seq(C.choice(C.operator('*'), C.operator('/'), C.operator('%')), parseLambdaBodyApplication))
+		),
+		([left, rest]) => {
+			let result = left;
+			for (const [op, right] of rest) {
+				result = {
+					kind: 'binary',
+					operator: op.value as '*' | '/' | '%',
+					left: result,
+					right,
+					location: result.location,
+				};
+			}
+			return result;
+		}
+	)(tokens);
+};
+
+const parseLambdaBodyApplication: C.Parser<Expression> = tokens => {
+	return C.map(
+		C.seq(parseLambdaBodyUnary, C.many(parseLambdaBodyUnary)),
+		([func, args]) => {
+			let result = func;
+			for (const arg of args) {
+				result = {
+					kind: 'application',
+					func: result,
+					args: [arg],
+					location: result.location,
+				};
+			}
+			return result;
+		}
+	)(tokens);
+	// Note: No parsePostfixFromResult call - this is the key difference
+};
+
+const parseLambdaBodyUnary: C.Parser<Expression> = tokens => {
+	if (tokens.length >= 2 && tokens[0].type === 'OPERATOR' && tokens[0].value === '-') {
+		const minusToken = tokens[0];
+		const nextToken = tokens[1];
+		if (minusToken.location.end.line === nextToken.location.start.line &&
+			minusToken.location.end.column === nextToken.location.start.column) {
+			
+			const operandResult = parsePrimary(tokens.slice(1));
+			if (!operandResult.success) return operandResult;
+			
+			return {
+				success: true as const,
+				value: {
+					kind: 'binary' as const,
+					operator: '*' as const,
+					left: { kind: 'literal' as const, value: -1, location: minusToken.location },
+					right: operandResult.value,
+					location: minusToken.location,
+				},
+				remaining: operandResult.remaining,
+			};
+		}
+	}
+	return parsePrimary(tokens);
 };
 
 // --- List Parsing ---
