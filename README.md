@@ -4,14 +4,12 @@ An functional, expression-based, LLM-friendly programming language designed for 
 
 ## Features
 - **Expression-based** - everything is an expression
-- **Strong type inference** with Hindley-Milner
+- **Strong type inference** with optional postfix type annotations
 - **Trait system** - constraint definitions and implementations
 - **Effect system** - explicit effect tracking in types
 - **Where expressions** - local definitions within expressions
 - **Pipeline operators** (`|>`, `<|`, `|`, `|?`, `$`) for composition
 - **Variants** - algebraic data types with pattern matching (type shadowing is disallowed)
-- **User-defined types** - records, tuples, and union types
-- **Records & tuples** - structured data with type safety
 - **Destructuring patterns** - ergonomic data extraction and import spreading
 - **REPL** - interactive development environment
 - **VSCode Language Server** - for intellisense and hover types (WIP)
@@ -241,6 +239,92 @@ result = match data with (
 # Import spreading with destructuring  
 {@add, @multiply} = import "examples/math_module"
 {@square sq, @cube cb} = import "examples/power_module"  # With renaming
+```
+
+## Type Annotations
+
+Noolang supports optional **postfix type annotations** for definitions to provide explicit type information and improve code documentation.
+
+### Definition-Level Type Annotations
+
+Type annotations can be added to any definition using postfix `: Type` syntax:
+
+```noolang
+# Simple type annotations
+x = 42 : Float
+name = "Alice" : String
+flag = True : Bool
+
+# Function type annotations
+add = fn x y => x + y : Float -> Float -> Float
+double = fn x => x * 2 : Float -> Float
+
+# Complex type annotations with effects
+logger = fn msg => print msg : String -> String !write
+readConfig = fn path => readFile path : String -> String !read
+```
+
+### Function Type Syntax
+
+Function types use arrow syntax with effects:
+
+```noolang
+# Pure functions
+identity = fn x => x : a -> a
+add = fn x y => x + y : Float -> Float -> Float
+
+# Functions with effects
+printNumber = fn n => print (show n) : Float -> Float !write
+randomValue = fn () => random : Unit -> Float !rand
+
+# Multiple effects
+logAndSave = fn msg => (
+  log msg;
+  writeFile "log.txt" msg
+) : String -> Unit !log !write
+```
+
+### Complex Type Examples
+
+```noolang
+# List types
+numbers = [1, 2, 3] : List Float
+names = ["Alice", "Bob"] : List String
+
+# Record types
+user = { @name "Alice", @age 30 } : { @name String, @age Float }
+point = { @x 10, @y 20 } : { @x Float, @y Float }
+
+# Option types
+safeDiv = fn x y => if y == 0 then None else Some (x / y) : Float -> Float -> Option Float
+
+# Higher-order function types
+mapFn = map : (a -> b) -> List a -> List b
+applyTwice = fn f x => f (f x) : (a -> a) -> a -> a
+```
+
+### Type Annotation Benefits
+
+1. **Documentation**: Makes function signatures explicit
+2. **Type Safety**: Catches type errors early
+3. **IDE Support**: Enables better tooling and autocomplete
+4. **Readability**: Clarifies intent for complex functions
+5. **Debugging**: Helps identify type-related issues
+
+### When to Use Type Annotations
+
+```noolang
+# Always useful for exported functions
+exported_fn = fn x y => complex_calculation x y : InputType -> InputType -> OutputType
+
+# Helpful for complex generic functions
+process = fn items => map (filter (validate)) items : List a -> List a
+
+# Essential for functions with effects
+save_data = fn data => writeFile "data.txt" (serialize data) : Data -> Unit !write
+
+# Good for documenting constraints
+show_all = map show : Show a => List a -> List String
 ```
 
 ## Language Syntax
@@ -660,8 +744,6 @@ Destructuring works seamlessly with properly typed imports:
 ```noolang
 # Basic destructuring
 {@add, @multiply} = import "examples/math_module"
-# add : Float -> Float -> Float
-# multiply : Float -> Float -> Float
 
 # Destructuring with renaming
 {@square sq, @cube cb} = import "examples/power_module"

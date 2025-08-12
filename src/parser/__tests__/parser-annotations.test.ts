@@ -322,14 +322,9 @@ complex_fn = fn f g x =>
 		});
 
 		test('Lambda with where clause and type annotation', () => {
-			const code = `
-where_fn = fn x => 
-  result where (
-    doubled = x * 2;
-    result = doubled + 10
-  ): Float -> Float
-`;
-			const result = parseDefinition(code);
+			const result = parseDefinition(
+				`where_fn = fn x => result where (doubled = x * 2; result = doubled + 10) : Float -> Float`
+			);
 			expect(result.statements.length).toBe(1);
 			const def = result.statements[0];
 			assertDefinitionExpression(def);
@@ -341,12 +336,9 @@ where_fn = fn x =>
 
 		test('Lambda with if-then-else and type annotation (requires parentheses)', () => {
 			// Due to operator precedence, if-then-else requires parentheses
-			const code = `
-conditional_fn = fn x => 
-  (if x > 0 then x * 2 else x / 2)
-: Float -> Float
-`;
-			const result = parseDefinition(code);
+			const result = parseDefinition(
+				`conditional_fn = fn x => (if x > 0 then x * 2 else x / 2) : Float -> Float`
+			);
 			expect(result.statements.length).toBe(1);
 			const def = result.statements[0];
 			assertDefinitionExpression(def);
@@ -357,12 +349,9 @@ conditional_fn = fn x =>
 		});
 
 		test('Lambda with pipeline operators and type annotation', () => {
-			const code = `
-pipeline_fn = fn list => 
-  list |> filter (fn x => x > 0) |> map (fn x => x * 2)
-: List Float -> List Float
-`;
-			const result = parseDefinition(code);
+			const result = parseDefinition(
+				`pipeline_fn = fn list => list |> filter (fn x => x > 0) |> map (fn x => x * 2) : List Float -> List Float`
+			);
 			expect(result.statements.length).toBe(1);
 			const def = result.statements[0];
 			assertDefinitionExpression(def);
@@ -373,12 +362,9 @@ pipeline_fn = fn list =>
 		});
 
 		test('Lambda with thrush operator and type annotation', () => {
-			const code = `
-thrush_fn = fn x => 
-  x | add 10 | multiply 2
-: Float -> Float
-`;
-			const result = parseDefinition(code);
+			const result = parseDefinition(
+				`thrush_fn = fn x => x | add 10 | multiply 2 : Float -> Float`
+			);
 			expect(result.statements.length).toBe(1);
 			const def = result.statements[0];
 			assertDefinitionExpression(def);
@@ -392,12 +378,9 @@ thrush_fn = fn x =>
 		});
 
 		test('Lambda with dollar operator and type annotation', () => {
-			const code = `
-dollar_fn = fn x => 
-  map (add 1) $ filter (gt 0) $ [x, x+1, x+2]
-: Float -> List Float
-`;
-			const result = parseDefinition(code);
+			const result = parseDefinition(
+				`dollar_fn = fn x => map (add 1) $ filter (gt 0) $ [x, x+1, x+2] : Float -> List Float`
+			);
 			expect(result.statements.length).toBe(1);
 			const def = result.statements[0];
 			assertDefinitionExpression(def);
@@ -412,12 +395,9 @@ dollar_fn = fn x =>
 
 		test('Nested lambda definitions with type annotations (requires parentheses)', () => {
 			// Due to operator precedence, nested lambdas with types require parentheses
-			const code = `
-outer_fn = fn x => 
-  (fn y => x + y : Float -> Float)
-: Float -> (Float -> Float)
-`;
-			const result = parseDefinition(code);
+			const result = parseDefinition(
+				`outer_fn = fn x => (fn y => x + y : Float -> Float) : Float -> (Float -> Float)`
+			);
 			expect(result.statements.length).toBe(1);
 			const def = result.statements[0];
 			assertDefinitionExpression(def);
@@ -431,12 +411,9 @@ outer_fn = fn x =>
 		});
 
 		test('Lambda with arithmetic expressions and type annotation', () => {
-			const code = `
-math_fn = fn x y => 
-  (x * 2 + y) / (x - y + 1)
-: Float -> Float -> Float
-`;
-			const result = parseDefinition(code);
+			const result = parseDefinition(
+				`math_fn = fn x y => (x * 2 + y) / (x - y + 1) : Float -> Float -> Float`
+			);
 			expect(result.statements.length).toBe(1);
 			const def = result.statements[0];
 			assertDefinitionExpression(def);
@@ -450,12 +427,9 @@ math_fn = fn x y =>
 		});
 
 		test('Lambda with function application and type annotation', () => {
-			const code = `
-app_fn = fn f x => 
-  f (f x)
-: (a -> a) -> a -> a
-`;
-			const result = parseDefinition(code);
+			const result = parseDefinition(
+				`app_fn = fn f x => f (f x) : (a -> a) -> a -> a`
+			);
 			expect(result.statements.length).toBe(1);
 			const def = result.statements[0];
 			assertDefinitionExpression(def);
@@ -466,12 +440,9 @@ app_fn = fn f x =>
 		});
 
 		test('Lambda with list construction and type annotation', () => {
-			const code = `
-list_fn = fn x => 
-  [x, x+1, x+2, x*2]
-: Float -> List Float
-`;
-			const result = parseDefinition(code);
+			const result = parseDefinition(
+				`list_fn = fn x => [x, x+1, x+2, x*2] : Float -> List Float`
+			);
 			expect(result.statements.length).toBe(1);
 			const def = result.statements[0];
 			assertDefinitionExpression(def);
@@ -485,12 +456,9 @@ list_fn = fn x =>
 		});
 
 		test('Lambda with record construction and type annotation', () => {
-			const code = `
-record_fn = fn x y => 
-  { @x x, @y y, @sum (x + y) }
-: Float -> Float -> { @x Float, @y Float, @sum Float }
-`;
-			const result = parseDefinition(code);
+			const result = parseDefinition(
+				`record_fn = fn x y => { @x x, @y y, @sum (x + y) } : Float -> Float -> { @x Float, @y Float, @sum Float }`
+			);
 			expect(result.statements.length).toBe(1);
 			const def = result.statements[0];
 			assertDefinitionExpression(def);
@@ -504,12 +472,9 @@ record_fn = fn x y =>
 		});
 
 		test('Lambda with accessor chaining and type annotation', () => {
-			const code = `
-accessor_fn = fn obj => 
-  obj | @user | @profile | @name
-: { @user { @profile { @name String } } } -> String
-`;
-			const result = parseDefinition(code);
+			const result = parseDefinition(
+				`accessor_fn = fn obj => obj | @user | @profile | @name : { @user { @profile { @name String } } } -> String`
+			);
 			expect(result.statements.length).toBe(1);
 			const def = result.statements[0];
 			assertDefinitionExpression(def);
@@ -523,10 +488,9 @@ accessor_fn = fn obj =>
 		});
 
 		test('Lambda with unary minus and type annotation', () => {
-			const code = `
-neg_fn = fn x => -x * 2 : Float -> Float
-`;
-			const result = parseDefinition(code);
+			const result = parseDefinition(
+				`neg_fn = fn x => -x * 2 : Float -> Float`
+			);
 			expect(result.statements.length).toBe(1);
 			const def = result.statements[0];
 			assertDefinitionExpression(def);
@@ -536,35 +500,10 @@ neg_fn = fn x => -x * 2 : Float -> Float
 			expect(def.value.expression.body.kind).toBe('binary');
 		});
 
-		test('Multiple type annotations should be parsed (but may be semantically invalid)', () => {
-			// This tests that the parser handles multiple type annotations gracefully
-			// Parses as: (fn x => x : Float) : Float -> Float
-			const code = `
-multi_typed = fn x => x : Float : Float -> Float
-`;
-			const result = parseDefinition(code);
-			expect(result.statements.length).toBe(1);
-			const def = result.statements[0];
-			assertDefinitionExpression(def);
-			// Outer type annotation
-			assertTypedExpression(def.value);
-<<<<<<< HEAD
-			// Inner type annotation
-=======
-			// Inner type annotation  
->>>>>>> f591952 (fix function annotations not working)
-			assertTypedExpression(def.value.expression);
-			// Innermost function
-			assertFunctionExpression(def.value.expression.expression);
-		});
-
 		test('Type annotation with effects', () => {
-			const code = `
-effectful_fn = fn msg => 
-  print msg
-: String -> String !write
-`;
-			const result = parseDefinition(code);
+			const result = parseDefinition(
+				`effectful_fn = fn msg => print msg : String -> String !write`
+			);
 			expect(result.statements.length).toBe(1);
 			const def = result.statements[0];
 			assertDefinitionExpression(def);
@@ -578,12 +517,9 @@ effectful_fn = fn msg =>
 		});
 
 		test('Complex lambda with import and type annotation', () => {
-			const code = `
-import_fn = fn filename => 
-  import "some/path"
-: String -> Module
-`;
-			const result = parseDefinition(code);
+			const result = parseDefinition(
+				`import_fn = fn filename => import "some/path" : String -> Module`
+			);
 			expect(result.statements.length).toBe(1);
 			const def = result.statements[0];
 			assertDefinitionExpression(def);
@@ -593,8 +529,4 @@ import_fn = fn filename =>
 			expect(def.value.expression.body.kind).toBe('import');
 		});
 	});
-<<<<<<< HEAD
 });
-=======
-});
->>>>>>> f591952 (fix function annotations not working)

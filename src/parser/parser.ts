@@ -39,9 +39,6 @@ import {
 	type RecordTypeDefinition,
 	type TupleTypeDefinition,
 	type UnionTypeDefinition,
-	userDefinedRecordType,
-	userDefinedTupleType,
-	userDefinedUnionType,
 	type MatchExpression,
 	type ConstructorDefinition,
 	type Pattern,
@@ -659,7 +656,7 @@ const parseAccessor = C.map(
 // --- Record Parsing ---
 const parseRecordFieldName = C.map(
 	C.accessor(),
-	token => token.value.endsWith('?') ? token.value.slice(0, -1) : token.value // Just get the field name without @ and without optional marker
+	token => (token.value.endsWith('?') ? token.value.slice(0, -1) : token.value) // Just get the field name without @ and without optional marker
 );
 
 // Parse an expression that stops at @ (accessor tokens) or semicolon
@@ -893,19 +890,18 @@ const parseLambdaExpression: C.Parser<Expression> = tokens => {
 		location: fnResult.value.location,
 	};
 
-	// Apply postfix operators (including type annotations) to the complete lambda
-	return parsePostfixFromResult(lambda, bodyResult.remaining);
+	return { success: true, value: lambda, remaining: bodyResult.remaining };
 };
 
 // --- Lambda Body Parser ---
-// This creates a parsing hierarchy that handles all expressions but doesn't apply 
+// This creates a parsing hierarchy that handles all expressions but doesn't apply
 // type annotation postfix operators, preventing them from binding inside lambda bodies
 const parseLambdaBody: C.Parser<Expression> = tokens => {
 	// Handle complex expressions that start with keywords
 	const complexResult = C.choice(
 		parseMatchExpression,
 		parseTypeDefinition,
-		parseUserDefinedType, 
+		parseUserDefinedType,
 		parseConstraintDefinition,
 		parseImplementDefinition,
 		parseMutableDefinition,
@@ -916,11 +912,11 @@ const parseLambdaBody: C.Parser<Expression> = tokens => {
 		parseDefinition,
 		parseWhereExpression
 	)(tokens);
-	
+
 	if (complexResult.success) {
 		return complexResult;
 	}
-	
+
 	// For expressions with operators, recreate the parsing hierarchy without postfix
 	return parseLambdaBodyThrush(tokens);
 };
@@ -930,7 +926,12 @@ const parseLambdaBodyThrush: C.Parser<Expression> = tokens => {
 	const thrushResult = C.map(
 		C.seq(
 			parseLambdaBodyDollar,
-			C.many(C.seq(C.choice(C.operator('|'), C.operator('|?')), parseLambdaBodyDollar))
+			C.many(
+				C.seq(
+					C.choice(C.operator('|'), C.operator('|?')),
+					parseLambdaBodyDollar
+				)
+			)
 		),
 		([left, rest]) => {
 			let result = left;
@@ -953,10 +954,11 @@ const parseLambdaBodyDollar: C.Parser<Expression> = tokens => {
 	const leftResult = parseLambdaBodyCompose(tokens);
 	if (!leftResult.success) return leftResult;
 
-	if (leftResult.remaining.length > 0 &&
+	if (
+		leftResult.remaining.length > 0 &&
 		leftResult.remaining[0].type === 'OPERATOR' &&
-		leftResult.remaining[0].value === '$') {
-		
+		leftResult.remaining[0].value === '$'
+	) {
 		const remaining = leftResult.remaining.slice(1);
 		const rightResult = parseLambdaBodyDollar(remaining);
 		if (!rightResult.success) return rightResult;
@@ -980,7 +982,12 @@ const parseLambdaBodyCompose: C.Parser<Expression> = tokens => {
 	return C.map(
 		C.seq(
 			parseLambdaBodyComparison,
-			C.many(C.seq(C.choice(C.operator('|>'), C.operator('<|')), parseLambdaBodyComparison))
+			C.many(
+				C.seq(
+					C.choice(C.operator('|>'), C.operator('<|')),
+					parseLambdaBodyComparison
+				)
+			)
 		),
 		([left, rest]) => {
 			const steps = [left];
@@ -989,7 +996,7 @@ const parseLambdaBodyCompose: C.Parser<Expression> = tokens => {
 				operators.push(op.value as '|>' | '<|');
 				steps.push(right);
 			}
-			
+
 			if (steps.length > 1) {
 				return {
 					kind: 'pipeline',
@@ -1007,10 +1014,19 @@ const parseLambdaBodyComparison: C.Parser<Expression> = tokens => {
 	return C.map(
 		C.seq(
 			parseLambdaBodyAdditive,
-			C.many(C.seq(
-				C.choice(C.operator('<'), C.operator('>'), C.operator('<='), C.operator('>='), C.operator('=='), C.operator('!=')),
-				parseLambdaBodyAdditive
-			))
+			C.many(
+				C.seq(
+					C.choice(
+						C.operator('<'),
+						C.operator('>'),
+						C.operator('<='),
+						C.operator('>='),
+						C.operator('=='),
+						C.operator('!=')
+					),
+					parseLambdaBodyAdditive
+				)
+			)
 		),
 		([left, rest]) => {
 			let result = left;
@@ -1032,7 +1048,12 @@ const parseLambdaBodyAdditive: C.Parser<Expression> = tokens => {
 	return C.map(
 		C.seq(
 			parseLambdaBodyMultiplicative,
-			C.many(C.seq(C.choice(C.operator('+'), C.operator('-')), parseLambdaBodyMultiplicative))
+			C.many(
+				C.seq(
+					C.choice(C.operator('+'), C.operator('-')),
+					parseLambdaBodyMultiplicative
+				)
+			)
 		),
 		([left, rest]) => {
 			let result = left;
@@ -1054,7 +1075,12 @@ const parseLambdaBodyMultiplicative: C.Parser<Expression> = tokens => {
 	return C.map(
 		C.seq(
 			parseLambdaBodyApplication,
-			C.many(C.seq(C.choice(C.operator('*'), C.operator('/'), C.operator('%')), parseLambdaBodyApplication))
+			C.many(
+				C.seq(
+					C.choice(C.operator('*'), C.operator('/'), C.operator('%')),
+					parseLambdaBodyApplication
+				)
+			)
 		),
 		([left, rest]) => {
 			let result = left;
@@ -1092,21 +1118,30 @@ const parseLambdaBodyApplication: C.Parser<Expression> = tokens => {
 };
 
 const parseLambdaBodyUnary: C.Parser<Expression> = tokens => {
-	if (tokens.length >= 2 && tokens[0].type === 'OPERATOR' && tokens[0].value === '-') {
+	if (
+		tokens.length >= 2 &&
+		tokens[0].type === 'OPERATOR' &&
+		tokens[0].value === '-'
+	) {
 		const minusToken = tokens[0];
 		const nextToken = tokens[1];
-		if (minusToken.location.end.line === nextToken.location.start.line &&
-			minusToken.location.end.column === nextToken.location.start.column) {
-			
+		if (
+			minusToken.location.end.line === nextToken.location.start.line &&
+			minusToken.location.end.column === nextToken.location.start.column
+		) {
 			const operandResult = parsePrimary(tokens.slice(1));
 			if (!operandResult.success) return operandResult;
-			
+
 			return {
 				success: true as const,
 				value: {
 					kind: 'binary' as const,
 					operator: '*' as const,
-					left: { kind: 'literal' as const, value: -1, location: minusToken.location },
+					left: {
+						kind: 'literal' as const,
+						value: -1,
+						location: minusToken.location,
+					},
 					right: operandResult.value,
 					location: minusToken.location,
 				},
@@ -1303,17 +1338,13 @@ const parsePrimaryWithPostfix: C.Parser<Expression> = tokens => {
 	}
 	const primaryResult = parsePrimary(tokens);
 	if (!primaryResult.success) return primaryResult;
-	const postfixResult = parsePostfixFromResult(
-		primaryResult.value,
-		primaryResult.remaining
-	);
 	if (process.env.NOO_DEBUG_PARSE) {
 		console.log(
 			'parsePrimaryWithPostfix result:',
-			postfixResult.success ? postfixResult.value : postfixResult.error
+			primaryResult.success ? primaryResult.value : (primaryResult as any).error
 		);
 	}
-	return postfixResult;
+	return primaryResult;
 };
 
 // --- Unary Operators (negation, only if '-' is adjacent to the next token) ---
@@ -1386,10 +1417,7 @@ const parseApplication: C.Parser<Expression> = tokens => {
 		}
 	)(tokens);
 
-	if (!appResult.success) return appResult;
-
-	// Apply postfix operators (type annotations) to the result
-	return parsePostfixFromResult(appResult.value, appResult.remaining);
+	return appResult;
 };
 
 // --- Multiplicative (*, /, %) ---
@@ -1419,10 +1447,7 @@ const parseMultiplicative: C.Parser<Expression> = tokens => {
 		}
 	)(tokens);
 
-	if (!multResult.success) return multResult;
-
-	// Apply postfix operators (type annotations) to the result
-	return parsePostfixFromResult(multResult.value, multResult.remaining);
+	return multResult;
 };
 
 // --- Additive (+, -) ---
@@ -1449,10 +1474,7 @@ const parseAdditive: C.Parser<Expression> = tokens => {
 		}
 	)(tokens);
 
-	if (!addResult.success) return addResult;
-
-	// Apply postfix operators (type annotations) to the result
-	return parsePostfixFromResult(addResult.value, addResult.remaining);
+	return addResult;
 };
 
 // --- Comparison (<, >, <=, >=, ==, !=) ---
@@ -1489,10 +1511,7 @@ const parseComparison: C.Parser<Expression> = tokens => {
 		}
 	)(tokens);
 
-	if (!compResult.success) return compResult;
-
-	// Apply postfix operators (type annotations) to the result
-	return parsePostfixFromResult(compResult.value, compResult.remaining);
+	return compResult;
 };
 
 // --- Composition (|>, <|) ---
@@ -1529,10 +1548,7 @@ const parseCompose: C.Parser<Expression> = tokens => {
 		}
 	)(tokens);
 
-	if (!compResult.success) return compResult;
-
-	// Apply postfix operators (type annotations) to the result
-	return parsePostfixFromResult(compResult.value, compResult.remaining);
+	return compResult;
 };
 
 // --- Thrush (|) and Safe Thrush (|?) ---
@@ -1557,10 +1573,7 @@ const parseThrush: C.Parser<Expression> = tokens => {
 		}
 	)(tokens);
 
-	if (!thrushResult.success) return thrushResult;
-
-	// Apply postfix operators (type annotations) to the result
-	return parsePostfixFromResult(thrushResult.value, thrushResult.remaining);
+	return thrushResult;
 };
 
 // --- Dollar ($) - Low precedence function application (right-associative) ---
@@ -1589,20 +1602,16 @@ const parseDollar: C.Parser<Expression> = tokens => {
 			location: leftResult.value.location,
 		};
 
-		return parsePostfixFromResult(result, rightResult.remaining);
+		return { success: true, value: result, remaining: rightResult.remaining };
 	}
 
 	// No $ operator found, just return the left expression
-	return parsePostfixFromResult(leftResult.value, leftResult.remaining);
+	return leftResult;
 };
 
 // --- If Expression (after dollar, before sequence) ---
 const parseIfAfterDollar: C.Parser<Expression> = tokens => {
-	const ifResult = parseIfExpression(tokens);
-	if (!ifResult.success) return ifResult;
-
-	// Apply postfix operators (type annotations) to the result
-	return parsePostfixFromResult(ifResult.value, ifResult.remaining);
+	return parseIfExpression(tokens);
 };
 
 // Helper function to apply postfix operators to an expression
@@ -1623,43 +1632,6 @@ const parseTypeAnnotation = C.map(
 		constraint: constraintClause ? constraintClause[1] : undefined,
 	})
 );
-
-// Clean postfix parser using combinators
-const parsePostfixFromResult = (
-	expr: Expression,
-	tokens: Token[]
-): C.ParseResult<Expression> => {
-	let result = expr;
-	let remaining = tokens;
-
-	// Try to parse type annotations repeatedly
-	while (remaining.length > 0) {
-		const annotationResult = parseTypeAnnotation(remaining);
-		if (!annotationResult.success) break;
-
-		// Create appropriate expression based on whether we have constraints
-		if (annotationResult.value.constraint) {
-			result = {
-				kind: 'constrained',
-				expression: result,
-				type: annotationResult.value.type,
-				constraint: annotationResult.value.constraint,
-				location: result.location,
-			};
-		} else {
-			result = {
-				kind: 'typed',
-				expression: result,
-				type: annotationResult.value.type,
-				location: result.location,
-			};
-		}
-
-		remaining = annotationResult.remaining;
-	}
-
-	return { success: true, value: result, remaining };
-};
 
 // --- Destructuring Element Parser ---
 const parseDestructuringElement: C.Parser<DestructuringElement> = C.choice(
@@ -1870,7 +1842,7 @@ const parseDefinition: C.Parser<Expression> = tokens => {
 	}
 
 	// Fallback to regular definition
-	return C.map(
+	const regularResult = C.map(
 		C.seq(
 			C.identifier(),
 			C.operator('='),
@@ -1885,6 +1857,60 @@ const parseDefinition: C.Parser<Expression> = tokens => {
 			};
 		}
 	)(tokens);
+
+	if (!regularResult.success) return regularResult;
+
+	// Check for optional type annotation after the definition
+	const remaining = regularResult.remaining;
+	if (
+		remaining.length > 0 &&
+		remaining[0].type === 'PUNCTUATION' &&
+		remaining[0].value === ':'
+	) {
+		// Parse the type annotation
+		const typeResult = parseTypeAnnotation(remaining);
+		if (typeResult.success) {
+			// Modify the definition to have a typed value
+			const originalDef = regularResult.value as DefinitionExpression;
+
+			// Create typed value
+			let typedValue: Expression;
+			if (typeResult.value.constraint) {
+				// Create constrained expression
+				typedValue = {
+					kind: 'constrained',
+					expression: originalDef.value,
+					type: typeResult.value.type,
+					constraint: typeResult.value.constraint,
+					location: originalDef.value.location,
+				};
+			} else {
+				// Create typed expression
+				typedValue = {
+					kind: 'typed',
+					expression: originalDef.value,
+					type: typeResult.value.type,
+					location: originalDef.value.location,
+				};
+			}
+
+			// Create new definition with typed value
+			const modifiedDef: DefinitionExpression = {
+				kind: 'definition',
+				name: originalDef.name,
+				value: typedValue,
+				location: originalDef.location,
+			};
+
+			return {
+				success: true,
+				value: modifiedDef,
+				remaining: typeResult.remaining,
+			};
+		}
+	}
+
+	return regularResult;
 };
 
 // --- Definition with typed expression (now just a regular definition) ---
@@ -2098,14 +2124,11 @@ const parseUserDefinedType: C.Parser<UserDefinedTypeExpression> = C.map(
 		name: name.value,
 		typeParams: typeParams.map(p => p.value),
 		definition: definition as UserDefinedTypeDefinition,
-		location: createLocation(
-			typeKeyword.location.start,
-			equals.location.end
-		),
+		location: createLocation(typeKeyword.location.start, equals.location.end),
 	})
 );
 
-// Parse record type definition: {@field Type, ...}  
+// Parse record type definition: {@field Type, ...}
 const parseRecordTypeDefinition: C.Parser<RecordTypeDefinition> = C.map(
 	C.seq(
 		C.punctuation('{'),
@@ -2123,7 +2146,7 @@ const parseRecordTypeDefinition: C.Parser<RecordTypeDefinition> = C.map(
 		),
 		C.punctuation('}')
 	),
-	([openBrace, fields, closeBrace]): RecordTypeDefinition => {
+	([_openBrace, fields, _closeBrace]): RecordTypeDefinition => {
 		const fieldObj: { [key: string]: Type } = {};
 		if (fields) {
 			for (const [name, type] of fields) {
@@ -2149,7 +2172,7 @@ const parseTupleTypeDefinition: C.Parser<TupleTypeDefinition> = C.map(
 		),
 		C.punctuation('}')
 	),
-	([_openBrace, elements, closeBrace]): TupleTypeDefinition => ({
+	([_openBrace, elements, _closeBrace]): TupleTypeDefinition => ({
 		kind: 'tuple-type',
 		elements: elements || [],
 	})
@@ -2735,7 +2758,7 @@ const parseSequenceTerm: C.Parser<Expression> = tokens => {
 			break;
 
 		case 'PUNCTUATION':
-			// PUNCTUATION cases are complex and context-dependent 
+			// PUNCTUATION cases are complex and context-dependent
 			// Always fall back to full parser for correctness
 			break;
 
@@ -2789,7 +2812,7 @@ const parseRecordStructure: C.Parser<RecordStructure> = C.map(
 				),
 				([accessor, type]): [string, StructureFieldType] => [
 					accessor.value, // Accessor value already excludes the @ prefix
-					type
+					type,
 				]
 			),
 			C.punctuation(',')
@@ -2987,35 +3010,40 @@ const parseExpr: C.Parser<Expression> = parseSequence;
 // --- Main Parse Function ---
 // Helper: skip semicolons
 const skipSemicolons = (tokens: Token[]): Token[] => {
-	while (tokens.length > 0 && tokens[0].type === 'PUNCTUATION' && tokens[0].value === ';') {
+	while (
+		tokens.length > 0 &&
+		tokens[0].type === 'PUNCTUATION' &&
+		tokens[0].value === ';'
+	) {
 		tokens = tokens.slice(1);
 	}
 	return tokens;
 };
 
-// Clean combinator-based program parser  
+// Clean combinator-based program parser
 const parseStatements = (tokens: Token[]): C.ParseResult<Expression[]> => {
 	const statements: Expression[] = [];
 	let rest = skipSemicolons(tokens.filter(t => t.type !== 'EOF'));
-	
+
 	while (rest.length > 0) {
 		const result = parseExpr(rest);
 		if (!result.success) return result;
-		
+
 		statements.push(result.value);
 		rest = skipSemicolons(result.remaining);
 	}
-	
+
 	return { success: true, value: statements, remaining: [] };
 };
 
 export const parse = (tokens: Token[]): Program => {
 	const result = parseStatements(tokens);
 	if (!result.success) {
-		const errorLocation = result.position > 0 ? ` at line ${result.position}` : '';
+		const errorLocation =
+			result.position > 0 ? ` at line ${result.position}` : '';
 		throw new Error(`Parse error: ${result.error}${errorLocation}`);
 	}
-	
+
 	// Check for leftover tokens (should be none after successful parse)
 	if (result.remaining.length > 0) {
 		const next = result.remaining[0];
@@ -3023,7 +3051,7 @@ export const parse = (tokens: Token[]): Program => {
 			`Unexpected token after expression: ${next.type} '${next.value}' at line ${next.location.start.line}, column ${next.location.start.column}`
 		);
 	}
-	
+
 	return {
 		statements: result.value,
 		location: createLocation({ line: 1, column: 1 }, { line: 1, column: 1 }),
