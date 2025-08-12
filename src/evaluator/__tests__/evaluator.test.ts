@@ -389,7 +389,7 @@ describe('Evaluator', () => {
 	test('duck-typed record accessor chain', () => {
 		const result = runCode(`
       foo = {@bar {@baz fn x => {@qux x}, @extra 42}};
-      (((foo | @bar) | @baz) $ 1) | @qux
+      (((foo | @bar) | @baz) 1) | @qux
     `);
 		expect(result.finalValue).toEqual(1);
 	});

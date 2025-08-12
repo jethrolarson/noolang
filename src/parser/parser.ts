@@ -924,35 +924,7 @@ const parseThrush: C.Parser<Expression> = tokens => {
 
 // --- Dollar ($) - Low precedence function application (right-associative) ---
 const parseDollar: C.Parser<Expression> = tokens => {
-	const leftResult = parseCompose(tokens);
-	if (!leftResult.success) return leftResult;
-
-	// Check for $ operator
-	if (
-		leftResult.remaining.length > 0 &&
-		leftResult.remaining[0].type === 'OPERATOR' &&
-		leftResult.remaining[0].value === '$'
-	) {
-		// Consume the $ token
-		const remaining = leftResult.remaining.slice(1);
-
-		// Recursively parse the right side (this creates right-associativity)
-		const rightResult = parseDollar(remaining);
-		if (!rightResult.success) return rightResult;
-
-		const result = {
-			kind: 'binary' as const,
-			operator: '$' as const,
-			left: leftResult.value,
-			right: rightResult.value,
-			location: leftResult.value.location,
-		};
-
-		return { success: true, value: result, remaining: rightResult.remaining };
-	}
-
-	// No $ operator found, just return the left expression
-	return leftResult;
+	return parseCompose(tokens);
 };
 
 // Helper function to apply postfix operators to an expression

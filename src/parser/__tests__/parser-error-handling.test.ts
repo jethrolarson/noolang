@@ -90,13 +90,3 @@ test('Operator Precedence - should parse composition operators', () => {
 	expect(pipeline.steps.length).toBe(3);
 });
 
-test('Operator Precedence - should parse dollar operator', () => {
-	const lexer = new Lexer('f $ g $ h');
-	const tokens = lexer.tokenize();
-	const program = parse(tokens);
-	expect(program.statements.length).toBe(1);
-	const expr = program.statements[0];
-	assertBinaryExpression(expr);
-	expect(expr.operator).toBe('$');
-});
-
