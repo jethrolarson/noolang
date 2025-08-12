@@ -102,20 +102,25 @@ The REPL includes comprehensive debugging tools:
 **Working examples include**: `basic.noo`, `adt_demo.noo`, `recursive_adts.noo`, `safe_thrush_demo.noo`, `simple_adt.noo`, `card_game.noo`, `math_functions.noo`, and all import examples (`math_module.noo`, `power_module.noo`, `number_module.noo`, `string_module.noo`, `function_module.noo`, `list_module.noo`).
 
 ```noolang
-# Function definition
-add = fn x y => x + y;
+# Function definition (this is a comment)
+add1 = fn x => x + 1;
 
 # Function application doesn't require parens and `,` is only used for separating items in data structures like `Tuple`, `Record` and `List`
-add 2 3;
+add1 2;
 
 # The + operator works for both numbers and strings
-1 + 2;           # => 3 : Int
+1 + 2;           # => 3 : Float
 "hello" + " world";  # => "hello world" : String
+
+# All numeric operators are available as functions as well
+add 1 2; # => 3 : Float
+multiply 2 3; # => 6 : Float
+subtract 10 2; # => 8 : Float
+divide 10 2; # => 5 : Float
 
 # all functions are curried so if you pass less than their full number of arguments you get back a partially applied function
 increment = add 1;
-increment 2;
-# 3 : Float
+increment 2; # => 3 : Float
 
 # to nest calls you may need parenthesis
 add 2 (add 3 2);
@@ -126,12 +131,11 @@ add 1 2;
 ((add 1) 2);
 # in javascript this could be seen as `const add = x => y => x + y; add(1)(2);`
 
-# Where expressions for local definitions
+# use where expressions do define local variables for an expression
 x + y where (x = 1; y = 2);  # => 3
 
-# Destructuring for clean data extraction
-{x, y} = {10, 20}; x + y;  # => 30
-{@name, @age} = {@name "Alice", @age 30}; name;  # => "Alice"
+# or just create a definition inside an expression with `;` operator
+(x = 1; y = 2; x + y); # => 3
 
 # because nesting can get confusing fast noolang includes a few helpful opperators for reducing the need for parens such as the `|` operator:
 2 | add 3 | add 2;
@@ -139,39 +143,64 @@ x + y where (x = 1; y = 2);  # => 3
 [1, 2, 3] | map (add 1); # => [2, 3, 4]
 
 # the $ operator acts like a weak function application operator allowing you to often skip parens on the right hand expression:
-[1, 2, 3] | map $ add 1;
+# FIXME currently not working: [1, 2, 3] | map $ add 1;
 
-# can be written as
+# Is sugar for
+map (add 1) [1, 2, 3];
 
-
+# tuples are of fixed length and have different types per element
+{1, "hello", True}; # => {1, "hello", True} : {Float, String, Bool}
 
 # Conditional expressions
 if True then 1 else 2;
 
 # Records
-user = { @name "Alice", @age 30 };
+user = { @name "Alice", @age 30, @address { @street "123 Main St", @city "Anytown" } };
 
 # Accessors
-(@name user);
+(@name user); # => "Alice"
+
+# you can set using accessors
+ruth = set @name "Ruth" user;
+
+# pipe with accessors can give you . notation-like ergonomics
+ruth | @name; # => "Ruth"
+
+# you can also use the `@` operator to set the value of a field
+ruth | set @name "Ruth";
+
+# accessors can be chained
+user | @address | @street; # => "123 Main St"
+
+# accessors can also be composed
+user_street = @address <| @street;
+user_street user; # => "123 Main St"
+
+# Destructuring for clean data extraction
+{x, y} = {10, 20}; 
+x + y;  # => 30
+{@name, @age} = {@name "Alice", @age 30}; 
+name;  # => "Alice"
 
 # Recursion
 factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1));
-
-# Where expressions in functions
-fn x => x * 2 where (x = 5);  # => 10
 
 # Mutation
 mut counter = 0;
 mut! counter = counter + 1;
 
 # List operations
-[1, 2, 3] |> tail |> head;
+[1, 2, 3] | map (add 1) | head; # => Option 2
 
-# Variant Types (ADTs)
+# Variant Types (ADTs) are a way to define a type with a fixed set of possible values
 variant Color = Red | Green | Blue;
 favorite = Red;
 
-variant Option a = Some a | None;
+# Option is a usefull built-in variant type for handling optional values
+Some 1; # => Some 1 : Option 1
+None; # => None : Option None
+
+# Pattern matching is a way to extract the value of a variant
 result = match (Some 42) with (Some x => x; None => 0);
 
 # Pattern matching with variants
@@ -196,7 +225,6 @@ type Response = User | String | Float;
 # Creating and using user-defined types
 user = {@name "Alice", @age 30, @active True};
 point = {10.5, 20.3};
-response = user;
 
 # Accessing user-defined types
 userName = user | @name;  # "Alice"
@@ -1396,13 +1424,11 @@ variant JsonValue =
     JsonNumber Float |
     JsonBool Bool |
     JsonNull;
-```
 
 #### Working with Recursive ADTs
 
-**Tree Construction and Traversal:**
+# **Tree Construction and Traversal:**
 
-```noolang
 # Create a binary tree
 tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
 
@@ -1426,11 +1452,9 @@ depth = fn t => match t with (
 
 getValue tree;  # => 5
 sumTree tree;   # => 15 (5+3+7)
-```
 
-**Linked List Operations:**
+# Linked List Operations:
 
-```noolang
 # Create a linked list
 myList = Cons 1 (Cons 2 (Cons 3 Nil));
 
@@ -1480,7 +1504,7 @@ eval calculation;  # => 20
 
 #### Pattern Matching with Recursive Types
 
-Recursive ADTs work seamlessly with Noolang's pattern matching:
+Recursive ADTs work with Noolang's pattern matching:
 
 ```noolang
 # Find element in tree
@@ -1507,24 +1531,6 @@ contains 10 tree;    # => False
 mapTree (multiply 2) tree;  # Double all values in tree
 ```
 
-#### Type Safety with Recursion
-
-Recursive ADTs maintain full type safety:
-
-```noolang
-# Type inference works correctly
-numberTree = Node 42 Leaf Leaf;          # Tree Float
-stringTree = Node "hello" Leaf Leaf;     # Tree String
-
-# Pattern matching ensures exhaustiveness
-safeTail = fn lst => match lst with (
-    Cons _ tail => Some tail;
-    Nil => None
-);
-```
-
-**Note**: Recursive ADTs support all existing Noolang features including higher-order functions, pipeline operators, and integration with the constraint system.
-
 ## Duck-Typed Records and Accessors
 
 Noolang records are **duck-typed**: any record with the required field(s) can be used, regardless of extra fields. This makes accessors and record operations flexible and ergonomic, similar to JavaScript or Python objects.
@@ -1533,12 +1539,12 @@ Noolang records are **duck-typed**: any record with the required field(s) can be
 
 ```noolang
 # Record with extra fields
-duck_person = { @name "Bob", @age 42, @extra "ignored" }
-duck_name = duck_person | @name  # Returns "Bob"
+duck_person = { @name "Bob", @age 42, @extra "ignored" };
+duck_name = duck_person | @name  # Returns "Bob";
 
 # Chained accessors with extra fields
-complex = { @bar { @baz fn x => { @qux x }, @extra 42 } }
-duck_chain = (((complex | @bar) | @baz) $ 123) | @qux  # Returns 123
+complex = { @bar { @baz fn x => { @qux x }, @extra 42 } };
+duck_chain = (((complex | @bar) | @baz) $ 123) | @qux;  # Returns 123
 ```
 
 - **Accessors** (`@field`) work with any record that has the required field, even if there are extra fields.
@@ -1559,44 +1565,8 @@ Noolang features a **comprehensive trait system** that enables constraint-based 
 
 ### Constraint Definitions
 
-Define constraints that specify required functions and their signatures:
-
-```noolang
-# Simple constraint with one function
-constraint Show a ( show : a -> String );
-
-# Constraint with multiple functions
-constraint Eq a ( 
-  equals : a -> a -> Bool; 
-  notEquals : a -> a -> Bool 
-);
-
-# Complex constraint with generic functions
-constraint Monad m (
-  return : a -> m a;
-  bind : m a -> (a -> m b) -> m b
-);
-```
-
 ### Constraint Implementations
 
-Provide implementations of constraints for specific types:
-
-```noolang
-# Implement Show for Float
-implement Show Float ( show = intToString );
-
-# Implement Eq for String
-implement Eq String ( 
-  equals = stringEquals;
-  notEquals = fn a b => not (stringEquals a b)
-);
-
-# Implement Show for Lists (if elements are showable)
-implement Show (List a) given Show a (
-  show = fn list => "[" + (joinStrings ", " (map show list)) + "]"
-);
-```
 
 ### Type-Directed Dispatch
 
@@ -1604,11 +1574,11 @@ Constraint functions automatically resolve to the correct implementation based o
 
 ```noolang
 # These calls automatically resolve to the right implementation
-show 42              # Uses Show Float implementation
-show "hello"         # Uses Show String implementation  
-show [1, 2, 3]       # Uses Show (List a) implementation with Show Float
+show 42;              # Uses Show Float implementation
+show "hello";         # Uses Show String implementation  
+show [1, 2, 3];       # Uses Show (List a) implementation with Show Float
 
-equals 1 2           # Uses Eq Float implementation
+equals 1 2;           # Uses Eq Float implementation
 equals "a" "b"       # Uses Eq String implementation
 ```
 
@@ -1617,52 +1587,15 @@ equals "a" "b"       # Uses Eq String implementation
 Implement constraints conditionally based on other constraints:
 
 ```noolang
-# Show for Lists only if elements are showable
-implement Show (List a) given Show a (
-  show = fn list => "[" + (joinStrings ", " (map show list)) + "]"
-);
+# FIXME this is not working yet
+#type Point = {Float, Float};
 
 # Eq for pairs if both components are comparable
-implement Eq (Pair a b) given Eq a, Eq b (
-  equals = fn (Pair x1 y1) (Pair x2 y2) => 
-    (equals x1 x2) && (equals y1 y2)
-);
-```
+# implement Eq Point (equals = fn p1 p2 => ({x1, y1} = p1; {x2, y2} = p2; (equals x1 x2) && (equals y1 y2))););
 
-### Error Handling
-
-Clear error messages when implementations are missing:
-
-```noolang
-# This would produce a helpful error:
-show someCustomType   # Error: No implementation of Show for CustomType
-```
-
-### Complete Example
-
-Here's a complete example showing constraint definitions and usage at the top level:
-
-```noolang
-# Define constraints at top level
-constraint Show a ( show : a -> String );
-constraint Eq a ( 
-  equals : a -> a -> Bool; 
-  notEquals : a -> a -> Bool 
-);
-
-# Implement constraints for different types
-implement Show Float ( show = toString );
-implement Show String ( show = fn s => s );
-implement Eq Float ( 
-  equals = fn a b => a == b;
-  notEquals = fn a b => a != b
-);
-
-# Use constraint functions - they resolve automatically
-result1 = show 42;           # "42"
-result2 = show "hello";      # "hello"
-result3 = equals 1 2;        # False
-result4 = notEquals 1 2;     # True
+# then you can use == to compare pairs
+# Point 1 2 == Point 1 2; # => True
+# Point 1 2 == Point 2 1; # => False
 ```
 
 ### Integration with Existing Features
@@ -1671,19 +1604,11 @@ The trait system works seamlessly with all existing Noolang features:
 
 ```noolang
 # With higher-order functions
-showAll = map show    # Automatically constrains to Show a => List a -> List String
+showAll = map show;    # Automatically constrains to Show a => List a -> List String
 
 # With pipeline operators
-result = [1, 2, 3] |> map show |> joinStrings ", "
+result = [1, 2, 3] | map show | join ", ";
 
-# With ADTs and pattern matching
-variant Option a = Some a | None;
-implement Show (Option a) given Show a (
-  show = fn opt => match opt with (
-    Some x => "Some(" + show x + ")";
-    None => "None"
-  )
-);
 ```
 
 ### Current Implementation Status
@@ -1723,21 +1648,6 @@ Noolang provides several built-in constraints:
 
 TODO add examples
 
-#### Explicit Constraint Annotations (Planned)
-
-Future versions will support explicit constraint annotations:
-
-```noolang
-# Single constraint
-id = fn x => x : a -> a given a is Collection
-
-# Multiple constraints with "and"
-map = fn f list => map f list : (a -> b, List a) -> List b given a is Show and b is Eq
-
-# Complex constraint logic with "or"
-flexible = fn x => x : a -> a given a is Collection or a is String
-```
-
 ### Constraint Propagation
 
 Constraints automatically propagate through function composition:
@@ -1763,47 +1673,6 @@ TODO add examples
 #### Function Composition with Constraints
 TODO add examples
 
-
-### Current Implementation Status
-
-- **✅ Constraint System**: Fully implemented with Hindley-Milner style inference
-- **✅ Constraint Propagation**: Constraints are properly propagated through function composition
-- **✅ Built-in Constraints**: All 9 constraint types are implemented and validated
-- **✅ Constraint Validation**: Type checker enforces constraints during unification
-- **✅ Error Reporting**: Clear error messages when constraints are violated
-- **🚧 Explicit Annotations**: `given` syntax is parsed but constraint evaluation uses AND semantics for OR constraints
-
-### Constraint System Benefits
-
-1. **Type Safety**: Prevents invalid operations on incompatible types
-2. **Generic Programming**: Enables safe polymorphic functions with requirements
-3. **Clear Error Messages**: Specific feedback about constraint violations
-4. **Automatic Propagation**: Constraints flow naturally through function composition
-5. **LLM-Friendly**: Clear, predictable constraint semantics
-
-## Project Structure
-
-```
-src/
-  ├── ast.ts          # Abstract Syntax Tree definitions
-  ├── lexer.ts        # Tokenizer for whitespace-significant syntax
-  ├── parser/         # Parser implementation
-  │   ├── parser.ts   # Main parser (combinator-based)
-  │   └── combinators.ts # Parser combinator library
-  ├── evaluator.ts    # Interpreter for evaluating expressions
-  ├── typer_functional.ts # Type inference and checking
-  ├── repl.ts         # Interactive REPL
-  ├── cli.ts          # Command-line interface
-  └── format.ts       # Value formatting and output
-
-test/
-  ├── parser.test.ts    # Parser tests
-  ├── evaluator.test.ts # Evaluator tests
-  └── typer_functional.test.ts # Type inference tests
-
-syntaxes/
-  └── noolang.tmLanguage.json # VSCode syntax highlighting
-```
 
 ## Development
 
