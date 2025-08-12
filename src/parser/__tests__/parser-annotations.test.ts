@@ -366,21 +366,7 @@ complex_fn = fn f g x =>
 			}
 		});
 
-		test('Lambda with dollar operator and type annotation', () => {
-			const result = parseDefinition(
-				`dollar_fn = fn x => map (add 1) $ filter (gt 0) $ [x, x+1, x+2] : Float -> List Float`
-			);
-			expect(result.statements.length).toBe(1);
-			const def = result.statements[0];
-			assertDefinitionExpression(def);
-			assertTypedExpression(def.value);
-			assertFunctionExpression(def.value.expression);
-			// Body should contain dollar operator
-			expect(def.value.expression.body.kind).toBe('binary');
-			if (def.value.expression.body.kind === 'binary') {
-				expect(def.value.expression.body.operator).toBe('$');
-			}
-		});
+
 
 		test('Nested lambda definitions with type annotations (requires parentheses)', () => {
 			// Due to operator precedence, nested lambdas with types require parentheses

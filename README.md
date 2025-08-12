@@ -460,29 +460,7 @@ Some 10 |? (fn x => x + 5) |? (fn x => x * 2) |? safe_divide  # Some 6
 Some 0 |? (fn x => x + 5) |? (fn x => x * 2) |? safe_divide   # None
 ```
 
-#### Dollar Operator (`$`) - Low-Precedence Function Application
-Applies the left function to the right value with low precedence (avoids parentheses):
-```noolang
-# Without $ - lots of parentheses needed
-map (fn x => x * 2) (filter (fn x => x > 5) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
 
-# With $ - much cleaner
-map (fn x => x * 2) $ filter (fn x => x > 5) $ [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-
-# Method-chaining with accessors
-person = { @address { @street "123 Main St", @city "Anytown" } };
-street_value = person | @address | @street;  # Get the street value
-
-# Using $ to avoid parentheses in complex expressions
-# Without $ - nested parentheses
-result1 = map (fn x => x * 2) (filter (fn x => x > 3) (person | @scores));
-
-# With $ - cleaner chain
-result2 = map (fn x => x * 2) $ filter (fn x => x > 3) $ (person | @scores);
-
-# Complex nested function calls
-reduce (+) 0 $ map (fn x => x * x) $ filter (fn x => x % 2 == 0) $ [1, 2, 3, 4, 5, 6]
-```
 
 ### Conditional Expressions
 
@@ -897,7 +875,7 @@ Noolang provides a set of built-in functions organized by category:
 - **`|?`** - Safe thrush operator (monadic chaining): `m a -> (a -> m b) -> m b`
 - **`|>`** - Pipeline operator (left-to-right composition): `(a -> b) -> (b -> c) -> (a -> c)`
 - **`<|`** - Compose operator (right-to-left composition): `(b -> c) -> (a -> b) -> (a -> c)`
-- **`$`** - Dollar operator (low precedence function application): `(a -> b) -> a -> b`
+
 - **`;`** - Semicolon operator (sequence): `a -> b -> b`
 
 #### List Operations (Pure)
