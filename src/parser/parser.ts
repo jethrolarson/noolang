@@ -2149,7 +2149,7 @@ const parseTupleTypeDefinition: C.Parser<TupleTypeDefinition> = C.map(
 		),
 		C.punctuation('}')
 	),
-	([openBrace, elements, closeBrace]): TupleTypeDefinition => ({
+	([_openBrace, elements, closeBrace]): TupleTypeDefinition => ({
 		kind: 'tuple-type',
 		elements: elements || [],
 	})
@@ -2168,19 +2168,22 @@ const parseUnionTypeDefinition: C.Parser<UnionTypeDefinition> = C.map(
 );
 
 // Parse structured type definition (record or tuple based on content)
-const parseStructuredTypeDefinition: C.Parser<RecordTypeDefinition | TupleTypeDefinition> = (tokens: Token[]) => {
+const parseStructuredTypeDefinition: C.Parser<
+	RecordTypeDefinition | TupleTypeDefinition
+> = (tokens: Token[]) => {
 	// Look ahead to see if we have accessor syntax (@field) or regular types
-	if (tokens.length === 0) return { success: false, error: 'Unexpected end of input', position: 0 };
-	
+	if (tokens.length === 0)
+		return { success: false, error: 'Unexpected end of input', position: 0 };
+
 	if (tokens[0].type !== 'PUNCTUATION' || tokens[0].value !== '{') {
 		return { success: false, error: 'Expected {', position: 0 };
 	}
-	
+
 	// Look ahead to determine if this is a record (has @) or tuple (no @)
 	let i = 1;
 	let hasAccessor = false;
 	let braceCount = 1;
-	
+
 	while (i < tokens.length && braceCount > 0) {
 		if (tokens[i].type === 'PUNCTUATION') {
 			if (tokens[i].value === '{') braceCount++;
@@ -2191,7 +2194,7 @@ const parseStructuredTypeDefinition: C.Parser<RecordTypeDefinition | TupleTypeDe
 		}
 		i++;
 	}
-	
+
 	// Parse as record or tuple based on what we found
 	if (hasAccessor) {
 		return parseRecordTypeDefinition(tokens);
@@ -2201,10 +2204,11 @@ const parseStructuredTypeDefinition: C.Parser<RecordTypeDefinition | TupleTypeDe
 };
 
 // Parse user-defined type definition (structured type or union)
-const parseUserDefinedTypeDefinition: C.Parser<UserDefinedTypeDefinition> = C.choice(
-	C.map(parseStructuredTypeDefinition, (s): UserDefinedTypeDefinition => s),
-	C.map(parseUnionTypeDefinition, (u): UserDefinedTypeDefinition => u)
-);
+const parseUserDefinedTypeDefinition: C.Parser<UserDefinedTypeDefinition> =
+	C.choice(
+		C.map(parseStructuredTypeDefinition, (s): UserDefinedTypeDefinition => s),
+		C.map(parseUnionTypeDefinition, (u): UserDefinedTypeDefinition => u)
+	);
 
 // --- Constraint Function ---
 const parseConstraintFunction: C.Parser<ConstraintFunction> = C.map(
@@ -2408,36 +2412,47 @@ const parsePatternFieldOrElement = (
 	};
 };
 
-const parsePatternFields: C.Parser<{ isRecord: boolean; fieldName?: string; pattern: Pattern }[]> = (tokens: Token[]): C.ParseResult<{ isRecord: boolean; fieldName?: string; pattern: Pattern }[]> => {
-	const fields: { isRecord: boolean; fieldName?: string; pattern: Pattern }[] = [];
+const parsePatternFields: C.Parser<
+	{ isRecord: boolean; fieldName?: string; pattern: Pattern }[]
+> = (
+	tokens: Token[]
+): C.ParseResult<
+	{ isRecord: boolean; fieldName?: string; pattern: Pattern }[]
+> => {
+	const fields: { isRecord: boolean; fieldName?: string; pattern: Pattern }[] =
+		[];
 	let rest = tokens;
-	
+
 	// Parse first field/element
 	const firstResult = parsePatternFieldOrElement(0)(rest);
 	if (!firstResult.success) {
 		return firstResult;
 	}
-	
+
 	fields.push(firstResult.value);
 	rest = firstResult.remaining;
-	
+
 	// Parse remaining fields/elements with comma separators
-	while (rest.length > 0 && rest[0].type === 'PUNCTUATION' && rest[0].value === ',') {
+	while (
+		rest.length > 0 &&
+		rest[0].type === 'PUNCTUATION' &&
+		rest[0].value === ','
+	) {
 		rest = rest.slice(1); // consume comma
-		
+
 		const fieldResult = parsePatternFieldOrElement(fields.length)(rest);
 		if (!fieldResult.success) {
 			break;
 		}
-		
+
 		fields.push(fieldResult.value);
 		rest = fieldResult.remaining;
 	}
-	
+
 	return {
 		success: true,
 		value: fields,
-		remaining: rest
+		remaining: rest,
 	};
 };
 
@@ -2445,20 +2460,20 @@ const parseTupleOrRecordPattern: C.Parser<Pattern> = C.map(
 	C.seq(C.punctuation('{'), C.optional(parsePatternFields), C.punctuation('}')),
 	([open, fields, close]): Pattern => {
 		const fieldsList = fields || [];
-		
+
 		if (fieldsList.length === 0) {
 			// Empty braces - this could be unit pattern, but for now treat as empty tuple
 			return {
 				kind: 'tuple',
 				elements: [],
-				location: createLocation(open.location.start, close.location.end)
+				location: createLocation(open.location.start, close.location.end),
 			};
 		}
-		
+
 		// Check if all fields are record fields or all are tuple elements
 		const allRecord = fieldsList.every(f => f.isRecord);
 		const allTuple = fieldsList.every(f => !f.isRecord);
-		
+
 		if (allRecord) {
 			// Record pattern
 			return {
@@ -2466,20 +2481,22 @@ const parseTupleOrRecordPattern: C.Parser<Pattern> = C.map(
 				fields: fieldsList.map(f => ({
 					fieldName: f.fieldName!,
 					pattern: f.pattern,
-					location: f.pattern.location
+					location: f.pattern.location,
 				})),
-				location: createLocation(open.location.start, close.location.end)
+				location: createLocation(open.location.start, close.location.end),
 			};
 		} else if (allTuple) {
 			// Tuple pattern
 			return {
 				kind: 'tuple',
 				elements: fieldsList.map(f => f.pattern),
-				location: createLocation(open.location.start, close.location.end)
+				location: createLocation(open.location.start, close.location.end),
 			};
 		} else {
 			// Mixed - error
-			throw new Error('Cannot mix record fields (@field) and tuple elements in the same pattern');
+			throw new Error(
+				'Cannot mix record fields (@field) and tuple elements in the same pattern'
+			);
 		}
 	}
 );
@@ -2641,27 +2658,97 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
 	}
 );
 
-// --- Sequence term: everything else ---
-const parseSequenceTerm: C.Parser<Expression> = C.choice(
-	// Parse keyword-based expressions first to avoid identifier conflicts
-	parseMatchExpression, // ADT pattern matching (starts with "match")
-	parseTypeDefinition, // ADT variant definitions (starts with "variant")
-	parseUserDefinedType, // User-defined types (starts with "type")
-	parseConstraintDefinition, // constraint definitions (starts with "constraint")
-	parseImplementDefinition, // implement definitions (starts with "implement")
-	parseMutableDefinition, // starts with "mut"
-	parseMutation, // starts with "mut!"
-	parseImportExpression, // starts with "import"
-	parseIfAfterDollar, // if expressions (starts with "if")
-	// Then parse identifier-based expressions (including destructuring)
-	parseDefinitionWithType, // allow definitions with type annotations (includes destructuring)
-	parseDefinition, // fallback to regular definitions
-	parseWhereExpression, // where expressions (must come before lambda to avoid precedence issues)
-	parseLambdaExpression, // lambda expressions (moved after where)
-	parseThrush, // full expression hierarchy (includes all primaries and type annotations)
+// Original choice-based parser for fallback
+const parseSequenceTermOriginal: C.Parser<Expression> = C.choice(
+	parseMatchExpression,
+	parseTypeDefinition,
+	parseUserDefinedType,
+	parseConstraintDefinition,
+	parseImplementDefinition,
+	parseMutableDefinition,
+	parseMutation,
+	parseImportExpression,
+	parseIfAfterDollar,
+	parseDefinitionWithType,
+	parseDefinition,
+	parseWhereExpression,
+	parseLambdaExpression,
+	parseThrush,
 	parseRecord,
 	parseThrush
 );
+
+const parseSequenceTerm: C.Parser<Expression> = tokens => {
+	if (tokens.length === 0) {
+		return { success: false, error: 'Unexpected end of input', position: 0 };
+	}
+
+	const firstToken = tokens[0];
+
+	// Comprehensive fast dispatch - handle 90%+ of cases to minimize fallback
+	switch (firstToken.type) {
+		case 'KEYWORD':
+			switch (firstToken.value) {
+				case 'constraint':
+					return parseConstraintDefinition(tokens);
+				case 'implement':
+					return parseImplementDefinition(tokens);
+				case 'variant':
+					return parseTypeDefinition(tokens);
+				case 'type':
+					return parseUserDefinedType(tokens);
+				case 'match':
+					return parseMatchExpression(tokens);
+				case 'import':
+					return parseImportExpression(tokens);
+				case 'if':
+					return parseIfAfterDollar(tokens);
+				case 'fn':
+					return parseLambdaExpression(tokens);
+				case 'where':
+					return parseWhereExpression(tokens);
+				case 'mut':
+					if (
+						tokens.length > 1 &&
+						tokens[1].type === 'OPERATOR' &&
+						tokens[1].value === '!'
+					) {
+						return parseMutation(tokens);
+					} else {
+						return parseMutableDefinition(tokens);
+					}
+			}
+			break;
+
+		case 'IDENTIFIER':
+			// Handle simple, unambiguous identifier patterns
+			if (tokens.length > 1) {
+				const secondToken = tokens[1];
+				if (secondToken.type === 'OPERATOR' && secondToken.value === '=') {
+					// Simple definition: x = expr
+					return parseDefinition(tokens);
+				}
+				// Type annotations (x : Type) are more complex due to "given" clauses, constraints, etc.
+				// Let those fall back to full parser for now
+			}
+			// Fall back to full parser for complex identifier cases
+			break;
+
+		case 'PUNCTUATION':
+			// PUNCTUATION cases are complex and context-dependent 
+			// Always fall back to full parser for correctness
+			break;
+
+		case 'NUMBER':
+		case 'STRING':
+		case 'ACCESSOR':
+			// Simple literals - handle directly with parseThrush
+			return parseThrush(tokens);
+	}
+
+	// Fallback only for truly unknown cases
+	return parseSequenceTermOriginal(tokens);
+};
 
 // parseSequenceTerm now includes parseIfExpression
 const parseSequenceTermWithIf: C.Parser<Expression> = parseSequenceTerm;
