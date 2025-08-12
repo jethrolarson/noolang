@@ -7,8 +7,8 @@ test.skip('should work when ADTs are used sequentially without list_map (require
 	const result = runCode(`
         variant Color = Red | Green | Blue;
         variant Shape a = Circle a | Rectangle a a | Triangle a a a;
-        color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
-        calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
+        color_to_number = fn color => match color (Red => 1; Green => 2; Blue => 3);
+        calculate_area = fn shape => match shape (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
         color_result = color_to_number Red;
         shape_result = calculate_area (Circle 5);
         { @color color_result, @shape shape_result }
@@ -35,8 +35,8 @@ test('should demonstrate that the variant unification issue is now fixed', () =>
         colors = [Red, Green, Blue];
         shapes = [Circle 3, Rectangle 5 4];
         # This also works - separate operations
-        color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
-        calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
+        color_to_number = fn color => match color (Red => 1; Green => 2; Blue => 3);
+        calculate_area = fn shape => match shape (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
         # This now works - list_map is properly polymorphic
         color_numbers = list_map color_to_number colors;
         areas = list_map calculate_area shapes;
@@ -50,7 +50,7 @@ test('should work with separate variant definitions', () => {
 	const result1 = runCode(`
         variant Color = Red | Green | Blue;
         colors = [Red, Green, Blue];
-        color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
+        color_to_number = fn color => match color (Red => 1; Green => 2; Blue => 3);
         list_map color_to_number colors
       `);
 
@@ -62,8 +62,8 @@ test.skip('should work with manual iteration instead of list_map (requires Phase
 	const result = runCode(`
         variant Color = Red | Green | Blue;
         variant Shape a = Circle a | Rectangle a a | Triangle a a a;
-        color_to_number = fn color => match color with (Red => 1; Green => 2; Blue => 3);
-        calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
+        color_to_number = fn color => match color (Red => 1; Green => 2; Blue => 3);
+        calculate_area = fn shape => match shape (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
         # Manual iteration instead of list_map
         colors = [Red, Green, Blue];
         shapes = [Circle 3, Rectangle 5 4];

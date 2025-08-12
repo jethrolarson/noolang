@@ -27,7 +27,7 @@ describe('Algebraic Data Types', () => {
 		test('should pattern match on Some', () => {
 			const result = runCode(`
 		opt = Some 42;
-		match opt with (
+		match opt (
 			Some x => x;
 			None => 0
 		)
@@ -39,7 +39,7 @@ describe('Algebraic Data Types', () => {
 		test('should pattern match on None', () => {
 			const result = runCode(`
 		opt = None;
-		match opt with (
+		match opt (
 			Some x => x;
 			None => 0
 		)
@@ -51,7 +51,7 @@ describe('Algebraic Data Types', () => {
 		test('should handle nested Some values', () => {
 			const result = runCode(`
 		nested = Some (Some 42);
-		match nested with (
+		match nested (
 			Some (Some x) => x;
 			Some None => -1;
 			None => 0
@@ -79,7 +79,7 @@ describe('Algebraic Data Types', () => {
 		const result = runCode(`
 		variant Color = Red | Green | Blue;
 		
-		colorToString = fn color => match color with (
+		colorToString = fn color => match color (
 			Red => "red";
 			Green => "green";
 			Blue => "blue"
@@ -152,7 +152,7 @@ describe('Algebraic Data Types', () => {
 		const result = runCode(`
 		variant Result2 a b = Ok2 a | Error2 b;
 		
-		unwrap = fn result => match result with (
+		unwrap = fn result => match result (
 			Ok2 value => value;
 			Error2 msg => 0
 		);
@@ -167,7 +167,7 @@ describe('Algebraic Data Types', () => {
 		const result = runCode(`
 		variant Point = Point Float Float;
 		
-		getX = fn point => match point with (
+		getX = fn point => match point (
 			Point x y => x
 		);
 		
@@ -182,8 +182,8 @@ describe('Algebraic Data Types', () => {
 		variant Inner = InnerValue Float;
 		variant Outer = OuterValue Inner;
 		
-		getValue = fn outer => match outer with (
-			OuterValue inner => match inner with (
+		getValue = fn outer => match outer (
+			OuterValue inner => match inner (
 				InnerValue value => value
 			)
 		);
@@ -247,7 +247,7 @@ describe('Algebraic Data Types', () => {
 		const result = runCode(`
 		variant Status = Success | Failure;
 		
-		statusToNumber = fn status => match status with (
+		statusToNumber = fn status => match status (
 			Success => 1;
 			Failure => 0
 		);
@@ -262,7 +262,7 @@ describe('Algebraic Data Types', () => {
 		const result = runCode(`
 		variant Status = Success | Failure;
 		
-		statusToNumber = fn status => match status with (
+		statusToNumber = fn status => match status (
 			Success => 1;
 			Failure => 0
 		);
@@ -304,8 +304,8 @@ describe('Algebraic Data Types', () => {
 		variant Color = Red | Green | Blue;
 		variant Size = Small | Medium | Large;
 		
-		colorToString = fn color => match color with (Red => "red"; Green => "green"; Blue => "blue");
-		sizeToString = fn size => match size with (Small => "small"; Medium => "medium"; Large => "large");
+		colorToString = fn color => match color (Red => "red"; Green => "green"; Blue => "blue");
+		sizeToString = fn size => match size (Small => "small"; Medium => "medium"; Large => "large");
 		
 		colorToString Red
 	`);
@@ -318,7 +318,7 @@ describe('Algebraic Data Types', () => {
 		variant Color = Red | Green | Blue;
 		variant Status = Success | Failure;
 		
-		colorToStatus = fn color => match color with (
+		colorToStatus = fn color => match color (
 			Red => Failure;
 			Green => Success;
 			Blue => Failure
@@ -355,7 +355,7 @@ describe('Algebraic Data Types', () => {
 		const result = runCode(`
 		variant U = U;
 		
-		isU = fn x => match x with (
+		isU = fn x => match x (
 			U => True
 		);
 		
@@ -374,7 +374,7 @@ describe('Algebraic Data Types', () => {
 		variant Color = Red | Green | Blue;
 		variant Shape a = Circle a | Rectangle a a | Triangle a a a;
 		shapes = [Circle 3, Rectangle 5 4];
-		calculate_area = fn shape => match shape with (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
+		calculate_area = fn shape => match shape (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
 		areas = list_map calculate_area shapes;
 		areas
 	`);
@@ -444,7 +444,7 @@ describe('Algebraic Data Types', () => {
 
 		tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
 
-		getValue = fn t => match t with (
+		getValue = fn t => match t (
 			Node value left right => value;
 			Leaf => 0
 		);
@@ -459,7 +459,7 @@ describe('Algebraic Data Types', () => {
 		const result = runCode(`
 		variant LinkedList a = Cons a (LinkedList a) | Nil;
 
-		sum = fn lst => match lst with (
+		sum = fn lst => match lst (
 			Cons h t => h + (sum t);
 			Nil => 0
 		);
@@ -475,7 +475,7 @@ describe('Algebraic Data Types', () => {
 		const result = runCode(`
 		variant MyList a = Cons a (MyList a) | Nil;
 
-		length = fn lst => match lst with (
+		length = fn lst => match lst (
 			Cons h t => 1 + (length t);
 			Nil => 0
 		);
@@ -491,7 +491,7 @@ describe('Algebraic Data Types', () => {
 		const result = runCode(`
 		variant Tree a = Node a (Tree a) (Tree a) | Leaf;
 
-		sumTree = fn t => match t with (
+		sumTree = fn t => match t (
 			Node value left right => value + (sumTree left) + (sumTree right);
 			Leaf => 0
 		);

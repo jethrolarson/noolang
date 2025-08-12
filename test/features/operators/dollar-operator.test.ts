@@ -127,7 +127,7 @@ test('Dollar Operator ($) - Complex Chaining - deep $ chaining', () => {
 
 test('Dollar Operator ($) - Complex Chaining - $ with mixed operators', () => {
 	const result = runCode(
-		'sum = fn x y => x + y; opt = [10] | head; match opt with (Some x => (sum $ x) $ 5; None => 0)'
+		'sum = fn x y => x + y; opt = [10] | head; match opt (Some x => (sum $ x) $ 5; None => 0)'
 	);
 	expect(result.finalValue).toEqual(15);
 });

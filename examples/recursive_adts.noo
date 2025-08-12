@@ -13,31 +13,31 @@ numberTree = Node 5 (Node 3 (Node 1 Leaf Leaf) (Node 4 Leaf Leaf)) (Node 7 (Node
 stringTree = Node "root" (Node "left" Leaf Leaf) (Node "right" Leaf Leaf);
 
 # Basic tree operations
-getValue = fn tree => match tree with (
+getValue = fn tree => match tree (
     Node value _ _ => value;
     Leaf => 0
 );
 
 # Sum all values in a numeric tree
-sumTree = fn tree => match tree with (
+sumTree = fn tree => match tree (
     Node value left right => value + (sumTree left) + (sumTree right);
     Leaf => 0
 );
 
 # Calculate tree depth
-depth = fn tree => match tree with (
+depth = fn tree => match tree (
     Node _ left right => 1 + max (depth left) (depth right);
     Leaf => 0
 );
 
 # Count total nodes
-nodeCount = fn tree => match tree with (
+nodeCount = fn tree => match tree (
     Node _ left right => 1 + (nodeCount left) + (nodeCount right);
     Leaf => 0
 );
 
 # Find if value exists in tree
-contains = fn target tree => match tree with (
+contains = fn target tree => match tree (
     Node value left right => 
         if value == target 
         then True 
@@ -46,7 +46,7 @@ contains = fn target tree => match tree with (
 );
 
 # Transform all values in tree
-mapTree = fn f tree => match tree with (
+mapTree = fn f tree => match tree (
     Node value left right => Node (f value) (mapTree f left) (mapTree f right);
     Leaf => Leaf
 );
@@ -72,36 +72,36 @@ numbers = Cons 1 (Cons 2 (Cons 3 (Cons 4 (Cons 5 Nil))));
 words = Cons "hello" (Cons "world" (Cons "from" (Cons "noolang" Nil)));
 
 # Basic list operations
-head = fn lst => match lst with (
+head = fn lst => match lst (
     Cons h _ => Some h;
     Nil => None
 );
 
-tail = fn lst => match lst with (
+tail = fn lst => match lst (
     Cons _ t => Some t;
     Nil => None
 );
 
 # List length
-length = fn lst => match lst with (
+length = fn lst => match lst (
     Cons _ tail => 1 + (length tail);
     Nil => 0
 );
 
 # Sum numeric list
-sum = fn lst => match lst with (
+sum = fn lst => match lst (
     Cons head tail => head + (sum tail);
     Nil => 0
 );
 
 # Map function over list
-listMap = fn f lst => match lst with (
+listMap = fn f lst => match lst (
     Cons head tail => Cons (f head) (listMap f tail);
     Nil => Nil
 );
 
 # Filter list elements
-filter = fn predicate lst => match lst with (
+filter = fn predicate lst => match lst (
     Cons head tail => 
         if predicate head 
         then Cons head (filter predicate tail)
@@ -110,14 +110,14 @@ filter = fn predicate lst => match lst with (
 );
 
 # Append two lists
-append = fn list1 list2 => match list1 with (
+append = fn list1 list2 => match list1 (
     Cons head tail => Cons head (append tail list2);
     Nil => list2
 );
 
 # Reverse a list
 reverse = fn lst => 
-    let reverseHelper = fn acc remaining => match remaining with (
+    let reverseHelper = fn acc remaining => match remaining (
         Cons head tail => reverseHelper (Cons head acc) tail;
         Nil => acc
     ) in
@@ -145,7 +145,7 @@ variant Expr =
     Number Float;
 
 # Evaluate expression tree
-eval = fn expr => match expr with (
+eval = fn expr => match expr (
     Add left right => (eval left) + (eval right);
     Multiply left right => (eval left) * (eval right);
     Subtract left right => (eval left) - (eval right);
@@ -154,7 +154,7 @@ eval = fn expr => match expr with (
 );
 
 # Convert expression to string representation
-exprToString = fn expr => match expr with (
+exprToString = fn expr => match expr (
     Add left right => "(" + (exprToString left) + " + " + (exprToString right) + ")";
     Multiply left right => "(" + (exprToString left) + " * " + (exprToString right) + ")";
     Subtract left right => "(" + (exprToString left) + " - " + (exprToString right) + ")";
@@ -213,7 +213,7 @@ sampleJson = JsonObject (
 );
 
 # Extract string representation of JSON
-jsonToString = fn json => match json with (
+jsonToString = fn json => match json (
     JsonObject fields => "{" + (fieldsToString fields) + "}";
     JsonArray values => "[" + (arrayToString values) + "]";
     JsonString s => "\"" + s + "\"";
@@ -224,18 +224,18 @@ jsonToString = fn json => match json with (
 );
 
 # Helper for object fields
-fieldsToString = fn fields => match fields with (
+fieldsToString = fn fields => match fields (
     Cons {key, value} tail => 
         "\"" + key + "\": " + (jsonToString value) + 
-        (match tail with (Nil => ""; _ => ", " + (fieldsToString tail)));
+        (match tail (Nil => ""; _ => ", " + (fieldsToString tail)));
     Nil => ""
 );
 
 # Helper for arrays
-arrayToString = fn values => match values with (
+arrayToString = fn values => match values (
     Cons value tail =>
         (jsonToString value) + 
-        (match tail with (Nil => ""; _ => ", " + (arrayToString tail)));
+        (match tail (Nil => ""; _ => ", " + (arrayToString tail)));
     Nil => ""
 );
 

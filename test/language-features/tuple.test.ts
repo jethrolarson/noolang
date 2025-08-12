@@ -131,7 +131,7 @@ test('should work in function definitions', () => {
 
 test('should work with pattern matching', () => {
 	const source = `
-		match { 1, 2 } with (
+		match { 1, 2 } (
 			{ x, y } => tupleLength { x, y }
 		)
 	`;

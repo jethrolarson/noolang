@@ -203,7 +203,7 @@ result = [1, 2, 3] |> map show |> joinStrings ", "
 # With ADTs and pattern matching
 type Option a = Some a | None;
 implement Show (Option a) given Show a (
-  show = fn opt => match opt with (
+  show = fn opt => match opt (
     Some x => "Some(" + show x + ")";
     None => "None"
   )
@@ -393,7 +393,7 @@ Pattern matching on `Unknown` values refines them to concrete types:
 result = ffi "node" "fs.readFileSync";
 
 # Pattern matching refines the type
-content = match result with (
+content = match result (
   String s => "got string: " + s;
   Error e => "got error";
   Function f => "got function";
@@ -408,7 +408,7 @@ Explicit conversion from any type to `Unknown`:
 ```noolang
 myFloat = 42;                    # myFloat: Float
 dynamic = forget myFloat;        # dynamic: Unknown
-refined = match dynamic with (
+refined = match dynamic (
   Float n => n * 2;
   _ => 0
 );
@@ -497,7 +497,7 @@ readFile = fs |? @readFileSync?;    # readFile: Option Unknown
 result = readFile |? fn f => f ["file.txt"] |? processContent;
 
 # Type refinement through pattern matching
-content = match result with (
+content = match result (
   Some (String s) => s;
   _ => "failed to read file"
 );

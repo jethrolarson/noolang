@@ -23,7 +23,7 @@ status = if age > 18 then "adult" else "minor";
 
 # Pattern matching with ADTs
 option_value = Some 42;
-unwrapped = match option_value with (Some x => x; None => 0);
+unwrapped = match option_value (Some x => x; None => 0);
 
 # Type annotations (commented out - not fully supported in current version)
 # typed_function = fn x => x + 1 : (Float) -> Float;

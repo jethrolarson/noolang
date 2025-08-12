@@ -12,7 +12,7 @@ import {
 // --- Parser Tests ---
 
 test('Tuple Pattern Parsing - should parse simple tuple pattern', () => {
-	const lexer = new Lexer('match point with ( {x, y} => x + y; _ => 0 )');
+	const lexer = new Lexer('match point ( {x, y} => x + y; _ => 0 )');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
@@ -34,7 +34,7 @@ test('Tuple Pattern Parsing - should parse simple tuple pattern', () => {
 
 test('Record Pattern Parsing - should parse simple record pattern', () => {
 	const lexer = new Lexer(
-		'match person with ( {@name n, @age a} => n; _ => "unknown" )'
+		'match person ( {@name n, @age a} => n; _ => "unknown" )'
 	);
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
@@ -67,7 +67,7 @@ test('Tuple Pattern Evaluation - should match and bind tuple elements', () => {
 	expect(
 		runCode(`
 		point = {10, 20};
-		match point with (
+		match point (
 			{x, y} => x + y;
 			_ => 0
 		)
@@ -79,7 +79,7 @@ test('Tuple Pattern Evaluation - should match literal values in tuples', () => {
 	expect(
 		runCode(`
 		origin = {0, 0};
-		match origin with (
+		match origin (
 			{0, 0} => "origin";
 			{x, 0} => "x-axis";
 			{0, y} => "y-axis";
@@ -93,7 +93,7 @@ test('Record Pattern Evaluation - should match and bind record fields', () => {
 	expect(
 		runCode(`
 		person = {@name "Alice", @age 30};
-		match person with (
+		match person (
 			{@name n, @age a} => n + " is " + (toString a);
 			_ => "unknown"
 		)
@@ -105,7 +105,7 @@ test('Record Pattern Evaluation - should match specific field values', () => {
 	expect(
 		runCode(`
 		user = {@role "admin", @name "Alice"};
-		match user with (
+		match user (
 			{@role "admin", @name n} => "Administrator: " + n;
 			{@role "user", @name n} => "User: " + n;
 			_ => "unknown role"
@@ -118,7 +118,7 @@ test('Nested Pattern Evaluation - should handle nested tuple patterns', () => {
 	expect(
 		runCode(`
 		nested = {1, {2, 3}};
-		match nested with (
+		match nested (
 			{x, {y, z}} => x + y + z;
 			_ => 0
 		)
@@ -130,7 +130,7 @@ test('Nested Pattern Evaluation - should handle nested record patterns', () => {
 	expect(
 		runCode(`
 		complex = {@user {@name "Alice", @id 123}, @status "active"};
-		match complex with (
+		match complex (
 			{@user {@name "Alice"}, @status s} => "Alice is " + s;
 			{@user {@name n}, @status s} => n + " is " + s;
 			_ => "unknown"
@@ -143,7 +143,7 @@ test('Mixed ADT and Data Structure Patterns - should work with Option types', ()
 	expect(
 		runCode(`
 		data = Some {10, 20};
-		match data with (
+		match data (
 			Some {x, y} => x * y;
 			Some _ => 0;
 			None => -1
@@ -156,7 +156,7 @@ test('Record Pattern Evaluation - should support partial field matching', () => 
 	expect(
 		runCode(`
 		user = {@name "Bob", @age 25, @city "NYC", @email "bob@example.com"};
-		match user with (
+		match user (
 			{@name "Alice"} => "Found Alice";
 			{@name n} => "User: " + n;
 			_ => "No name"

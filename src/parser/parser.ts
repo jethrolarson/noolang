@@ -1754,7 +1754,6 @@ const parseMatchExpression: C.Parser<MatchExpression> = C.map(
 	C.seq(
 		C.keyword('match'),
 		C.lazy(() => parseThrush), // Use a simpler expression parser to avoid circular dependency
-		C.keyword('with'),
 		C.punctuation('('),
 		C.sepBy(parseMatchCase, C.punctuation(';')),
 		// Allow and ignore trailing semicolons after the last case
@@ -1764,7 +1763,6 @@ const parseMatchExpression: C.Parser<MatchExpression> = C.map(
 	([
 		match,
 		expression,
-		_with,
 		_openParen,
 		cases,
 		_trailingSemicolons,

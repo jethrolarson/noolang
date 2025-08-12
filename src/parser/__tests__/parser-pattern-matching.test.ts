@@ -12,7 +12,7 @@ import {
 } from '../../../test/utils';
 
 test('Pattern Matching - should parse simple match expression', () => {
-	const lexer = new Lexer('match x with ( True => 1; False => 0 )');
+	const lexer = new Lexer('match x ( True => 1; False => 0 )');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
@@ -27,7 +27,7 @@ test('Pattern Matching - should parse simple match expression', () => {
 });
 
 test('Pattern Matching - should parse match with variable patterns', () => {
-	const lexer = new Lexer('match x with ( Some y => y; None => 0 )');
+	const lexer = new Lexer('match x ( Some y => y; None => 0 )');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
@@ -41,7 +41,7 @@ test('Pattern Matching - should parse match with variable patterns', () => {
 });
 
 test('Pattern Matching - should parse match with wildcard patterns', () => {
-	const lexer = new Lexer('match x with ( Some _ => 1; _ => 0 )');
+	const lexer = new Lexer('match x ( Some _ => 1; _ => 0 )');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
@@ -56,7 +56,7 @@ test('Pattern Matching - should parse match with wildcard patterns', () => {
 
 test('Pattern Matching - should parse match with literal patterns', () => {
 	const lexer = new Lexer(
-		'match x with ( 1 => "one"; "hello" => "world"; _ => "other" )'
+		'match x ( 1 => "one"; "hello" => "world"; _ => "other" )'
 	);
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
@@ -71,7 +71,7 @@ test('Pattern Matching - should parse match with literal patterns', () => {
 });
 
 test('Pattern Matching - should parse match with nested constructor patterns', () => {
-	const lexer = new Lexer('match x with ( Wrap (Value n) => n; _ => 0 )');
+	const lexer = new Lexer('match x ( Wrap (Value n) => n; _ => 0 )');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);
@@ -85,7 +85,7 @@ test('Pattern Matching - should parse match with nested constructor patterns', (
 });
 
 test('Pattern Matching - should parse match with trailing semicolons in cases', () => {
-	const lexer = new Lexer('match x with ( True => 1; False => 0;;;; )');
+	const lexer = new Lexer('match x ( True => 1; False => 0;;;; )');
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
 	expect(program.statements.length).toBe(1);

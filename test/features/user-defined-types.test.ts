@@ -223,17 +223,17 @@ describe('Type Alias Functionality', () => {
     });
 
     test('tuple type alias should work for type annotations', () => {
-        const code = `type Point = {Float, Float}; point = {10.5, 20.3} : Point; match point with ({x, y} => x)`;
-        expectSuccess(code, 10.5);
-    });
+			const code = `type Point = {Float, Float}; point = {10.5, 20.3} : Point; match point ({x, y} => x)`;
+			expectSuccess(code, 10.5);
+		});
 
-    test('function types within user-defined types should work', () => {
-        const code = `
+		test('function types within user-defined types should work', () => {
+			const code = `
             type Handler = {(Float) -> String};
             handler = fn x => toString x;
             h = {handler} : Handler;
-            match h with ({f} => f 42)
+            match h ({f} => f 42)
         `;
-        expectSuccess(code, "42");
-    });
+			expectSuccess(code, '42');
+		});
 });

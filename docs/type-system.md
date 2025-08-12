@@ -281,7 +281,7 @@ result
 # person.name  # Not yet supported
 
 # Use pattern matching
-getName = fn person => match person with (
+getName = fn person => match person (
   { @name n, @age _ } => n;
   _ => "Unknown"
 );

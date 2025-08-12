@@ -230,7 +230,7 @@ describe('Evaluator', () => {
 	test('Recursion - should handle recursive list sum', () => {
 		const result = runCode(`
         # Helper to extract value from Some
-        getSome = fn opt => match opt with (Some x => x; None => 0);
+        getSome = fn opt => match opt (Some x => x; None => 0);
         recSum = fn list => if isEmpty list then 0 else (getSome (head list)) + (recSum (tail list));
         recSum [1, 2, 3, 4, 5]
       `);
@@ -240,7 +240,7 @@ describe('Evaluator', () => {
 	test('Recursion - should handle recursive list reverse', () => {
 		const result = runCode(`
         # Helper to extract value from Some
-        getSome = fn opt => match opt with (Some x => x; None => 0);
+        getSome = fn opt => match opt (Some x => x; None => 0);
         recReverse = fn list => if isEmpty list then [] else append (recReverse (tail list)) [getSome (head list)];
         recReverse [1, 2, 3]
       `);
@@ -464,7 +464,7 @@ describe('Evaluator', () => {
 	test('Additional Coverage - should handle wildcard pattern', () => {
 		const result = runCode(`
         value = "anything";
-        match value with (
+        match value (
           _ => "wildcard matched"
         )
       `);
@@ -474,7 +474,7 @@ describe('Evaluator', () => {
 	test('Additional Coverage - should handle variable pattern with binding', () => {
 		const result = runCode(`
         value = 123;
-        match value with (
+        match value (
           x => x + 1
         )
       `);
@@ -485,7 +485,7 @@ describe('Evaluator', () => {
 		const result = runCode(`
         variant MyType = A | B Float;
         value = B 42;
-        match value with (
+        match value (
           A => 0;
           B x => x
         )
@@ -498,7 +498,7 @@ describe('Evaluator', () => {
 			runCode(`
         variant Color = Red | Blue;
         value = Red;
-        match value with (
+        match value (
           Blue => "blue"
         )
       `)
@@ -665,7 +665,7 @@ describe('Evaluator', () => {
 		const result = runCode(`
         outer = 10;
         value = 42;
-        match value with (
+        match value (
           x => x + outer
         )
       `);

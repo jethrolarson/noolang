@@ -262,7 +262,7 @@ describe('Type annotations', () => {
 
 	test('Function type annotation after lambda body binds to the lambda (not the body)', () => {
 		const code = `
-map_err = fn f res => match res with (
+map_err = fn f res => match res (
   Ok x => Ok x;
   Err e => Err (f e)
 ) : (b -> c) -> Result a b -> Result a c
@@ -292,8 +292,8 @@ add_func = fn x y => x + y : Float -> Float -> Float;
 		test('Complex nested match expression with type annotation', () => {
 			const code = `
 complex_fn = fn f g x => 
-  match (f x) with (
-    Some y => match (g y) with (
+  match (f x) (
+    Some y => match (g y) (
       Ok z => Some z;
       Err _ => None
     );

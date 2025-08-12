@@ -4,12 +4,12 @@ print "=== Tuple Pattern Matching ===";
 
 # Basic tuple destructuring
 point = {10, 20};
-sum = match point with ({x, y} => x + y);
+sum = match point ({x, y} => x + y);
 println sum;
 
 # Tuple with literals
 origin = {0, 0};
-origin_check = match origin with (
+origin_check = match origin (
     {0, 0} => "origin"; 
     _ => "not origin"
 );
@@ -19,12 +19,12 @@ print "=== Record Pattern Matching ===";
 
 # Basic record destructuring
 user = { @name "Alice", @age 30 };
-greeting = match user with ({@name n} => "Hello " + n);
+greeting = match user ({@name n} => "Hello " + n);
 println greeting;
 
 # Partial record matching
 admin = { @name "Bob", @role "admin", @active True };
-role_check = match admin with (
+role_check = match admin (
     {@role "admin"} => "Administrator";
     {@role "user"} => "Regular user";
     _ => "Unknown role"
@@ -35,7 +35,7 @@ print "=== ADT Integration ===";
 
 # Constructor with tuple
 point_opt = Some {100, 200};
-point_result = match point_opt with (
+point_result = match point_opt (
     Some {x, y} => x + y;
     None => 0
 );
@@ -43,7 +43,7 @@ println point_result;
 
 # Constructor with record
 user_result = Ok { @name "Charlie", @score 95 };
-score_msg = match user_result with (
+score_msg = match user_result (
     Ok {@score s} => "Score: " + toString s;
     Err _ => "No score"
 );

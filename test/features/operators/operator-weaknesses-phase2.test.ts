@@ -14,7 +14,7 @@ describe('Operator Functionality', () => {
 		expectSuccess(
 			`
         result = Ok 5 |? (fn x => x * 2);
-        match result with (Ok x => x; Err _ => 0)
+        match result (Ok x => x; Err _ => 0)
     `,
 			10
 		);
@@ -47,7 +47,7 @@ describe('Operator Functionality', () => {
 		expectSuccess(
 			`
         variant Point a = Point a a;
-        getX = fn point => match point with (Point x y => x);
+        getX = fn point => match point (Point x y => x);
         points = [Point 1 2, Point 3 4];
         result = points | list_map $ getX;
         result
@@ -123,7 +123,7 @@ describe('Operator Functionality', () => {
 			`
         safeDivide = fn x y => if y == 0 then None else (x / y);
         result = Some 10 |? (fn x => safeDivide x 2);
-        match result with (Some x => x; None => 0)
+        match result (Some x => x; None => 0)
     `,
 			5
 		);

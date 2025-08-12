@@ -195,7 +195,7 @@ test('Effects Phase 3 - Effect Propagation in Pattern Matching - pattern matchin
 	expectEffects(
 		`
 				opt = Some 42;
-				match opt with (
+				match opt (
 					Some x => (print x; {});
 					None => (log "empty"; {})
 				)
@@ -208,7 +208,7 @@ test('Effects Phase 3 - Effect Propagation in Pattern Matching - pattern matchin
 	expectEffects(
 		`
 				result = Ok 42;
-				match result with (
+				match result (
 					Ok value => print value;
 					Err msg => (log msg; random)
 				)

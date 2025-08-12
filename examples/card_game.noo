@@ -46,14 +46,14 @@ gameState = {
 };
 
 # Example of pattern matching with variants
-suitToString = fn suit => match suit with (
+suitToString = fn suit => match suit (
   Spade => "♠";
   Heart => "♥"; 
   Club => "♣";
   Diamond => "♦"
 );
 
-cardNumToString = fn num => match num with (
+cardNumToString = fn num => match num (
   Ace => "A";
   N2 => "2";
   N3 => "3";
@@ -70,7 +70,7 @@ cardNumToString = fn num => match num with (
 );
 
 # Function to display a card
-cardToString = fn card => match card with (
+cardToString = fn card => match card (
   {num, suit} => (cardNumToString num) + (suitToString suit)
 );
 

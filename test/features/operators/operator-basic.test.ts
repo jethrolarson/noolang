@@ -80,7 +80,7 @@ describe('Operator', () => {
 			expectSuccess(
 				`
         result = [1, 2, 3] | head;
-        match result with (Some x => x; None => 0)
+        match result (Some x => x; None => 0)
     `,
 				1
 			);
@@ -125,7 +125,7 @@ describe('Operator', () => {
 		expectSuccess(
 			`
         result = Some 5 |? (fn x => x * 2);
-        match result with (Some x => x; None => 0)
+        match result (Some x => x; None => 0)
     `,
 			10
 		);
@@ -135,7 +135,7 @@ describe('Operator', () => {
 		expectSuccess(
 			`
         result = None |? (fn x => x * 2);
-        match result with (Some x => x; None => -1)
+        match result (Some x => x; None => -1)
     `,
 			-1
 		);
@@ -199,7 +199,7 @@ describe('Operator', () => {
 			expectSuccess(
 				`
         double = fn x => x * 2;
-        filterEven = fn list => list_filter (fn x => match x % 2 with (Some remainder => remainder == 0; None => False)) list;
+        filterEven = fn list => list_filter (fn x => match x % 2 (Some remainder => remainder == 0; None => False)) list;
         pipeline = filterEven |> list_map double;
         pipeline [1, 2, 3, 4, 5, 6]
     `,
@@ -211,9 +211,9 @@ describe('Operator', () => {
 			expectSuccess(
 				`
         addFive = fn x => x + 5;
-        pipeline = head |> (fn opt => match opt with (Some x => Some (addFive x); None => None));
+        pipeline = head |> (fn opt => match opt (Some x => Some (addFive x); None => None));
         result = pipeline [1, 2, 3];
-        match result with (Some x => x; None => 0)
+        match result (Some x => x; None => 0)
     `,
 				6
 			);
@@ -264,7 +264,7 @@ describe('Operator', () => {
 			expectSuccess(
 				`
         double = fn x => x * 2;
-        filterEven = fn list => list_filter (fn x => match x % 2 with (Some remainder => remainder == 0; None => False)) list;
+        filterEven = fn list => list_filter (fn x => match x % 2 (Some remainder => remainder == 0; None => False)) list;
         pipeline = list_map double <| filterEven;
         pipeline [1, 2, 3, 4, 5, 6]
     `,
@@ -276,9 +276,9 @@ describe('Operator', () => {
 			expectSuccess(
 				`
         addFive = fn x => x + 5;
-        pipeline = (fn opt => match opt with (Some x => Some (addFive x); None => None)) <| head;
+        pipeline = (fn opt => match opt (Some x => Some (addFive x); None => None)) <| head;
         result = pipeline [1, 2, 3];
-        match result with (Some x => x; None => 0)
+        match result (Some x => x; None => 0)
     `,
 				6
 			);

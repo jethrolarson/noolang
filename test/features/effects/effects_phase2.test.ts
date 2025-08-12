@@ -71,7 +71,7 @@ test('pure pattern matching has no effects', () => {
 	const result = runCode(`
 				variant Color = Red | Green | Blue;
 				color = Red;
-				match color with (Red => 1; Green => 2; Blue => 3)
+				match color (Red => 1; Green => 2; Blue => 3)
 			`);
 	expect(result.typeResult.effects.size).toBe(0);
 });
@@ -201,7 +201,7 @@ test('thrush operator with pure functions has no effects', () => {
 test('pattern matching with pure cases has no effects', () => {
 	const result = runCode(`
 				opt = Some 42;
-				match opt with (
+				match opt (
 					Some x => x * 2;
 					None => 0
 				)
@@ -212,8 +212,8 @@ test('pattern matching with pure cases has no effects', () => {
 test('nested pattern matching with pure expressions has no effects', () => {
 	const result = runCode(`
 				result = Ok (Some 42);
-				match result with (
-					Ok opt => match opt with (Some x => x; None => 0);
+				match result (
+					Ok opt => match opt (Some x => x; None => 0);
 					Err e => -1
 				)
 			`);
