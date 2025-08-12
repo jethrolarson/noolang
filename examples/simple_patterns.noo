@@ -2,11 +2,11 @@
 
 # Test tuple patterns
 point = {10, 20};
-result1 = match point with ({x, y} => x + y);
+result1 = match point ({x, y} => x + y);
 
 # Test record patterns  
 user = { @name "Alice", @age 30 };
-result2 = match user with ({@name n} => n);
+result2 = match user ({@name n} => n);
 
 # Print results
 print "Tuple result: ";

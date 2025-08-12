@@ -439,7 +439,7 @@ describe('Trait System', () => {
 
 		test('should integrate with ADT pattern matching', () => {
 			const code = `
-		handleOption = fn opt => match opt with (
+		handleOption = fn opt => match opt (
 			Some x => show x;
 			None => "nothing"
 		);

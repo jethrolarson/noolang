@@ -27,26 +27,26 @@ Match tuples by position with comma-separated patterns:
 
 ```noolang
 # Basic tuple matching
-match point with (
+match point (
   {x, y} => x + y;
   _ => 0
 )
 
 # Mixed pattern types
-match data with (
+match data (
   {1, name} => name;           # First element literal 1, bind second to name
   {_, "default"} => "found";   # Wildcard first, literal second
   {x, y} => "other"            # Bind both elements
 )
 
 # Nested tuple patterns
-match nested with (
+match nested (
   {x, {inner, rest}} => inner + rest;
   _ => 0
 )
 
 # Single element tuples (edge case)
-match single with (
+match single (
   {value} => value;
   _ => 0
 )
@@ -58,27 +58,27 @@ Match records by field name with `@field` patterns:
 
 ```noolang
 # Basic record matching
-match person with (
+match person (
   {@name "Alice", @age 30} => "Found Alice";
   {@name n, @age a} => n + " is " + (toString a);
   _ => "Unknown person"
 )
 
 # Partial record matching (only specified fields matter)
-match user with (
+match user (
   {@name "admin"} => "Administrator";  # Other fields ignored
   {@name n} => "User: " + n
 )
 
 # Nested record patterns
-match complex with (
+match complex (
   {@user {@name "Alice"}, @status "active"} => "Active Alice";
   {@user {@name n}, @status s} => n + " is " + s;
   _ => "Unknown"
 )
 
 # Mixed field patterns
-match data with (
+match data (
   {@id 123, @name n} => "Special user: " + n;
   {@id i, @name "guest"} => "Guest #" + (toString i);
   {@id i, @name n} => n + " #" + (toString i)
@@ -207,7 +207,7 @@ const matchesPattern = (pattern: Pattern, value: any, env: Environment): boolean
 
 ```noolang
 # Tuple matching for coordinate systems
-processPoint = fn point => match point with (
+processPoint = fn point => match point (
   {0, 0} => "origin";
   {x, 0} => "on x-axis: " + (toString x);
   {0, y} => "on y-axis: " + (toString y);
@@ -215,7 +215,7 @@ processPoint = fn point => match point with (
 );
 
 # Record matching for user processing
-processUser = fn user => match user with (
+processUser = fn user => match user (
   {@role "admin", @name n} => "Administrator: " + n;
   {@role "user", @active True, @name n} => "Active user: " + n;
   {@role "user", @active False, @name n} => "Inactive user: " + n;
@@ -224,7 +224,7 @@ processUser = fn user => match user with (
 );
 
 # Mixed ADT and data structure patterns
-processData = fn data => match data with (
+processData = fn data => match data (
   Some {x, y} => "Point: " + (toString x) + ", " + (toString y);
   Some {@name n, @value v} => n + " = " + (toString v);
   Some value => "Other: " + (toString value);
@@ -245,7 +245,7 @@ processData = fn data => match data with (
 ### Optional Field Patterns (Future)
 ```noolang
 # Optional field matching with |? operator integration
-match user with (
+match user (
   {@email? email} => "Email: " + (email |? toString | option_get_or "none");
   _ => "No email"
 )
@@ -254,7 +254,7 @@ match user with (
 ### Pattern Guards (Future)
 ```noolang
 # Pattern guards for additional conditions
-match point with (
+match point (
   {x, y} when x > 0 and y > 0 => "positive quadrant";
   {x, y} => "other quadrant"
 )
@@ -263,7 +263,7 @@ match point with (
 ### Rest Patterns (Future)
 ```noolang
 # Rest patterns for ignoring remaining fields
-match record with (
+match record (
   {@name n, ...} => "Name: " + n;  # Ignore other fields
   _ => "No name"
 )

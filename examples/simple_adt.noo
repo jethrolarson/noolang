@@ -9,7 +9,7 @@ green = Green;
 blue = Blue;
 
 # Simple pattern matching
-color_value = match Red with (
+color_value = match Red (
   Red => 42;
   Green => 0;
   Blue => 0
@@ -20,7 +20,7 @@ some_val = Some 123;
 none_val = None;
 
 # Option pattern matching
-option_result = match some_val with (
+option_result = match some_val (
   Some x => x;
   None => 0
 );

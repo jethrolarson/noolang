@@ -12,7 +12,7 @@ test('Stdlib Parsing Regression Tests - should parse the problematic implement s
 variant Option a = Some a | None;
 
 implement Show (Option a) given a implements Show (
-  show = fn opt => match opt with (
+  show = fn opt => match opt (
     Some x => concat "Some(" (concat (show x) ")");
     None => "None"
   )
@@ -31,7 +31,7 @@ test('Stdlib Parsing Regression Tests - should handle another complex implement 
 variant List a = Nil | Cons a (List a);
 
 implement Functor List (
-  map = fn f list => match list with (
+  map = fn f list => match list (
     Nil => Nil;
     Cons head tail => Cons (f head) (map f tail)
   )

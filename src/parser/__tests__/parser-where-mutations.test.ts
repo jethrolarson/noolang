@@ -232,9 +232,7 @@ describe('Mutable Definitions and Mutations', () => {
 	});
 
 	test('should parse mutation with match expression', () => {
-		const lexer = new Lexer(
-			'mut! result = match x with (Some y => y; None => 0)'
-		);
+		const lexer = new Lexer('mut! result = match x (Some y => y; None => 0)');
 		const tokens = lexer.tokenize();
 		const program = parse(tokens);
 		expect(program.statements.length).toBe(1);

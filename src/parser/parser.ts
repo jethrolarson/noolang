@@ -345,57 +345,6 @@ const parseLambdaBody: C.Parser<Expression> = tokens => {
 	return parseLambdaBodyThrush(tokens);
 };
 
-const parseLambdaBodyDollar: C.Parser<Expression> = tokens => {
-	const leftResult = parseLambdaBodyCompose(tokens);
-	if (!leftResult.success) return leftResult;
-
-	if (
-		leftResult.remaining.length > 0 &&
-		leftResult.remaining[0].type === 'OPERATOR' &&
-		leftResult.remaining[0].value === '$'
-	) {
-		const remaining = leftResult.remaining.slice(1);
-		const rightResult = parseLambdaBodyDollar(remaining);
-		if (!rightResult.success) return rightResult;
-
-		return {
-			success: true as const,
-			value: {
-				kind: 'binary' as const,
-				operator: '$' as const,
-				left: leftResult.value,
-				right: rightResult.value,
-				location: leftResult.value.location,
-			},
-			remaining: rightResult.remaining,
-		};
-	}
-	return leftResult;
-};
-
-// Simplified parsing hierarchy for lambda bodies
-const parseLambdaBodyThrush: C.Parser<Expression> = C.map(
-	C.seq(
-		parseLambdaBodyDollar,
-		C.many(
-			C.seq(C.choice2(C.operator('|'), C.operator('|?')), parseLambdaBodyDollar)
-		)
-	),
-	([left, rest]) => {
-		let result = left;
-		for (const [op, right] of rest) {
-			result = {
-				kind: 'binary',
-				operator: op.value as '|' | '|?',
-				left: result,
-				right,
-				location: result.location,
-			};
-		}
-		return result;
-	}
-);
-
 const parseLambdaBodyComparison: C.Parser<Expression> = tokens => {
 	return C.map(
 		C.seq(
@@ -457,6 +406,32 @@ const parseLambdaBodyCompose: C.Parser<Expression> = C.map(
 			} as PipelineExpression;
 		}
 		return left;
+	}
+);
+
+// Simplified parsing hierarchy for lambda bodies
+const parseLambdaBodyThrush: C.Parser<Expression> = C.map(
+	C.seq(
+		parseLambdaBodyCompose,
+		C.many(
+			C.seq(
+				C.choice2(C.operator('|'), C.operator('|?')),
+				parseLambdaBodyCompose
+			)
+		)
+	),
+	([left, rest]) => {
+		let result = left;
+		for (const [op, right] of rest) {
+			result = {
+				kind: 'binary',
+				operator: op.value as '|' | '|?',
+				left: result,
+				right,
+				location: result.location,
+			};
+		}
+		return result;
 	}
 );
 
@@ -901,8 +876,8 @@ const parseCompose: C.Parser<Expression> = tokens => {
 const parseThrush: C.Parser<Expression> = tokens => {
 	const thrushResult = C.map(
 		C.seq(
-			parseDollar,
-			C.many(C.seq(C.choice2(C.operator('|'), C.operator('|?')), parseDollar))
+			parseCompose,
+			C.many(C.seq(C.choice2(C.operator('|'), C.operator('|?')), parseCompose))
 		),
 		([left, rest]) => {
 			let result = left;
@@ -922,38 +897,7 @@ const parseThrush: C.Parser<Expression> = tokens => {
 	return thrushResult;
 };
 
-// --- Dollar ($) - Low precedence function application (right-associative) ---
-const parseDollar: C.Parser<Expression> = tokens => {
-	const leftResult = parseCompose(tokens);
-	if (!leftResult.success) return leftResult;
 
-	// Check for $ operator
-	if (
-		leftResult.remaining.length > 0 &&
-		leftResult.remaining[0].type === 'OPERATOR' &&
-		leftResult.remaining[0].value === '$'
-	) {
-		// Consume the $ token
-		const remaining = leftResult.remaining.slice(1);
-
-		// Recursively parse the right side (this creates right-associativity)
-		const rightResult = parseDollar(remaining);
-		if (!rightResult.success) return rightResult;
-
-		const result = {
-			kind: 'binary' as const,
-			operator: '$' as const,
-			left: leftResult.value,
-			right: rightResult.value,
-			location: leftResult.value.location,
-		};
-
-		return { success: true, value: result, remaining: rightResult.remaining };
-	}
-
-	// No $ operator found, just return the left expression
-	return leftResult;
-};
 
 // Helper function to apply postfix operators to an expression
 // Parse type annotation with optional constraint: : Type [given Constraint]
@@ -1754,7 +1698,6 @@ const parseMatchExpression: C.Parser<MatchExpression> = C.map(
 	C.seq(
 		C.keyword('match'),
 		C.lazy(() => parseThrush), // Use a simpler expression parser to avoid circular dependency
-		C.keyword('with'),
 		C.punctuation('('),
 		C.sepBy(parseMatchCase, C.punctuation(';')),
 		// Allow and ignore trailing semicolons after the last case
@@ -1764,7 +1707,6 @@ const parseMatchExpression: C.Parser<MatchExpression> = C.map(
 	([
 		match,
 		expression,
-		_with,
 		_openParen,
 		cases,
 		_trailingSemicolons,
@@ -1795,14 +1737,12 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
 		definitions,
 		_trailingSemicolons,
 		_closeParen,
-	]): WhereExpression => {
-		return {
-			kind: 'where',
-			main,
-			definitions,
-			location: main.location,
-		};
-	}
+	]): WhereExpression => ({
+		kind: 'where',
+		main,
+		definitions,
+		location: main.location,
+	})
 );
 
 // Original choice-based parser for fallback

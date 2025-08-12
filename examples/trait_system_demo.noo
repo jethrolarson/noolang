@@ -91,7 +91,7 @@ variant Option a = Some a | None;
 
 # Show implementation for Option
 implement Show (Option a) given a implements Show (
-  show = fn opt => match opt with (
+  show = fn opt => match opt (
     Some x => concat "Some(" (concat (show x) ")");
     None => "None"
   )

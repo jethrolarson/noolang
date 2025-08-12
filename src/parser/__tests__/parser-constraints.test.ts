@@ -24,7 +24,7 @@ test('should parse constraint definition', () => {
 
 test('should parse implement definition', () => {
 	const lexer = new Lexer(
-		'implement Monad Option ( return = Some; bind = fn opt f => match opt with ( Some x => f x; None => None ) )'
+		'implement Monad Option ( return = Some; bind = fn opt f => match opt ( Some x => f x; None => None ) )'
 	);
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);

@@ -18,7 +18,7 @@ test('| operator with built-in constraint resolution', () => {
 	expectSuccess(
 		`
         result = [1, 2, 3] | head;
-        match result with (Some x => x; None => 0)
+        match result (Some x => x; None => 0)
     `,
 		1
 	);
@@ -44,7 +44,7 @@ test('| operator with built-in ADTs works', () => {
 	expectSuccess(
 		`
         opts = [Some 1, None, Some 3];
-        extract = fn opt => match opt with (Some x => x; None => 0);
+        extract = fn opt => match opt (Some x => x; None => 0);
         result = opts | list_map extract;
         result
     `,

@@ -201,17 +201,17 @@ Some 1; # => Some 1 : Option 1
 None; # => None : Option None
 
 # Pattern matching is a way to extract the value of a variant
-result = match (Some 42) with (Some x => x; None => 0);
+result = match (Some 42) (Some x => x; None => 0);
 
 # Pattern matching with variants
 variant Point = Point Float Float;
 point = Point 10 20;
-x = match point with (Point x y => x);
+x = match point (Point x y => x);
 
 # Recursive variants (Binary Tree)
 variant Tree a = Node a (Tree a) (Tree a) | Leaf;
 tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
-sum = fn t => match t with (
+sum = fn t => match t (
     Node value left right => value + (sum left) + (sum right);
     Leaf => 0
 );
@@ -229,11 +229,11 @@ point = {10.5, 20.3};
 # Accessing user-defined types
 userName = user | @name;  # "Alice"
 userAge = user | @age;    # 30
-x_coord = match point with ({x, y} => x);  # 10.5
+x_coord = match point ({x, y} => x);  # 10.5
 
 # Tuple pattern matching
 coordinates = {10, 20, 30};
-sum = match coordinates with (
+sum = match coordinates (
     {x, y, z} => x + y + z;
     {x, y} => x + y;
     _ => 0
@@ -241,14 +241,14 @@ sum = match coordinates with (
 
 # Record pattern matching  
 user = { @name "Alice", @age 30, @city "NYC" };
-greeting = match user with (
+greeting = match user (
     {@name n, @age a} => "Hello " + n + ", age " + toString a;
     _ => "Unknown user"
 )
 
 # Nested patterns with constructors
 data = Some {10, 20};
-result = match data with (
+result = match data (
     Some {x, y} => x * y;
     Some _ => 0;
     None => -1
@@ -460,29 +460,7 @@ Some 10 |? (fn x => x + 5) |? (fn x => x * 2) |? safe_divide  # Some 6
 Some 0 |? (fn x => x + 5) |? (fn x => x * 2) |? safe_divide   # None
 ```
 
-#### Dollar Operator (`$`) - Low-Precedence Function Application
-Applies the left function to the right value with low precedence (avoids parentheses):
-```noolang
-# Without $ - lots of parentheses needed
-map (fn x => x * 2) (filter (fn x => x > 5) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
 
-# With $ - much cleaner
-map (fn x => x * 2) $ filter (fn x => x > 5) $ [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-
-# Method-chaining with accessors
-person = { @address { @street "123 Main St", @city "Anytown" } };
-street_value = person | @address | @street;  # Get the street value
-
-# Using $ to avoid parentheses in complex expressions
-# Without $ - nested parentheses
-result1 = map (fn x => x * 2) (filter (fn x => x > 3) (person | @scores));
-
-# With $ - cleaner chain
-result2 = map (fn x => x * 2) $ filter (fn x => x > 3) $ (person | @scores);
-
-# Complex nested function calls
-reduce (+) 0 $ map (fn x => x * x) $ filter (fn x => x % 2 == 0) $ [1, 2, 3, 4, 5, 6]
-```
 
 ### Conditional Expressions
 
@@ -613,7 +591,7 @@ sum_squares where (
 # With pattern matching
 safe_head where (
   list = [1, 2, 3];
-  safe_head = match list with (
+  safe_head = match list (
     [] => None;
     [head, ...] => Some head
   )
@@ -843,7 +821,7 @@ result = import "examples/math_module" | @add | ($ 2) | ($ 3)  # => 5
 
 # With pattern matching (if importing ADTs)
 option = import "examples/option_module"
-value = match option with (Some x => x; None => 0)
+value = match option (Some x => x; None => 0)
 
 # With higher-order functions
 {@map, @filter} = import "examples/list_utils"
@@ -897,7 +875,7 @@ Noolang provides a set of built-in functions organized by category:
 - **`|?`** - Safe thrush operator (monadic chaining): `m a -> (a -> m b) -> m b`
 - **`|>`** - Pipeline operator (left-to-right composition): `(a -> b) -> (b -> c) -> (a -> c)`
 - **`<|`** - Compose operator (right-to-left composition): `(b -> c) -> (a -> b) -> (a -> c)`
-- **`$`** - Dollar operator (low precedence function application): `(a -> b) -> a -> b`
+
 - **`;`** - Semicolon operator (sequence): `a -> b -> b`
 
 #### List Operations (Pure)
@@ -1085,20 +1063,20 @@ Use `match` expressions to destructure ADTs and handle different cases:
 
 ```noolang
 # Basic pattern matching
-handle_option = fn opt => match opt with (
+handle_option = fn opt => match opt (
   Some value => value * 2;
   None => 0
 );
 
 # Pattern matching with multiple constructors
-area = fn shape => match shape with (
+area = fn shape => match shape (
   Circle radius => radius * radius * 3;
   Rectangle width height => width * height;
   Triangle a b c => (a * b) / 2
 );
 
 # Extracting values from constructors
-get_coordinate = fn point => match point with (
+get_coordinate = fn point => match point (
   Point x y => { @x x, @y y }
 );
 ```
@@ -1124,7 +1102,7 @@ ADTs work seamlessly with Noolang's existing features:
 ```noolang
 # With higher-order functions
 options = [Some 1, None, Some 3];
-extract = fn opt => match opt with (Some x => x; None => 0);
+extract = fn opt => match opt (Some x => x; None => 0);
 values = map extract options;  # [1, 0, 3]
 
 # With type constraints (automatic)
@@ -1141,24 +1119,24 @@ Pattern matching supports various pattern types:
 
 ```noolang
 # Constructor patterns with variables
-match value with (Some x => x; None => 0)
+match value (Some x => x; None => 0)
 
 # Tuple patterns - destructure tuples
-match point with (
+match point (
     {x, y} => x + y;           # 2D point
     {x, y, z} => x + y + z;    # 3D point
     _ => 0                     # Any other case
 )
 
 # Record patterns - destructure records by field name
-match user with (
+match user (
     {@name n, @age a} => n + " is " + toString a;
     {@name n} => "Name: " + n;  # Partial matching
     _ => "Unknown"
 )
 
 # Mixed literal and variable patterns in tuples
-match coordinates with (
+match coordinates (
     {0, 0} => "origin";        # Literal values
     {x, 0} => "x-axis";        # Mix literals and variables
     {0, y} => "y-axis";
@@ -1166,21 +1144,21 @@ match coordinates with (
 )
 
 # Nested patterns (constructors with tuples/records)
-match data with (
+match data (
     Some {x, y} => x * y;      # Constructor with tuple pattern
     Some {@value v} => v;      # Constructor with record pattern
     None => 0
 )
 
 # Complex nested patterns
-match result with (
+match result (
     Ok {@user {@name n, @age a}} => "User: " + n;
     Ok _ => "Success";
     Err msg => "Error: " + msg
 )
 
 # Wildcard patterns
-match color with (Red => 1; _ => 0)
+match color (Red => 1; _ => 0)
 ```
 
 ### Type Safety
@@ -1201,10 +1179,10 @@ Destructure tuples by position:
 ```noolang
 # Basic tuple destructuring
 point = {10, 20};
-match point with ({x, y} => x + y)  # Returns 30
+match point ({x, y} => x + y)  # Returns 30
 
 # Mixed literals and variables
-match coordinates with (
+match coordinates (
     {0, 0} => "origin";
     {x, 0} => "x-axis point";
     {0, y} => "y-axis point";
@@ -1212,7 +1190,7 @@ match coordinates with (
 )
 
 # Variable-length matching
-match data with (
+match data (
     {a} => "single: " + toString a;
     {a, b} => "pair: " + toString (a + b);
     {a, b, c} => "triple: " + toString (a + b + c);
@@ -1225,19 +1203,19 @@ Destructure records by field name with partial matching support:
 ```noolang
 # Basic record destructuring
 person = { @name "Alice", @age 30, @city "NYC" };
-match person with (
+match person (
     {@name n, @age a} => n + " is " + toString a + " years old"
 )
 
 # Partial field matching (ignores extra fields)
-match person with (
+match person (
     {@name n} => "Hello " + n;  # Ignores @age and @city
     _ => "No name found"
 )
 
 # Complex nested record patterns
 user = { @profile { @name "Bob", @settings { @theme "dark" } } };
-match user with (
+match user (
     {@profile {@name n, @settings {@theme t}}} => n + " uses " + t + " theme";
     _ => "unknown user"
 )
@@ -1248,14 +1226,14 @@ Combine constructor, tuple, and record patterns:
 ```noolang
 # Constructor with tuple argument
 data = Some {10, 20};
-match data with (
+match data (
     Some {x, y} => x * y;    # Destructure tuple inside Some
     None => 0
 )
 
 # Constructor with record argument  
 user_result = Ok { @name "Alice", @role "admin" };
-match user_result with (
+match user_result (
     Ok {@name n, @role "admin"} => "Admin: " + n;
     Ok {@name n} => "User: " + n;
     Err msg => "Error: " + msg
@@ -1265,7 +1243,7 @@ match user_result with (
 ### Current Implementation Status
 
 - ✅ **Type definitions**: `variant Name = Constructor1 | Constructor2`
-- ✅ **Pattern matching**: `match expr with (pattern => expr; ...)`  
+- ✅ **Pattern matching**: `match expr (pattern => expr; ...)`  
 - ✅ **Built-in types**: Option and Result types with utility functions
 - ✅ **Constructor functions**: Automatic curried constructor creation
 - ✅ **Type checking**: Full type safety with inference
@@ -1318,7 +1296,7 @@ point = {10.5, 20.3};
 point3d = {1.0, 2.0, 3.0};
 
 # Access via pattern matching
-x_coord = match point with ({x, y} => x);  # 10.5
+x_coord = match point ({x, y} => x);  # 10.5
 
 # Parameterized tuple types
 type Pair a b = {a, b};
@@ -1343,7 +1321,7 @@ response2 = "error";        # String value
 response3 = 404;           # Float value
 
 # Pattern matching with union types (when implemented)
-# result = match response with (
+# result = match response (
 #   User u => "User: " + (u | @name);
 #   String s => "String: " + s;
 #   Float f => "Number: " + toString f
@@ -1433,19 +1411,19 @@ variant JsonValue =
 tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
 
 # Tree traversal with pattern matching
-getValue = fn t => match t with (
+getValue = fn t => match t (
     Node value left right => value;
     Leaf => 0
 );
 
 # Recursive tree operations
-sumTree = fn t => match t with (
+sumTree = fn t => match t (
     Node value left right => value + (sumTree left) + (sumTree right);
     Leaf => 0
 );
 
 # Tree depth calculation
-depth = fn t => match t with (
+depth = fn t => match t (
     Node _ left right => 1 + max (depth left) (depth right);
     Leaf => 0
 );
@@ -1459,19 +1437,19 @@ sumTree tree;   # => 15 (5+3+7)
 myList = Cons 1 (Cons 2 (Cons 3 Nil));
 
 # Recursive sum function
-sum = fn lst => match lst with (
+sum = fn lst => match lst (
     Cons head tail => head + (sum tail);
     Nil => 0
 );
 
 # List length calculation  
-length = fn lst => match lst with (
+length = fn lst => match lst (
     Cons _ tail => 1 + (length tail);
     Nil => 0
 );
 
 # List map function
-listMap = fn f lst => match lst with (
+listMap = fn f lst => match lst (
     Cons head tail => Cons (f head) (listMap f tail);
     Nil => Nil
 );
@@ -1491,7 +1469,7 @@ type Expr =
     Number Float;
 
 # Evaluate expression tree
-eval = fn expr => match expr with (
+eval = fn expr => match expr (
     Add left right => (eval left) + (eval right);
     Multiply left right => (eval left) * (eval right);
     Number n => n
@@ -1508,7 +1486,7 @@ Recursive ADTs work with Noolang's pattern matching:
 
 ```noolang
 # Find element in tree
-contains = fn target tree => match tree with (
+contains = fn target tree => match tree (
     Node value left right => 
         if value == target 
         then True 
@@ -1517,7 +1495,7 @@ contains = fn target tree => match tree with (
 );
 
 # Transform tree values
-mapTree = fn f tree => match tree with (
+mapTree = fn f tree => match tree (
     Node value left right => 
         Node (f value) (mapTree f left) (mapTree f right);
     Leaf => Leaf

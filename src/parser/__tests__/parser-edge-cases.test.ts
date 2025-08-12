@@ -229,7 +229,7 @@ describe('Parser Edge Cases', () => {
 			'(fn x => x) 42',
 			'[1, 2, 3] |> map |> filter',
 			'{ @a 1, @b 2, @c 3 }',
-			'match x with ( Some y => y + 1; None => 0 )',
+			'match x ( Some y => y + 1; None => 0 )',
 		];
 
 		for (const testCase of testCases) {

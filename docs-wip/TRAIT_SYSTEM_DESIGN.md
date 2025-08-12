@@ -140,7 +140,7 @@ given a has {Float, String}           # At least Float, String (extra elements O
 given a has {_, Float}                # Second element must be Float
 
 # Safe tuple accessors using pattern matching
-first = fn t => match t with ({x, ...} => x)
+first = fn t => match t ({x, ...} => x)
   : a -> b given a has {b}
 ```
 

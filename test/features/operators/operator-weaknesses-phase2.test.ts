@@ -14,7 +14,7 @@ describe('Operator Functionality', () => {
 		expectSuccess(
 			`
         result = Ok 5 |? (fn x => x * 2);
-        match result with (Ok x => x; Err _ => 0)
+        match result (Ok x => x; Err _ => 0)
     `,
 			10
 		);
@@ -26,20 +26,10 @@ describe('Operator Functionality', () => {
 			`
         f = fn x => x * 2;
         g = fn x => x + 1;
-        result = [1, 2, 3] | list_map $ f |> list_map $ g;
+        result = [1, 2, 3] | list_map f |> list_map g;
         result
     `,
 			[3, 5, 7]
-		);
-	});
-
-	test('constraint propagation through $ operator', () => {
-		expectSuccess(
-			`
-      showAndConcat = fn x => concat "Value: " $ show x;
-      showAndConcat 42
-      `,
-			'Value: 42'
 		);
 	});
 
@@ -47,9 +37,9 @@ describe('Operator Functionality', () => {
 		expectSuccess(
 			`
         variant Point a = Point a a;
-        getX = fn point => match point with (Point x y => x);
+        getX = fn point => match point (Point x y => x);
         points = [Point 1 2, Point 3 4];
-        result = points | list_map $ getX;
+        result = points | list_map getX;
         result
     `,
 			[1, 3]
@@ -59,11 +49,11 @@ describe('Operator Functionality', () => {
 	test('type inference with nested operator applications', () => {
 		expectSuccess(
 			`
-        compose = fn f g => fn x => f $ g x;
+        compose = fn f g => fn x => f (g x);
         sum1 = fn x => x + 1;
         mul2 = fn x => x * 2;
         combined = compose sum1 mul2;
-        result = [1, 2, 3] | list_map $ combined;
+        result = [1, 2, 3] | list_map combined;
         result
     `,
 			[3, 5, 7]
@@ -87,7 +77,7 @@ describe('Operator Functionality', () => {
 			`
         person = { @address { @street "123 Main", @city "NYC" } };
         getCity = fn p => p | @address | @city;
-        result = getCity $ person;
+        result = getCity person;
         result
     `,
 			'NYC'
@@ -109,7 +99,7 @@ describe('Operator Functionality', () => {
 		expectSuccess(
 			`
         double = fn x => x * 2;
-        toString = fn x => concat "Value: " $ show x;
+        toString = fn x => concat "Value: " (show x);
         result = 5 | double | toString;
         result
     `,
@@ -123,7 +113,7 @@ describe('Operator Functionality', () => {
 			`
         safeDivide = fn x y => if y == 0 then None else (x / y);
         result = Some 10 |? (fn x => safeDivide x 2);
-        match result with (Some x => x; None => 0)
+        match result (Some x => x; None => 0)
     `,
 			5
 		);
@@ -144,7 +134,7 @@ describe('Operator Functionality', () => {
 		expectSuccess(
 			`
         numbers = [1, 2, 3, 4, 5];
-        result = numbers | list_filter $ (fn x => x > 2) | list_map $ (fn x => x * 2);
+        result = numbers | list_filter (fn x => x > 2) | list_map (fn x => x * 2);
         result
     `,
 			[6, 8, 10]

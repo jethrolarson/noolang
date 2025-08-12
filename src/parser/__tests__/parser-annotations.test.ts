@@ -262,7 +262,7 @@ describe('Type annotations', () => {
 
 	test('Function type annotation after lambda body binds to the lambda (not the body)', () => {
 		const code = `
-map_err = fn f res => match res with (
+map_err = fn f res => match res (
   Ok x => Ok x;
   Err e => Err (f e)
 ) : (b -> c) -> Result a b -> Result a c
@@ -292,8 +292,8 @@ add_func = fn x y => x + y : Float -> Float -> Float;
 		test('Complex nested match expression with type annotation', () => {
 			const code = `
 complex_fn = fn f g x => 
-  match (f x) with (
-    Some y => match (g y) with (
+  match (f x) (
+    Some y => match (g y) (
       Ok z => Some z;
       Err _ => None
     );
@@ -366,21 +366,7 @@ complex_fn = fn f g x =>
 			}
 		});
 
-		test('Lambda with dollar operator and type annotation', () => {
-			const result = parseDefinition(
-				`dollar_fn = fn x => map (add 1) $ filter (gt 0) $ [x, x+1, x+2] : Float -> List Float`
-			);
-			expect(result.statements.length).toBe(1);
-			const def = result.statements[0];
-			assertDefinitionExpression(def);
-			assertTypedExpression(def.value);
-			assertFunctionExpression(def.value.expression);
-			// Body should contain dollar operator
-			expect(def.value.expression.body.kind).toBe('binary');
-			if (def.value.expression.body.kind === 'binary') {
-				expect(def.value.expression.body.operator).toBe('$');
-			}
-		});
+
 
 		test('Nested lambda definitions with type annotations (requires parentheses)', () => {
 			// Due to operator precedence, nested lambdas with types require parentheses

@@ -25,7 +25,7 @@ describe('Pattern Matching Failures', () => {
 		// FIXME: Currently fails with "Pattern expects constructor but got α"
 		const code = `
       variant Point a = Point a a;
-      get_x = fn point => match point with (Point x y => x);
+      get_x = fn point => match point (Point x y => x);
       origin = Point 0 0;
       get_x origin
     `;
@@ -36,7 +36,7 @@ describe('Pattern Matching Failures', () => {
 	test('should handle Option pattern matching in functions', () => {
 		// FIXME: Currently fails with "Pattern expects constructor but got α"
 		const code = `
-      handle_option = fn opt => match opt with (
+      handle_option = fn opt => match opt (
         Some value => value * 2;
         None => 0
       );
@@ -49,7 +49,7 @@ describe('Pattern Matching Failures', () => {
 	test('should handle Result pattern matching', () => {
 		// FIXME: Currently fails with "Pattern expects constructor but got α"
 		const code = `
-      handle_result = fn res => match res with (
+      handle_result = fn res => match res (
         Ok value => value + 10;
         Err msg => 0
       );
@@ -63,7 +63,7 @@ describe('Pattern Matching Failures', () => {
 		// FIXME: Currently fails with "Pattern expects constructor but got α"
 		const code = `
       variant Shape = Circle Float | Rectangle Float Float;
-      calculate_area = fn shape => match shape with (
+      calculate_area = fn shape => match shape (
         Circle radius => radius * radius * 3;
         Rectangle width height => width * height
       );

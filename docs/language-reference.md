@@ -232,15 +232,7 @@ result = Some 12 |? divideByTwo |? multiplyByThree;
 result
 ```
 
-#### Dollar Operator (`$`)
 
-```noolang
-# Low precedence function application
-double = fn x => x * 2;
-addTen = fn x => x + 10;
-result = addTen $ double $ 5
-# Equivalent to: addTen (double 5)
-```
 
 ### Conditional Expressions
 
@@ -343,7 +335,7 @@ From highest to lowest precedence (based on parser implementation):
 5. Comparison (`<`, `>`, `<=`, `>=`, `==`, `!=`)
 6. Logical (`and`, `or`)
 7. Pipeline (`|>`, `<|`, `|`, `|?`)
-8. Dollar operator (`$`) - lowest precedence
+8. Pipeline (`|>`, `<|`, `|`, `|?`) - lowest precedence
 
 ## Whitespace and Layout
 

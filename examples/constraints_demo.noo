@@ -70,7 +70,7 @@ test_person = { @name "Alice", @age 30 };
 person_name = test_person | @name;
 person_age = test_person | @age;
 
-first_number = match head_result with (Some x => x; None => 0);
+first_number = match head_result (Some x => x; None => 0);
 safe_head_result = head [10, 20, 30];
 composed_first = [1, 2, 3] | head;
 composed_rest = [1, 2, 3] | tail;

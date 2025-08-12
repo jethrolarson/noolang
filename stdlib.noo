@@ -107,17 +107,17 @@ id = fn x => x;
 variant Bool = True | False;
 
 # Boolean negation
-not = fn b => match b with (True => False; False => True);
+not = fn b => match b (True => False; False => True);
 
 implement Show Bool (
-  show = fn b => match b with (
+  show = fn b => match b (
     True => "True";
     False => "False"
   )
 );
 
 implement Eq Bool (
-  equals = fn a b => match a with (
+  equals = fn a b => match a (
     True => b;
     False => not b
   )
@@ -130,23 +130,23 @@ implement Eq Bool (
 variant Option a = Some a | None;
 
 implement Show (Option a) given a implements Show (
-  show = fn opt => match opt with (
+  show = fn opt => match opt (
     Some x => concat "Some(" (concat (show x) ")");
     None => "None"
   )
 );
 
-option_get_or = fn default opt => match opt with (
+option_get_or = fn default opt => match opt (
   Some value => value;
   None => default
 );
 
 # Map over Option (using Monad constraint)
 implement Monad Option (
-  bind = fn opt f => match opt with (
+  bind = fn opt f => match opt (
     Some x => (
       result = f x;
-      match result with (
+      match result (
         Some y => result;
         None => result;
         _ => Some result  # Auto-wrap non-Option values
@@ -158,19 +158,19 @@ implement Monad Option (
 );
 
 implement Functor Option (
-  map = fn f opt => match opt with (
+  map = fn f opt => match opt (
     Some x => Some (f x);
     None => None
   )
 );
 
 #implement Eq Option (
-#  equals = fn opt1 opt2 => match opt1 with (
-#    Some x => match opt2 with (
+#  equals = fn opt1 opt2 => match opt1 (
+#    Some x => match opt2 (
 #      Some y => equals x y;
 #      None => False
 #    );
-#    None => match opt2 with (   
+#    None => match opt2 (   
 #      Some y => False;
 #      None => True
 #    )
@@ -178,7 +178,7 @@ implement Functor Option (
 #);
 
 implement Applicative Option (
-  apply = fn f opt => match opt with (
+  apply = fn f opt => match opt (
     Some x => f x;
     None => None
   )
@@ -192,24 +192,24 @@ implement Applicative Option (
 variant Result a b = Ok a | Err b;
 
 implement Show Result (
-  show = fn res => match res with (
+  show = fn res => match res (
     Ok x => concat "Ok(" (concat (show x) ")");
     Err e => concat "Err(" (concat (show e) ")")
   )
 );
 
 # Extract value from Result with default for errors
-result_get_or = fn default res => match res with (
+result_get_or = fn default res => match res (
   Ok value => value;
   Err error => default
 );
 
 # Map over Result value (using Monad constraint) 
 implement Monad Result (
-  bind = fn res f => match res with (
+  bind = fn res f => match res (
     Ok x => (
       result = f x;
-      match result with (
+      match result (
         Ok y => result;
         Err e => result;
         _ => Ok result  # Auto-wrap non-Result values
@@ -221,35 +221,35 @@ implement Monad Result (
 );
 
 implement Functor Result (
-  map = fn f res => match res with (
+  map = fn f res => match res (
     Ok x => Ok (f x);
     Err e => Err e
   )
 );
 
-map_err = (fn f res => match res with (
+map_err = (fn f res => match res (
   Ok x => Ok x;
   Err e => Err (f e)
 )): (b -> c) -> Result a b -> Result a c;
 
-is_ok = fn res => match res with (
+is_ok = fn res => match res (
   Ok _ => True;
   Err _ => False
 );
 
-is_err = fn res => match res with (
+is_err = fn res => match res (
   Ok _ => False;
   Err _ => True
 );
 
 #implement Eq Result (
-#  equals = fn res1 res2 => match res1 with (
-#    Ok x => match res2 with (
+#  equals = fn res1 res2 => match res1 (
+#    Ok x => match res2 (
 #      Ok y => equals x y;
 #      Err e => False
 #    );
 #
-#    Err e => match res2 with (
+#    Err e => match res2 (
 #      Ok y => False;
 #      Err e => equals e e
 #    )
@@ -257,7 +257,7 @@ is_err = fn res => match res with (
 #);
 
 implement Applicative Result (
-  apply = fn f res => match res with (
+  apply = fn f res => match res (
     Ok x => f x;
     Err e => Err e
   )

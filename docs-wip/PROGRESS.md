@@ -26,7 +26,7 @@ fetch = ffi "browser" "window.fetch"          # Browser adapter interprets the p
 readFile = ffi "node" "fs.readFileSync";
 
 # Pattern matching to refine types
-content = match (readFile "file.txt") with (
+content = match (readFile "file.txt") (
   String s => s;
   Error e => "failed to read";
   _ => "unexpected type"

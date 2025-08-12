@@ -207,7 +207,7 @@ checkAge = fn age =>
   else None;
 
 # Pattern matching works
-getValue = fn maybe default => match maybe with (
+getValue = fn maybe default => match maybe (
   Some value => value;
   None => default
 );
