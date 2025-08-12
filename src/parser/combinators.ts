@@ -17,58 +17,49 @@ export type ParseResult<T> = ParseSuccess<T> | ParseError;
 export type Parser<T> = (tokens: Token[]) => ParseResult<T>;
 
 // Basic token matching
-export const token =
-	(type: TokenType, value?: string): Parser<Token> =>
-	(tokens: Token[]) => {
+export const token = (type: TokenType, value?: string): Parser<Token> => {
+	const expectedMsg = `Expected ${type}${value ? ` '${value}'` : ''}`;
+	return (tokens: Token[]) => {
 		if (tokens.length === 0) {
 			return {
 				success: false,
-				error: `Expected ${type}${
-					value ? ` '${value}'` : ''
-				}, but got end of input`,
+				error: `${expectedMsg}, but got end of input`,
 				position: 0,
 			};
 		}
 
-		const [first, ...rest] = tokens;
+		const first = tokens[0];
 		if (first.type === type && (value === undefined || first.value === value)) {
 			return {
 				success: true,
 				value: first,
-				remaining: rest,
+				remaining: tokens.slice(1),
 			};
 		}
 
 		return {
 			success: false,
-			error: `Expected ${type}${value ? ` '${value}'` : ''}, but got ${
-				first.type
-			} '${first.value}'`,
-			position: first.location.start.line,
+			error: `${expectedMsg}, but got ${first.type} '${first.value}'`,
+			position: first.location.start.column,
 		};
 	};
+};
 
 // Sequence of parsers
 export const seq =
 	<T extends any[]>(...parsers: { [K in keyof T]: Parser<T[K]> }): Parser<T> =>
 	(tokens: Token[]) => {
-		const results: T[] = [];
+		const results = new Array(parsers.length) as T; // Pre-allocate
 		let remaining = tokens;
 
-		for (const parser of parsers) {
-			const result = parser(remaining);
-			if (!result.success) {
-				return result;
-			}
-			results.push(result.value);
+		for (let i = 0; i < parsers.length; i++) {
+			const result = parsers[i](remaining);
+			if (!result.success) return result;
+			results[i] = result.value;
 			remaining = result.remaining;
 		}
 
-		return {
-			success: true,
-			value: results as T,
-			remaining,
-		};
+		return { success: true, value: results, remaining };
 	};
 
 // Choice between parsers (try each until one succeeds)
@@ -98,34 +89,40 @@ export const choice =
 	};
 
 // For common 2-parser case
-export const choice2 = <T>(p1: Parser<T>, p2: Parser<T>): Parser<T> =>
-  (tokens: Token[]) => {
-      const result1 = p1(tokens);
-      if (result1.success) return result1;
-      
-      const result2 = p2(tokens);
-      if (result2.success) return result2;
-      
-      return result2.position > result1.position ? result2 : result1;
-  };
+export const choice2 =
+	<T>(p1: Parser<T>, p2: Parser<T>): Parser<T> =>
+	(tokens: Token[]) => {
+		const result1 = p1(tokens);
+		if (result1.success) return result1;
 
-// For common 3-parser case  
-export const choice3 = <T>(p1: Parser<T>, p2: Parser<T>, p3: Parser<T>): Parser<T> =>
-  (tokens: Token[]) => {
-      const result1 = p1(tokens);
-      if (result1.success) return result1;
-      
-      const result2 = p2(tokens);
-      if (result2.success) return result2;
-      
-      const result3 = p3(tokens);
-      if (result3.success) return result3;
-      
-      // Return best error
-      if (result3.position > result2.position && result3.position > result1.position) return result3;
-      if (result2.position > result1.position) return result2;
-      return result1;
-  };
+		const result2 = p2(tokens);
+		if (result2.success) return result2;
+
+		return result2.position > result1.position ? result2 : result1;
+	};
+
+// For common 3-parser case
+export const choice3 =
+	<T>(p1: Parser<T>, p2: Parser<T>, p3: Parser<T>): Parser<T> =>
+	(tokens: Token[]) => {
+		const result1 = p1(tokens);
+		if (result1.success) return result1;
+
+		const result2 = p2(tokens);
+		if (result2.success) return result2;
+
+		const result3 = p3(tokens);
+		if (result3.success) return result3;
+
+		// Return best error
+		if (
+			result3.position > result2.position &&
+			result3.position > result1.position
+		)
+			return result3;
+		if (result2.position > result1.position) return result2;
+		return result1;
+	};
 
 // Zero or more repetitions
 export const many =
@@ -205,22 +202,18 @@ export const sepBy = <T, S>(
 	separator: Parser<S>
 ): Parser<T[]> => {
 	return (tokens: Token[]) => {
-		const results: T[] = [];
-		let remaining = tokens;
-
 		// Parse first element
-		const firstResult = parser(remaining);
+		const firstResult = parser(tokens);
 		if (!firstResult.success) {
 			return {
 				success: true,
 				value: [],
-				remaining,
+				remaining: tokens,
 			};
 		}
 
-		results.push(firstResult.value);
-		remaining = firstResult.remaining;
-
+		const results: T[] = [firstResult.value];
+		let remaining = firstResult.remaining;
 		// Parse subsequent elements separated by separator
 		while (remaining.length > 0) {
 			const sepResult = separator(remaining);
