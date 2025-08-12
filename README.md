@@ -103,81 +103,81 @@ The REPL includes comprehensive debugging tools:
 
 ```noolang
 # Function definition
-add = fn x y => x + y
+add = fn x y => x + y;
 
 # Function application doesn't require parens and `,` is only used for separating items in data structures like `Tuple`, `Record` and `List`
-add 2 3
+add 2 3;
 
 # The + operator works for both numbers and strings
-1 + 2           # => 3 : Int
-"hello" + " world"  # => "hello world" : String
+1 + 2;           # => 3 : Int
+"hello" + " world";  # => "hello world" : String
 
 # all functions are curried so if you pass less than their full number of arguments you get back a partially applied function
 increment = add 1;
-increment 2 
+increment 2;
 # 3 : Float
 
 # to nest calls you may need parenthesis
-add 2 (add 3 2)
+add 2 (add 3 2);
 
 # strictly speaking you never pass more than one argument
-add 1 2 
+add 1 2;
 # is actually 
-((add 1) 2)
+((add 1) 2);
 # in javascript this could be seen as `const add = x => y => x + y; add(1)(2);`
 
 # Where expressions for local definitions
-x + y where (x = 1; y = 2)  # => 3
+x + y where (x = 1; y = 2);  # => 3
 
 # Destructuring for clean data extraction
-{x, y} = {10, 20}; x + y  # => 30
-{@name, @age} = {@name "Alice", @age 30}; name  # => "Alice"
+{x, y} = {10, 20}; x + y;  # => 30
+{@name, @age} = {@name "Alice", @age 30}; name;  # => "Alice"
 
 # because nesting can get confusing fast noolang includes a few helpful opperators for reducing the need for parens such as the `|` operator:
-2 | add 3 | add 2
+2 | add 3 | add 2;
 
-[1, 2, 3] | map (add 1) # => [2, 3, 4]
+[1, 2, 3] | map (add 1); # => [2, 3, 4]
 
 # the $ operator acts like a weak function application operator allowing you to often skip parens on the right hand expression:
-[1, 2, 3] | map $ add 1
+[1, 2, 3] | map $ add 1;
 
 # can be written as
 
 
 
 # Conditional expressions
-if True then 1 else 2
+if True then 1 else 2;
 
 # Records
-user = { @name "Alice", @age 30 }
+user = { @name "Alice", @age 30 };
 
 # Accessors
-(@name user)
+(@name user);
 
 # Recursion
-factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1))
+factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1));
 
 # Where expressions in functions
-fn x => x * 2 where (x = 5)  # => 10
+fn x => x * 2 where (x = 5);  # => 10
 
 # Mutation
 mut counter = 0;
-mut! counter = counter + 1
+mut! counter = counter + 1;
 
 # List operations
-[1, 2, 3] |> tail |> head
+[1, 2, 3] |> tail |> head;
 
 # Variant Types (ADTs)
 variant Color = Red | Green | Blue;
 favorite = Red;
 
 variant Option a = Some a | None;
-result = match (Some 42) with (Some x => x; None => 0)
+result = match (Some 42) with (Some x => x; None => 0);
 
 # Pattern matching with variants
 variant Point = Point Float Float;
 point = Point 10 20;
-x = match point with (Point x y => x)
+x = match point with (Point x y => x);
 
 # Recursive variants (Binary Tree)
 variant Tree a = Node a (Tree a) (Tree a) | Leaf;
@@ -186,7 +186,7 @@ sum = fn t => match t with (
     Node value left right => value + (sum left) + (sum right);
     Leaf => 0
 );
-tree_sum = sum tree  # => 15
+tree_sum = sum tree;  # => 15
 
 # User-Defined Types
 type User = {@name String, @age Float, @active Bool};
@@ -227,18 +227,18 @@ result = match data with (
 )
 
 # Destructuring patterns for data extraction
-{x, y} = {10, 20}
-{@name, @age} = {@name "Bob", @age 25}
-{@name userName, @age} = {@name "Alice", @age 30}  # Renaming
+{x, y} = {10, 20};
+{@name, @age} = {@name "Bob", @age 25};
+{@name userName, @age} = {@name "Alice", @age 30};  # Renaming
 
 # Nested destructuring
-{outer, {inner, rest}} = {1, {2, 3}}
-{@user {@name, @age}} = {@user {@name "Charlie", @age 35}}
-{@coords {x, y}, @metadata {@name author}} = {@coords {5, 10}, @metadata {@name "Dave"}}
+{outer, {inner, rest}} = {1, {2, 3}};
+{@user {@name, @age}} = {@user {@name "Charlie", @age 35}};
+{@coords {x, y}, @metadata {@name author}} = {@coords {5, 10}, @metadata {@name "Dave"}};
 
 # Import spreading with destructuring  
-{@add, @multiply} = import "examples/math_module"
-{@square sq, @cube cb} = import "examples/power_module"  # With renaming
+{@add, @multiply} = import "examples/math_module";
+{@square sq, @cube cb} = import "examples/power_module";  # With renaming
 ```
 
 ## Type Annotations
@@ -251,17 +251,17 @@ Type annotations can be added to any definition using postfix `: Type` syntax:
 
 ```noolang
 # Simple type annotations
-x = 42 : Float
-name = "Alice" : String
-flag = True : Bool
+x = 42 : Float;
+name = "Alice" : String;
+flag = True : Bool;
 
 # Function type annotations
-add = fn x y => x + y : Float -> Float -> Float
-double = fn x => x * 2 : Float -> Float
+add = fn x y => x + y : Float -> Float -> Float;
+double = fn x => x * 2 : Float -> Float;
 
 # Complex type annotations with effects
-logger = fn msg => print msg : String -> String !write
-readConfig = fn path => readFile path : String -> String !read
+logger = fn msg => print msg : String -> String !write;
+readConfig = fn path => readFile path : String -> String !read;
 ```
 
 ### Function Type Syntax
@@ -270,12 +270,12 @@ Function types use arrow syntax with effects:
 
 ```noolang
 # Pure functions
-identity = fn x => x : a -> a
-add = fn x y => x + y : Float -> Float -> Float
+identity = fn x => x : a -> a;
+add = fn x y => x + y : Float -> Float -> Float;
 
 # Functions with effects
-printNumber = fn n => print (show n) : Float -> Float !write
-randomValue = fn () => random : Unit -> Float !rand
+printNumber = fn n => print (show n) : Float -> Float !write;
+randomValue = fn () => random : Unit -> Float !rand;
 
 # Multiple effects
 logAndSave = fn msg => (
@@ -288,18 +288,18 @@ logAndSave = fn msg => (
 
 ```noolang
 # List types
-numbers = [1, 2, 3] : List Float
-names = ["Alice", "Bob"] : List String
+numbers = [1, 2, 3] : List Float;
+names = ["Alice", "Bob"] : List String;
 
 # Record types
-user = { @name "Alice", @age 30 } : { @name String, @age Float }
-point = { @x 10, @y 20 } : { @x Float, @y Float }
+user = { @name "Alice", @age 30 } : { @name String, @age Float };
+point = { @x 10, @y 20 } : { @x Float, @y Float };
 
 # Option types
-safeDiv = fn x y => if y == 0 then None else Some (x / y) : Float -> Float -> Option Float
+safeDiv = fn x y => if y == 0 then None else Some (x / y) : Float -> Float -> Option Float;
 
 # Higher-order function types
-mapFn = map : (a -> b) -> List a -> List b
+mapFn = map : (a -> b) -> List a -> List b;
 applyTwice = fn f x => f (f x) : (a -> a) -> a -> a
 ```
 
@@ -315,16 +315,16 @@ applyTwice = fn f x => f (f x) : (a -> a) -> a -> a
 
 ```noolang
 # Always useful for exported functions
-exported_fn = fn x y => complex_calculation x y : InputType -> InputType -> OutputType
+exported_fn = fn x y => complex_calculation x y : InputType -> InputType -> OutputType;
 
 # Helpful for complex generic functions
-process = fn items => map (filter (validate)) items : List a -> List a
+process = fn items => map (filter (validate)) items : List a -> List a;
 
 # Essential for functions with effects
-save_data = fn data => writeFile "data.txt" (serialize data) : Data -> Unit !write
+save_data = fn data => writeFile "data.txt" (serialize data) : Data -> Unit !write;
 
 # Good for documenting constraints
-show_all = map show : Show a => List a -> List String
+show_all = map show : Show a => List a -> List String;
 ```
 
 ## Language Syntax
@@ -363,26 +363,26 @@ print "hello"; map (fn x => x * 2) [4, 5, 6]
 
 ```noolang
 # Simple function
-add = fn x y => x + y
+add = fn x y => x + y;
 
 # Function with multiple parameters
-multiply = fn a b c => a * b * c
+multiply = fn a b c => a * b * c;
 
 # Curried function (Haskell-style)
-curried_add = fn a => fn b => a + b
+curried_add = fn a => fn b => a + b;
 ```
 
 ### Function Application
 
 ```noolang
 # Direct application
-add 2 3
+add 2 3;
 
 # Nested application
-add (multiply 2 3) 4
+add (multiply 2 3) 4;
 
 # Curried application
-curried_add 2 3
+curried_add 2 3;
 ```
 
 ### Pipeline and Function Application Operators
@@ -393,7 +393,15 @@ Noolang provides several operators for function composition and application:
 Composes functions from left to right (like Unix pipes):
 ```noolang
 # Chain functions: f |> g |> h means h(g(f(x)))
-[1, 2, 3] |> head |> add 5
+operate = add 5 |> multiply 2 |> subtract 1;
+operate 10;  # => -29 (1 - (2 * (5 + 10)))
+```
+#### Compose Operator (`<|`) - Function Composition
+Composes functions from right to left (like B combinator):
+```noolang
+# Chain functions: f <| g <| h means f(g(h(x)))
+operate = add 5 <| multiply 2 <| subtract 1;
+operate 10;  # => -13 (5 + (2 * (1 - 10))
 ```
 
 #### Thrush Operator (`|`) - Function Application
@@ -403,7 +411,7 @@ Applies the right function to the left value:
 [1, 2, 3] | map (fn x => x * 2)
 ```
 
-#### Safe Thrush Operator (`|?`) - Monadic Chaining
+#### Safe Thrush Operator (`|?`) - Monadic/Functor Chaining
 Safely applies functions to monadic values (like Option), implementing smart monadic bind behavior:
 ```noolang
 # Safe application to Some values

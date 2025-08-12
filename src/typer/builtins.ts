@@ -418,11 +418,6 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: [],
 	});
 
-	newEnv.set('primitive_float_subtract', {
-		type: createBinaryFunctionType(floatType(), floatType(), floatType()),
-		quantifiedVars: [],
-	});
-
 	// Primitive Multiply trait implementations for type checking
 	newEnv.set('primitive_float_multiply', {
 		type: createBinaryFunctionType(floatType(), floatType(), floatType()),
