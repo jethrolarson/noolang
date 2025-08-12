@@ -167,15 +167,6 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a', 'b'],
 	});
 
-	// Dollar operator (low precedence function application)
-	newEnv.set('$', {
-		type: functionType(
-			[functionType([typeVariable('a')], typeVariable('b')), typeVariable('a')],
-			typeVariable('b')
-		),
-		quantifiedVars: ['a', 'b'],
-	});
-
 	// Effectful functions - I/O and logging
 	newEnv.set('print', {
 		type: functionType(
@@ -462,12 +453,13 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		),
 		quantifiedVars: ['a'],
 	});
+	//FIXME this needs to apply the constraint correctly
 	newEnv.set('set', {
 		type: functionType(
 			[
 				typeVariable('accessor'), // Accept any accessor function type
-				recordType({}),
 				typeVariable('a'),
+				recordType({}),
 			],
 			recordType({})
 		),

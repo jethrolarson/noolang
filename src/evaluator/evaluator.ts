@@ -744,7 +744,7 @@ export class Evaluator {
 			'set',
 			createNativeFunction(
 				'set',
-				(accessor: Value) => (record: Value) => (newValue: Value) => {
+				(accessor: Value) => (newValue: Value) => (record: Value) => {
 					if (isNativeFunction(accessor) && isRecord(record)) {
 						// For now, just handle simple field accessors
 						const field = accessor.name?.replace('@', '');

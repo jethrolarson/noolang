@@ -16,7 +16,7 @@
 ```noolang
 42;          # Integer
 3.14159;     # Float
-123.456     # Decimal numbers
+123.456;     # Decimal numbers
 ```
 
 ### Strings
@@ -24,14 +24,14 @@
 ```noolang
 "Hello, World!";
 "String with spaces";
-""          # Empty string
+"";          # Empty string
 ```
 
 ### Booleans
 
 ```noolang
 True;
-False
+False;
 ```
 
 ### Lists
@@ -51,7 +51,7 @@ at 3 [10, 20, 30];   # None
 ```noolang
 {};                              # Empty record
 { @name "Alice", @age 30 };      # Record with fields
-{ @x 1, @y 2, @z 3 }           # Multi-field record
+{ @x 1, @y 2, @z 3 };           # Multi-field record
 ```
 
 ## Keywords
@@ -167,7 +167,7 @@ double = fn x => x * 2;
 getMessage = fn => "Hello!";
 
 # Higher-order function
-myMap = fn f list => map f list
+myMap = fn f list => map f list;
 ```
 
 ### Function Application
@@ -183,7 +183,7 @@ result2 = add5 10;     # Results in 15
 
 # Multiple arguments
 createPerson = fn name age job => { @name name, @age age, @job job };
-person = createPerson "Alice" 30 "Engineer"
+person = createPerson "Alice" 30 "Engineer";
 ```
 
 ### Pipeline Operators in Detail
@@ -202,7 +202,7 @@ result = head doubled;
 
 # Field access with pipe
 user = { @name "Alice", @age 30 };
-userName = user | @name             # Get field from record
+userName = user | @name;             # Get field from record
 ```
 
 #### Function Composition (`|>`)
@@ -214,7 +214,7 @@ square = fn x => x * x;
 composed = addOne |> square;    # fn x => square (addOne x)
 
 # Use composed function
-result = 5 | composed             # square (addOne 5) = 36
+result = 5 | composed;             # square (addOne 5) = 36
 ```
 
 #### Safe Pipe (`|?`)
@@ -223,8 +223,7 @@ result = 5 | composed             # square (addOne 5) = 36
 # Works with Option/Result types
 divideByTwo = fn x => x / 2;
 multiplyByThree = fn x => x * 3;
-result = Some 12 |? divideByTwo |? multiplyByThree;
-result
+Some 12 |? divideByTwo |? multiplyByThree;
 ```
 
 
@@ -240,7 +239,7 @@ result = if x > 0 then "positive" else "non-positive";
 y = -3;
 sign = if y > 0 then "positive"
        else if y < 0 then "negative"
-       else "zero"
+       else "zero";
 ```
 
 ### Local Bindings
@@ -254,7 +253,7 @@ result = (x = 5; y = 10; x + y * 2);
 # More complex example
 x = 6;
 z = 9;
-calculation = (base = x * 2; helper = 3; base + helper)
+calculation = (base = x * 2; helper = 3; base + helper);
 ```
 
 ### Record Operations
@@ -264,29 +263,14 @@ calculation = (base = x * 2; helper = 3; base + helper)
 person = { @name "Alice", @age 30, @city "NYC" };
 
 # Record with computed fields
-point = { @x 1 + 2, @y 3 * 4 };
-point
+{ @x 1 + 2, @y 3 * 4 };
 ```
 
 ### Accessor Patterns
 
 ```noolang
 # Simple record operations
-person = { @name "Alice", @age 30 };
-person
-```
-
-## Type Annotations (Planned)
-
-While type inference handles most cases, explicit annotations will be supported:
-
-```noolang
-# Function definition (type inferred)
-addTwo = fn x y => x + y;
-
-# Variable (type inferred)
-count = 42;
-count
+{ @name "Alice", @age 30 };
 ```
 
 ## Type Names and Shadowing
@@ -304,7 +288,7 @@ Notes:
 
 ```noolang
 # Single line comment
-x = 5  # End of line comment
+x = 5;  # End of line comment
 
 # Comments can contain any text
 # TODO: implement feature
@@ -316,7 +300,7 @@ x = 5  # End of line comment
 ```noolang
 # Import system is planned but not yet implemented
 # Currently all stdlib functions are available globally
-result = show 42
+result = show 42;
 ```
 
 ## Operator Precedence
@@ -353,7 +337,7 @@ option1 = head [1, 2, 3];
 option2 = head [];
 
 # Show the results
-show result1
+show result1;
 ```
 
 ## Next Steps

@@ -1887,6 +1887,50 @@ const parseSequence: C.Parser<Expression> = C.map(
 // --- Expression (top-level) ---
 const parseExpr: C.Parser<Expression> = parseSequence;
 
+// --- Literate Programming Support ---
+// Preprocess markdown files to extract code blocks and create a valid Noolang program
+export function preprocessLiterateNoolang(content: string): string {
+	const lines = content.split('\n');
+	const result: string[] = new Array(lines.length).fill('');
+	let inCodeBlock = false;
+	let currentBlock: string[] = [];
+	let currentBlockStart = 0;
+
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		
+		if (line.trim() === '```noolang') {
+			inCodeBlock = true;
+			currentBlock = [];
+			currentBlockStart = i;
+		} else if (line.trim() === '```' && inCodeBlock) {
+			inCodeBlock = false;
+			if (currentBlock.length > 0) {
+				// Add the code block content at the correct positions
+				for (let j = 0; j < currentBlock.length; j++) {
+					const targetLine = currentBlockStart + 1 + j;
+					result[targetLine] = currentBlock[j];
+				}
+			}
+		} else if (inCodeBlock) {
+			currentBlock.push(line);
+		}
+		// Non-code blocks remain as empty strings (already set by fill(''))
+	}
+
+	// Handle case where file ends with a code block
+	if (inCodeBlock && currentBlock.length > 0) {
+		// Add the code block content at the correct positions
+		for (let j = 0; j < currentBlock.length; j++) {
+			const targetLine = currentBlockStart + 1 + j;
+			result[targetLine] = currentBlock[j];
+		}
+	}
+
+	// Join all lines to create a valid Noolang program with exact line parity
+	return result.join('\n');
+}
+
 // --- Main Parse Function ---
 // Helper: skip semicolons
 const skipSemicolons = (tokens: Token[]): Token[] => {

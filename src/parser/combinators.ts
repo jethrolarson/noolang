@@ -40,7 +40,7 @@ export const token = (type: TokenType, value?: string): Parser<Token> => {
 		return {
 			success: false,
 			error: `${expectedMsg}, but got ${first.type} '${first.value}'`,
-			position: first.location.start.column,
+			position: first.location.start.line,
 		};
 	};
 };

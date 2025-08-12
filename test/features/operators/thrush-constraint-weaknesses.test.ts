@@ -116,3 +116,12 @@ test('| operator with built-in functions', () => {
 		['1', '2', '3']
 	);
 });
+
+test.skip('| operator with trait and built-in partially applied functions (add)', () => {
+	expectSuccess(
+		`
+      [1, 2, 3] | map (add 1)
+    `,
+		[2, 3, 4]
+	);
+});

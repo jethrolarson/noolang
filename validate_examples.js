@@ -4,99 +4,22 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 
-// Transform markdown to literate Noolang program using ; as expression sequencer
-function transformMarkdownToNoolang(filePath) {
-	const content = fs.readFileSync(filePath, 'utf8');
-	const lines = content.split('\n');
-	const noolangLines = [];
-
-	let inCodeBlock = false;
-	let codeBlockContent = [];
-
-	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i];
-
-		if (line.trim() === '```noolang') {
-			inCodeBlock = true;
-			codeBlockContent = [];
-		} else if (line.trim() === '```' && inCodeBlock) {
-			inCodeBlock = false;
-			// Add the code block content
-			noolangLines.push(...codeBlockContent);
-			noolangLines.push(''); // Empty line for separation
-		} else if (inCodeBlock) {
-			codeBlockContent.push(line);
-		}
-		// Skip all non-code lines
-	}
-
-	// Ensure we end with a proper expression if the file ends with code
-	if (inCodeBlock && codeBlockContent.length > 0) {
-		noolangLines.push(...codeBlockContent);
-	}
-
-	// Now post-process to create a valid Noolang program using ; as expression sequencer
-	const processedLines = [];
-
-	// Start with a comment explaining this is a literate program
-	processedLines.push('# Literate Noolang program generated from markdown');
-	processedLines.push(
-		'# All examples are combined into one program using ; as expression sequencer'
-	);
-	processedLines.push('');
-
-	// Process each line and build a sequence of expressions
-	let expressions = [];
-
-	for (let i = 0; i < noolangLines.length; i++) {
-		const line = noolangLines[i];
-
-		if (line.trim() === '') {
-			continue; // Skip empty lines
-		} else if (line.trim().startsWith('#')) {
-			// Comments are fine as-is
-			processedLines.push(line);
-		} else if (line.trim()) {
-			// This is code, collect it for sequencing
-			// Remove trailing semicolon if present, we'll add it back in the sequence
-			let cleanLine = line.trim();
-			if (cleanLine.endsWith(';')) {
-				cleanLine = cleanLine.slice(0, -1).trim();
-			}
-			if (cleanLine) {
-				expressions.push(cleanLine);
-			}
-		}
-	}
-
-	// Now create the sequenced expression
-	if (expressions.length > 0) {
-		// Join all expressions with ; to create a sequence
-		const sequencedExpression = expressions.join(' ; ');
-		processedLines.push('');
-		processedLines.push('# Sequenced expressions:');
-		processedLines.push(sequencedExpression);
-	}
-
-	return processedLines.join('\n');
-}
-
-// Test the transformed program
-function testLiterateProgram(content, sourceFile) {
-	const testFile = `test_literate_${path.basename(sourceFile, '.md')}.noo`;
-
+// Run a markdown file directly using CLI's literate mode
+function runMarkdown(filePath) {
 	try {
-		fs.writeFileSync(testFile, content);
-		execSync(`bun start ${testFile}`, { stdio: 'pipe' });
-		fs.unlinkSync(testFile);
+		// Run without a pipe so non-zero exits propagate correctly
+		execSync(`bun start ${filePath}`, { stdio: 'pipe' });
 		return { success: true };
 	} catch (error) {
-		// Don't delete the test file so we can inspect it
+		// Collect as much context as possible from bun/CLI
+		const stdout = error.stdout ? error.stdout.toString() : '';
+		const stderr = error.stderr ? error.stderr.toString() : '';
+		const message = error.message || '';
 		return {
 			success: false,
-			error: error.message,
-			sourceFile,
-			testFile,
+			error: message,
+			stdout,
+			stderr,
 		};
 	}
 }
@@ -109,7 +32,9 @@ const files = fs
 	.map(f => path.join(docsDir, f))
 	.concat(['README.md']);
 
-console.log('🔍 Validating Noolang examples as literate programs...\n');
+console.log(
+	'🔍 Validating Noolang markdown files using native literate mode...\n'
+);
 
 let totalFiles = 0;
 let failedFiles = 0;
@@ -119,15 +44,25 @@ for (const file of files) {
 	totalFiles++;
 
 	try {
-		const noolangProgram = transformMarkdownToNoolang(file);
-		const result = testLiterateProgram(noolangProgram, file);
+		const result = runMarkdown(file);
 
 		if (result.success) {
-			console.log(`  ✅ PASS - Generated valid Noolang program`);
+			console.log(`  ✅ PASS`);
 		} else {
 			failedFiles++;
-			console.log(`  ❌ FAIL - ${result.error}`);
-			console.log(`  Test file saved as: ${result.testFile}`);
+			console.log(`  ❌ FAIL`);
+			if (result.stdout && result.stdout.trim().length > 0) {
+				console.log('  ── stdout:');
+				console.log(result.stdout.trim());
+			}
+			if (result.stderr && result.stderr.trim().length > 0) {
+				console.log('  ── stderr:');
+				console.log(result.stderr.trim());
+			}
+			if (result.error) {
+				console.log('  ── error:');
+				console.log(result.error);
+			}
 		}
 	} catch (error) {
 		failedFiles++;
@@ -137,7 +72,7 @@ for (const file of files) {
 }
 
 console.log(
-	`📊 Summary: ${totalFiles - failedFiles}/${totalFiles} files generate valid programs`
+	`📊 Summary: ${totalFiles - failedFiles}/${totalFiles} files executed successfully`
 );
 if (failedFiles > 0) {
 	process.exit(1);
