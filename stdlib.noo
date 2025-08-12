@@ -5,6 +5,19 @@
 # TYPE CONSTRAINTS
 # ========================================
 
+# Constraint for functors
+constraint Functor f ( 
+  map : (a -> b) -> f a -> f b
+);
+
+constraint Eq a ( 
+  equals : a -> a -> Bool 
+);
+
+constraint Applicative f ( 
+  apply : f (a -> b) -> f a -> f b 
+);
+
 # Constraint for showing a type
 constraint Show a (
   show : a -> String
@@ -33,6 +46,12 @@ constraint Modulus a (
 # Constraint for division operation (returns Option for safety)
 constraint Div a (
   divide : a -> a -> Option Float
+);
+
+# Constraint for monads
+constraint Monad m ( 
+  bind : m a -> (a -> m b) -> m b; 
+  pure : a -> m a 
 );
 
 # Basic Show implementations (must come before conditional implementations)
@@ -70,23 +89,8 @@ implement Modulus Float (
   modulus = primitive_float_modulus
 );
 
-# Constraint for monads
-constraint Monad m ( 
-  bind : m a -> (a -> m b) -> m b; 
-  pure : a -> m a 
-);
-
-# Constraint for functors
-constraint Functor f ( 
-  map : (a -> b) -> f a -> f b
-);
-
-constraint Eq a ( 
-  equals : a -> a -> Bool 
-);
-
-constraint Applicative f ( 
-  apply : f (a -> b) -> f a -> f b 
+implement Eq Float (
+  equals = primitive_float_equals
 );
 
 # ========================================

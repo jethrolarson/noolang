@@ -349,19 +349,7 @@ const parseLambdaBodyComparison: C.Parser<Expression> = tokens => {
 	return C.map(
 		C.seq(
 			parseLambdaBodyAdditive,
-			C.many(
-				C.seq(
-					C.choice(
-						C.operator('<'),
-						C.operator('>'),
-						C.operator('<='),
-						C.operator('>='),
-						C.operator('=='),
-						C.operator('!=')
-					),
-					parseLambdaBodyAdditive
-				)
-			)
+			C.many(C.seq(parseComparisonOperator, parseLambdaBodyAdditive))
 		),
 		([left, rest]) => {
 			let result = left;
@@ -729,7 +717,7 @@ const parseUnary: C.Parser<Expression> = tokens => {
 };
 
 // --- Function Application (left-associative, tightest binding) ---
-const parseApplication: C.Parser<Expression> = C.map(
+const parseApplication = C.map(
 	C.seq(parseUnary, C.many(parseUnary)),
 	([func, args]) => {
 		let result = func;
@@ -746,7 +734,7 @@ const parseApplication: C.Parser<Expression> = C.map(
 );
 
 // --- Multiplicative (*, /, %) ---
-const parseMultiplicative: C.Parser<Expression> = C.map(
+const parseMultiplicative = C.map(
 	C.seq(
 		parseApplication,
 		C.many(
@@ -772,105 +760,87 @@ const parseMultiplicative: C.Parser<Expression> = C.map(
 );
 
 // --- Additive (+, -) ---
-const parseAdditive: C.Parser<Expression> = tokens => {
-	const addResult = C.map(
-		C.seq(
-			parseMultiplicative,
-			C.many(
-				C.seq(C.choice2(C.operator('+'), C.operator('-')), parseMultiplicative)
-			)
-		),
-		([left, rest]) => {
-			let result = left;
-			for (const [op, right] of rest) {
-				result = {
-					kind: 'binary',
-					operator: op.value as '+' | '-',
-					left: result,
-					right,
-					location: result.location,
-				};
-			}
-			return result;
+const parseAdditive = C.map(
+	C.seq(
+		parseMultiplicative,
+		C.many(
+			C.seq(C.choice2(C.operator('+'), C.operator('-')), parseMultiplicative)
+		)
+	),
+	([left, rest]) => {
+		let result = left;
+		for (const [op, right] of rest) {
+			result = {
+				kind: 'binary',
+				operator: op.value as '+' | '-',
+				left: result,
+				right,
+				location: result.location,
+			};
 		}
-	)(tokens);
+		return result;
+	}
+);
 
-	return addResult;
-};
+const parseComparisonOperator = C.choice(
+	C.operator('<'),
+	C.operator('>'),
+	C.operator('<='),
+	C.operator('>='),
+	C.operator('=='),
+	C.operator('!=')
+);
 
 // --- Comparison (<, >, <=, >=, ==, !=) ---
-const parseComparison: C.Parser<Expression> = tokens => {
-	const compResult = C.map(
-		C.seq(
-			parseAdditive,
-			C.many(
-				C.seq(
-					C.choice(
-						C.operator('<'),
-						C.operator('>'),
-						C.operator('<='),
-						C.operator('>='),
-						C.operator('=='),
-						C.operator('!=')
-					),
-					parseAdditive
-				)
-			)
-		),
-		([left, rest]) => {
-			let result = left;
-			for (const [op, right] of rest) {
-				result = {
-					kind: 'binary',
-					operator: op.value as '<' | '>' | '<=' | '>=' | '==' | '!=',
-					left: result,
-					right,
-					location: result.location,
-				};
-			}
-			return result;
+const parseComparison = C.map(
+	C.seq(parseAdditive, C.many(C.seq(parseComparisonOperator, parseAdditive))),
+	([left, rest]) => {
+		let result = left;
+		for (const [op, right] of rest) {
+			result = {
+				kind: 'binary',
+				operator: op.value as '<' | '>' | '<=' | '>=' | '==' | '!=',
+				left: result,
+				right,
+				location: result.location,
+			};
 		}
-	)(tokens);
-
-	return compResult;
-};
+		return result;
+	}
+);
 
 // --- Composition (|>, <|) ---
-const parseCompose: C.Parser<Expression> = tokens => {
-	const compResult = C.map(
-		C.seq(
-			parseComparison,
-			C.many(
-				C.seq(C.choice2(C.operator('|>'), C.operator('<|')), parseComparison)
-			)
-		),
-		([left, rest]) => {
-			// Build steps array for pipeline expression
-			const steps = [left];
-			const operators: ('|>' | '<|')[] = [];
-			for (const [op, right] of rest) {
-				operators.push(op.value as '|>' | '<|');
-				steps.push(right);
-			}
-
-			// If we have multiple steps, create a pipeline expression
-			if (steps.length > 1) {
-				const result: PipelineExpression = {
-					kind: 'pipeline',
-					steps,
-					operators,
-					location: left.location,
-				};
-				return result;
-			}
-
-			// Otherwise just return the single expression
-			return left;
+const parseCompose = C.map(
+	C.seq(
+		parseComparison,
+		C.many(
+			C.seq(C.choice2(C.operator('|>'), C.operator('<|')), parseComparison)
+		)
+	),
+	([left, rest]) => {
+		// Build steps array for pipeline expression
+		const steps = [left];
+		const operators: ('|>' | '<|')[] = [];
+		for (const [op, right] of rest) {
+			operators.push(op.value as '|>' | '<|');
+			steps.push(right);
 		}
-	)(tokens);
 
-	return compResult;
-};
+		// If we have multiple steps, create a pipeline expression
+		if (steps.length > 1) {
+			const result: PipelineExpression = {
+				kind: 'pipeline',
+				steps,
+				operators,
+				location: left.location,
+			};
+			return result;
+		}
+
+		// Otherwise just return the single expression
+		return left;
+	}
+);
 
 // --- Thrush (|) and Safe Thrush (|?) ---
 const parseThrush: C.Parser<Expression> = tokens => {

@@ -40,11 +40,6 @@ False
 [];              # Empty list
 [1, 2, 3];       # List of numbers
 ["a", "b"];      # List of strings
-<<<<<<< HEAD
-[1, 2, 3, 4];    # Comma separators
-=======
-[1, 2, 3, 4];    # Comma separators (equivalent to previous examples)
->>>>>>> 5df6101 (Fix type annotation syntax and update documentation examples)
 
 # Safe element access (index, list) -> Option
 at 0 [10, 20, 30];   # Some 10

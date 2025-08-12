@@ -407,6 +407,11 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: [],
 	});
 
+	newEnv.set('primitive_float_equals', {
+		type: createBinaryFunctionType(floatType(), floatType(), boolType()),
+		quantifiedVars: [],
+	});
+
 	newEnv.set('primitive_string_concat', {
 		type: createBinaryFunctionType(stringType(), stringType(), stringType()),
 		quantifiedVars: [],

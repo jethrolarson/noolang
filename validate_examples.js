@@ -4,53 +4,99 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 
-// Find all noolang code blocks in markdown files
-function extractCodeBlocks(filePath) {
+// Transform markdown to literate Noolang program using ; as expression sequencer
+function transformMarkdownToNoolang(filePath) {
 	const content = fs.readFileSync(filePath, 'utf8');
-	const blocks = [];
 	const lines = content.split('\n');
+	const noolangLines = [];
 
 	let inCodeBlock = false;
-	let currentBlock = [];
-	let blockStart = 0;
+	let codeBlockContent = [];
 
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
 
 		if (line.trim() === '```noolang') {
 			inCodeBlock = true;
-			blockStart = i + 1;
-			currentBlock = [];
+			codeBlockContent = [];
 		} else if (line.trim() === '```' && inCodeBlock) {
 			inCodeBlock = false;
-			blocks.push({
-				code: currentBlock.join('\n'),
-				startLine: blockStart,
-				filePath,
-			});
+			// Add the code block content
+			noolangLines.push(...codeBlockContent);
+			noolangLines.push(''); // Empty line for separation
 		} else if (inCodeBlock) {
-			currentBlock.push(line);
+			codeBlockContent.push(line);
+		}
+		// Skip all non-code lines
+	}
+
+	// Ensure we end with a proper expression if the file ends with code
+	if (inCodeBlock && codeBlockContent.length > 0) {
+		noolangLines.push(...codeBlockContent);
+	}
+
+	// Now post-process to create a valid Noolang program using ; as expression sequencer
+	const processedLines = [];
+
+	// Start with a comment explaining this is a literate program
+	processedLines.push('# Literate Noolang program generated from markdown');
+	processedLines.push(
+		'# All examples are combined into one program using ; as expression sequencer'
+	);
+	processedLines.push('');
+
+	// Process each line and build a sequence of expressions
+	let expressions = [];
+
+	for (let i = 0; i < noolangLines.length; i++) {
+		const line = noolangLines[i];
+
+		if (line.trim() === '') {
+			continue; // Skip empty lines
+		} else if (line.trim().startsWith('#')) {
+			// Comments are fine as-is
+			processedLines.push(line);
+		} else if (line.trim()) {
+			// This is code, collect it for sequencing
+			// Remove trailing semicolon if present, we'll add it back in the sequence
+			let cleanLine = line.trim();
+			if (cleanLine.endsWith(';')) {
+				cleanLine = cleanLine.slice(0, -1).trim();
+			}
+			if (cleanLine) {
+				expressions.push(cleanLine);
+			}
 		}
 	}
 
-	return blocks;
+	// Now create the sequenced expression
+	if (expressions.length > 0) {
+		// Join all expressions with ; to create a sequence
+		const sequencedExpression = expressions.join(' ; ');
+		processedLines.push('');
+		processedLines.push('# Sequenced expressions:');
+		processedLines.push(sequencedExpression);
+	}
+
+	return processedLines.join('\n');
 }
 
-// Test a code block
-function testCodeBlock(block, index) {
-	const testFile = `test_auto_${index}.noo`;
+// Test the transformed program
+function testLiterateProgram(content, sourceFile) {
+	const testFile = `test_literate_${path.basename(sourceFile, '.md')}.noo`;
 
 	try {
-		fs.writeFileSync(testFile, block.code);
+		fs.writeFileSync(testFile, content);
 		execSync(`bun start ${testFile}`, { stdio: 'pipe' });
 		fs.unlinkSync(testFile);
 		return { success: true };
 	} catch (error) {
-		fs.unlinkSync(testFile);
+		// Don't delete the test file so we can inspect it
 		return {
 			success: false,
 			error: error.message,
-			code: block.code,
+			sourceFile,
+			testFile,
 		};
 	}
 }
@@ -63,37 +109,36 @@ const files = fs
 	.map(f => path.join(docsDir, f))
 	.concat(['README.md']);
 
-console.log('🔍 Validating all Noolang examples...\n');
+console.log('🔍 Validating Noolang examples as literate programs...\n');
 
-let totalBlocks = 0;
-let failedBlocks = 0;
+let totalFiles = 0;
+let failedFiles = 0;
 
 for (const file of files) {
 	console.log(`📄 ${file}`);
-	const blocks = extractCodeBlocks(file);
+	totalFiles++;
 
-	for (let i = 0; i < blocks.length; i++) {
-		const block = blocks[i];
-		totalBlocks++;
-
-		const result = testCodeBlock(block, totalBlocks);
+	try {
+		const noolangProgram = transformMarkdownToNoolang(file);
+		const result = testLiterateProgram(noolangProgram, file);
 
 		if (result.success) {
-			console.log(`  ✅ Block ${i + 1} (line ${block.startLine}): PASS`);
+			console.log(`  ✅ PASS - Generated valid Noolang program`);
 		} else {
-			failedBlocks++;
-			console.log(`  ❌ Block ${i + 1} (line ${block.startLine}): FAIL`);
-			console.log(`     Error: ${result.error}`);
-			console.log(`     Code: ${result.code}`);
+			failedFiles++;
+			console.log(`  ❌ FAIL - ${result.error}`);
+			console.log(`  Test file saved as: ${result.testFile}`);
 		}
+	} catch (error) {
+		failedFiles++;
+		console.log(`  ❌ ERROR - ${error.message}`);
 	}
 	console.log();
 }
 
 console.log(
-	`📊 Summary: ${totalBlocks - failedBlocks}/${totalBlocks} examples pass`
+	`📊 Summary: ${totalFiles - failedFiles}/${totalFiles} files generate valid programs`
 );
-if (failedBlocks > 0) {
-	console.log(`⚠️  ${failedBlocks} examples need fixing`);
+if (failedFiles > 0) {
 	process.exit(1);
 }
