@@ -84,3 +84,13 @@ test('Pattern Matching - should parse match with nested constructor patterns', (
 	expect(matchExpr.cases[0].pattern.args[0].name).toBe('Value');
 });
 
+test('Pattern Matching - should parse match with trailing semicolons in cases', () => {
+	const lexer = new Lexer('match x with ( True => 1; False => 0;;;; )');
+	const tokens = lexer.tokenize();
+	const program = parse(tokens);
+	expect(program.statements.length).toBe(1);
+	const matchExpr = program.statements[0];
+	assertMatchExpression(matchExpr);
+	expect(matchExpr.cases.length).toBe(2);
+});
+

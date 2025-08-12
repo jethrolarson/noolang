@@ -114,10 +114,10 @@ Advanced type system features:
 
 ```noolang
 # Function with explicit type
-add_func = fn x y => x + y : Float -> Float -> Float;
+add_func = (fn x y => x + y) : Float -> Float -> Float;
 
 # Polymorphic function
-identity = fn x => x : a -> a;
+identity = (fn x => x) : a -> a;
 
 # Lists with types
 numbers = [1, 2, 3, 4, 5] : List Float;

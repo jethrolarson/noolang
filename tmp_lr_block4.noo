@@ -1,0 +1,8 @@
+[];              # Empty list
+[1, 2, 3];       # List of numbers  
+["a", "b"];      # List of strings
+[1, 2, 3, 4]    # Comma separators
+
+# Safe element access (index, list) -> Option
+at 0 [10, 20, 30];   # Some 10
+at 3 [10, 20, 30];   # None

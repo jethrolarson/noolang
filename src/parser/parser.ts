@@ -1757,6 +1757,8 @@ const parseMatchExpression: C.Parser<MatchExpression> = C.map(
 		C.keyword('with'),
 		C.punctuation('('),
 		C.sepBy(parseMatchCase, C.punctuation(';')),
+		// Allow and ignore trailing semicolons after the last case
+		C.many(C.punctuation(';')),
 		C.punctuation(')')
 	),
 	([
@@ -1765,6 +1767,7 @@ const parseMatchExpression: C.Parser<MatchExpression> = C.map(
 		_with,
 		_openParen,
 		cases,
+		_trailingSemicolons,
 		closeParen,
 	]): MatchExpression => ({
 		kind: 'match',
@@ -1781,9 +1784,18 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
 		C.keyword('where'),
 		C.punctuation('('),
 		C.sepBy(parseWhereDefinition, C.punctuation(';')),
+		// Allow and ignore trailing semicolons after the last definition
+		C.many(C.punctuation(';')),
 		C.punctuation(')')
 	),
-	([main, _where, _openParen, definitions, _closeParen]): WhereExpression => {
+	([
+		main,
+		_where,
+		_openParen,
+		definitions,
+		_trailingSemicolons,
+		_closeParen,
+	]): WhereExpression => {
 		return {
 			kind: 'where',
 			main,
@@ -1943,9 +1955,11 @@ const parseSequence: C.Parser<Expression> = C.map(
 				C.punctuation(';'),
 				C.lazy(() => parseExprWithType)
 			)
-		)
+		),
+		// Allow and ignore any trailing semicolons with no RHS
+		C.many(C.punctuation(';'))
 	),
-	([left, rest]) => {
+	([left, rest, _trailingSemicolons]) => {
 		let result = left;
 		for (const [_op, right] of rest) {
 			result = {
@@ -2007,7 +2021,6 @@ export const parse = (tokens: Token[]): Program => {
 			`Unexpected token after expression: ${next.type} '${next.value}' at line ${next.location.start.line}, column ${next.location.start.column}`
 		);
 	}
-
 	return {
 		statements: result.value,
 		location: createLocation({ line: 1, column: 1 }, { line: 1, column: 1 }),
