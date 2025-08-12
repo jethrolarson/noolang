@@ -19,31 +19,17 @@ type Schema a = Unknown -> Result a DecodeError;
 
 # Primitive schema functions
 string_schema = fn data => 
-  match isString data with (
-    Ok value => Ok value;
-    Err _ => Err (TypeMismatch "String" "Unknown")
-  );
+  map_err (fn e => NestedError "string" e) (isString data);
 
-float_schema = fn data => 
-  match isNumber data with (
-    Ok value => Ok value;
-    Err _ => Err (TypeMismatch "Float" "Unknown")
-  );
+float_schema = isNumber |> map_err (fn e => NestedError "float" e);
 
-bool_schema = fn data => 
-  match isBool data with (
-    Ok value => Ok value;
-    Err _ => Err (TypeMismatch "Bool" "Unknown")
-  );
+bool_schema = isBool |> map_err (fn e => NestedError "bool" e);
 
-unit_schema = fn data => 
-  match data with (
-    {} => Ok {};
-    _ => Err (TypeMismatch "Unit" "Unknown")
-  );
+unit_schema = isUnit |> map_err (fn e => NestedError "unit" e);
+
 
 # Schema combinators
-list_schema = (fn element_schema data => 
+list_schema = fn element_schema data => 
   match isList data with (
     Ok list => (
       validated_elements = list_map element_schema list;
@@ -54,7 +40,7 @@ list_schema = (fn element_schema data =>
       )
     );
     Err _ => Err (TypeMismatch "List" "Unknown")
-  )) : (Unknown -> Result a DecodeError) -> Unknown -> Result (List a) DecodeError;
+  ) # : (Unknown -> Result a DecodeError) -> Unknown -> Result (List a) DecodeError;
 
 # tuple_schema = fn schemas => fn data => 
 #   match isList data with (
@@ -176,8 +162,8 @@ list_schema = (fn element_schema data =>
 
 # # Main decode function, this will be moved to built-ins and be responsible for !ffi erasure
 decode = fn schema data => schema data;
-
-decode (list_schema string_schema) (forget ["test", "test2"]);
+string_schema
+#list_schema string_schema (forget ["test", "test2"]);
 
 # # Guard function that returns Option instead of Result
 # guard = fn schema data => 

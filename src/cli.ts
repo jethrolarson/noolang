@@ -27,6 +27,7 @@ function printUsage() {
 	console.log(
 		`       ${colorize.command('noo --symbol-type <file> <symbol>')}`
 	);
+	console.log(`       ${colorize.command('noo --benchmark <file>')}`);
 	console.log('');
 	console.log(colorize.section('Examples:'));
 	console.log(`  ${colorize.identifier('noo my_program.noo')}`);
@@ -53,6 +54,9 @@ function printUsage() {
 	);
 	console.log(
 		`  ${colorize.identifier('noo --symbol-type examples/demo.noo factorial')}`
+	);
+	console.log(
+		`  ${colorize.identifier('noo --benchmark benchmarks/simple.noo')}`
 	);
 	console.log('');
 	console.log(colorize.section('Or use the REPL:'));

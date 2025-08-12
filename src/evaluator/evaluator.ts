@@ -988,6 +988,48 @@ export class Evaluator {
 			})
 		);
 
+    this.environment.set(
+			'primitive_float_multiply',
+			createNativeFunction(
+				'primitive_float_multiply',
+				(a: Value) => (b: Value) => {
+					if (isNumber(a) && isNumber(b)) {
+						return createNumber(a.value * b.value);
+					}
+					throw new Error('primitive_float_multiply requires two numbers');
+				}
+			)
+		);
+
+		this.environment.set(
+			'primitive_float_subtract',
+			createNativeFunction(
+				'primitive_float_subtract',
+				(a: Value) => (b: Value) => {
+					if (isNumber(a) && isNumber(b)) {
+						return createNumber(a.value - b.value);
+					}
+					throw new Error('primitive_float_subtract requires two numbers');
+				}
+			)
+		);
+
+		this.environment.set(
+			'primitive_float_divide',
+			createNativeFunction(
+				'primitive_float_divide',
+				(a: Value) => (b: Value) => {
+					if (isNumber(a) && isNumber(b)) {
+						if (b.value === 0) {
+							return createConstructor('None', []);
+						}
+						return createConstructor('Some', [createNumber(a.value / b.value)]);
+					}
+					throw new Error('primitive_float_divide requires two numbers');
+				}
+			)
+		);
+
 		this.environment.set(
 			'primitive_string_concat',
 			createNativeFunction(

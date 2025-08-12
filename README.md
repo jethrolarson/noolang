@@ -4,14 +4,12 @@ An functional, expression-based, LLM-friendly programming language designed for 
 
 ## Features
 - **Expression-based** - everything is an expression
-- **Strong type inference** with Hindley-Milner
+- **Strong type inference** with optional postfix type annotations
 - **Trait system** - constraint definitions and implementations
 - **Effect system** - explicit effect tracking in types
 - **Where expressions** - local definitions within expressions
 - **Pipeline operators** (`|>`, `<|`, `|`, `|?`, `$`) for composition
 - **Variants** - algebraic data types with pattern matching (type shadowing is disallowed)
-- **User-defined types** - records, tuples, and union types
-- **Records & tuples** - structured data with type safety
 - **Destructuring patterns** - ergonomic data extraction and import spreading
 - **REPL** - interactive development environment
 - **VSCode Language Server** - for intellisense and hover types (WIP)
@@ -104,82 +102,111 @@ The REPL includes comprehensive debugging tools:
 **Working examples include**: `basic.noo`, `adt_demo.noo`, `recursive_adts.noo`, `safe_thrush_demo.noo`, `simple_adt.noo`, `card_game.noo`, `math_functions.noo`, and all import examples (`math_module.noo`, `power_module.noo`, `number_module.noo`, `string_module.noo`, `function_module.noo`, `list_module.noo`).
 
 ```noolang
-# Function definition
-add = fn x y => x + y
+# Function definition (this is a comment)
+add1 = fn x => x + 1;
 
 # Function application doesn't require parens and `,` is only used for separating items in data structures like `Tuple`, `Record` and `List`
-add 2 3
+add1 2;
 
 # The + operator works for both numbers and strings
-1 + 2           # => 3 : Int
-"hello" + " world"  # => "hello world" : String
+1 + 2;           # => 3 : Float
+"hello" + " world";  # => "hello world" : String
+
+# All numeric operators are available as functions as well
+add 1 2; # => 3 : Float
+multiply 2 3; # => 6 : Float
+subtract 10 2; # => 8 : Float
+divide 10 2; # => 5 : Float
 
 # all functions are curried so if you pass less than their full number of arguments you get back a partially applied function
 increment = add 1;
-increment 2 
-# 3 : Float
+increment 2; # => 3 : Float
 
 # to nest calls you may need parenthesis
-add 2 (add 3 2)
+add 2 (add 3 2);
 
 # strictly speaking you never pass more than one argument
-add 1 2 
+add 1 2;
 # is actually 
-((add 1) 2)
+((add 1) 2);
 # in javascript this could be seen as `const add = x => y => x + y; add(1)(2);`
 
-# Where expressions for local definitions
-x + y where (x = 1; y = 2)  # => 3
+# use where expressions do define local variables for an expression
+x + y where (x = 1; y = 2);  # => 3
 
-# Destructuring for clean data extraction
-{x, y} = {10, 20}; x + y  # => 30
-{@name, @age} = {@name "Alice", @age 30}; name  # => "Alice"
+# or just create a definition inside an expression with `;` operator
+(x = 1; y = 2; x + y); # => 3
 
 # because nesting can get confusing fast noolang includes a few helpful opperators for reducing the need for parens such as the `|` operator:
-2 | add 3 | add 2
+2 | add 3 | add 2;
 
-[1, 2, 3] | map (add 1) # => [2, 3, 4]
+[1, 2, 3] | map (add 1); # => [2, 3, 4]
 
 # the $ operator acts like a weak function application operator allowing you to often skip parens on the right hand expression:
-[1, 2, 3] | map $ add 1
+# FIXME currently not working: [1, 2, 3] | map $ add 1;
 
-# can be written as
+# Is sugar for
+map (add 1) [1, 2, 3];
 
-
+# tuples are of fixed length and have different types per element
+{1, "hello", True}; # => {1, "hello", True} : {Float, String, Bool}
 
 # Conditional expressions
-if True then 1 else 2
+if True then 1 else 2;
 
 # Records
-user = { @name "Alice", @age 30 }
+user = { @name "Alice", @age 30, @address { @street "123 Main St", @city "Anytown" } };
 
 # Accessors
-(@name user)
+(@name user); # => "Alice"
+
+# you can set using accessors
+ruth = set @name "Ruth" user;
+
+# pipe with accessors can give you . notation-like ergonomics
+ruth | @name; # => "Ruth"
+
+# you can also use the `@` operator to set the value of a field
+ruth | set @name "Ruth";
+
+# accessors can be chained
+user | @address | @street; # => "123 Main St"
+
+# accessors can also be composed
+user_street = @address <| @street;
+user_street user; # => "123 Main St"
+
+# Destructuring for clean data extraction
+{x, y} = {10, 20}; 
+x + y;  # => 30
+{@name, @age} = {@name "Alice", @age 30}; 
+name;  # => "Alice"
 
 # Recursion
-factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1))
-
-# Where expressions in functions
-fn x => x * 2 where (x = 5)  # => 10
+factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1));
 
 # Mutation
 mut counter = 0;
-mut! counter = counter + 1
+mut! counter = counter + 1;
 
 # List operations
-[1, 2, 3] |> tail |> head
+[1, 2, 3] | map (add 1) | head; # => Option 2
 
-# Variant Types (ADTs)
+# Variant Types (ADTs) are a way to define a type with a fixed set of possible values
 variant Color = Red | Green | Blue;
 favorite = Red;
 
-variant Option a = Some a | None;
-result = match (Some 42) with (Some x => x; None => 0)
+# Option is a usefull built-in variant type for handling optional values
+Some 1; # => Some 1 : Option 1
+None; # => None : Option None
+
+# Pattern matching is a way to extract the value of a variant
+result = match (Some 42) with (Some x => x; None => 0);
 
 # Pattern matching with variants
 variant Point = Point Float Float;
 point = Point 10 20;
-x = match point with (Point x y => x)
+x = match point with (Point x y => x);
 
 # Recursive variants (Binary Tree)
 variant Tree a = Node a (Tree a) (Tree a) | Leaf;
@@ -188,7 +215,7 @@ sum = fn t => match t with (
     Node value left right => value + (sum left) + (sum right);
     Leaf => 0
 );
-tree_sum = sum tree  # => 15
+tree_sum = sum tree;  # => 15
 
 # User-Defined Types
 type User = {@name String, @age Float, @active Bool};
@@ -198,7 +225,6 @@ type Response = User | String | Float;
 # Creating and using user-defined types
 user = {@name "Alice", @age 30, @active True};
 point = {10.5, 20.3};
-response = user;
 
 # Accessing user-defined types
 userName = user | @name;  # "Alice"
@@ -229,18 +255,104 @@ result = match data with (
 )
 
 # Destructuring patterns for data extraction
-{x, y} = {10, 20}
-{@name, @age} = {@name "Bob", @age 25}
-{@name userName, @age} = {@name "Alice", @age 30}  # Renaming
+{x, y} = {10, 20};
+{@name, @age} = {@name "Bob", @age 25};
+{@name userName, @age} = {@name "Alice", @age 30};  # Renaming
 
 # Nested destructuring
-{outer, {inner, rest}} = {1, {2, 3}}
-{@user {@name, @age}} = {@user {@name "Charlie", @age 35}}
-{@coords {x, y}, @metadata {@name author}} = {@coords {5, 10}, @metadata {@name "Dave"}}
+{outer, {inner, rest}} = {1, {2, 3}};
+{@user {@name, @age}} = {@user {@name "Charlie", @age 35}};
+{@coords {x, y}, @metadata {@name author}} = {@coords {5, 10}, @metadata {@name "Dave"}};
 
 # Import spreading with destructuring  
-{@add, @multiply} = import "examples/math_module"
-{@square sq, @cube cb} = import "examples/power_module"  # With renaming
+{@add, @multiply} = import "examples/math_module";
+{@square sq, @cube cb} = import "examples/power_module";  # With renaming
+```
+
+## Type Annotations
+
+Noolang supports optional **postfix type annotations** for definitions to provide explicit type information and improve code documentation.
+
+### Definition-Level Type Annotations
+
+Type annotations can be added to any definition using postfix `: Type` syntax:
+
+```noolang
+# Simple type annotations
+x = 42 : Float;
+name = "Alice" : String;
+flag = True : Bool;
+
+# Function type annotations
+add = fn x y => x + y : Float -> Float -> Float;
+double = fn x => x * 2 : Float -> Float;
+
+# Complex type annotations with effects
+logger = fn msg => print msg : String -> String !write;
+readConfig = fn path => readFile path : String -> String !read;
+```
+
+### Function Type Syntax
+
+Function types use arrow syntax with effects:
+
+```noolang
+# Pure functions
+identity = fn x => x : a -> a;
+add = fn x y => x + y : Float -> Float -> Float;
+
+# Functions with effects
+printNumber = fn n => print (show n) : Float -> Float !write;
+randomValue = fn () => random : Unit -> Float !rand;
+
+# Multiple effects
+logAndSave = fn msg => (
+  log msg;
+  writeFile "log.txt" msg
+) : String -> Unit !log !write
+```
+
+### Complex Type Examples
+
+```noolang
+# List types
+numbers = [1, 2, 3] : List Float;
+names = ["Alice", "Bob"] : List String;
+
+# Record types
+user = { @name "Alice", @age 30 } : { @name String, @age Float };
+point = { @x 10, @y 20 } : { @x Float, @y Float };
+
+# Option types
+safeDiv = fn x y => if y == 0 then None else Some (x / y) : Float -> Float -> Option Float;
+
+# Higher-order function types
+mapFn = map : (a -> b) -> List a -> List b;
+applyTwice = fn f x => f (f x) : (a -> a) -> a -> a
+```
+
+### Type Annotation Benefits
+
+1. **Documentation**: Makes function signatures explicit
+2. **Type Safety**: Catches type errors early
+3. **IDE Support**: Enables better tooling and autocomplete
+4. **Readability**: Clarifies intent for complex functions
+5. **Debugging**: Helps identify type-related issues
+
+### When to Use Type Annotations
+
+```noolang
+# Always useful for exported functions
+exported_fn = fn x y => complex_calculation x y : InputType -> InputType -> OutputType;
+
+# Helpful for complex generic functions
+process = fn items => map (filter (validate)) items : List a -> List a;
+
+# Essential for functions with effects
+save_data = fn data => writeFile "data.txt" (serialize data) : Data -> Unit !write;
+
+# Good for documenting constraints
+show_all = map show : Show a => List a -> List String;
 ```
 
 ## Language Syntax
@@ -279,26 +391,26 @@ print "hello"; map (fn x => x * 2) [4, 5, 6]
 
 ```noolang
 # Simple function
-add = fn x y => x + y
+add = fn x y => x + y;
 
 # Function with multiple parameters
-multiply = fn a b c => a * b * c
+multiply = fn a b c => a * b * c;
 
 # Curried function (Haskell-style)
-curried_add = fn a => fn b => a + b
+curried_add = fn a => fn b => a + b;
 ```
 
 ### Function Application
 
 ```noolang
 # Direct application
-add 2 3
+add 2 3;
 
 # Nested application
-add (multiply 2 3) 4
+add (multiply 2 3) 4;
 
 # Curried application
-curried_add 2 3
+curried_add 2 3;
 ```
 
 ### Pipeline and Function Application Operators
@@ -309,7 +421,15 @@ Noolang provides several operators for function composition and application:
 Composes functions from left to right (like Unix pipes):
 ```noolang
 # Chain functions: f |> g |> h means h(g(f(x)))
-[1, 2, 3] |> head |> add 5
+operate = add 5 |> multiply 2 |> subtract 1;
+operate 10;  # => -29 (1 - (2 * (5 + 10)))
+```
+#### Compose Operator (`<|`) - Function Composition
+Composes functions from right to left (like B combinator):
+```noolang
+# Chain functions: f <| g <| h means f(g(h(x)))
+operate = add 5 <| multiply 2 <| subtract 1;
+operate 10;  # => -13 (5 + (2 * (1 - 10))
 ```
 
 #### Thrush Operator (`|`) - Function Application
@@ -319,7 +439,7 @@ Applies the right function to the left value:
 [1, 2, 3] | map (fn x => x * 2)
 ```
 
-#### Safe Thrush Operator (`|?`) - Monadic Chaining
+#### Safe Thrush Operator (`|?`) - Monadic/Functor Chaining
 Safely applies functions to monadic values (like Option), implementing smart monadic bind behavior:
 ```noolang
 # Safe application to Some values
@@ -660,8 +780,6 @@ Destructuring works seamlessly with properly typed imports:
 ```noolang
 # Basic destructuring
 {@add, @multiply} = import "examples/math_module"
-# add : Float -> Float -> Float
-# multiply : Float -> Float -> Float
 
 # Destructuring with renaming
 {@square sq, @cube cb} = import "examples/power_module"
@@ -1306,13 +1424,11 @@ variant JsonValue =
     JsonNumber Float |
     JsonBool Bool |
     JsonNull;
-```
 
 #### Working with Recursive ADTs
 
-**Tree Construction and Traversal:**
+# **Tree Construction and Traversal:**
 
-```noolang
 # Create a binary tree
 tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
 
@@ -1336,11 +1452,9 @@ depth = fn t => match t with (
 
 getValue tree;  # => 5
 sumTree tree;   # => 15 (5+3+7)
-```
 
-**Linked List Operations:**
+# Linked List Operations:
 
-```noolang
 # Create a linked list
 myList = Cons 1 (Cons 2 (Cons 3 Nil));
 
@@ -1390,7 +1504,7 @@ eval calculation;  # => 20
 
 #### Pattern Matching with Recursive Types
 
-Recursive ADTs work seamlessly with Noolang's pattern matching:
+Recursive ADTs work with Noolang's pattern matching:
 
 ```noolang
 # Find element in tree
@@ -1417,24 +1531,6 @@ contains 10 tree;    # => False
 mapTree (multiply 2) tree;  # Double all values in tree
 ```
 
-#### Type Safety with Recursion
-
-Recursive ADTs maintain full type safety:
-
-```noolang
-# Type inference works correctly
-numberTree = Node 42 Leaf Leaf;          # Tree Float
-stringTree = Node "hello" Leaf Leaf;     # Tree String
-
-# Pattern matching ensures exhaustiveness
-safeTail = fn lst => match lst with (
-    Cons _ tail => Some tail;
-    Nil => None
-);
-```
-
-**Note**: Recursive ADTs support all existing Noolang features including higher-order functions, pipeline operators, and integration with the constraint system.
-
 ## Duck-Typed Records and Accessors
 
 Noolang records are **duck-typed**: any record with the required field(s) can be used, regardless of extra fields. This makes accessors and record operations flexible and ergonomic, similar to JavaScript or Python objects.
@@ -1443,12 +1539,12 @@ Noolang records are **duck-typed**: any record with the required field(s) can be
 
 ```noolang
 # Record with extra fields
-duck_person = { @name "Bob", @age 42, @extra "ignored" }
-duck_name = duck_person | @name  # Returns "Bob"
+duck_person = { @name "Bob", @age 42, @extra "ignored" };
+duck_name = duck_person | @name  # Returns "Bob";
 
 # Chained accessors with extra fields
-complex = { @bar { @baz fn x => { @qux x }, @extra 42 } }
-duck_chain = (((complex | @bar) | @baz) $ 123) | @qux  # Returns 123
+complex = { @bar { @baz fn x => { @qux x }, @extra 42 } };
+duck_chain = (((complex | @bar) | @baz) $ 123) | @qux;  # Returns 123
 ```
 
 - **Accessors** (`@field`) work with any record that has the required field, even if there are extra fields.
@@ -1469,44 +1565,8 @@ Noolang features a **comprehensive trait system** that enables constraint-based 
 
 ### Constraint Definitions
 
-Define constraints that specify required functions and their signatures:
-
-```noolang
-# Simple constraint with one function
-constraint Show a ( show : a -> String );
-
-# Constraint with multiple functions
-constraint Eq a ( 
-  equals : a -> a -> Bool; 
-  notEquals : a -> a -> Bool 
-);
-
-# Complex constraint with generic functions
-constraint Monad m (
-  return : a -> m a;
-  bind : m a -> (a -> m b) -> m b
-);
-```
-
 ### Constraint Implementations
 
-Provide implementations of constraints for specific types:
-
-```noolang
-# Implement Show for Float
-implement Show Float ( show = intToString );
-
-# Implement Eq for String
-implement Eq String ( 
-  equals = stringEquals;
-  notEquals = fn a b => not (stringEquals a b)
-);
-
-# Implement Show for Lists (if elements are showable)
-implement Show (List a) given Show a (
-  show = fn list => "[" + (joinStrings ", " (map show list)) + "]"
-);
-```
 
 ### Type-Directed Dispatch
 
@@ -1514,11 +1574,11 @@ Constraint functions automatically resolve to the correct implementation based o
 
 ```noolang
 # These calls automatically resolve to the right implementation
-show 42              # Uses Show Float implementation
-show "hello"         # Uses Show String implementation  
-show [1, 2, 3]       # Uses Show (List a) implementation with Show Float
+show 42;              # Uses Show Float implementation
+show "hello";         # Uses Show String implementation  
+show [1, 2, 3];       # Uses Show (List a) implementation with Show Float
 
-equals 1 2           # Uses Eq Float implementation
+equals 1 2;           # Uses Eq Float implementation
 equals "a" "b"       # Uses Eq String implementation
 ```
 
@@ -1527,52 +1587,15 @@ equals "a" "b"       # Uses Eq String implementation
 Implement constraints conditionally based on other constraints:
 
 ```noolang
-# Show for Lists only if elements are showable
-implement Show (List a) given Show a (
-  show = fn list => "[" + (joinStrings ", " (map show list)) + "]"
-);
+# FIXME this is not working yet
+#type Point = {Float, Float};
 
 # Eq for pairs if both components are comparable
-implement Eq (Pair a b) given Eq a, Eq b (
-  equals = fn (Pair x1 y1) (Pair x2 y2) => 
-    (equals x1 x2) && (equals y1 y2)
-);
-```
+# implement Eq Point (equals = fn p1 p2 => ({x1, y1} = p1; {x2, y2} = p2; (equals x1 x2) && (equals y1 y2))););
 
-### Error Handling
-
-Clear error messages when implementations are missing:
-
-```noolang
-# This would produce a helpful error:
-show someCustomType   # Error: No implementation of Show for CustomType
-```
-
-### Complete Example
-
-Here's a complete example showing constraint definitions and usage at the top level:
-
-```noolang
-# Define constraints at top level
-constraint Show a ( show : a -> String );
-constraint Eq a ( 
-  equals : a -> a -> Bool; 
-  notEquals : a -> a -> Bool 
-);
-
-# Implement constraints for different types
-implement Show Float ( show = toString );
-implement Show String ( show = fn s => s );
-implement Eq Float ( 
-  equals = fn a b => a == b;
-  notEquals = fn a b => a != b
-);
-
-# Use constraint functions - they resolve automatically
-result1 = show 42;           # "42"
-result2 = show "hello";      # "hello"
-result3 = equals 1 2;        # False
-result4 = notEquals 1 2;     # True
+# then you can use == to compare pairs
+# Point 1 2 == Point 1 2; # => True
+# Point 1 2 == Point 2 1; # => False
 ```
 
 ### Integration with Existing Features
@@ -1581,19 +1604,11 @@ The trait system works seamlessly with all existing Noolang features:
 
 ```noolang
 # With higher-order functions
-showAll = map show    # Automatically constrains to Show a => List a -> List String
+showAll = map show;    # Automatically constrains to Show a => List a -> List String
 
 # With pipeline operators
-result = [1, 2, 3] |> map show |> joinStrings ", "
+result = [1, 2, 3] | map show | join ", ";
 
-# With ADTs and pattern matching
-variant Option a = Some a | None;
-implement Show (Option a) given Show a (
-  show = fn opt => match opt with (
-    Some x => "Some(" + show x + ")";
-    None => "None"
-  )
-);
 ```
 
 ### Current Implementation Status
@@ -1633,21 +1648,6 @@ Noolang provides several built-in constraints:
 
 TODO add examples
 
-#### Explicit Constraint Annotations (Planned)
-
-Future versions will support explicit constraint annotations:
-
-```noolang
-# Single constraint
-id = fn x => x : a -> a given a is Collection
-
-# Multiple constraints with "and"
-map = fn f list => map f list : (a -> b, List a) -> List b given a is Show and b is Eq
-
-# Complex constraint logic with "or"
-flexible = fn x => x : a -> a given a is Collection or a is String
-```
-
 ### Constraint Propagation
 
 Constraints automatically propagate through function composition:
@@ -1673,47 +1673,6 @@ TODO add examples
 #### Function Composition with Constraints
 TODO add examples
 
-
-### Current Implementation Status
-
-- **✅ Constraint System**: Fully implemented with Hindley-Milner style inference
-- **✅ Constraint Propagation**: Constraints are properly propagated through function composition
-- **✅ Built-in Constraints**: All 9 constraint types are implemented and validated
-- **✅ Constraint Validation**: Type checker enforces constraints during unification
-- **✅ Error Reporting**: Clear error messages when constraints are violated
-- **🚧 Explicit Annotations**: `given` syntax is parsed but constraint evaluation uses AND semantics for OR constraints
-
-### Constraint System Benefits
-
-1. **Type Safety**: Prevents invalid operations on incompatible types
-2. **Generic Programming**: Enables safe polymorphic functions with requirements
-3. **Clear Error Messages**: Specific feedback about constraint violations
-4. **Automatic Propagation**: Constraints flow naturally through function composition
-5. **LLM-Friendly**: Clear, predictable constraint semantics
-
-## Project Structure
-
-```
-src/
-  ├── ast.ts          # Abstract Syntax Tree definitions
-  ├── lexer.ts        # Tokenizer for whitespace-significant syntax
-  ├── parser/         # Parser implementation
-  │   ├── parser.ts   # Main parser (combinator-based)
-  │   └── combinators.ts # Parser combinator library
-  ├── evaluator.ts    # Interpreter for evaluating expressions
-  ├── typer_functional.ts # Type inference and checking
-  ├── repl.ts         # Interactive REPL
-  ├── cli.ts          # Command-line interface
-  └── format.ts       # Value formatting and output
-
-test/
-  ├── parser.test.ts    # Parser tests
-  ├── evaluator.test.ts # Evaluator tests
-  └── typer_functional.test.ts # Type inference tests
-
-syntaxes/
-  └── noolang.tmLanguage.json # VSCode syntax highlighting
-```
 
 ## Development
 

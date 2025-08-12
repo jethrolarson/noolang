@@ -93,3 +93,4 @@ The FFI system revealed a dependency chain that requires foundational features:
   type User = {@name String};
   type User = {@name String, @age Float};   # Type already defined: User
   ```
+- this should work: `[1, 2, 3] | map $ add 1;`

@@ -263,6 +263,8 @@ implement Applicative Result (
   )
 );
 
+const = fn a b => a;
+
 
 # ========================================
 # LIST OPERATIONS

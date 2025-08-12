@@ -1,5 +1,6 @@
 import { Lexer } from '../../lexer/lexer';
-import { parse, parseTypeExpression } from '../parser';
+import { parse } from '../parser';
+import { parseTypeExpression } from '../parse-type';
 import {
 	assertListType,
 	assertFunctionType,
@@ -18,6 +19,12 @@ import {
 import type { ParseResult, ParseSuccess } from '../../parser/combinators';
 import { test, expect } from 'bun:test';
 
+function parseType(typeSrc: string) {
+	const lexer = new Lexer(typeSrc);
+	const tokens = lexer.tokenize();
+	return parseTypeExpression(tokens);
+}
+
 function assertParseSuccess<T>(
 	result: ParseResult<T>
 ): asserts result is ParseSuccess<T> {
@@ -27,9 +34,7 @@ function assertParseSuccess<T>(
 }
 
 test('Advanced Type Expressions - should parse Tuple type constructor', () => {
-	const lexer = new Lexer('Tuple Float String Bool');
-	const tokens = lexer.tokenize();
-	const result = parseTypeExpression(tokens);
+	const result = parseType('Tuple Float String Bool');
 	assertParseSuccess(result);
 	assertTupleType(result.value);
 	const tupleConstructor = result.value;
@@ -37,17 +42,13 @@ test('Advanced Type Expressions - should parse Tuple type constructor', () => {
 });
 
 test('Advanced Type Expressions - should parse parenthesized type expression', () => {
-	const lexer = new Lexer('(Float -> String)');
-	const tokens = lexer.tokenize();
-	const result = parseTypeExpression(tokens);
+	const result = parseType('(Float -> String)');
 	assertParseSuccess(result);
 	assertFunctionType(result.value);
 });
 
 test('Advanced Type Expressions - should parse List type with generic parameter', () => {
-	const lexer = new Lexer('List');
-	const tokens = lexer.tokenize();
-	const result = parseTypeExpression(tokens);
+	const result = parseType('List');
 	assertParseSuccess(result);
 	assertListType(result.value);
 	const listType = result.value;
@@ -56,9 +57,7 @@ test('Advanced Type Expressions - should parse List type with generic parameter'
 });
 
 test('Advanced Type Expressions - should parse variant type with args', () => {
-	const lexer = new Lexer('Maybe String');
-	const tokens = lexer.tokenize();
-	const result = parseTypeExpression(tokens);
+	const result = parseType('Maybe String');
 	assertParseSuccess(result);
 	assertVariantType(result.value);
 	const variantType = result.value;
