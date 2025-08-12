@@ -48,24 +48,6 @@ export const token =
 		};
 	};
 
-// Match any token
-export const anyToken = (): Parser<Token> => (tokens: Token[]) => {
-	if (tokens.length === 0) {
-		return {
-			success: false,
-			error: 'Expected any token, but got end of input',
-			position: 0,
-		};
-	}
-
-	const [first, ...rest] = tokens;
-	return {
-		success: true,
-		value: first,
-		remaining: rest,
-	};
-};
-
 // Sequence of parsers
 export const seq =
 	<T extends any[]>(...parsers: { [K in keyof T]: Parser<T[K]> }): Parser<T> =>
@@ -114,6 +96,36 @@ export const choice =
 			position: lastPosition,
 		};
 	};
+
+// For common 2-parser case
+export const choice2 = <T>(p1: Parser<T>, p2: Parser<T>): Parser<T> =>
+  (tokens: Token[]) => {
+      const result1 = p1(tokens);
+      if (result1.success) return result1;
+      
+      const result2 = p2(tokens);
+      if (result2.success) return result2;
+      
+      return result2.position > result1.position ? result2 : result1;
+  };
+
+// For common 3-parser case  
+export const choice3 = <T>(p1: Parser<T>, p2: Parser<T>, p3: Parser<T>): Parser<T> =>
+  (tokens: Token[]) => {
+      const result1 = p1(tokens);
+      if (result1.success) return result1;
+      
+      const result2 = p2(tokens);
+      if (result2.success) return result2;
+      
+      const result3 = p3(tokens);
+      if (result3.success) return result3;
+      
+      // Return best error
+      if (result3.position > result2.position && result3.position > result1.position) return result3;
+      if (result2.position > result1.position) return result2;
+      return result1;
+  };
 
 // Zero or more repetitions
 export const many =

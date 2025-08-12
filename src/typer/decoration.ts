@@ -24,7 +24,7 @@ export const typeAndDecorate = (
 		// Populate protected type names to prevent shadowing of any existing types
 		const protectedNames = new Set<string>(state.protectedTypeNames);
 		// From environment: collect keys that represent type constructors or type aliases
-		for (const [name, scheme] of state.environment.entries()) {
+		for (const [name] of state.environment.entries()) {
 			// Heuristic: treat uppercase-leading identifiers as type names (constructors/variants)
 			if (name && name[0] === name[0].toUpperCase()) {
 				protectedNames.add(name);

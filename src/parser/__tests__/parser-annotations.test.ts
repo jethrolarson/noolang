@@ -1,5 +1,6 @@
 import { Lexer } from '../../lexer/lexer';
-import { parse, parseTypeExpression } from '../parser';
+import { parse } from '../parser';
+import { parseTypeExpression } from '../parse-type';
 import { test, expect, describe } from 'bun:test';
 import {
 	assertParseSuccess,
@@ -155,9 +156,7 @@ describe('Type annotations', () => {
 	});
 	describe('Effect parsing', () => {
 		test('should parse function type with single effect', () => {
-			const lexer = new Lexer('Float -> Float !write');
-			const tokens = lexer.tokenize();
-			const result = parseTypeExpression(tokens);
+			const result = parseType('Float -> Float !write');
 
 			assertParseSuccess(result);
 			assertFunctionType(result.value);
@@ -169,9 +168,7 @@ describe('Type annotations', () => {
 		});
 
 		test('should parse function type with multiple effects', () => {
-			const lexer = new Lexer('Float -> String !write !log');
-			const tokens = lexer.tokenize();
-			const result = parseTypeExpression(tokens);
+			const result = parseType('Float -> String !write !log');
 
 			assertParseSuccess(result);
 			assertFunctionType(result.value);
@@ -180,11 +177,9 @@ describe('Type annotations', () => {
 		});
 
 		test('should parse function type with all valid effects', () => {
-			const lexer = new Lexer(
+			const result = parseType(
 				'Float -> Float !log !read !write !state !time !rand !ffi !async'
 			);
-			const tokens = lexer.tokenize();
-			const result = parseTypeExpression(tokens);
 
 			assertParseSuccess(result);
 			assertFunctionType(result.value);
@@ -202,9 +197,7 @@ describe('Type annotations', () => {
 		});
 
 		test('should parse function type with no effects', () => {
-			const lexer = new Lexer('Float -> Float');
-			const tokens = lexer.tokenize();
-			const result = parseTypeExpression(tokens);
+			const result = parseType('Float -> Float');
 
 			assertParseSuccess(result);
 			assertFunctionType(result.value);
@@ -213,18 +206,14 @@ describe('Type annotations', () => {
 		});
 
 		test('should reject invalid effect names', () => {
-			const lexer = new Lexer('Float -> Float !invalid');
-			const tokens = lexer.tokenize();
-			const result = parseTypeExpression(tokens);
+			const result = parseType('Float -> Float !invalid');
 
 			assertParseError(result);
 			expect(result.error.includes('Invalid effect: invalid')).toBeTruthy();
 		});
 
 		test('should require effect name after exclamation mark', () => {
-			const lexer = new Lexer('Float -> Float !');
-			const tokens = lexer.tokenize();
-			const result = parseTypeExpression(tokens);
+			const result = parseType('Float -> Float !');
 
 			assertParseError(result);
 			expect(
