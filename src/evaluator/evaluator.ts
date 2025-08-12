@@ -608,8 +608,10 @@ export class Evaluator {
 						}
 						return boolValue(result);
 					});
-					
-					return foundItem !== undefined ? createConstructor('Some', [foundItem]) : createConstructor('None', []);
+
+					return foundItem !== undefined
+						? createConstructor('Some', [foundItem])
+						: createConstructor('None', []);
 				}
 				throw new Error(
 					createHOFError('list_find', ['a predicate function', 'a list'])
@@ -988,7 +990,7 @@ export class Evaluator {
 			})
 		);
 
-    this.environment.set(
+		this.environment.set(
 			'primitive_float_multiply',
 			createNativeFunction(
 				'primitive_float_multiply',
@@ -1010,6 +1012,19 @@ export class Evaluator {
 						return createNumber(a.value - b.value);
 					}
 					throw new Error('primitive_float_subtract requires two numbers');
+				}
+			)
+		);
+
+		this.environment.set(
+			'primitive_float_equals',
+			createNativeFunction(
+				'primitive_float_equals',
+				(a: Value) => (b: Value) => {
+					if (isNumber(a) && isNumber(b)) {
+						return createBool(a.value === b.value);
+					}
+					throw new Error('primitive_float_equals requires two numbers');
 				}
 			)
 		);

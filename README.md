@@ -8,7 +8,7 @@ An functional, expression-based, LLM-friendly programming language designed for 
 - **Trait system** - constraint definitions and implementations
 - **Effect system** - explicit effect tracking in types
 - **Where expressions** - local definitions within expressions
-- **Pipeline operators** (`|>`, `<|`, `|`, `|?`, `$`) for composition
+- **Pipeline operators** (`|>`, `<|`, `|`, `|?`) for composition
 - **Variants** - algebraic data types with pattern matching (type shadowing is disallowed)
 - **Destructuring patterns** - ergonomic data extraction and import spreading
 - **REPL** - interactive development environment
@@ -141,12 +141,6 @@ x + y where (x = 1; y = 2);  # => 3
 2 | add 3 | add 2;
 
 [1, 2, 3] | map (add 1); # => [2, 3, 4]
-
-# the $ operator acts like a weak function application operator allowing you to often skip parens on the right hand expression:
-# FIXME currently not working: [1, 2, 3] | map $ add 1;
-
-# Is sugar for
-map (add 1) [1, 2, 3];
 
 # tuples are of fixed length and have different types per element
 {1, "hello", True}; # => {1, "hello", True} : {Float, String, Bool}
@@ -624,7 +618,7 @@ user | @age         # Returns 30
 
 # Chained accessors (with extra fields)
 complex = { @bar { @baz fn x => { @qux x }, @extra 42 } }
-duck_chain = (((complex | @bar) | @baz) $ 123) | @qux  # Returns 123
+duck_chain = (((complex | @bar) | @baz) 123) | @qux  # Returns 123
 
 # Accessors can be composed or used as functions
 getName = @name;
@@ -816,16 +810,13 @@ The import system provides comprehensive error handling:
 Imports work seamlessly with all Noolang features:
 
 ```noolang
-# With pipeline operators
-result = import "examples/math_module" | @add | ($ 2) | ($ 3)  # => 5
-
 # With pattern matching (if importing ADTs)
 option = import "examples/option_module"
 value = match option (Some x => x; None => 0)
 
 # With higher-order functions
 {@map, @filter} = import "examples/list_utils"
-result = [1, 2, 3, 4, 5] | filter (fn x => x > 2) | map (fn x => x * 2)  # => [6, 8, 10]
+result = [1, 2, 3, 4, 5] | list_filter (fn x => x > 2) | map (fn x => x * 2)  # => [6, 8, 10]
 ```
 
 ### Data Structure Syntax
@@ -1522,7 +1513,7 @@ duck_name = duck_person | @name  # Returns "Bob";
 
 # Chained accessors with extra fields
 complex = { @bar { @baz fn x => { @qux x }, @extra 42 } };
-duck_chain = (((complex | @bar) | @baz) $ 123) | @qux;  # Returns 123
+duck_chain = (complex | @bar | @baz) 123 | @qux;  # Returns 123
 ```
 
 - **Accessors** (`@field`) work with any record that has the required field, even if there are extra fields.
