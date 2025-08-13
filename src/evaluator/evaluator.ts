@@ -1747,6 +1747,19 @@ export class Evaluator {
 			const left = this.evaluateExpression(expr.left);
 			const right = this.evaluateExpression(expr.right);
 
+			// Support trait-function partial application: map (add 1) | [1,2,3]
+			if (right.tag === 'trait-function') {
+				const tf = right;
+				const args = Array.isArray(tf.partialArgs)
+					? [...tf.partialArgs, left]
+					: [left];
+				return this.resolveTraitFunctionWithArgs(
+					tf.name,
+					args,
+					tf.traitRegistry || this.traitRegistry
+				);
+			}
+
 			if (isFunction(right)) {
 				return right.fn(left);
 			} else if (isNativeFunction(right)) {
