@@ -52,6 +52,32 @@ test('| operator with built-in ADTs works', () => {
 	);
 });
 
+// New coverage: number piped into partially-applied add
+test('simple value thrush with partially applied add', () => {
+	expectSuccess(`1 | add 1`, 2);
+});
+
+// New coverage: list into map (add 1) then head
+test('chained thrush with trait partial and head', () => {
+	expectSuccess(
+		`
+      tmp = [1, 2, 3] | list_map (add 1) | head;
+      match tmp (Some x => x; None => 0)
+    `,
+		2
+	);
+});
+
+// New coverage: strings with Add String implementation
+test('| with trait add on strings through map', () => {
+	expectSuccess(
+		`
+      ["a", "b"] | map (add "x")
+    `,
+		['xa', 'xb']
+	);
+});
+
 // =============================================================================
 // WEAKNESS INVESTIGATION: OPERATOR CHAINING EDGE CASES
 // =============================================================================
@@ -87,8 +113,9 @@ test('| operator with non-function gives clear error', () => {
 	expectError(`5 | 3`, 'non-function|function');
 });
 
-test('| operator with wrong argument type', () => {
-	expectError(`"hello" | length`, 'type|argument');
+// New coverage: wrong typed partial application through map
+test('type error when partially applying add with wrong type', () => {
+	expectError(`[1, 2, 3] | map (add "x")`, 'requires two strings');
 });
 
 // =============================================================================
@@ -114,5 +141,14 @@ test('| operator with built-in functions', () => {
         result
     `,
 		['1', '2', '3']
+	);
+});
+
+test('| operator with trait and built-in partially applied functions (add)', () => {
+	expectSuccess(
+		`
+      [1, 2, 3] | map (add 1)
+    `,
+		[2, 3, 4]
 	);
 });

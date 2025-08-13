@@ -68,7 +68,7 @@ bun start -e "x = 10; x * 2"
 addTwo = fn x y => x + y;
 
 # Function application
-addTwo 5 3
+addTwo 5 3;
 ```
 
 ### Pipeline Operations
@@ -83,7 +83,7 @@ doubled = map (fn x => x * 2) [1, 2, 3, 4];
 double = fn x => x * 2;
 addOne = fn x => x + 1;
 composed = addOne |> double;
-result = 5 | composed              # Apply composed function
+result = 5 | composed;              # Apply composed function
 ```
 
 ### Type System
@@ -94,7 +94,7 @@ Types are inferred automatically:
 # The type system figures out these types
 identity = fn x => x;              # 'a -> 'a
 numbers = [1, 2, 3];              # List Float
-greeting = "Hello"               # String
+greeting = "Hello";               # String
 ```
 
 ## REPL Commands
@@ -102,20 +102,24 @@ greeting = "Hello"               # String
 The REPL provides powerful debugging and inspection tools:
 
 ### Basic Commands
+
 - `.help` - Show all available commands
 - `.quit` or `.exit` - Exit the REPL
 
 ### Environment Inspection
+
 - `.env` - Show current environment with types
 - `.types` - Show type environment
 - `.env-json` - Export environment as JSON
 
 ### Debugging
+
 - `.tokens (expression)` - Show lexical tokens
 - `.ast (expression)` - Show abstract syntax tree
 - `.ast-json (expression)` - Show AST as JSON
 
 ### File Operations
+
 - `.tokens-file filename.noo` - Analyze file tokens
 - `.ast-file filename.noo` - Show file AST
 
@@ -128,7 +132,7 @@ add : Number -> Number -> Number
 noo> .tokens (add 5 3)
 [IDENTIFIER:add, NUMBER:5, NUMBER:3, EOF]
 
-noo> add 5 3
+noo> add 5 3;
 8 : Number
 ```
 
@@ -144,7 +148,7 @@ Explore the examples to learn more:
 ## Next Steps
 
 1. **Learn the syntax**: Read [Language Reference](language-reference.md)
-2. **Understand types**: Study [Type System Guide](type-system-guide.md) 
+2. **Understand types**: Study [Type System Guide](type-system-guide.md)
 3. **Explore tools**: Check [Tools & CLI Guide](tools-and-cli.md)
 4. **Try examples**: Work through [Examples & Tutorials](examples-and-tutorials.md)
 

@@ -52,7 +52,7 @@ boolId = identity True;      # True
 Noolang provides several fundamental types:
 
 - **`Float`**: Floating-point numbers (`42`, `3.14`, `-1.5`)
-- **`String`**: Text strings (`"hello"`, `"world"`)
+- **`String`**: Text strings (`"hello"`, "world")
 - **`Bool`**: Boolean values (`True`, `False`)
 - **`Unit`**: The unit type representing empty values
 
@@ -161,7 +161,6 @@ result = head strings;                          # Option String
 double = fn x => x * 2;
 increment = fn x => x + 1;
 composed = double |> increment;  # Float -> Float
-result
 ```
 
 ### Error Handling with Option
@@ -176,7 +175,7 @@ unsafeDiv = 10 / 0;         # None
 
 # Type system supports Option types
 result = safeHead;  # Option Float
-show result
+show result;
 ```
 
 ## Type Annotations (Optional)
@@ -189,7 +188,7 @@ addTwo = fn x y => x + y;    # Inferred: Float -> Float -> Float
 
 # Variable type hints (for clarity)
 count = 42;                  # Inferred: Float
-count                        # count: Float
+count;                       # count: Float
 ```
 
 ## Type Definition Rules
@@ -233,7 +232,7 @@ processData = fn items =>
 
 # Safe property access with records
 person = { @name "Alice", @age 30 };
-person
+person;
 ```
 
 ## Advanced Features
@@ -262,7 +261,7 @@ empty = head [];            # None
 
 # Working with Option results
 result = first;
-result
+result;
 ```
 
 ## Type System Limitations

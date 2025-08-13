@@ -10,21 +10,21 @@ import { createNumber } from '../evaluator';
 describe('Evaluator', () => {
 	test('should set a field in a record using set', () => {
 		const result = runCode(
-			'user = { @name "Alice", @age 30 }; user2 = set @age user 31; user2'
+			'user = { @name "Alice", @age 30 }; user2 = set @age 31 user; user2'
 		);
 		expect(result.finalValue).toEqual({ name: 'Alice', age: 31 });
 	});
 
 	test('should add a new field to a record using set', () => {
 		const result = runCode(
-			'user = { @name "Alice" }; user2 = set @age user 42; user2'
+			'user = { @name "Alice" }; user2 = set @age 42 user; user2'
 		);
 		expect(result.finalValue).toEqual({ name: 'Alice', age: 42 });
 	});
 
 	test('set should not mutate the original record', () => {
 		const result = runCode(
-			'user = { @name "Alice", @age 30 }; user2 = set @age user 31; user;'
+			'user = { @name "Alice", @age 30 }; user2 = set @age 31 user; user;'
 		);
 		expect(result.finalValue).toEqual({ name: 'Alice', age: 30 });
 	});

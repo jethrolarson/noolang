@@ -744,7 +744,7 @@ export class Evaluator {
 			'set',
 			createNativeFunction(
 				'set',
-				(accessor: Value) => (record: Value) => (newValue: Value) => {
+				(accessor: Value) => (newValue: Value) => (record: Value) => {
 					if (isNativeFunction(accessor) && isRecord(record)) {
 						// For now, just handle simple field accessors
 						const field = accessor.name?.replace('@', '');
@@ -1746,6 +1746,19 @@ export class Evaluator {
 			// Handle thrush operator
 			const left = this.evaluateExpression(expr.left);
 			const right = this.evaluateExpression(expr.right);
+
+			// Support trait-function partial application: map (add 1) | [1,2,3]
+			if (right.tag === 'trait-function') {
+				const tf = right;
+				const args = Array.isArray(tf.partialArgs)
+					? [...tf.partialArgs, left]
+					: [left];
+				return this.resolveTraitFunctionWithArgs(
+					tf.name,
+					args,
+					tf.traitRegistry || this.traitRegistry
+				);
+			}
 
 			if (isFunction(right)) {
 				return right.fn(left);

@@ -140,7 +140,7 @@ x + y where (x = 1; y = 2);  # => 3
 # because nesting can get confusing fast noolang includes a few helpful opperators for reducing the need for parens such as the `|` operator:
 2 | add 3 | add 2;
 
-[1, 2, 3] | map (add 1); # => [2, 3, 4]
+#[1, 2, 3] | map (add 1); # => [2, 3, 4]
 
 # tuples are of fixed length and have different types per element
 {1, "hello", True}; # => {1, "hello", True} : {Float, String, Bool}
@@ -155,19 +155,20 @@ user = { @name "Alice", @age 30, @address { @street "123 Main St", @city "Anytow
 (@name user); # => "Alice"
 
 # you can set using accessors
-ruth = set @name "Ruth" user;
+# FIXME set isn't return the correct type need to fix set in builtins.ts
+# ruth = set @name "Ruth" user;
 
 # pipe with accessors can give you . notation-like ergonomics
-ruth | @name; # => "Ruth"
+# ruth | @name; # => "Ruth"
 
 # you can also use the `@` operator to set the value of a field
-ruth | set @name "Ruth";
+# ruth | set @name "Ruth";
 
 # accessors can be chained
 user | @address | @street; # => "123 Main St"
 
 # accessors can also be composed
-user_street = @address <| @street;
+user_street = @address |> @street;
 user_street user; # => "123 Main St"
 
 # Destructuring for clean data extraction
@@ -184,7 +185,7 @@ mut counter = 0;
 mut! counter = counter + 1;
 
 # List operations
-[1, 2, 3] | map (add 1) | head; # => Option 2
+# [1, 2, 3] | map (add 1) | head; # => Option 2
 
 # Variant Types (ADTs) are a way to define a type with a fixed set of possible values
 variant Color = Red | Green | Blue;
@@ -198,9 +199,9 @@ None; # => None : Option None
 result = match (Some 42) (Some x => x; None => 0);
 
 # Pattern matching with variants
-variant Point = Point Float Float;
-point = Point 10 20;
-x = match point (Point x y => x);
+#variant Point = Point Float Float;
+#point = Point 10 20;
+#x = match point (Point x y => x);
 
 # Recursive variants (Binary Tree)
 variant Tree a = Node a (Tree a) (Tree a) | Leaf;
@@ -322,7 +323,7 @@ safeDiv = fn x y => if y == 0 then None else Some (x / y) : Float -> Float -> Op
 
 # Higher-order function types
 mapFn = map : (a -> b) -> List a -> List b;
-applyTwice = fn f x => f (f x) : (a -> a) -> a -> a
+applyTwice = fn f x => f (f x) : (a -> a) -> a -> a;
 ```
 
 ### Type Annotation Benefits
@@ -346,7 +347,7 @@ process = fn items => map (filter (validate)) items : List a -> List a;
 save_data = fn data => writeFile "data.txt" (serialize data) : Data -> Unit !write;
 
 # Good for documenting constraints
-show_all = map show : Show a => List a -> List String;
+show_all = map show : List a -> List String given a implements Show;
 ```
 
 ## Language Syntax
@@ -378,7 +379,7 @@ print "hello"; map (fn x => x * 2) [4, 5, 6]
 {}          # Unit
 [1, 2, 3]   # List (comma-separated)
 { @name "Alice", @age 30 }  # Record (comma-separated fields)
-{1, 2, 3}   # Tuple (comma-separated)
+{1, 2, 3};   # Tuple (comma-separated)
 ```
 
 ### Function Definitions
@@ -437,21 +438,21 @@ Applies the right function to the left value:
 Safely applies functions to monadic values (like Option), implementing smart monadic bind behavior:
 ```noolang
 # Safe application to Some values
-Some 42 |? (fn x => x + 10)     # Some 52
+Some 42 |? (fn x => x + 10);     # Some 52
 
 # None values short-circuit  
-None |? (fn x => x + 10)         # None
+None |? (fn x => x + 10);         # None
 
 # Monadic bind: functions returning Options don't get double-wrapped
 safe_divide = fn x => if x == 0 then None else Some (100 / x);
-Some 10 |? safe_divide           # Some 10 (not Some Some 10)
+Some 10 |? safe_divide;           # Some 10 (not Some Some 10)
 
 # Functions returning regular values get automatically wrapped
-Some 5 |? (fn x => x * 2)        # Some 10
+Some 5 |? (fn x => x * 2);        # Some 10
 
 # Chaining operations with short-circuiting
-Some 10 |? (fn x => x + 5) |? (fn x => x * 2) |? safe_divide  # Some 6
-Some 0 |? (fn x => x + 5) |? (fn x => x * 2) |? safe_divide   # None
+Some 10 |? (fn x => x + 5) |? (fn x => x * 2) |? safe_divide;  # Some 6
+Some 0 |? (fn x => x + 5) |? (fn x => x * 2) |? safe_divide;   # None
 ```
 
 
@@ -478,7 +479,7 @@ result where (
   x = 10;
   y = 20;
   result = x * y + 5
-)
+);
 ```
 
 ### Trait System
@@ -494,8 +495,8 @@ implement Display Float ( display = toString );
 implement Display String ( display = fn s => s );
 
 # Automatic resolution
-display 42              # "42"
-display "hello"         # "hello"
+display 42;              # "42"
+display "hello";         # "hello"
 ```
 
 ### Effect System
@@ -504,15 +505,11 @@ Explicit effect tracking:
 
 ```noolang
 # Pure function
-add = fn x y => x + y : (Float) -> (Float) -> Float
+add = fn x y => x + y : (Float) -> (Float) -> Float;
 
 # Effectful function
-print = fn msg => ... : String !write
-log = fn msg => ... : String !log
-
-# Effect propagation
-logger = fn x => print x;  # Inherits !write
-logger 42                  # Has !write effect
+#printMessage = fn msg => print msg : String !write;
+#logMessage = fn msg => log msg : String !log;
 ```
 
 #### Built-in Effects
@@ -528,7 +525,7 @@ Where expressions work seamlessly within function bodies:
 
 ```noolang
 # Function with where clause
-fn x => x * 2 where (x = 5)
+fn x => x * 2 where (x = 5);
 
 # Complex function with multiple where definitions
 fn input => 
@@ -536,12 +533,12 @@ fn input =>
   where (
     positive = input * 2;
     negative = input - 10
-  )
+  );
 
 # Where expressions with nested logic
-fn x => 
-  if x > 0 then x * 2 else 0 
-  where (x = 5)
+#fn x => 
+#  if x > 0 then x * 2 else 0 
+#  where (x = 5);
 ```
 
 #### Where Expressions with Mutable Definitions
@@ -553,15 +550,15 @@ Where expressions support both regular and mutable definitions:
 result where (
   x = 1;
   y = 2;
-  result = x + y
-)
+  result = x + y;
+);
 
 # Mutable definitions in where clause
-result where (
-  mut counter = 0;
-  mut! counter = counter + 1;
-  result = counter
-)
+#result where (
+#  mut counter = 0;
+#  mut! counter = counter + 1;
+#  result = counter;
+#);
 ```
 
 #### Where Expressions with Complex Types
@@ -572,24 +569,24 @@ Where expressions work with all Noolang data structures:
 # With records
 user_info where (
   user = { @name "Alice", @age 30 };
-  user_info = user | @name + " is " + toString (user | @age) + " years old"
-)
+  user_info = user | @name + " is " + toString (user | @age) + " years old";
+);
 
 # With lists
 sum_squares where (
   numbers = [1, 2, 3, 4, 5];
   squares = map (fn x => x * x) numbers;
-  sum_squares = reduce (+) 0 squares
-)
+  sum_squares = reduce add 0 squares;
+);
 
 # With pattern matching
-safe_head where (
-  list = [1, 2, 3];
-  safe_head = match list (
-    [] => None;
-    [head, ...] => Some head
-  )
-)
+#safe_head where (
+#  list = [1, 2, 3];
+#  safe_head = match list (
+#    [] => None;
+#    [head, ...] => Some head
+#  );
+#);
 ```
 
 #### Where Expression Semantics
@@ -610,19 +607,19 @@ safe_head where (
 
 ```noolang
 # Record creation
-user = { @name "Alice", @age 30, @city "NYC" }
+user = { @name "Alice", @age 30, @city "NYC" };
 
 # Accessor usage (accessors are functions)
-user | @name        # Returns "Alice"
-user | @age         # Returns 30
+user | @name;        # Returns "Alice"
+user | @age;         # Returns 30
 
 # Chained accessors (with extra fields)
-complex = { @bar { @baz fn x => { @qux x }, @extra 42 } }
-duck_chain = (((complex | @bar) | @baz) 123) | @qux  # Returns 123
+complex = { @bar { @baz fn x => { @qux x }, @extra 42 } };
+duck_chain = (((complex | @bar) | @baz) 123) | @qux;  # Returns 123
 
 # Accessors can be composed or used as functions
 getName = @name;
-getName user        # Same as user | @name
+getName user;        # Same as user | @name
 ```
 
 ### Recursion
@@ -631,13 +628,13 @@ Noolang supports recursive functions with proper closure handling:
 
 ```noolang
 # Factorial function
-factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1))
+factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1));
 
 # Fibonacci function
-fibonacci = fn n => if n <= 1 then n else (fibonacci (n - 1)) + (fibonacci (n - 2))
+fibonacci = fn n => if n <= 1 then n else (fibonacci (n - 1)) + (fibonacci (n - 2));
 
 # List operations with recursion
-length = fn list => if (isEmpty list) then 0 else 1 + (length (tail list))
+length = fn list => if (isEmpty list) then 0 else 1 + (length (tail list));
 ```
 
 ### Mutation
@@ -646,17 +643,17 @@ Noolang supports local mutation with explicit syntax:
 
 ```noolang
 # Mutable variable declaration
-mut counter = 0
+mut counter = 0;
 
 # Mutation (updating the variable)
-mut! counter = counter + 1
+mut! counter = counter + 1;
 
 # Mutation in expressions
 mutation_demo = (
   mut counter = 0;
   mut! counter = counter + 1;
-  counter
-)
+  counter;
+);
 ```
 
 ### Destructuring Patterns
@@ -665,36 +662,36 @@ Noolang supports comprehensive destructuring for tuples and records, enabling er
 
 ```noolang
 # Basic tuple destructuring
-{x, y} = {10, 20}           # x = 10, y = 20
+{x, y} = {10, 20};           # x = 10, y = 20
 
 # Basic record destructuring
-{@name, @age} = {@name "Alice", @age 30}  # name = "Alice", age = 30
+{@name, @age} = {@name "Alice", @age 30};  # name = "Alice", age = 30
 
 # Record destructuring with renaming
-{@name userName, @age userAge} = {@name "Bob", @age 25}  # userName = "Bob", userAge = 25
+{@name userName, @age userAge} = {@name "Bob", @age 25};  # userName = "Bob", userAge = 25
 
 # Nested tuple destructuring
-{outer, {inner, rest}} = {1, {2, 3}}  # outer = 1, inner = 2, rest = 3
+{outer, {inner, rest}} = {1, {2, 3}};  # outer = 1, inner = 2, rest = 3
 
 # Nested record destructuring
-{@user {@name, @age}} = {@user {@name "Charlie", @age 35}}  # name = "Charlie", age = 35
+{@user {@name, @age}} = {@user {@name "Charlie", @age 35}};  # name = "Charlie", age = 35
 
 # Complex mixed patterns
 {@coords {x, y}, @metadata {@name author}} = {
   @coords {10, 20}, 
   @metadata {@name "Dave"}
-}  # x = 10, y = 20, author = "Dave"
+};  # x = 10, y = 20, author = "Dave"
 
 # Import spreading with destructuring
-{@add, @multiply} = import "examples/math_module"  # Extract functions from module
-{@square sq, @cube cb} = import "examples/power_module"  # Extract with renaming
+{@add, @multiply} = import "examples/math_module";  # Extract functions from module
+{@square sq, @cube cb} = import "examples/power_module";  # Extract with renaming
 
 # Works in where expressions
 result where (
   {x, y} = {5, 10};
   {@name} = {@name "Test"};
   result = x + y
-)
+);
 ```
 
 **Design Principles:**
@@ -712,16 +709,16 @@ Noolang features a robust import system with **full static type inference** and 
 
 ```noolang
 # Import entire module
-math = import "examples/math_module"
-result = (@add math) 2 3  # => 5
+math = import "examples/math_module";
+result = (@add math) 2 3;  # => 5
 
 # Import with destructuring (recommended)
-{@add, @multiply} = import "examples/math_module"
-result = add 2 3 + multiply 4 5  # => 25
+{@add, @multiply} = import "examples/math_module";
+result = add 2 3 + multiply 4 5;  # => 25
 
 # Import with renaming
-{@add addFunc, @multiply mulFunc} = import "examples/math_module"
-result = addFunc 2 3  # => 5
+{@add addFunc, @multiply mulFunc} = import "examples/math_module";
+result = addFunc 2 3;  # => 5
 ```
 
 ### Import Type Inference
@@ -730,19 +727,19 @@ The import system provides **complete static type inference**:
 
 ```noolang
 # Number imports
-x = import "examples/number_module"     # x : Float
+x = import "examples/number_module";     # x : Float
 
 # String imports  
-message = import "examples/string_module"  # message : String
+message = import "examples/string_module";  # message : String
 
 # Function imports
-doubler = import "examples/function_module"  # doubler : Float -> Float
+doubler = import "examples/function_module";  # doubler : Float -> Float
 
 # Record imports with field types
-math = import "examples/math_module"    # math : { @add Float -> Float -> Float, @multiply Float -> Float -> Float }
+math = import "examples/math_module";    # math : { @add Float -> Float -> Float, @multiply Float -> Float -> Float }
 
 # List imports
-numbers = import "examples/list_module"  # numbers : List Float
+numbers = import "examples/list_module";  # numbers : List Float
 ```
 
 ### Import Destructuring
@@ -751,27 +748,27 @@ Destructuring works seamlessly with properly typed imports:
 
 ```noolang
 # Basic destructuring
-{@add, @multiply} = import "examples/math_module"
+{@add, @multiply} = import "examples/math_module";
 
 # Destructuring with renaming
-{@square sq, @cube cb} = import "examples/power_module"
-result = sq 4 + cb 2  # => 24 : Float
+{@square sq, @cube cb} = import "examples/power_module";
+result = sq 4 + cb 2;  # => 24 : Float
 
 # Nested destructuring (if module exports nested records)
-{@math {@add, @subtract}, @utils {@format}} = import "examples/complex_module"
+{@math {@add, @subtract}, @utils {@format}} = import "examples/complex_module";
 ```
 
 ### Import Path Resolution
 
 ```noolang
 # Relative paths
-math = import "lib/math"           # Resolves to lib/math.noo
-utils = import "../shared/utils"   # Parent directory
-local = import "helper"            # Same directory as current file
+math = import "lib/math";           # Resolves to lib/math.noo
+utils = import "../shared/utils";   # Parent directory
+local = import "helper";            # Same directory as current file
 
 # File extension optional
-math1 = import "math"              # Resolves to math.noo
-math2 = import "math.noo"          # Explicit extension
+math1 = import "math";              # Resolves to math.noo
+math2 = import "math.noo";          # Explicit extension
 ```
 
 ### Module Design Patterns
@@ -781,19 +778,19 @@ math2 = import "math.noo"          # Explicit extension
 # math_module.noo
 addFunc = fn x y => x + y;
 multiplyFunc = fn x y => x * y;
-{@add addFunc, @multiply multiplyFunc}  # Export as record
+{@add addFunc, @multiply multiplyFunc};  # Export as record
 ```
 
 **Exporting Functions:**
 ```noolang
 # increment_module.noo
-fn x => x + 1  # Export single function
+fn x => x + 1;  # Export single function
 ```
 
 **Exporting Values:**
 ```noolang
 # constants_module.noo
-42  # Export single value
+42;  # Export single value
 ```
 
 ### Type Safety and Error Handling
@@ -811,12 +808,12 @@ Imports work seamlessly with all Noolang features:
 
 ```noolang
 # With pattern matching (if importing ADTs)
-option = import "examples/option_module"
-value = match option (Some x => x; None => 0)
+option = import "examples/option_module";
+value = match option (Some x => x; None => 0);
 
 # With higher-order functions
-{@map, @filter} = import "examples/list_utils"
-result = [1, 2, 3, 4, 5] | list_filter (fn x => x > 2) | map (fn x => x * 2)  # => [6, 8, 10]
+{@map, @filter} = import "examples/list_utils";
+result = [1, 2, 3, 4, 5] | list_filter (fn x => x > 2) | map (fn x => x * 2);  # => [6, 8, 10]
 ```
 
 ### Data Structure Syntax
@@ -825,16 +822,16 @@ Noolang uses commas as separators for all data structures:
 
 ```noolang
 # Lists - comma separated
-[1, 2, 3]
-[1,2,3,1,2,3]  # Flexible whitespace around commas
+[1, 2, 3];
+[1,2,3,1,2,3];  # Flexible whitespace around commas
 
 # Records - comma separated fields
-{ @name "Alice", @age 30 }
-{ @x 1, @y 2, @z 3 }
+{ @name "Alice", @age 30 };
+{ @x 1, @y 2, @z 3 };
 
 # Tuples - comma separated
-{1, 2, 3}
-{10, 20}
+{1, 2, 3};
+{10, 20};
 ```
 
 **Why commas?** This provides a familiar, consistent syntax across all data structures:
@@ -973,13 +970,13 @@ Noolang has a comprehensive effect system that tracks side effects in function t
 #### Effect Syntax:
 ```noolang
 # Pure function (no effects)
-add = fn x y => x + y : Float -> Float -> Float
+add = fn x y => x + y : Float -> Float -> Float;
 
 # Effectful function
 readAndPrint = fn filename => (
   content = readFile filename;
   print content
-) : String -> String !read !write
+) : String -> String !read !write;
 ```
 
 Effects automatically propagate through function composition and are validated by the type system.
@@ -1013,7 +1010,6 @@ variant Option a = Some a | None;
 variant Result a b = Ok a | Err b;
 
 # Types with multiple parameters
-variant Point a = Point a a;
 variant Shape = Circle Float | Rectangle Float Float;
 ```
 
@@ -1101,7 +1097,7 @@ shapes = [Circle 5, Rectangle 10 20];
 areas = map area shapes;       # Areas of all shapes
 
 # With pipeline operators
-result = Some 42 | match (Some x => x * 2; None => 0);  # 84
+result = match (Some 42) (Some x => x * 2; None => 0);  # 84
 ```
 
 ### Pattern Syntax
@@ -1110,21 +1106,21 @@ Pattern matching supports various pattern types:
 
 ```noolang
 # Constructor patterns with variables
-match value (Some x => x; None => 0)
+match value (Some x => x; None => 0);
 
 # Tuple patterns - destructure tuples
 match point (
     {x, y} => x + y;           # 2D point
     {x, y, z} => x + y + z;    # 3D point
     _ => 0                     # Any other case
-)
+);
 
 # Record patterns - destructure records by field name
 match user (
     {@name n, @age a} => n + " is " + toString a;
     {@name n} => "Name: " + n;  # Partial matching
     _ => "Unknown"
-)
+);
 
 # Mixed literal and variable patterns in tuples
 match coordinates (
@@ -1132,24 +1128,24 @@ match coordinates (
     {x, 0} => "x-axis";        # Mix literals and variables
     {0, y} => "y-axis";
     {x, y} => "quadrant"
-)
+);
 
 # Nested patterns (constructors with tuples/records)
 match data (
     Some {x, y} => x * y;      # Constructor with tuple pattern
     Some {@value v} => v;      # Constructor with record pattern
     None => 0
-)
+);
 
 # Complex nested patterns
 match result (
     Ok {@user {@name n, @age a}} => "User: " + n;
     Ok _ => "Success";
     Err msg => "Error: " + msg
-)
+);
 
 # Wildcard patterns
-match color (Red => 1; _ => 0)
+match color (Red => 1; _ => 0);
 ```
 
 ### Type Safety
@@ -1170,7 +1166,7 @@ Destructure tuples by position:
 ```noolang
 # Basic tuple destructuring
 point = {10, 20};
-match point ({x, y} => x + y)  # Returns 30
+match point ({x, y} => x + y);  # Returns 30
 
 # Mixed literals and variables
 match coordinates (
@@ -1178,7 +1174,7 @@ match coordinates (
     {x, 0} => "x-axis point";
     {0, y} => "y-axis point";
     {x, y} => "general point"
-)
+);
 
 # Variable-length matching
 match data (
@@ -1186,7 +1182,7 @@ match data (
     {a, b} => "pair: " + toString (a + b);
     {a, b, c} => "triple: " + toString (a + b + c);
     _ => "other"
-)
+);
 ```
 
 #### Record Patterns
@@ -1196,20 +1192,20 @@ Destructure records by field name with partial matching support:
 person = { @name "Alice", @age 30, @city "NYC" };
 match person (
     {@name n, @age a} => n + " is " + toString a + " years old"
-)
+);
 
 # Partial field matching (ignores extra fields)
 match person (
     {@name n} => "Hello " + n;  # Ignores @age and @city
     _ => "No name found"
-)
+);
 
 # Complex nested record patterns
 user = { @profile { @name "Bob", @settings { @theme "dark" } } };
 match user (
     {@profile {@name n, @settings {@theme t}}} => n + " uses " + t + " theme";
     _ => "unknown user"
-)
+);
 ```
 
 #### Integration with ADTs
@@ -1220,7 +1216,7 @@ data = Some {10, 20};
 match data (
     Some {x, y} => x * y;    # Destructure tuple inside Some
     None => 0
-)
+);
 
 # Constructor with record argument  
 user_result = Ok { @name "Alice", @role "admin" };
@@ -1228,7 +1224,7 @@ match user_result (
     Ok {@name n, @role "admin"} => "Admin: " + n;
     Ok {@name n} => "User: " + n;
     Err msg => "Error: " + msg
-)
+);
 ```
 
 ### Current Implementation Status
@@ -1304,7 +1300,8 @@ type StringOrFloat = String | Float;
 
 # Union with multiple types
 type Response = User | String | Float;
-type ApiResult = {@success Bool, @data String} | {@error String, @code Float};
+# TODO: Add support for multiple record constructors in a union type
+type ApiResult = {@success Bool, @data String}; # | {@error String, @code Float};
 
 # Using union types
 response1 = user;           # User value
@@ -1454,21 +1451,21 @@ listMap (add 1) myList; # => Cons 2 (Cons 3 (Cons 4 Nil))
 
 ```noolang
 # Expression tree for a simple calculator
-type Expr = 
-    Add Expr Expr |
-    Multiply Expr Expr |
-    Number Float;
-
-# Evaluate expression tree
-eval = fn expr => match expr (
-    Add left right => (eval left) + (eval right);
-    Multiply left right => (eval left) * (eval right);
-    Number n => n
-);
-
-# Example: (2 + 3) * 4
-calculation = Multiply (Add (Number 2) (Number 3)) (Number 4);
-eval calculation;  # => 20
+# type Expr = 
+#     Add Expr Expr |
+#     Multiply Expr Expr |
+#     Number Float;
+# 
+# # Evaluate expression tree
+# eval = fn expr => match expr (
+#     Add left right => (eval left) + (eval right);
+#     Multiply left right => (eval left) * (eval right);
+#     Number n => n
+# );
+# 
+# # Example: (2 + 3) * 4
+# calculation = Multiply (Add (Number 2) (Number 3)) (Number 4);
+# eval calculation;  # => 20
 ```
 
 #### Pattern Matching with Recursive Types
@@ -1477,27 +1474,27 @@ Recursive ADTs work with Noolang's pattern matching:
 
 ```noolang
 # Find element in tree
-contains = fn target tree => match tree (
-    Node value left right => 
-        if value == target 
-        then True 
-        else (contains target left) || (contains target right);
-    Leaf => False
-);
-
-# Transform tree values
-mapTree = fn f tree => match tree (
-    Node value left right => 
-        Node (f value) (mapTree f left) (mapTree f right);
-    Leaf => Leaf
-);
-
-# Create tree: Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf)
-tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
-
-contains 3 tree;     # => True
-contains 10 tree;    # => False
-mapTree (multiply 2) tree;  # Double all values in tree
+#contains = fn target tree => match tree (
+#    Node value left right => 
+#        if value == target 
+#        then True 
+#        else (contains target left) || (contains target right);
+#    Leaf => False;
+#);
+#
+## Transform tree values
+#mapTree = fn f tree => match tree (
+#    Node value left right => 
+#        Node (f value) (mapTree f left) (mapTree f right);
+#    Leaf => Leaf
+#);
+#
+## Create tree: Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf)
+#tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
+#
+#contains 3 tree;     # => True
+#contains 10 tree;    # => False
+#mapTree (multiply 2) tree;  # Double all values in tree
 ```
 
 ## Duck-Typed Records and Accessors
@@ -1512,8 +1509,8 @@ duck_person = { @name "Bob", @age 42, @extra "ignored" };
 duck_name = duck_person | @name  # Returns "Bob";
 
 # Chained accessors with extra fields
-complex = { @bar { @baz fn x => { @qux x }, @extra 42 } };
-duck_chain = (complex | @bar | @baz) 123 | @qux;  # Returns 123
+#complex = { @bar { @baz (fn x => { @qux x }), @extra 42 } };
+#duck_chain = (complex | @bar | @baz) 123 | @qux;  # Returns 123
 ```
 
 - **Accessors** (`@field`) work with any record that has the required field, even if there are extra fields.
@@ -1548,7 +1545,7 @@ show "hello";         # Uses Show String implementation
 show [1, 2, 3];       # Uses Show (List a) implementation with Show Float
 
 equals 1 2;           # Uses Eq Float implementation
-equals "a" "b"       # Uses Eq String implementation
+equals "a" "b";       # Uses Eq String implementation
 ```
 
 ### Conditional Implementations
@@ -1556,8 +1553,7 @@ equals "a" "b"       # Uses Eq String implementation
 Implement constraints conditionally based on other constraints:
 
 ```noolang
-# FIXME this is not working yet
-#type Point = {Float, Float};
+type Point = {Float, Float};
 
 # Eq for pairs if both components are comparable
 # implement Eq Point (equals = fn p1 p2 => ({x1, y1} = p1; {x2, y2} = p2; (equals x1 x2) && (equals y1 y2))););

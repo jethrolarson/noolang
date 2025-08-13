@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
 import { Lexer } from './lexer/lexer';
-import { parse } from './parser/parser';
+import { parse, preprocessLiterateNoolang } from './parser/parser';
 import { Evaluator } from './evaluator/evaluator';
 import { typeAndDecorate } from './typer/index';
 import { typeToString } from './typer/helpers';
@@ -11,7 +11,7 @@ import { formatValue } from './format';
 import { colorize } from './colors';
 
 function printUsage() {
-	console.log(colorize.section('Usage: noo <file.noo>'));
+	console.log(colorize.section('Usage: noo <file.noo> or noo <file.md>'));
 	console.log(`       ${colorize.command('noo --eval <expr>')}`);
 	console.log(`       ${colorize.command('noo -e <expr>')}`);
 	console.log(`       ${colorize.command('noo --tokens <expr>')}`);
@@ -32,6 +32,9 @@ function printUsage() {
 	console.log(colorize.section('Examples:'));
 	console.log(`  ${colorize.identifier('noo my_program.noo')}`);
 	console.log(`  ${colorize.identifier('noo examples/basic.noo')}`);
+	console.log(
+		`  ${colorize.identifier('noo getting-started.noo.md')}  # Literate programming`
+	);
 	console.log(`  ${colorize.identifier('noo --eval "1 + 2 * 3"')}`);
 	console.log(`  ${colorize.identifier('noo -e "x = 10; x * 2"')}`);
 	console.log(
@@ -414,7 +417,16 @@ async function main() {
 		const startTime = performance.now();
 
 		const fullPath = path.resolve(file);
-		const code = fs.readFileSync(fullPath, 'utf8');
+		let code = fs.readFileSync(fullPath, 'utf8');
+
+		// Check if this is a literate Noolang file (.md)
+		if (file.endsWith('.md')) {
+			console.log(colorize.info('📖 Processing literate Noolang file...'));
+			code = preprocessLiterateNoolang(code);
+			console.log(colorize.info('📝 Preprocessed code:'));
+			console.log(code);
+		}
+
 		const readTime = performance.now();
 
 		const lexer = new Lexer(code);

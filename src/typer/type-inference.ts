@@ -896,11 +896,16 @@ export const typeBinary = (
 			);
 		}
 
+		// Pass along any constraints from the right function type so that
+		// unification can resolve constrained variants (e.g., f a ~ List a)
+		const constraintContext = rightResult.type.constraints || [];
+
 		currentState = unify(
 			rightResult.type.params[0],
 			leftResult.type,
 			currentState,
-			getExprLocation(expr)
+			getExprLocation(expr),
+			{ constraintContext }
 		);
 
 		// Return the function's return type (which may be a partially applied function)
