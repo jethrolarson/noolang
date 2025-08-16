@@ -18,12 +18,20 @@ describe('map_err type inference bug', () => {
 		const firstParam = result.type.params[0];
 		assertFunctionType(firstParam);
 		expect(firstParam.params).toHaveLength(1);
+<<<<<<< HEAD
 		assertVariableType(firstParam.return);
+=======
+		expect(firstParam.return.kind).toBe('variable');
+>>>>>>> 22202c1 (checkpoint)
 
 		// Return type should be Result a b -> Result a c
 		const returnType = result.type.return;
 		assertFunctionType(returnType);
 		expect(returnType.params).toHaveLength(1);
+<<<<<<< HEAD
+=======
+		expect(returnType.params[0].kind).toBe('variant');
+>>>>>>> 22202c1 (checkpoint)
 		assertVariantType(returnType.params[0]);
 		expect(returnType.params[0].name).toBe('Result');
 		expect(returnType.params[0].args).toHaveLength(2);
@@ -57,10 +65,18 @@ describe('map_err type inference bug', () => {
 		expect(testResult.type.args).toHaveLength(2);
 
 		// First arg should be a type variable (success type preserved as polymorphic)
+<<<<<<< HEAD
 		assertVariableType(testResult.type.args[0]);
 
 		// Second arg should be the transformed error type (whatever the transformer returns)
 		// In this case, it should be DecodeError since the transformer returns TypeMismatch
+=======
+		expect(testResult.type.args[0].kind).toBe('variable');
+
+		// Second arg should be the transformed error type (whatever the transformer returns)
+		// In this case, it should be DecodeError since the transformer returns TypeMismatch
+		expect(testResult.type.args[1].kind).toBe('variant');
+>>>>>>> 22202c1 (checkpoint)
 		assertVariantType(testResult.type.args[1]);
 		expect(testResult.type.args[1].name).toBe('DecodeError');
 	});
@@ -85,11 +101,19 @@ describe('map_err type inference bug', () => {
 		expect(testResult.type.name).toBe('Result');
 		expect(testResult.type.args).toHaveLength(2);
 
+<<<<<<< HEAD
 		// Success type should be preserved as Float (from Ok 42)
 		assertPrimitiveType(testResult.type.args[0]);
 		expect(testResult.type.args[0].name).toBe('Float');
 
 		// Error type should be transformed to TestError
+=======
+		// Success type should be preserved as a type variable (polymorphic)
+		expect(testResult.type.args[0].kind).toBe('variable');
+
+		// Error type should be transformed to TestError
+		expect(testResult.type.args[1].kind).toBe('variant');
+>>>>>>> 22202c1 (checkpoint)
 		assertVariantType(testResult.type.args[1]);
 		expect(testResult.type.args[1].name).toBe('TestError');
 	});
@@ -108,12 +132,20 @@ describe('map_err type inference bug', () => {
 
 		// Verify the function parameter has distinct input/output types
 		expect(firstParam.params).toHaveLength(1);
+<<<<<<< HEAD
 		assertVariableType(firstParam.return);
+=======
+		expect(firstParam.return.kind).toBe('variable');
+>>>>>>> 22202c1 (checkpoint)
 
 		// The return type should be a function taking Result a b and returning Result a c
 		const returnType = result.type.return;
 		assertFunctionType(returnType);
 		expect(returnType.params).toHaveLength(1);
+<<<<<<< HEAD
+=======
+		expect(returnType.params[0].kind).toBe('variant');
+>>>>>>> 22202c1 (checkpoint)
 		assertVariantType(returnType.params[0]);
 		expect(returnType.params[0].name).toBe('Result');
 	});
@@ -143,12 +175,17 @@ describe('map_err type inference bug', () => {
 		const result = parseAndType('map_err');
 
 		// Verify the type structure matches the expected annotation
+<<<<<<< HEAD
+=======
+		expect(result.type.kind).toBe('function');
+>>>>>>> 22202c1 (checkpoint)
 		assertFunctionType(result.type);
 
 		expect(result.type.params).toHaveLength(1);
 
 		// First parameter should be (b -> c)
 		const firstParam = result.type.params[0];
+<<<<<<< HEAD
 		assertFunctionType(firstParam);
 
 		expect(firstParam.params).toHaveLength(1);
@@ -159,12 +196,31 @@ describe('map_err type inference bug', () => {
 		assertFunctionType(returnType);
 
 		expect(returnType.params).toHaveLength(1);
+=======
+		expect(firstParam.kind).toBe('function');
+		assertFunctionType(firstParam);
+
+		expect(firstParam.params).toHaveLength(1);
+		expect(firstParam.return.kind).toBe('variable');
+
+		// Return type should be Result a b -> Result a c
+		const returnType = result.type.return;
+		expect(returnType.kind).toBe('function');
+		assertFunctionType(returnType);
+
+		expect(returnType.params).toHaveLength(1);
+		expect(returnType.params[0].kind).toBe('variant');
+>>>>>>> 22202c1 (checkpoint)
 		assertVariantType(returnType.params[0]);
 
 		expect(returnType.params[0].name).toBe('Result');
 		expect(returnType.params[0].args).toHaveLength(2);
 
 		// Final return should also be Result
+<<<<<<< HEAD
+=======
+		expect(returnType.return.kind).toBe('variant');
+>>>>>>> 22202c1 (checkpoint)
 		assertVariantType(returnType.return);
 
 		expect(returnType.return.name).toBe('Result');
