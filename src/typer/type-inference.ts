@@ -770,10 +770,51 @@ export const typeDefinition = (
 	envForGen.delete(expr.name);
 
 	// Generalize the type before storing in the environment (apply substitution!)
+	// For explicit type annotations, use fresh type variables to avoid corruption
+	let typeToGeneralize = valueResult.type;
+	let substitutionToUse = currentState.substitution;
+	
+	// If this is an explicit type annotation, don't apply substitutions that corrupt it
+	if (expr.value.kind === 'typed') {
+		// For explicit type annotations, preserve the original structure by using empty substitution
+		substitutionToUse = new Map();
+		
+		// Only quantify type variables for polymorphic function types, not for concrete types
+		// Check if this is a polymorphic function by looking at the underlying type
+		const isPolymorphicFunction = (type: Type): boolean => {
+			if (type.kind === 'function') {
+				// This is a function type, so check if it has type variables
+				const typeVars = freeTypeVars(type);
+				return typeVars.size > 0;
+			}
+			return false;
+		};
+		
+		if (isPolymorphicFunction(typeToGeneralize)) {
+			// For polymorphic functions, manually extract all type variables for quantification
+			// This ensures that type variables like 'a', 'b', 'c' in explicit annotations
+			// are properly quantified even if they appear in the environment
+			const explicitTypeVars = freeTypeVars(typeToGeneralize);
+			const quantifiedVars = Array.from(explicitTypeVars);
+			
+			// Create the scheme manually to ensure proper quantification
+			const scheme = {
+				type: typeToGeneralize,
+				quantifiedVars: quantifiedVars
+			};
+			
+			// Store in environment and return
+			const newEnv = mapSet(currentState.environment, expr.name, scheme);
+			currentState = { ...currentState, environment: newEnv };
+			return createPureTypeResult(typeToGeneralize, currentState);
+		}
+		// For non-polymorphic types (like type aliases), fall through to normal generalization
+	}
+	
 	const scheme = generalize(
-		valueResult.type,
+		typeToGeneralize,
 		envForGen,
-		currentState.substitution
+		substitutionToUse
 	);
 
 	// Check if this variable would shadow a trait function
@@ -1577,21 +1618,66 @@ const resolveTypeReferences = (
 };
 
 // Type inference for typed expressions
+// Helper function to resolve type aliases in type annotations
+const resolveTypeAliases = (type: Type, state: TypeState): Type => {
+	switch (type.kind) {
+		case 'variant':
+			// Check if this variant name is actually a type alias
+			const aliasScheme = state.environment.get(type.name);
+			if (aliasScheme && aliasScheme.quantifiedVars.length === 0) {
+				// This is a type alias with no parameters, resolve it
+				return resolveTypeAliases(aliasScheme.type, state);
+			}
+			// If it has arguments, recursively resolve them
+			const resolvedArgs = type.args.map(arg => resolveTypeAliases(arg, state));
+			return { ...type, args: resolvedArgs };
+		case 'function':
+			return {
+				...type,
+				params: type.params.map(param => resolveTypeAliases(param, state)),
+				return: resolveTypeAliases(type.return, state)
+			};
+		case 'list':
+			return {
+				...type,
+				element: resolveTypeAliases(type.element, state)
+			};
+		case 'tuple':
+			return {
+				...type,
+				elements: type.elements.map(elem => resolveTypeAliases(elem, state))
+			};
+		case 'record':
+			const resolvedFields: { [key: string]: Type } = {};
+			for (const [key, fieldType] of Object.entries(type.fields)) {
+				resolvedFields[key] = resolveTypeAliases(fieldType, state);
+			}
+			return { ...type, fields: resolvedFields };
+		case 'union':
+			return {
+				...type,
+				types: type.types.map(t => resolveTypeAliases(t, state))
+			};
+		default:
+			return type;
+	}
+};
+
 export const typeTyped = (
 	expr: TypedExpression,
 	state: TypeState
 ): TypeResult => {
-	// For typed expressions, validate that the explicit type matches the inferred type
+	// For typed expressions, trust the explicit type annotation completely
+	// This preserves the exact type annotation as written by the user
+	
+	// Infer the expression to get effects only
 	const inferredResult = typeExpression(expr.expression, state);
 
-	// Resolve type references in the explicit type annotation
-	const explicitType = resolveTypeReferences(expr.type, state.environment);
-
-	// FIX: Don't unify the inferred type with the explicit type for type annotations
-	// This prevents incorrect unification like mapping 'c' to 'b' when they should be distinct
-	// Instead, just return the explicit type directly
-
-	return createTypeResult(explicitType, inferredResult.effects, state); // Use the explicit type directly
+	// Resolve any type aliases in the explicit type annotation
+	const resolvedType = resolveTypeAliases(expr.type, inferredResult.state);
+	
+	// Return the resolved type (which preserves the annotation structure exactly)
+	return createTypeResult(resolvedType, inferredResult.effects, inferredResult.state);
 };
 
 // Type inference for constrained expressions

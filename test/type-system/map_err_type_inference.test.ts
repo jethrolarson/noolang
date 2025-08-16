@@ -18,13 +18,12 @@ describe('map_err type inference bug', () => {
 		const firstParam = result.type.params[0];
 		assertFunctionType(firstParam);
 		expect(firstParam.params).toHaveLength(1);
-		expect(firstParam.return.kind).toBe('variable');
+		assertVariableType(firstParam.return);
 
 		// Return type should be Result a b -> Result a c
 		const returnType = result.type.return;
 		assertFunctionType(returnType);
 		expect(returnType.params).toHaveLength(1);
-		expect(returnType.params[0].kind).toBe('variant');
 		assertVariantType(returnType.params[0]);
 		expect(returnType.params[0].name).toBe('Result');
 		expect(returnType.params[0].args).toHaveLength(2);
@@ -58,11 +57,10 @@ describe('map_err type inference bug', () => {
 		expect(testResult.type.args).toHaveLength(2);
 
 		// First arg should be a type variable (success type preserved as polymorphic)
-		expect(testResult.type.args[0].kind).toBe('variable');
+		assertVariableType(testResult.type.args[0]);
 
 		// Second arg should be the transformed error type (whatever the transformer returns)
 		// In this case, it should be DecodeError since the transformer returns TypeMismatch
-		expect(testResult.type.args[1].kind).toBe('variant');
 		assertVariantType(testResult.type.args[1]);
 		expect(testResult.type.args[1].name).toBe('DecodeError');
 	});
@@ -87,11 +85,11 @@ describe('map_err type inference bug', () => {
 		expect(testResult.type.name).toBe('Result');
 		expect(testResult.type.args).toHaveLength(2);
 
-		// Success type should be preserved as a type variable (polymorphic)
-		expect(testResult.type.args[0].kind).toBe('variable');
+		// Success type should be preserved as Float (from Ok 42)
+		assertPrimitiveType(testResult.type.args[0]);
+		expect(testResult.type.args[0].name).toBe('Float');
 
 		// Error type should be transformed to TestError
-		expect(testResult.type.args[1].kind).toBe('variant');
 		assertVariantType(testResult.type.args[1]);
 		expect(testResult.type.args[1].name).toBe('TestError');
 	});
@@ -110,13 +108,12 @@ describe('map_err type inference bug', () => {
 
 		// Verify the function parameter has distinct input/output types
 		expect(firstParam.params).toHaveLength(1);
-		expect(firstParam.return.kind).toBe('variable');
+		assertVariableType(firstParam.return);
 
 		// The return type should be a function taking Result a b and returning Result a c
 		const returnType = result.type.return;
 		assertFunctionType(returnType);
 		expect(returnType.params).toHaveLength(1);
-		expect(returnType.params[0].kind).toBe('variant');
 		assertVariantType(returnType.params[0]);
 		expect(returnType.params[0].name).toBe('Result');
 	});
@@ -146,33 +143,28 @@ describe('map_err type inference bug', () => {
 		const result = parseAndType('map_err');
 
 		// Verify the type structure matches the expected annotation
-		expect(result.type.kind).toBe('function');
 		assertFunctionType(result.type);
 
 		expect(result.type.params).toHaveLength(1);
 
 		// First parameter should be (b -> c)
 		const firstParam = result.type.params[0];
-		expect(firstParam.kind).toBe('function');
 		assertFunctionType(firstParam);
 
 		expect(firstParam.params).toHaveLength(1);
-		expect(firstParam.return.kind).toBe('variable');
+		assertVariableType(firstParam.return);
 
 		// Return type should be Result a b -> Result a c
 		const returnType = result.type.return;
-		expect(returnType.kind).toBe('function');
 		assertFunctionType(returnType);
 
 		expect(returnType.params).toHaveLength(1);
-		expect(returnType.params[0].kind).toBe('variant');
 		assertVariantType(returnType.params[0]);
 
 		expect(returnType.params[0].name).toBe('Result');
 		expect(returnType.params[0].args).toHaveLength(2);
 
 		// Final return should also be Result
-		expect(returnType.return.kind).toBe('variant');
 		assertVariantType(returnType.return);
 
 		expect(returnType.return.name).toBe('Result');
