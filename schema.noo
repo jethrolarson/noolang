@@ -18,15 +18,11 @@ variant EncodeError =
 type Schema a = Unknown -> Result a DecodeError;
 
 # Primitive schema functions
-string_schema = fn data => 
-  map_err (fn e => NestedError "string" e) (isString data);
+string_schema = isString |> map_err (fn e => TypeMismatch "String" "Unknown");
 
-float_schema = isNumber |> map_err (fn e => NestedError "float" e);
+float_schema = isNumber |> map_err (fn e => TypeMismatch "Float" "Unknown");
 
-bool_schema = isBool |> map_err (fn e => NestedError "bool" e);
-
-unit_schema = isUnit |> map_err (fn e => NestedError "unit" e);
-
+bool_schema = isBool |> map_err (fn e => TypeMismatch "Bool" "Unknown");
 
 # Schema combinators
 list_schema = fn element_schema data => 
@@ -162,8 +158,8 @@ list_schema = fn element_schema data =>
 
 # # Main decode function, this will be moved to built-ins and be responsible for !ffi erasure
 decode = fn schema data => schema data;
-string_schema
-#list_schema string_schema (forget ["test", "test2"]);
+
+list_schema string_schema (forget ["test", "test2"]);
 
 # # Guard function that returns Option instead of Result
 # guard = fn schema data => 

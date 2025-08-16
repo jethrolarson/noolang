@@ -120,6 +120,7 @@ export const instantiate = (
 ): [Type, TypeState] => {
 	const mapping = new Map<string, Type>();
 	let currentState = state;
+	
 	for (const varName of scheme.quantifiedVars) {
 		const [freshVar, newState] = freshTypeVariable(currentState);
 		mapping.set(varName, freshVar);

@@ -94,111 +94,79 @@ const parsePrimitiveType = (tokens: Token[]): C.ParseResult<Type> => {
 };
 
 // Parse List type with optional element type
-const parseListType = (tokens: Token[]): C.ParseResult<Type> => {
-	const listKeywordResult = C.keyword('List')(tokens);
-	if (listKeywordResult.success) {
-		// Try to parse a type argument for List
-		const argResult = C.lazy(() => parseTypeAtom)(listKeywordResult.remaining);
-		if (argResult.success) {
-			// List with specific element type: List Float, List String, etc.
-			return {
-				success: true,
-				value: listTypeWithElement(argResult.value),
-				remaining: argResult.remaining,
-			};
-		} else {
-			// Just List (generic)
-			return {
-				success: true,
-				value: listTypeWithElement(typeVariable('a')),
-				remaining: listKeywordResult.remaining,
-			};
+const parseListType: C.Parser<Type> = C.map(
+	C.seq(C.keyword('List'), C.optional(C.lazy(() => parseTypeAtom))),
+	([_keyword, elementType]) =>
+		listTypeWithElement(elementType || typeVariable('a'))
+);
+
+// Helper to convert field array to record object
+const fieldsToRecord = (
+	fields: Array<[string, Type]> | null
+): Record<string, Type> => {
+	const fieldObj: Record<string, Type> = {};
+	if (fields) {
+		for (const [name, type] of fields) {
+			fieldObj[name] = type;
 		}
 	}
-	return {
-		success: false,
-		error: 'Expected List type',
-		position: tokens[0]?.location.start.line || 0,
-	};
+	return fieldObj;
 };
 
 // Parse record type {field: Type, ...} or {@field Type, ...}
-const parseRecordType = (tokens: Token[]): C.ParseResult<Type> => {
-	// Try record type with accessor syntax (without colons): { @field Type, @field2 Type }
-	const accessorRecordResult = C.seq(
-		C.punctuation('{'),
-		C.optional(
-			C.sepBy(
-				C.map(
-					C.seq(
-						C.accessor(),
-						C.lazy(() => parseTypeExpression)
-					),
-					([accessor, type]) => [accessor.value, type] as [string, Type]
-				),
-				C.punctuation(',')
-			)
-		),
-		C.punctuation('}')
-	)(tokens);
-	if (accessorRecordResult.success) {
-		const fields: Array<[string, Type]> = accessorRecordResult.value[1] || [];
-		const fieldObj: Record<string, Type> = {};
-		for (const [name, type] of fields) {
-			fieldObj[name] = type;
-		}
-		return {
-			success: true as const,
-			value: recordType(fieldObj),
-			remaining: accessorRecordResult.remaining,
-		};
-	}
-
-	// Try record type with colon syntax: { field: Type, @field: Type }
-	const recordResult = C.seq(
-		C.punctuation('{'),
-		C.optional(
-			C.sepBy(
-				C.map(
-					C.seq(
-						C.choice2(
-							// Support @field syntax (ACCESSOR tokens)
-							C.map(C.accessor(), accessor => ({ value: accessor.value })),
-							// Also support plain identifier for backward compatibility
-							C.identifier()
+const parseRecordType: C.Parser<Type> = C.choice(
+	// Record type with accessor syntax (without colons): { @field Type, @field2 Type }
+	C.map(
+		C.seq(
+			C.punctuation('{'),
+			C.optional(
+				C.sepBy(
+					C.map(
+						C.seq(
+							C.accessor(),
+							C.lazy(() => parseTypeExpression)
 						),
-						C.punctuation(':'),
-						C.lazy(() => parseTypeExpression)
+						([accessor, type]): [string, Type] => [accessor.value, type]
 					),
-					([name, _colon, type]) => [name.value, type] as [string, Type]
-				),
-				C.punctuation(',')
-			)
+					C.punctuation(',')
+				)
+			),
+			C.punctuation('}')
 		),
-		C.punctuation('}')
-	)(tokens);
-	if (recordResult.success) {
-		const fields: Array<[string, Type]> = recordResult.value[1] || [];
-		const fieldObj: Record<string, Type> = {};
-		for (const [name, type] of fields) {
-			fieldObj[name] = type;
-		}
-		return {
-			success: true,
-			value: recordType(fieldObj),
-			remaining: recordResult.remaining,
-		};
-	}
-	return {
-		success: false,
-		error: 'Expected record type',
-		position: tokens[0]?.location.start.line || 0,
-	};
-};
+		([_open, fields, _close]) => recordType(fieldsToRecord(fields))
+	),
+
+	// Record type with colon syntax: { field: Type, @field: Type }
+	C.map(
+		C.seq(
+			C.punctuation('{'),
+			C.optional(
+				C.sepBy(
+					C.map(
+						C.seq(
+							C.choice2(
+								// Support @field syntax (ACCESSOR tokens)
+								C.map(C.accessor(), accessor => ({ value: accessor.value })),
+								// Also support plain identifier for backward compatibility
+								C.identifier()
+							),
+							C.punctuation(':'),
+							C.lazy(() => parseTypeExpression)
+						),
+						([name, _colon, type]): [string, Type] => [name.value, type]
+					),
+					C.punctuation(',')
+				)
+			),
+			C.punctuation('}')
+		),
+		([_open, fields, _close]) => recordType(fieldsToRecord(fields))
+	)
+);
 
 // Parse tuple type {Type, Type, ...}
-const parseTupleType = (tokens: Token[]): C.ParseResult<Type> => {
-	const tupleResult = C.seq(
+const parseTupleType: C.Parser<Type> = C.map(
+	C.seq(
 		C.punctuation('{'),
 		C.optional(
 			C.sepBy(
@@ -207,39 +175,48 @@ const parseTupleType = (tokens: Token[]): C.ParseResult<Type> => {
 			)
 		),
 		C.punctuation('}')
-	)(tokens);
-	if (tupleResult.success) {
-		const elements = tupleResult.value[1] || [];
-		return {
-			success: true,
-			value: tupleType(elements),
-			remaining: tupleResult.remaining,
-		};
-	}
-	return {
-		success: false,
-		error: 'Expected tuple type',
-		position: tokens[0]?.location.start.line || 0,
-	};
-};
+	),
+	([_open, elements, _close]) => tupleType(elements || [])
+);
 
 // Parse parenthesized type (Type)
-const parseParenthesizedType = (tokens: Token[]): C.ParseResult<Type> => {
-	const parenResult = C.seq(
+const parseParenthesizedType: C.Parser<Type> = C.map(
+	C.seq(
 		C.punctuation('('),
 		C.lazy(() => parseTypeExpression),
 		C.punctuation(')')
-	)(tokens);
-	if (parenResult.success) {
-		return {
-			success: true,
-			value: parenResult.value[1],
-			remaining: parenResult.remaining,
-		};
+	),
+	([_open, type, _close]) => type
+);
+
+// Parse simple type variable or nullary constructor (no type applications)
+const parseSimpleTypeVariable = (tokens: Token[]): C.ParseResult<Type> => {
+	if (tokens.length > 0 && tokens[0].type === 'IDENTIFIER') {
+		const typeNameResult = C.identifier()(tokens);
+		if (typeNameResult.success) {
+			const typeName = typeNameResult.value.value;
+			// Check if it's a type constructor (uppercase) or type variable (lowercase)
+			const isUpperCase = typeName[0] === typeName[0].toUpperCase();
+			if (isUpperCase) {
+				// Type constructor without arguments (like Bool, Option, etc.)
+				return {
+					success: true,
+					value: { kind: 'variant', name: typeName, args: [] },
+					remaining: typeNameResult.remaining,
+				};
+			} else {
+				// Type variable (like a, b, etc.)
+				return {
+					success: true,
+					value: typeVariable(typeName),
+					remaining: typeNameResult.remaining,
+				};
+			}
+		}
 	}
 	return {
 		success: false,
-		error: 'Expected parenthesized type',
+		error: 'Expected type variable or nullary type constructor',
 		position: tokens[0]?.location.start.line || 0,
 	};
 };
@@ -253,8 +230,8 @@ const parseTypeConstructorOrVariable = (
 		if (typeNameResult.success) {
 			const typeName = typeNameResult.value.value;
 
-			// Try to parse type arguments
-			const argsResult = C.many(C.lazy(() => parseTypeAtom))(
+			// Try to parse type arguments (use simple parsing to avoid nested type applications)
+			const argsResult = C.many(parseSimpleTypeArgument)(
 				typeNameResult.remaining
 			);
 			if (argsResult.success && argsResult.value.length > 0) {
@@ -319,32 +296,27 @@ const parseTupleConstructor = (tokens: Token[]): C.ParseResult<Type> => {
 	};
 };
 
+// Parse simple type arguments (no type applications to avoid Result a b becoming Result (a b))
+const parseSimpleTypeArgument = C.choice(
+	parsePrimitiveType,
+	parseListType,
+	parseRecordType,
+	parseTupleType,
+	parseTupleConstructor,
+	parseParenthesizedType,
+	parseSimpleTypeVariable // Use simple variable parser that doesn't parse applications
+);
+
 // Main type atom parser - now clean and focused
-function parseTypeAtom(tokens: Token[]): C.ParseResult<Type> {
-	// Try each type parser in order
-	const parsers = [
-		parsePrimitiveType,
-		parseListType,
-		parseRecordType,
-		parseTupleType,
-		parseTupleConstructor,
-		parseParenthesizedType,
-		parseTypeConstructorOrVariable,
-	];
-
-	for (const parser of parsers) {
-		const result = parser(tokens);
-		if (result.success) {
-			return result;
-		}
-	}
-
-	return {
-		success: false,
-		error: 'Expected type atom',
-		position: tokens[0]?.location.start.line || 0,
-	};
-}
+const parseTypeAtom = C.choice(
+	parsePrimitiveType,
+	parseListType,
+	parseRecordType,
+	parseTupleType,
+	parseTupleConstructor,
+	parseParenthesizedType,
+	parseTypeConstructorOrVariable
+);
 
 // --- Type Expression ---
 // Helper function to parse function types without top-level effects (right-associative)
@@ -381,264 +353,131 @@ const parseFunctionTypeWithoutEffects: C.Parser<Type> = tokens => {
 	return { success: true as const, value: leftResult.value, remaining: rest };
 };
 
-export const parseTypeExpression: C.Parser<Type> = tokens => {
-	// Try function type (right-associative): a -> b -> c FIRST
-	const funcType = (() => {
-		const leftResult = parseTypeAtom(tokens);
-		if (!leftResult.success) return leftResult;
+// Parse effects: !effect1 !effect2 ...
+const parseEffects: C.Parser<Set<Effect>> = (tokens: Token[]) => {
+	const effects = new Set<Effect>();
+	let remaining = tokens;
 
-		const rest = leftResult.remaining;
+	while (
+		remaining &&
+		remaining.length > 0 &&
+		remaining[0].type === 'OPERATOR' &&
+		remaining[0].value === '!'
+	) {
+		remaining = remaining.slice(1); // consume !
 
-		// Check for -> operator for right-associative parsing
+		// Expect an effect name (identifier or keyword)
 		if (
-			rest &&
-			rest.length > 0 &&
-			rest[0].type === 'OPERATOR' &&
-			rest[0].value === '->'
+			!remaining ||
+			remaining.length === 0 ||
+			(remaining[0].type !== 'IDENTIFIER' && remaining[0].type !== 'KEYWORD')
 		) {
-			const rightResult = parseFunctionTypeWithoutEffects(rest.slice(1));
-			if (!rightResult.success) return rightResult;
-			if (!rightResult.value)
-				return {
-					success: false,
-					error: 'Expected type expression',
-					position: tokens[0]?.location.start.line || 0,
-				};
-
-			const functionTypeResult = functionType(
-				[leftResult.value],
-				rightResult.value
-			);
-
-			// Parse effects at the end of the entire function type chain
-			const effects = new Set<Effect>();
-			let effectRest = rightResult.remaining;
-
-			// Parse effects: !effect1 !effect2 ...
-			while (
-				effectRest &&
-				effectRest.length > 0 &&
-				effectRest[0].type === 'OPERATOR' &&
-				effectRest[0].value === '!'
-			) {
-				effectRest = effectRest.slice(1); // consume !
-
-				// Expect an effect name (identifier or keyword)
-				if (
-					!effectRest ||
-					effectRest.length === 0 ||
-					(effectRest[0].type !== 'IDENTIFIER' &&
-						effectRest[0].type !== 'KEYWORD')
-				) {
-					return {
-						success: false,
-						error: 'Expected effect name after !',
-						position: effectRest?.[0]?.location?.start?.line || 0,
-					};
-				}
-
-				const effectName = effectRest[0].value;
-
-				// Validate effect name
-				const validEffects: Effect[] = [
-					'log',
-					'read',
-					'write',
-					'state',
-					'time',
-					'rand',
-					'ffi',
-					'async',
-				];
-				if (!validEffects.includes(effectName as Effect)) {
-					return {
-						success: false,
-						error: `Invalid effect: ${effectName}. Valid effects: ${validEffects.join(', ')}`,
-						position: effectRest[0].location.start.line,
-					};
-				}
-
-				effects.add(effectName as Effect);
-				effectRest = effectRest.slice(1); // consume effect name
-			}
-
-			// Apply effects to the function type (including empty effects)
-			const finalType = { ...functionTypeResult, effects };
-
 			return {
-				success: true as const,
-				value: finalType,
-				remaining: effectRest,
+				success: false,
+				error: 'Expected effect name after !',
+				position: remaining?.[0]?.location?.start?.line || 0,
 			};
 		}
 
-		// If no arrow, just return the left result
-		return {
-			success: true as const,
-			value: leftResult.value,
-			remaining: leftResult.remaining,
-		};
-	})();
+		const effectName = remaining[0].value;
 
-	if (funcType.success && funcType.value) {
-		return funcType;
-	}
-
-	// If function type parsing failed with a specific effect error, return that error
-	if (
-		!funcType.success &&
-		(funcType.error.includes('Invalid effect:') ||
-			funcType.error.includes('Expected effect name after !'))
-	) {
-		return funcType as C.ParseError;
-	}
-
-	// Try type variable (lowercase identifier)
-	if (
-		tokens.length > 0 &&
-		tokens[0].type === 'IDENTIFIER' &&
-		/^[a-z]/.test(tokens[0].value)
-	) {
-		const varResult = C.identifier()(tokens);
-		if (varResult.success) {
+		// Validate effect name
+		const validEffects: Effect[] = [
+			'log',
+			'read',
+			'write',
+			'state',
+			'time',
+			'rand',
+			'ffi',
+			'async',
+		];
+		if (!validEffects.includes(effectName as Effect)) {
 			return {
-				success: true as const,
-				value: typeVariable(varResult.value.value),
-				remaining: varResult.remaining,
+				success: false,
+				error: `Invalid effect: ${effectName}. Valid effects: ${validEffects.join(', ')}`,
+				position: remaining[0].location.start.line,
 			};
 		}
-	}
 
-	// Try record type: { name: String, age: Float }
-	const recordResult = C.seq(
-		C.punctuation('{'),
-		C.optional(
-			C.sepBy(
-				C.map(
-					C.seq(
-						C.identifier(),
-						C.punctuation(':'),
-						C.lazy(() => parseTypeExpression)
-					),
-					([name, _colon, type]) => [name.value, type] as [string, Type]
-				),
-				C.punctuation(',')
-			)
-		),
-		C.punctuation('}')
-	)(tokens);
-	if (recordResult.success) {
-		const fields: Array<[string, Type]> = recordResult.value[1] || [];
-		const fieldObj: Record<string, Type> = {};
-		for (const [name, type] of fields) {
-			fieldObj[name] = type;
-		}
-		return {
-			success: true as const,
-			value: recordType(fieldObj),
-			remaining: recordResult.remaining,
-		};
-	}
-
-	// Try tuple type: { Float, String }
-	const tupleResult = C.seq(
-		C.punctuation('{'),
-		C.optional(
-			C.sepBy(
-				C.lazy(() => parseTypeExpression),
-				C.punctuation(',')
-			)
-		),
-		C.punctuation('}')
-	)(tokens);
-	if (tupleResult.success) {
-		const elements = tupleResult.value[1] || [];
-		return {
-			success: true as const,
-			value: tupleType(elements),
-			remaining: tupleResult.remaining,
-		};
-	}
-
-	// Try List type
-	const listResult = C.seq(
-		C.keyword('List'),
-		C.lazy(() => parseTypeExpression)
-	)(tokens);
-	if (listResult.success) {
-		return {
-			success: true as const,
-			value: listTypeWithElement(listResult.value[1]),
-			remaining: listResult.remaining,
-		};
+		effects.add(effectName as Effect);
+		remaining = remaining.slice(1); // consume effect name
 	}
 
 	return {
-		success: false,
-		error: 'Expected type expression',
-		position: tokens[0]?.location.start.line || 0,
+		success: true,
+		value: effects,
+		remaining,
+	};
+};
+
+// Parse function type with effects: a -> b !effect
+export const parseTypeExpression: C.Parser<Type> = (tokens: Token[]) => {
+	const leftResult = parseTypeAtom(tokens);
+	if (!leftResult.success) {
+		// Return a more generic error message for consistency
+		return {
+			success: false,
+			error: 'Expected type expression',
+			position: tokens[0]?.location.start.line || 0,
+		};
+	}
+
+	const rest = leftResult.remaining;
+
+	// Check for -> operator for right-associative parsing
+	if (
+		rest &&
+		rest.length > 0 &&
+		rest[0].type === 'OPERATOR' &&
+		rest[0].value === '->'
+	) {
+		const rightResult = parseFunctionTypeWithoutEffects(rest.slice(1));
+		if (!rightResult.success) return rightResult;
+		if (!rightResult.value)
+			return {
+				success: false,
+				error: 'Expected type expression',
+				position: tokens[0]?.location.start.line || 0,
+			};
+
+		const functionTypeResult = functionType(
+			[leftResult.value],
+			rightResult.value
+		);
+
+		// Parse effects at the end of the entire function type chain
+		const effectsResult = parseEffects(rightResult.remaining);
+		if (!effectsResult.success) return effectsResult;
+
+		// Apply effects to the function type
+		const finalType = { ...functionTypeResult, effects: effectsResult.value };
+
+		return {
+			success: true,
+			value: finalType,
+			remaining: effectsResult.remaining,
+		};
+	}
+
+	// If no arrow, just return the left result
+	return {
+		success: true,
+		value: leftResult.value,
+		remaining: leftResult.remaining,
 	};
 };
 
 // Parse a simple type atom for ADT constructor arguments (no type constructor applications)
-const parseSimpleTypeAtom = (tokens: Token[]): C.ParseResult<Type> => {
-	// Try each simple type parser in order (no type constructor applications)
-	const parsers = [
-		parsePrimitiveType,
-		parseListType,
-		parseRecordType,
-		parseTupleType,
-		parseTupleConstructor,
-		parseParenthesizedType,
-		parseSimpleTypeVariable, // Use a simpler parser for variables
-	];
-
-	for (const parser of parsers) {
-		const result = parser(tokens);
-		if (result.success) {
-			return result;
-		}
-	}
-
-	return {
-		success: false,
-		error: 'Expected simple type atom',
-		position: tokens[0]?.location.start.line || 0,
-	};
-};
-
-// Parse type variable or nullary type constructor (no arguments allowed)
-const parseSimpleTypeVariable = (tokens: Token[]): C.ParseResult<Type> => {
-	if (tokens.length > 0 && tokens[0].type === 'IDENTIFIER') {
-		const typeNameResult = C.identifier()(tokens);
-		if (typeNameResult.success) {
-			const typeName = typeNameResult.value.value;
-
-			// Check if it's a type constructor (uppercase) or type variable (lowercase)
-			const isUpperCase = typeName[0] === typeName[0].toUpperCase();
-			if (isUpperCase) {
-				// Type constructor without arguments (like Bool, Option, etc.)
-				return {
-					success: true,
-					value: { kind: 'variant', name: typeName, args: [] },
-					remaining: typeNameResult.remaining,
-				};
-			} else {
-				// Type variable (like a, b, etc.)
-				return {
-					success: true,
-					value: typeVariable(typeName),
-					remaining: typeNameResult.remaining,
-				};
-			}
-		}
-	}
-	return {
-		success: false,
-		error: 'Expected type variable or nullary type constructor',
-		position: tokens[0]?.location.start.line || 0,
-	};
-};
+const parseSimpleTypeAtom = C.choice(
+	parsePrimitiveType,
+	parseListType,
+	parseRecordType,
+	parseTupleType,
+	parseTupleConstructor,
+	parseParenthesizedType,
+	parseSimpleTypeVariable // Use a simpler parser for variables
+);
 
 // --- ADT Constructor ---
 const parseConstructor: C.Parser<ConstructorDefinition> = C.map(

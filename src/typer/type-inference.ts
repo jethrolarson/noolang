@@ -49,6 +49,7 @@ import {
 	hasStructureConstraint,
 	implementsConstraint,
 	Pattern,
+	DestructuringElement,
 } from '../ast';
 import {
 	undefinedVariableError,
@@ -769,10 +770,51 @@ export const typeDefinition = (
 	envForGen.delete(expr.name);
 
 	// Generalize the type before storing in the environment (apply substitution!)
+	// For explicit type annotations, use fresh type variables to avoid corruption
+	let typeToGeneralize = valueResult.type;
+	let substitutionToUse = currentState.substitution;
+	
+	// If this is an explicit type annotation, don't apply substitutions that corrupt it
+	if (expr.value.kind === 'typed') {
+		// For explicit type annotations, preserve the original structure by using empty substitution
+		substitutionToUse = new Map();
+		
+		// Only quantify type variables for polymorphic function types, not for concrete types
+		// Check if this is a polymorphic function by looking at the underlying type
+		const isPolymorphicFunction = (type: Type): boolean => {
+			if (type.kind === 'function') {
+				// This is a function type, so check if it has type variables
+				const typeVars = freeTypeVars(type);
+				return typeVars.size > 0;
+			}
+			return false;
+		};
+		
+		if (isPolymorphicFunction(typeToGeneralize)) {
+			// For polymorphic functions, manually extract all type variables for quantification
+			// This ensures that type variables like 'a', 'b', 'c' in explicit annotations
+			// are properly quantified even if they appear in the environment
+			const explicitTypeVars = freeTypeVars(typeToGeneralize);
+			const quantifiedVars = Array.from(explicitTypeVars);
+			
+			// Create the scheme manually to ensure proper quantification
+			const scheme = {
+				type: typeToGeneralize,
+				quantifiedVars: quantifiedVars
+			};
+			
+			// Store in environment and return
+			const newEnv = mapSet(currentState.environment, expr.name, scheme);
+			currentState = { ...currentState, environment: newEnv };
+			return createPureTypeResult(typeToGeneralize, currentState);
+		}
+		// For non-polymorphic types (like type aliases), fall through to normal generalization
+	}
+	
 	const scheme = generalize(
-		valueResult.type,
+		typeToGeneralize,
 		envForGen,
-		currentState.substitution
+		substitutionToUse
 	);
 
 	// Check if this variable would shadow a trait function
@@ -1068,37 +1110,42 @@ export const typeBinary = (
 	);
 
 	// After unification, enforce operator trait constraints strictly (e.g., Numeric for -, *, /)
-	const substitutedOperatorType = substitute(operatorType, currentState.substitution);
-	  if (substitutedOperatorType.kind === 'function') {
-    const { functionConstraints } = extractFunctionConstraints(substitutedOperatorType);
-    if (functionConstraints && functionConstraints.length > 0) {
-      const substitutedArgTypes = [leftResult.type, rightResult.type].map(t =>
-        substitute(t, currentState.substitution)
-      );
-      const constraintResult = tryResolveConstraints(
-        resultType,
-        functionConstraints,
-        substitutedArgTypes,
-        currentState
-      );
-      if (!constraintResult) {
-        // If both operand types are fully concrete (no type variables), then fail hard
-        const hasVars = substitutedArgTypes.some(t => freeTypeVars(t).size > 0);
-        if (!hasVars) {
-          throw new Error(
-            `No implementation found for operator ${expr.operator} with operand types ${typeToString(
-              substitutedArgTypes[0],
-              currentState.substitution
-            )} and ${typeToString(substitutedArgTypes[1], currentState.substitution)}`
-          );
-        }
-        // Otherwise allow constraints to persist for later resolution (polymorphic context)
-      } else {
-        // Update state with any substitutions from constraint resolution
-        currentState = constraintResult.updatedState;
-      }
-    }
-  }
+	const substitutedOperatorType = substitute(
+		operatorType,
+		currentState.substitution
+	);
+	if (substitutedOperatorType.kind === 'function') {
+		const { functionConstraints } = extractFunctionConstraints(
+			substitutedOperatorType
+		);
+		if (functionConstraints && functionConstraints.length > 0) {
+			const substitutedArgTypes = [leftResult.type, rightResult.type].map(t =>
+				substitute(t, currentState.substitution)
+			);
+			const constraintResult = tryResolveConstraints(
+				resultType,
+				functionConstraints,
+				substitutedArgTypes,
+				currentState
+			);
+			if (!constraintResult) {
+				// If both operand types are fully concrete (no type variables), then fail hard
+				const hasVars = substitutedArgTypes.some(t => freeTypeVars(t).size > 0);
+				if (!hasVars) {
+					throw new Error(
+						`No implementation found for operator ${expr.operator} with operand types ${typeToString(
+							substitutedArgTypes[0],
+							currentState.substitution
+						)} and ${typeToString(substitutedArgTypes[1], currentState.substitution)}`
+					);
+				}
+				// Otherwise allow constraints to persist for later resolution (polymorphic context)
+			} else {
+				// Update state with any substitutions from constraint resolution
+				currentState = constraintResult.updatedState;
+			}
+		}
+	}
 
 	// Apply substitution to get final result type
 	const substitutedResultType = substitute(
@@ -1126,7 +1173,8 @@ export const typeUserDefinedType = (
 	}
 
 	// If stdlib and builtins are loaded (protected set is non-empty), enforce global no-shadowing
-	const strictShadowing = state.protectedTypeNames && state.protectedTypeNames.size > 0;
+	const strictShadowing =
+		state.protectedTypeNames && state.protectedTypeNames.size > 0;
 	if (strictShadowing) {
 		if (state.protectedTypeNames.has(name)) {
 			throw new Error(`Type shadowing is not allowed: ${name}`);
@@ -1154,20 +1202,20 @@ export const typeUserDefinedType = (
 
 	// Create the user-defined type based on the definition
 	let userType: Type;
-	
+
 	switch (definition.kind) {
 		case 'record-type':
 			// Convert to a standard record type
 			userType = {
 				kind: 'record',
-				fields: definition.fields  // definition.fields is already { [key: string]: Type }
+				fields: definition.fields, // definition.fields is already { [key: string]: Type }
 			};
 			break;
 		case 'tuple-type':
 			// Convert to a standard tuple type
 			userType = {
 				kind: 'tuple',
-				elements: definition.elements
+				elements: definition.elements,
 			};
 			break;
 		case 'union-type':
@@ -1178,26 +1226,26 @@ export const typeUserDefinedType = (
 				// Convert to a standard union type
 				userType = {
 					kind: 'union',
-					types: definition.types
+					types: definition.types,
 				};
 			}
 			break;
 	}
-	
+
 	// Add the user-defined type to the environment so it can be referenced by name
 	const envWithType = new Map(state.environment);
 	envWithType.set(name, {
 		type: userType,
 		quantifiedVars: typeParams,
 	});
-	
+
 	const newState = { ...state, environment: envWithType };
 
 	// Add this user-defined type name to protected set to prevent shadowing later
 	const updatedProtected = new Set(newState.protectedTypeNames);
 	updatedProtected.add(name);
 	const finalState = { ...newState, protectedTypeNames: updatedProtected };
- 
+
 	return createPureTypeResult(unitType(), finalState);
 };
 
@@ -1271,7 +1319,10 @@ export const typeImport = (
 		// Type check the imported program - get the type of the final statement
 		if (program.statements.length === 0) {
 			// Empty program returns empty list type
-			return createPureTypeResult(listTypeWithElement(typeVariable('a')), state);
+			return createPureTypeResult(
+				listTypeWithElement(typeVariable('a')),
+				state
+			);
 		}
 
 		// Process all statements and return the type of the final one
@@ -1283,10 +1334,9 @@ export const typeImport = (
 			currentState = result.state;
 			finalType = result.type;
 		}
-		
+
 		// Return the type of the final statement
 		return createPureTypeResult(finalType, currentState);
-		
 	} catch (error) {
 		// If import fails, we fall back to a type variable to avoid breaking the whole type check
 		// This allows gradual typing and better error messages
@@ -1439,8 +1489,8 @@ export const typeWhere = (
 
 	// Type all definitions in the where clause
 	for (const def of expr.definitions) {
-		if ((def as DefinitionExpression).kind === 'definition') {
-			const definitionDef = def as DefinitionExpression;
+		if (def.kind === 'definition') {
+			const definitionDef = def;
 			const valueResult = typeExpression(definitionDef.value, currentState);
 			currentState = valueResult.state;
 
@@ -1455,10 +1505,8 @@ export const typeWhere = (
 
 			whereEnv = mapSet(currentState.environment, definitionDef.name, scheme);
 			currentState = { ...currentState, environment: whereEnv };
-		} else if (
-			(def as MutableDefinitionExpression).kind === 'mutable-definition'
-		) {
-			const mutableDef = def as MutableDefinitionExpression;
+		} else if (def.kind === 'mutable-definition') {
+			const mutableDef = def;
 			const valueResult = typeExpression(mutableDef.value, currentState);
 			currentState = valueResult.state;
 
@@ -1467,12 +1515,12 @@ export const typeWhere = (
 				quantifiedVars: [],
 			});
 			currentState = { ...currentState, environment: whereEnv };
-		} else if ((def as TupleDestructuringExpression).kind === 'tuple-destructuring') {
-			const tupleResult = typeTupleDestructuring(def as TupleDestructuringExpression, currentState);
+		} else if (def.kind === 'tuple-destructuring') {
+			const tupleResult = typeTupleDestructuring(def, currentState);
 			currentState = tupleResult.state;
 			whereEnv = currentState.environment;
-		} else if ((def as RecordDestructuringExpression).kind === 'record-destructuring') {
-			const recordResult = typeRecordDestructuring(def as RecordDestructuringExpression, currentState);
+		} else if (def.kind === 'record-destructuring') {
+			const recordResult = typeRecordDestructuring(def, currentState);
 			currentState = recordResult.state;
 			whereEnv = currentState.environment;
 		}
@@ -1489,11 +1537,14 @@ export const typeWhere = (
 };
 
 // Resolve type references in user-defined types
-const resolveTypeReferences = (type: Type, environment: Map<string, { type: Type; quantifiedVars: string[] }>): Type => {
+const resolveTypeReferences = (
+	type: Type,
+	environment: Map<string, { type: Type; quantifiedVars: string[] }>
+): Type => {
 	if (!type) {
 		return type;
 	}
-	
+
 	if (type.kind === 'primitive' || type.kind === 'variant') {
 		// Check if this is a reference to a user-defined type
 		const typeDef = environment.get(type.name);
@@ -1506,7 +1557,7 @@ const resolveTypeReferences = (type: Type, environment: Map<string, { type: Type
 			return resolvedType;
 		}
 	}
-	
+
 	// For complex types, recursively resolve references
 	switch (type.kind) {
 		case 'user-defined-record':
@@ -1521,16 +1572,21 @@ const resolveTypeReferences = (type: Type, environment: Map<string, { type: Type
 		case 'record':
 			const resolvedFields: { [key: string]: Type } = {};
 			for (const [fieldName, fieldType] of Object.entries(type.fields)) {
-				resolvedFields[fieldName] = resolveTypeReferences(fieldType, environment);
+				resolvedFields[fieldName] = resolveTypeReferences(
+					fieldType,
+					environment
+				);
 			}
 			return {
 				...type,
-				fields: resolvedFields
+				fields: resolvedFields,
 			};
 		case 'tuple':
 			return {
 				...type,
-				elements: type.elements.map(element => resolveTypeReferences(element, environment))
+				elements: type.elements.map(element =>
+					resolveTypeReferences(element, environment)
+				),
 			};
 		case 'union':
 			return {
@@ -1541,18 +1597,20 @@ const resolveTypeReferences = (type: Type, environment: Map<string, { type: Type
 						return t;
 					}
 					return resolved;
-				})
+				}),
 			};
 		case 'list':
 			return {
 				...type,
-				element: resolveTypeReferences(type.element, environment)
+				element: resolveTypeReferences(type.element, environment),
 			};
 		case 'function':
 			return {
 				...type,
-				params: type.params.map(param => resolveTypeReferences(param, environment)),
-				return: resolveTypeReferences(type.return, environment)
+				params: type.params.map(param =>
+					resolveTypeReferences(param, environment)
+				),
+				return: resolveTypeReferences(type.return, environment),
 			};
 		default:
 			return type;
@@ -1560,27 +1618,66 @@ const resolveTypeReferences = (type: Type, environment: Map<string, { type: Type
 };
 
 // Type inference for typed expressions
+// Helper function to resolve type aliases in type annotations
+const resolveTypeAliases = (type: Type, state: TypeState): Type => {
+	switch (type.kind) {
+		case 'variant':
+			// Check if this variant name is actually a type alias
+			const aliasScheme = state.environment.get(type.name);
+			if (aliasScheme && aliasScheme.quantifiedVars.length === 0) {
+				// This is a type alias with no parameters, resolve it
+				return resolveTypeAliases(aliasScheme.type, state);
+			}
+			// If it has arguments, recursively resolve them
+			const resolvedArgs = type.args.map(arg => resolveTypeAliases(arg, state));
+			return { ...type, args: resolvedArgs };
+		case 'function':
+			return {
+				...type,
+				params: type.params.map(param => resolveTypeAliases(param, state)),
+				return: resolveTypeAliases(type.return, state)
+			};
+		case 'list':
+			return {
+				...type,
+				element: resolveTypeAliases(type.element, state)
+			};
+		case 'tuple':
+			return {
+				...type,
+				elements: type.elements.map(elem => resolveTypeAliases(elem, state))
+			};
+		case 'record':
+			const resolvedFields: { [key: string]: Type } = {};
+			for (const [key, fieldType] of Object.entries(type.fields)) {
+				resolvedFields[key] = resolveTypeAliases(fieldType, state);
+			}
+			return { ...type, fields: resolvedFields };
+		case 'union':
+			return {
+				...type,
+				types: type.types.map(t => resolveTypeAliases(t, state))
+			};
+		default:
+			return type;
+	}
+};
+
 export const typeTyped = (
 	expr: TypedExpression,
 	state: TypeState
 ): TypeResult => {
-	// For typed expressions, validate that the explicit type matches the inferred type
-	const inferredResult = typeExpression(expr.expression, state);
+	// For typed expressions, trust the explicit type annotation completely
+	// This preserves the exact type annotation as written by the user
 	
-	// Resolve type references in the explicit type annotation
-	const explicitType = resolveTypeReferences(expr.type, state.environment);
+	// Infer the expression to get effects only
+	const inferredResult = typeExpression(expr.expression, state);
 
-	const newState = unify(
-		inferredResult.type,
-		explicitType,
-		inferredResult.state,
-		{
-			line: expr.location?.start.line || 1,
-			column: expr.location?.start.column || 1,
-		}
-	);
-
-	return createTypeResult(explicitType, inferredResult.effects, newState); // Use the explicit type
+	// Resolve any type aliases in the explicit type annotation
+	const resolvedType = resolveTypeAliases(expr.type, inferredResult.state);
+	
+	// Return the resolved type (which preserves the annotation structure exactly)
+	return createTypeResult(resolvedType, inferredResult.effects, inferredResult.state);
 };
 
 // Type inference for constrained expressions
@@ -1724,7 +1821,7 @@ type NestedRecordResult = {
 
 // Helper function to type nested tuple patterns
 const typeNestedTuplePattern = (
-	pattern: TupleDestructuringPattern, 
+	pattern: TupleDestructuringPattern,
 	state: TypeState
 ): [NestedTupleResult, TypeState] => {
 	let currentState = state;
@@ -1738,17 +1835,25 @@ const typeNestedTuplePattern = (
 			elementTypes.push(elementType);
 			bindings.push({ name: element.name, type: elementType });
 		} else if (element.kind === 'nested-tuple') {
-			const [nestedResult, newState] = typeNestedTuplePattern(element.pattern, currentState);
+			const [nestedResult, newState] = typeNestedTuplePattern(
+				element.pattern,
+				currentState
+			);
 			currentState = newState;
 			elementTypes.push(nestedResult.tupleType);
 			bindings.push(...nestedResult.bindings);
 		} else if (element.kind === 'nested-record') {
-			const [nestedResult, newState] = typeNestedRecordPattern(element.pattern, currentState);
+			const [nestedResult, newState] = typeNestedRecordPattern(
+				element.pattern,
+				currentState
+			);
 			currentState = newState;
 			elementTypes.push(nestedResult.recordType);
 			bindings.push(...nestedResult.bindings);
 		} else {
-			throw new Error(`Unknown destructuring element kind: ${(element as any).kind}`);
+			throw new Error(
+				`Unknown destructuring element kind: ${(element as DestructuringElement).kind}`
+			);
 		}
 	}
 
@@ -1776,17 +1881,25 @@ const typeNestedRecordPattern = (
 			fieldTypes[field.fieldName] = fieldType;
 			bindings.push({ name: field.localName, type: fieldType });
 		} else if (field.kind === 'nested-tuple') {
-			const [nestedResult, newState] = typeNestedTuplePattern(field.pattern, currentState);
+			const [nestedResult, newState] = typeNestedTuplePattern(
+				field.pattern,
+				currentState
+			);
 			currentState = newState;
 			fieldTypes[field.fieldName] = nestedResult.tupleType;
 			bindings.push(...nestedResult.bindings);
 		} else if (field.kind === 'nested-record') {
-			const [nestedResult, newState] = typeNestedRecordPattern(field.pattern, currentState);
+			const [nestedResult, newState] = typeNestedRecordPattern(
+				field.pattern,
+				currentState
+			);
 			currentState = newState;
 			fieldTypes[field.fieldName] = nestedResult.recordType;
 			bindings.push(...nestedResult.bindings);
 		} else {
-			throw new Error(`Unknown record destructuring field kind: ${(field as any).kind}`);
+			throw new Error(
+				`Unknown record destructuring field kind: ${(field as any).kind}`
+			);
 		}
 	}
 
@@ -1807,7 +1920,7 @@ export const typeTupleDestructuring = (
 	// Create fresh type variables for each destructured element
 	const elementTypes: Type[] = [];
 	const allBindings: { name: string; type: Type }[] = [];
-	
+
 	// Extract variable names and create types for them
 	for (const element of expr.pattern.elements) {
 		if (element.kind === 'variable') {
@@ -1817,18 +1930,26 @@ export const typeTupleDestructuring = (
 			allBindings.push({ name: element.name, type: elementType });
 		} else if (element.kind === 'nested-tuple') {
 			// Handle nested tuple destructuring
-			const [nestedResult, newState] = typeNestedTuplePattern(element.pattern, currentState);
+			const [nestedResult, newState] = typeNestedTuplePattern(
+				element.pattern,
+				currentState
+			);
 			currentState = newState;
 			elementTypes.push(nestedResult.tupleType);
 			allBindings.push(...nestedResult.bindings);
 		} else if (element.kind === 'nested-record') {
-			// Handle nested record destructuring  
-			const [nestedResult, newState] = typeNestedRecordPattern(element.pattern, currentState);
+			// Handle nested record destructuring
+			const [nestedResult, newState] = typeNestedRecordPattern(
+				element.pattern,
+				currentState
+			);
 			currentState = newState;
 			elementTypes.push(nestedResult.recordType);
 			allBindings.push(...nestedResult.bindings);
 		} else {
-			throw new Error(`Unknown destructuring element kind: ${(element as any).kind}`);
+			throw new Error(
+				`Unknown destructuring element kind: ${(element as any).kind}`
+			);
 		}
 	}
 
@@ -1869,8 +1990,9 @@ export const typeRecordDestructuring = (
 
 	// Create fresh type variables for each destructured field and collect bindings
 	const fieldTypes: { [key: string]: Type } = {};
-	const localBindings: { localName: string; fieldName: string; type: Type }[] = [];
-	
+	const localBindings: { localName: string; fieldName: string; type: Type }[] =
+		[];
+
 	// Extract field information and create types
 	for (const field of expr.pattern.fields) {
 		if (field.kind === 'shorthand') {
@@ -1880,7 +2002,7 @@ export const typeRecordDestructuring = (
 			localBindings.push({
 				localName: field.fieldName, // shorthand: @name -> name
 				fieldName: field.fieldName,
-				type: fieldType
+				type: fieldType,
 			});
 		} else if (field.kind === 'rename') {
 			const [fieldType, newState] = freshTypeVariable(currentState);
@@ -1889,10 +2011,13 @@ export const typeRecordDestructuring = (
 			localBindings.push({
 				localName: field.localName, // rename: @name userName -> userName
 				fieldName: field.fieldName,
-				type: fieldType
+				type: fieldType,
 			});
 		} else if (field.kind === 'nested-tuple') {
-			const [nestedResult, newState] = typeNestedTuplePattern(field.pattern, currentState);
+			const [nestedResult, newState] = typeNestedTuplePattern(
+				field.pattern,
+				currentState
+			);
 			currentState = newState;
 			fieldTypes[field.fieldName] = nestedResult.tupleType;
 			// Add all nested bindings
@@ -1900,11 +2025,14 @@ export const typeRecordDestructuring = (
 				localBindings.push({
 					localName: binding.name,
 					fieldName: field.fieldName,
-					type: binding.type
+					type: binding.type,
 				});
 			}
 		} else if (field.kind === 'nested-record') {
-			const [nestedResult, newState] = typeNestedRecordPattern(field.pattern, currentState);
+			const [nestedResult, newState] = typeNestedRecordPattern(
+				field.pattern,
+				currentState
+			);
 			currentState = newState;
 			fieldTypes[field.fieldName] = nestedResult.recordType;
 			// Add all nested bindings
@@ -1912,11 +2040,13 @@ export const typeRecordDestructuring = (
 				localBindings.push({
 					localName: binding.name,
 					fieldName: field.fieldName,
-					type: binding.type
+					type: binding.type,
 				});
 			}
 		} else {
-			throw new Error(`Unknown record destructuring field kind: ${(field as any).kind}`);
+			throw new Error(
+				`Unknown record destructuring field kind: ${(field as RecordDestructuringPattern).kind}`
+			);
 		}
 	}
 
@@ -1936,12 +2066,20 @@ export const typeRecordDestructuring = (
 			currentState.environment,
 			currentState.substitution
 		);
-		const finalEnv = mapSet(currentState.environment, binding.localName, scheme);
+		const finalEnv = mapSet(
+			currentState.environment,
+			binding.localName,
+			scheme
+		);
 		currentState = { ...currentState, environment: finalEnv };
 	}
 
 	// Return the record type and effects
-	return createTypeResult(expectedRecordType, valueResult.effects, currentState);
+	return createTypeResult(
+		expectedRecordType,
+		valueResult.effects,
+		currentState
+	);
 };
 
 // DEPTH-FIRST constraint generation - replaces collectAccessorConstraints

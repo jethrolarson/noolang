@@ -131,13 +131,13 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a'],
 	});
 
-	// Pipeline operator (pure)
+	// Pipeline operator (function composition, pure)
 	newEnv.set('|>', {
 		type: functionType(
-			[typeVariable('a'), functionType([typeVariable('a')], typeVariable('b'))],
-			typeVariable('b')
+			[functionType([typeVariable('a')], typeVariable('b')), functionType([typeVariable('b')], typeVariable('c'))],
+			functionType([typeVariable('a')], typeVariable('c'))
 		),
-		quantifiedVars: ['a', 'b'],
+		quantifiedVars: ['a', 'b', 'c'],
 	});
 
 	// Compose operator
