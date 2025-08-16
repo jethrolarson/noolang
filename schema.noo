@@ -19,13 +19,16 @@ type Schema a = Unknown -> Result a DecodeError;
 
 # Primitive schema functions
 string_schema = fn data => 
-  map_err (fn e => NestedError "string" e) (isString data);
+  map_err (fn e => TypeMismatch "String" "Unknown") (isString data);
 
-float_schema = isNumber |> map_err (fn e => NestedError "float" e);
+float_schema = fn data => 
+  map_err (fn e => TypeMismatch "Float" "Unknown") (isNumber data);
 
-bool_schema = isBool |> map_err (fn e => NestedError "bool" e);
+bool_schema = fn data => 
+  map_err (fn e => TypeMismatch "Bool" "Unknown") (isBool data);
 
-unit_schema = isUnit |> map_err (fn e => NestedError "unit" e);
+unit_schema = fn data => 
+  map_err (fn e => TypeMismatch "Unit" "Unknown") (isUnit data);
 
 
 # Schema combinators

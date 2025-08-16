@@ -234,7 +234,7 @@ implement Functor Result (
 map_err = (fn f res => match res (
   Ok x => Ok x;
   Err e => Err (f e)
-)): (b -> c) -> Result a b -> Result a c;
+)) : (b -> c) -> Result a b -> Result a c;
 
 is_ok = fn res => match res (
   Ok _ => True;
