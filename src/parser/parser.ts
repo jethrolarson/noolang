@@ -32,6 +32,7 @@ import {
 	type ConstraintFunction,
 	type ImplementationFunction,
 	type MutationExpression,
+	type IfExpression,
 } from '../ast';
 import {
 	parseTypeDefinition,
@@ -89,28 +90,13 @@ const parseRecordFieldName = C.map(
 	token => (token.value.endsWith('?') ? token.value.slice(0, -1) : token.value) // Just get the field name without @ and without optional marker
 );
 
-// Parse an expression that stops at @ (accessor tokens) or semicolon
-const parseRecordFieldValue = (tokens: Token[]): C.ParseResult<Expression> => {
-	// Use the full expression parser to parse the complete expression
-	// This includes records, so we can parse nested records
-	const result = C.lazy(() => parseSequence)(tokens);
-	if (!result.success) {
-		return result;
-	}
-
-	// The expression parser should have consumed all the tokens it needs
-	// and left us with the remaining tokens that come after the expression
-	return {
-		success: true,
-		value: result.value,
-		remaining: result.remaining,
-	};
-};
-
 const parseRecordField = C.map(
-	C.seq(parseRecordFieldName, parseRecordFieldValue),
-	([fieldName, value]) => ({
-		name: fieldName,
+	C.seq(
+		parseRecordFieldName,
+		C.lazy(() => parseSequence)
+	),
+	([name, value]) => ({
+		name,
 		value,
 		isNamed: true,
 	})
@@ -131,7 +117,7 @@ const parseRecordFieldOrPositional =
 			};
 		}
 		// If that fails, try to parse as positional field (expression without accessor)
-		const positionalFieldResult = parseRecordFieldValue(tokens);
+		const positionalFieldResult = parseSequence(tokens);
 		if (positionalFieldResult.success) {
 			return {
 				success: true,
@@ -603,27 +589,6 @@ const parseImportExpression: C.Parser<ImportExpression> = C.map(
 	})
 );
 
-// --- If Expression (special: do not allow semicolon in branches) ---
-const parseIfExpression: C.Parser<Expression> = C.map(
-	C.seq(
-		C.keyword('if'),
-		C.lazy(() => parseSequenceTerm),
-		C.keyword('then'),
-		C.lazy(() => parseSequenceTerm),
-		C.keyword('else'),
-		C.lazy(() => parseSequenceTerm)
-	),
-	([ifKw, condition, _thenKw, thenExpr, _elseKw, elseExpr]) => {
-		return {
-			kind: 'if',
-			condition,
-			then: thenExpr,
-			else: elseExpr,
-			location: ifKw.location,
-		};
-	}
-);
-
 // --- Primary Expressions (no unary minus) ---
 const parsePrimary: C.Parser<Expression> = tokens => {
 	if (tokens.length === 0) {
@@ -660,7 +625,7 @@ const parsePrimary: C.Parser<Expression> = tokens => {
 			if (firstToken.value === 'fn') {
 				return parseLambdaExpression(tokens);
 			} else if (firstToken.value === 'let') {
-				return C.lazy(() => parseDefinition)(tokens);
+				return parseDefinition(tokens);
 			} else if (firstToken.value === 'import') {
 				return parseImportExpression(tokens);
 			} else {
@@ -843,31 +808,25 @@ const parseCompose = C.map(
 );
 
 // --- Thrush (|) and Safe Thrush (|?) ---
-const parseThrush: C.Parser<Expression> = tokens => {
-	const thrushResult = C.map(
-		C.seq(
-			parseCompose,
-			C.many(C.seq(C.choice2(C.operator('|'), C.operator('|?')), parseCompose))
-		),
-		([left, rest]) => {
-			let result = left;
-			for (const [op, right] of rest) {
-				result = {
-					kind: 'binary',
-					operator: op.value as '|' | '|?',
-					left: result,
-					right,
-					location: result.location,
-				};
-			}
-			return result;
+const parseThrush: C.Parser<Expression> = C.map(
+	C.seq(
+		parseCompose,
+		C.many(C.seq(C.choice2(C.operator('|'), C.operator('|?')), parseCompose))
+	),
+	([left, rest]) => {
+		let result = left;
+		for (const [op, right] of rest) {
+			result = {
+				kind: 'binary',
+				operator: op.value as '|' | '|?',
+				left: result,
+				right,
+				location: result.location,
+			};
 		}
-	)(tokens);
-
-	return thrushResult;
-};
-
-
+		return result;
+	}
+);
 
 // Helper function to apply postfix operators to an expression
 // Parse type annotation with optional constraint: : Type [given Constraint]
@@ -916,67 +875,62 @@ const parseDestructuringElement: C.Parser<DestructuringElement> = C.choice(
 	)
 );
 
-// --- Tuple Destructuring Pattern Parser ---
-const parseTupleDestructuringPattern: C.Parser<TupleDestructuringPattern> =
+const parseTupleDestructuringPattern = C.map(
+	C.seq(
+		C.punctuation('{'),
+		C.sepBy(parseDestructuringElement, C.punctuation(',')),
+		C.punctuation('}')
+	),
+	([openBrace, elements, _closeBrace]): TupleDestructuringPattern => ({
+		kind: 'tuple-destructuring-pattern',
+		elements,
+		location: openBrace.location,
+	})
+);
+
+const parseRecordDestructuringField = C.choice(
+	C.map(
+		C.seq(C.accessor(), C.identifier()),
+		([accessor, localName]): RecordDestructuringField => ({
+			kind: 'rename',
+			fieldName: accessor.value,
+			localName: localName.value,
+			location: accessor.location,
+		})
+	),
+	// {@field {x, y}} - nested tuple
+	C.map(
+		C.seq(C.accessor(), parseTupleDestructuringPattern),
+		([accessor, pattern]): RecordDestructuringField => ({
+			kind: 'nested-tuple',
+			fieldName: accessor.value,
+			pattern,
+			location: accessor.location,
+		})
+	),
+	// {@field {@nested}} - nested record
 	C.map(
 		C.seq(
-			C.punctuation('{'),
-			C.sepBy(parseDestructuringElement, C.punctuation(',')),
-			C.punctuation('}')
-		),
-		([openBrace, elements, _closeBrace]): TupleDestructuringPattern => ({
-			kind: 'tuple-destructuring-pattern',
-			elements,
-			location: openBrace.location,
-		})
-	);
-
-// --- Record Destructuring Field Parser ---
-const parseRecordDestructuringField: C.Parser<RecordDestructuringField> =
-	C.choice(
-		// {@field localName} - rename
-		C.map(
-			C.seq(C.accessor(), C.identifier()),
-			([accessor, localName]): RecordDestructuringField => ({
-				kind: 'rename',
-				fieldName: accessor.value,
-				localName: localName.value,
-				location: accessor.location,
-			})
-		),
-		// {@field {x, y}} - nested tuple
-		C.map(
-			C.seq(C.accessor(), parseTupleDestructuringPattern),
-			([accessor, pattern]): RecordDestructuringField => ({
-				kind: 'nested-tuple',
-				fieldName: accessor.value,
-				pattern,
-				location: accessor.location,
-			})
-		),
-		// {@field {@nested}} - nested record
-		C.map(
-			C.seq(
-				C.accessor(),
-				C.lazy(() => parseRecordDestructuringPattern)
-			),
-			([accessor, pattern]): RecordDestructuringField => ({
-				kind: 'nested-record',
-				fieldName: accessor.value,
-				pattern,
-				location: accessor.location,
-			})
-		),
-		// {@field} - shorthand
-		C.map(
 			C.accessor(),
-			(accessor): RecordDestructuringField => ({
-				kind: 'shorthand',
-				fieldName: accessor.value,
-				location: accessor.location,
-			})
-		)
-	);
+			C.lazy(() => parseRecordDestructuringPattern)
+		),
+		([accessor, pattern]): RecordDestructuringField => ({
+			kind: 'nested-record',
+			fieldName: accessor.value,
+			pattern,
+			location: accessor.location,
+		})
+	),
+	// {@field} - shorthand
+	C.map(
+		C.accessor(),
+		(accessor): RecordDestructuringField => ({
+			kind: 'shorthand',
+			fieldName: accessor.value,
+			location: accessor.location,
+		})
+	)
+);
 
 // --- Record Destructuring Pattern Parser ---
 const parseRecordDestructuringPattern: C.Parser<RecordDestructuringPattern> =
@@ -1084,16 +1038,10 @@ export const parseRecordDestructuring: C.Parser<
 const parseDefinition: C.Parser<Expression> = tokens => {
 	// First try destructuring patterns
 	if (isDestructuringPattern(tokens)) {
-		// Try tuple destructuring first
-		const tupleResult = parseTupleDestructuring(tokens);
-		if (tupleResult.success) {
-			return tupleResult;
-		}
-		// Try record destructuring
-		const recordResult = parseRecordDestructuring(tokens);
-		if (recordResult.success) {
-			return recordResult;
-		}
+		return C.choice2<Expression>(
+			parseTupleDestructuring,
+			parseRecordDestructuring
+		)(tokens);
 	}
 
 	// Fallback to regular definition
@@ -1645,7 +1593,7 @@ const parsePattern: C.Parser<Pattern> = C.choice(
 // This parser supports expressions in match cases, including nested match expressions
 const parseMatchCaseExpression: C.Parser<Expression> = C.choice3(
 	C.lazy(() => parseMatchExpression), // Support nested match expressions
-	parseIfExpression, // Support if expressions
+	C.lazy(() => parseIfExpression), // Support if expressions
 	C.lazy(() => parseExprWithType) // Support all other expressions including type annotations
 );
 
@@ -1794,6 +1742,27 @@ const parseSequenceTerm: C.Parser<Expression> = tokens => {
 	// Fallback only for truly unknown cases
 	return parseSequenceTermOriginal(tokens);
 };
+
+// --- If Expression (special: do not allow semicolon in branches) ---
+const parseIfExpression = C.map(
+	C.seq(
+		C.keyword('if'),
+		parseSequenceTerm,
+		C.keyword('then'),
+		parseSequenceTerm,
+		C.keyword('else'),
+		parseSequenceTerm
+	),
+	([ifKw, condition, _thenKw, thenExpr, _elseKw, elseExpr]): IfExpression => {
+		return {
+			kind: 'if',
+			condition,
+			then: thenExpr,
+			else: elseExpr,
+			location: ifKw.location,
+		};
+	}
+);
 
 // TODO: should this use the fast path parser?
 // Version for where clause main expressions - excludes lambda to avoid precedence issues

@@ -36,7 +36,8 @@ list_schema = fn element_schema data =>
       )
     );
     Err _ => Err (TypeMismatch "List" "Unknown")
-  ) # : (Unknown -> Result a DecodeError) -> Unknown -> Result (List a) DecodeError;
+    # FIXME if I uncomment this type the evaluation hangs - infinite loop in type inference
+  ) #: (Unknown -> Result a DecodeError) -> Unknown -> Result (List a) DecodeError;
 
 # tuple_schema = fn schemas => fn data => 
 #   match isList data (
@@ -184,34 +185,6 @@ list_schema string_schema (forget ["test", "test2"]);
 #     Unit
 #   );
 
-# set_field = fn name value record => 
-#   # For now, return the record unchanged - proper mutation would need more complex implementation
-#   record;
-
 # keys = fn record => 
 #   # For now, return empty list - proper key extraction would need more complex implementation
-#   [];
-
-# # List utilities implemented using existing functions
-# any = fn predicate list => 
-#   reduce (fn acc x => 
-#     if acc then True else (
-#       result = predicate x;
-#       if (isBool result) then result else False
-#     )
-#   ) False list;
-
-# find = fn predicate list => 
-#   reduce (fn acc x => 
-#     if acc == None then (
-#       result = predicate x;
-#       if (isBool result) and result then Some x else None
-#     ) else (
-#       acc
-#     )
-#   ) None list;
-
-# zip = fn list1 list2 => 
-#   # This is more complex - would need to track indices
-#   # For now, return empty list as placeholder
 #   [];
