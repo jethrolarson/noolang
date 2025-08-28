@@ -29,7 +29,6 @@ describe('map_err type inference bug', () => {
 		expect(returnType.params[0].args).toHaveLength(2);
 
 		// Final return should also be Result
-		expect(returnType.return.kind).toBe('variant');
 		assertVariantType(returnType.return);
 		expect(returnType.return.name).toBe('Result');
 		expect(returnType.return.args).toHaveLength(2);

@@ -48,8 +48,9 @@ export const typeAndDecorate = (
 		type = result.type;
 		effects = unionEffects(effects, result.effects);
 
-		// Now just add the computed type to the AST node (lightweight decoration)
-		statement.type = result.type;
+		// Apply current substitution to get the resolved type for the statement
+		const resolvedStatementType = substitute(result.type, state.substitution);
+		statement.type = resolvedStatementType;
 	}
 
 	// Apply final substitution to the program type

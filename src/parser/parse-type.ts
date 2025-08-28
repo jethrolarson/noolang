@@ -38,7 +38,7 @@ const parseTypeName: C.Parser<Token> = (tokens: Token[]) => {
 	}
 
 	const [first, ...rest] = tokens;
-	const typeKeywords = ['Float', 'String', 'Unit', 'List'];
+	const typeKeywords = ['Float', 'String', 'Unit', 'List', 'Unknown'];
 
 	if (
 		first.type === 'IDENTIFIER' ||
@@ -60,7 +60,7 @@ const parseTypeName: C.Parser<Token> = (tokens: Token[]) => {
 
 // Parse primitive types (Float, String, etc.)
 const parsePrimitiveType = (tokens: Token[]): C.ParseResult<Type> => {
-	const primitiveTypes = ['Float', 'String', 'Unit'];
+	const primitiveTypes = ['Float', 'String', 'Unit', 'Unknown'];
 	for (const typeName of primitiveTypes) {
 		const result = C.keyword(typeName)(tokens);
 		if (result.success) {
@@ -81,6 +81,12 @@ const parsePrimitiveType = (tokens: Token[]): C.ParseResult<Type> => {
 					return {
 						success: true,
 						value: unitType(),
+						remaining: result.remaining,
+					};
+				case 'Unknown':
+					return {
+						success: true,
+						value: { kind: 'unknown' },
 						remaining: result.remaining,
 					};
 			}

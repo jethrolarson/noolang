@@ -173,6 +173,7 @@ export class Lexer {
 			'String',
 			'Unit',
 			'List',
+			'Unknown',
 		];
 		const type = keywords.includes(value) ? 'KEYWORD' : 'IDENTIFIER';
 
