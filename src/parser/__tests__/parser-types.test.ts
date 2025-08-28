@@ -1,7 +1,20 @@
 import { Lexer } from '../../lexer/lexer';
 import { parse } from '../parser';
-import { test, expect } from 'bun:test';
-import { assertTypeDefinitionExpression } from '../../../test/utils';
+import { parseTypeExpression } from '../parse-type';
+import { test, expect, describe } from 'bun:test';
+import {
+	assertTypeDefinitionExpression,
+	assertFunctionType,
+	assertVariantType,
+} from '../../../test/utils';
+
+function assertParseSuccess<T>(result: {
+	success: boolean;
+	value?: T;
+}): asserts result is { success: true; value: T } {
+	expect(result.success).toBe(true);
+	if (!result.success) throw new Error('Parse failed');
+}
 
 test('Type Definitions (ADTs) - should parse simple variant definition', () => {
 	const lexer = new Lexer('variant Bool = True | False');
@@ -62,3 +75,62 @@ test('Type Definitions (ADTs) - should parse variant definition with multiple co
 	expect(typeDef.constructors[0].args.length).toBe(2);
 });
 
+describe('Unknown Type Parsing', () => {
+	test('should parse Unknown as unknown type, not variant type', () => {
+		const code = 'Unknown';
+		const lexer = new Lexer(code);
+		const tokens = lexer.tokenize();
+
+		const result = parseTypeExpression(tokens);
+		assertParseSuccess(result);
+		expect(result.value.kind).toBe('unknown');
+	});
+
+	test('should parse function type with Unknown correctly', () => {
+		const code = 'Unknown -> Result a DecodeError';
+		const lexer = new Lexer(code);
+		const tokens = lexer.tokenize();
+
+		const result = parseTypeExpression(tokens);
+		assertParseSuccess(result);
+		assertFunctionType(result.value);
+		expect(result.value.params[0].kind).toBe('unknown');
+	});
+
+	test('should parse complex polymorphic annotation from schema.noo', () => {
+		const code =
+			'(Unknown -> Result a DecodeError) -> Unknown -> Result (List a) DecodeError';
+		const lexer = new Lexer(code);
+		const tokens = lexer.tokenize();
+
+		const result = parseTypeExpression(tokens);
+		assertParseSuccess(result);
+		assertFunctionType(result.value);
+		expect(result.value.params.length).toBe(1);
+
+		const firstParam = result.value.params[0];
+		assertFunctionType(firstParam);
+		expect(firstParam.params[0].kind).toBe('unknown');
+
+		const returnFunc = result.value.return;
+		assertFunctionType(returnFunc);
+		expect(returnFunc.params[0].kind).toBe('unknown');
+	});
+
+	test('should distinguish between Unknown keyword and actual variants', () => {
+		const unknownCode = 'Unknown';
+		const unknownLexer = new Lexer(unknownCode);
+		const unknownTokens = unknownLexer.tokenize();
+		const unknownResult = parseTypeExpression(unknownTokens);
+		assertParseSuccess(unknownResult);
+		expect(unknownResult.value.kind).toBe('unknown');
+
+		const variantCode = 'MyUnknown';
+		const variantLexer = new Lexer(variantCode);
+		const variantTokens = variantLexer.tokenize();
+		const variantResult = parseTypeExpression(variantTokens);
+		assertParseSuccess(variantResult);
+		assertVariantType(variantResult.value);
+		expect(variantResult.value.name).toBe('MyUnknown');
+	});
+});

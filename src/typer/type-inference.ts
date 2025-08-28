@@ -66,9 +66,12 @@ import {
 import { unify } from './unify';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
-import { tryResolveConstraints, extractFunctionConstraints } from './constraint-resolution';
+import {
+	tryResolveConstraints,
+	extractFunctionConstraints,
+} from './constraint-resolution';
 import { isReservedTypeName } from './type-operations';
-import { freeTypeVars } from './type-operations';
+import { freeTypeVars, freeTypeVarsEnv } from './type-operations';
 
 import {
 	type TypeState,
@@ -520,7 +523,7 @@ function buildNormalFunctionType(
 	// Extract constraints from the body result type if it's constrained
 	const bodyConstraints: Constraint[] = [];
 	let bodyType = bodyResult.type;
-	
+
 	if (bodyType.kind === 'constrained') {
 		// Extract constraints from constrained body type
 		for (const [typeVar, constraints] of bodyType.constraints.entries()) {
@@ -769,53 +772,29 @@ export const typeDefinition = (
 	const envForGen = new Map(currentState.environment);
 	envForGen.delete(expr.name);
 
-	// Generalize the type before storing in the environment (apply substitution!)
-	// For explicit type annotations, use fresh type variables to avoid corruption
-	let typeToGeneralize = valueResult.type;
-	let substitutionToUse = currentState.substitution;
-	
-	// If this is an explicit type annotation, don't apply substitutions that corrupt it
+	// Generalize the type before storing in the environment
+	let scheme: TypeScheme;
+
 	if (expr.value.kind === 'typed') {
-		// For explicit type annotations, preserve the original structure by using empty substitution
-		substitutionToUse = new Map();
-		
-		// Only quantify type variables for polymorphic function types, not for concrete types
-		// Check if this is a polymorphic function by looking at the underlying type
-		const isPolymorphicFunction = (type: Type): boolean => {
-			if (type.kind === 'function') {
-				// This is a function type, so check if it has type variables
-				const typeVars = freeTypeVars(type);
-				return typeVars.size > 0;
-			}
-			return false;
+		// For explicit annotations: force quantification of all free variables to prevent sharing
+		const annotationType = expr.value.type;
+		const substitutedAnnotationType = substitute(
+			annotationType,
+			currentState.substitution
+		);
+
+		// Force quantification of all free variables in the annotation
+		// This prevents type variable sharing between different polymorphic functions
+		const allTypeVars = freeTypeVars(substitutedAnnotationType);
+
+		scheme = {
+			type: substitutedAnnotationType,
+			quantifiedVars: Array.from(allTypeVars),
 		};
-		
-		if (isPolymorphicFunction(typeToGeneralize)) {
-			// For polymorphic functions, manually extract all type variables for quantification
-			// This ensures that type variables like 'a', 'b', 'c' in explicit annotations
-			// are properly quantified even if they appear in the environment
-			const explicitTypeVars = freeTypeVars(typeToGeneralize);
-			const quantifiedVars = Array.from(explicitTypeVars);
-			
-			// Create the scheme manually to ensure proper quantification
-			const scheme = {
-				type: typeToGeneralize,
-				quantifiedVars: quantifiedVars
-			};
-			
-			// Store in environment and return
-			const newEnv = mapSet(currentState.environment, expr.name, scheme);
-			currentState = { ...currentState, environment: newEnv };
-			return createPureTypeResult(typeToGeneralize, currentState);
-		}
-		// For non-polymorphic types (like type aliases), fall through to normal generalization
+	} else {
+		// Normal generalization for non-annotated definitions
+		scheme = generalize(valueResult.type, envForGen, currentState.substitution);
 	}
-	
-	const scheme = generalize(
-		typeToGeneralize,
-		envForGen,
-		substitutionToUse
-	);
 
 	// Check if this variable would shadow a trait function
 	const traitFunctions = currentState.traitRegistry.functionTraits.get(
@@ -1619,44 +1598,62 @@ const resolveTypeReferences = (
 
 // Type inference for typed expressions
 // Helper function to resolve type aliases in type annotations
-const resolveTypeAliases = (type: Type, state: TypeState): Type => {
+const resolveTypeAliases = (
+	type: Type,
+	state: TypeState,
+	visited: Set<string> = new Set()
+): Type => {
 	switch (type.kind) {
 		case 'variant':
+			// Prevent infinite recursion by tracking visited types
+			if (visited.has(type.name)) {
+				return type;
+			}
+
 			// Check if this variant name is actually a type alias
 			const aliasScheme = state.environment.get(type.name);
 			if (aliasScheme && aliasScheme.quantifiedVars.length === 0) {
 				// This is a type alias with no parameters, resolve it
-				return resolveTypeAliases(aliasScheme.type, state);
+				visited.add(type.name);
+				const resolved = resolveTypeAliases(aliasScheme.type, state, visited);
+				visited.delete(type.name);
+				return resolved;
 			}
 			// If it has arguments, recursively resolve them
-			const resolvedArgs = type.args.map(arg => resolveTypeAliases(arg, state));
+			const resolvedArgs = type.args.map(arg =>
+				resolveTypeAliases(arg, state, visited)
+			);
 			return { ...type, args: resolvedArgs };
 		case 'function':
 			return {
 				...type,
-				params: type.params.map(param => resolveTypeAliases(param, state)),
-				return: resolveTypeAliases(type.return, state)
+				params: type.params.map(param =>
+					resolveTypeAliases(param, state, visited)
+				),
+				return: resolveTypeAliases(type.return, state, visited),
 			};
 		case 'list':
 			return {
 				...type,
-				element: resolveTypeAliases(type.element, state)
+				element: resolveTypeAliases(type.element, state, visited),
 			};
 		case 'tuple':
 			return {
 				...type,
-				elements: type.elements.map(elem => resolveTypeAliases(elem, state))
+				elements: type.elements.map(elem =>
+					resolveTypeAliases(elem, state, visited)
+				),
 			};
 		case 'record':
 			const resolvedFields: { [key: string]: Type } = {};
 			for (const [key, fieldType] of Object.entries(type.fields)) {
-				resolvedFields[key] = resolveTypeAliases(fieldType, state);
+				resolvedFields[key] = resolveTypeAliases(fieldType, state, visited);
 			}
 			return { ...type, fields: resolvedFields };
 		case 'union':
 			return {
 				...type,
-				types: type.types.map(t => resolveTypeAliases(t, state))
+				types: type.types.map(t => resolveTypeAliases(t, state, visited)),
 			};
 		default:
 			return type;
@@ -1669,15 +1666,19 @@ export const typeTyped = (
 ): TypeResult => {
 	// For typed expressions, trust the explicit type annotation completely
 	// This preserves the exact type annotation as written by the user
-	
+
 	// Infer the expression to get effects only
 	const inferredResult = typeExpression(expr.expression, state);
 
 	// Resolve any type aliases in the explicit type annotation
 	const resolvedType = resolveTypeAliases(expr.type, inferredResult.state);
-	
+
 	// Return the resolved type (which preserves the annotation structure exactly)
-	return createTypeResult(resolvedType, inferredResult.effects, inferredResult.state);
+	return createTypeResult(
+		resolvedType,
+		inferredResult.effects,
+		inferredResult.state
+	);
 };
 
 // Type inference for constrained expressions
@@ -2089,7 +2090,7 @@ function generateDepthFirstConstraints(
 	paramTypes: Type[]
 ): Constraint[] {
 	const constraints: Constraint[] = [];
-	
+
 	// Create mapping from parameter names to their type variables
 	const paramTypeVars = new Map<string, string>();
 	for (let i = 0; i < paramNames.length && i < paramTypes.length; i++) {
@@ -2098,26 +2099,31 @@ function generateDepthFirstConstraints(
 			paramTypeVars.set(paramNames[i], paramType.name);
 		}
 	}
-	
+
 	// Analyze expression for accessor composition patterns
 	function analyzeExpression(e: Expression): void {
 		if (!e) return;
-		
-		if (e.kind === 'application' && e.func.kind === 'accessor' && e.args.length === 1) {
+
+		if (
+			e.kind === 'application' &&
+			e.func.kind === 'accessor' &&
+			e.args.length === 1
+		) {
 			const outerField = e.func.field;
 			const innerArg = e.args[0];
-			
+
 			// Check for composition: @outer (@inner param)
-			if (innerArg.kind === 'application' && 
+			if (
+				innerArg.kind === 'application' &&
 				innerArg.func.kind === 'accessor' &&
 				innerArg.args.length === 1 &&
 				innerArg.args[0].kind === 'variable' &&
-				paramTypeVars.has(innerArg.args[0].name)) {
-				
+				paramTypeVars.has(innerArg.args[0].name)
+			) {
 				const innerField = innerArg.func.field;
 				const paramName = innerArg.args[0].name;
 				const paramTypeVar = paramTypeVars.get(paramName)!;
-				
+
 				// Generate multiplicative constraint directly
 				const resultVar = `α${Math.random().toString(36).substr(2, 9)}`;
 				const composedConstraint = hasStructureConstraint(paramTypeVar, {
@@ -2126,18 +2132,18 @@ function generateDepthFirstConstraints(
 							kind: 'nested',
 							structure: {
 								fields: {
-									[outerField]: { kind: 'variable', name: resultVar }
-								}
-							}
-						}
-					}
+									[outerField]: { kind: 'variable', name: resultVar },
+								},
+							},
+						},
+					},
 				});
-				
+
 				constraints.push(composedConstraint);
 				return; // Don't recurse - we handled the composition
 			}
 		}
-		
+
 		// Recurse into sub-expressions for other cases
 		if (e.kind === 'application') {
 			analyzeExpression(e.func);
@@ -2148,7 +2154,7 @@ function generateDepthFirstConstraints(
 		}
 		// Add other cases as needed
 	}
-	
+
 	analyzeExpression(expr);
 	return constraints;
 }

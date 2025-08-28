@@ -36,8 +36,7 @@ list_schema = fn element_schema data =>
       )
     );
     Err _ => Err (TypeMismatch "List" "Unknown")
-    # FIXME if I uncomment this type the evaluation hangs - infinite loop in type inference
-  ) #: (Unknown -> Result a DecodeError) -> Unknown -> Result (List a) DecodeError;
+  ) : (Unknown -> Result a DecodeError) -> Unknown -> Result (List a) DecodeError;
 
 # tuple_schema = fn schemas => fn data => 
 #   match isList data (
