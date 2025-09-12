@@ -2,7 +2,6 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Lexer } from '../lexer/lexer';
 import { parse } from '../parser/parser';
-// Inline optimizations for actual LOC reduction
 import {
 	type Expression,
 	type LiteralExpression,
@@ -98,10 +97,6 @@ import {
 	addTraitImplementation,
 } from './trait-system';
 
-// Note: Main typeExpression is now in expression-dispatcher.ts
-// This file only contains the individual type inference functions
-
-// Type inference for literals
 export const typeLiteral = (
 	expr: LiteralExpression,
 	state: TypeState
@@ -118,27 +113,20 @@ export const typeLiteral = (
 	}
 };
 
-// Type inference for variables
 export const typeVariableExpr = (
 	expr: VariableExpression,
 	state: TypeState
 ): TypeResult => {
 	const scheme = state.environment.get(expr.name);
 	if (!scheme) {
-		// NEW: Check if this is a trait function before throwing error
 		if (isTraitFunction(state.traitRegistry, expr.name)) {
-			// Get the trait function's type and constraint information
-			const traitInfo = getTraitFunctionInfo(state.traitRegistry, expr.name);
+				const traitInfo = getTraitFunctionInfo(state.traitRegistry, expr.name);
 			if (traitInfo) {
-				// Use standard type scheme instantiation instead of manual freshening
-				// First, collect all type variables from the trait function type
 				const typeVars = new Set<string>();
 				collectTypeVariables(traitInfo.functionType, typeVars);
 
-				// Add the trait type parameter if not already collected
 				typeVars.add(traitInfo.typeParam);
 
-				// Create a type scheme and instantiate it properly
 				const scheme: TypeScheme = {
 					quantifiedVars: Array.from(typeVars),
 					type: traitInfo.functionType,
@@ -168,22 +156,18 @@ export const typeVariableExpr = (
 
 	const [instantiatedType, newState] = instantiate(scheme, state);
 
-	// Handle effects from TypeScheme
 	const effects = scheme.effects || emptyEffects();
 	return createTypeResult(instantiatedType, effects, newState);
 };
 
-// Helper function to count parameters in a function type  
 const countFunctionParams = (type: Type): number => {
 	if (type.kind !== 'function') return 0;
 	return type.params.length + countFunctionParams(type.return);
 };
 
-// Flatten a constraint expression into a list of atomic constraints
 const flattenConstraintExpr = (expr: ConstraintExpr): Constraint[] => {
 	switch (expr.kind) {
 		case 'is':
-			// NOTE: Constraint name validation removed
 			return [expr];
 		case 'hasField':
 		case 'implements':
@@ -207,7 +191,6 @@ const flattenConstraintExpr = (expr: ConstraintExpr): Constraint[] => {
 	}
 };
 
-// Collect free variables used in an expression
 const collectFreeVars = (
 	expr: Expression,
 	boundVars: Set<string> = new Set()
@@ -340,7 +323,6 @@ const collectFreeVars = (
 	return freeVars;
 };
 
-// Helper: Create function environment with closure culling
 function createFunctionEnvironment(
 	expr: FunctionExpression,
 	state: TypeState
@@ -426,7 +408,6 @@ function createFunctionEnvironment(
 	return functionEnv;
 }
 
-// Helper: Create parameter types and type function body
 function createParameterTypesAndTypeBody(
 	expr: FunctionExpression,
 	functionEnv: Map<string, TypeScheme>,
@@ -453,7 +434,6 @@ function createParameterTypesAndTypeBody(
 	return { paramTypes, bodyResult, currentState };
 }
 
-// Helper: Handle constrained function bodies
 function handleConstrainedFunctionBody(
 	expr: FunctionExpression,
 	paramTypes: Type[],
@@ -513,7 +493,6 @@ function handleConstrainedFunctionBody(
 	return funcType;
 }
 
-// Helper: Build normal function type
 function buildNormalFunctionType(
 	paramTypes: Type[],
 	bodyResult: TypeResult,
@@ -565,35 +544,24 @@ function buildNormalFunctionType(
 	return funcType;
 }
 
-// Main function type inference (now much more focused)
 export const typeFunction = (
 	expr: FunctionExpression,
 	state: TypeState
 ): TypeResult => {
 	const originalBody = expr.body;
 
-	// 1. Create function environment with closure culling
 	const functionEnv = createFunctionEnvironment(expr, state);
-
-	// 2. Create parameter types and type the body
 	const { paramTypes, bodyResult, currentState } =
 		createParameterTypesAndTypeBody(expr, functionEnv, state);
-
-	// 3. Collect implicit constraints from the original function body
 	const implicitConstraints = collectImplicitConstraints(
 		bodyResult.type,
 		paramTypes,
-		currentState,
 		originalBody,
 		expr.params
 	);
-
-	// 4. Substitute parameter types with current substitutions to detect monomorphic cases
 	const substitutedParamTypes = paramTypes.map(t =>
 		substitute(t, currentState.substitution)
 	);
-
-	// 5. Build function type based on whether body is constrained, using substituted params
 	const funcType =
 		expr.body.kind === 'constrained'
 			? handleConstrainedFunctionBody(
@@ -611,11 +579,9 @@ export const typeFunction = (
 	return createTypeResult(funcType, bodyResult.effects, currentState);
 };
 
-// Helper function to collect implicit constraints from function bodies
 function collectImplicitConstraints(
 	bodyType: Type,
 	paramTypes: Type[],
-	state: TypeState,
 	bodyExpr?: Expression,
 	paramNames?: string[]
 ): Constraint[] {
@@ -649,7 +615,6 @@ function collectImplicitConstraints(
 	return constraints;
 }
 
-// Helper function to check if an expression uses a specific operator
 function usesOperator(expr: Expression, targetOperator: string): boolean {
 	switch (expr.kind) {
 		case 'binary':
@@ -708,10 +673,8 @@ function usesOperator(expr: Expression, targetOperator: string): boolean {
 	}
 }
 
-// Helper function to check if an expression uses the + operator (for backward compatibility)
-function usesAddOperator(expr: Expression): boolean {
-	return usesOperator(expr, '+');
-}
+const usesAddOperator = (expr: Expression): boolean => usesOperator(expr, '+');
+
 
 function collectTypeVariables(type: Type, vars: Set<string>): void {
 	switch (type.kind) {
@@ -735,7 +698,6 @@ function collectTypeVariables(type: Type, vars: Set<string>): void {
 	}
 }
 
-// Type inference for definitions
 export const typeDefinition = (
 	expr: DefinitionExpression,
 	state: TypeState
@@ -820,7 +782,6 @@ export const typeDefinition = (
 	return createTypeResult(finalType, valueResult.effects, finalState);
 };
 
-// Type inference for if expressions
 export const typeIf = (expr: IfExpression, state: TypeState): TypeResult => {
 	let currentState = state;
 
@@ -866,7 +827,6 @@ export const typeIf = (expr: IfExpression, state: TypeState): TypeResult => {
 	);
 };
 
-// Helper: Handle sequence operator
 const handleSequence = (
 	expr: BinaryExpression,
 	state: TypeState
@@ -884,7 +844,6 @@ const handleSequence = (
 	return createTypeResult(finalType || unitType(), allEffects, currentState);
 };
 
-// Helper: Handle thrush operator (|)
 const handleThrush = (
 	expr: BinaryExpression,
 	leftResult: TypeResult,
@@ -914,11 +873,9 @@ const handleThrush = (
 	);
 };
 
-// Helper: Handle dollar operator ($)
 const handleDollar = (expr: BinaryExpression, state: TypeState): TypeResult => 
 	typeApplication({ kind: 'application', func: expr.left, args: [expr.right], location: expr.location }, state);
 
-// Helper: Handle safe thrush operator (|?)
 const handleSafeThrush = (
 	expr: BinaryExpression,
 	leftResult: TypeResult,
@@ -993,7 +950,6 @@ const handleSafeThrush = (
 	}
 };
 
-// Type inference for binary expressions
 export const typeBinary = (
 	expr: BinaryExpression,
 	state: TypeState
