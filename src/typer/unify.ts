@@ -119,6 +119,11 @@ const unifyInternal = (
 		return unifyUnion(s1, s2, state, location);
 	}
 
+	// Handle union with non-union type
+	if (isTypeKind(s1, 'union') || isTypeKind(s2, 'union')) {
+		return unifyUnionWithType(s1, s2, state, location, context);
+	}
+
 	// Handle primitive types
 	if (isTypeKind(s1, 'primitive') && isTypeKind(s2, 'primitive')) {
 		return unifyPrimitive(s1, s2, state, location);
@@ -205,22 +210,201 @@ function unifyUnion(
 	if (!isTypeKind(s1, 'union') || !isTypeKind(s2, 'union')) {
 		throw new Error('unifyUnion called with non-union types');
 	}
-	// For now, require exact match of union types
-	if (s1.types.length !== s2.types.length)
+
+	// Check if all types in s1 are assignable to types in s2
+	// For union unification to succeed, every type in s1 must be unifiable with at least one type in s2
+	for (const type1 of s1.types) {
+		let canUnify = false;
+
+		// Try to unify type1 with each type in s2
+		for (const type2 of s2.types) {
+			try {
+				// Test unification without modifying state
+				unify(type1, type2, state, location);
+				canUnify = true;
+				break;
+			} catch {
+				// This type doesn't unify, try next
+				continue;
+			}
+		}
+
+		if (!canUnify) {
+			throw new Error(
+				formatTypeError(
+					createTypeError(
+						`Union type mismatch: type ${typeToString(type1, state.substitution)} from first union cannot be unified with any type in second union ${typeToString(s2, state.substitution)}`,
+						{
+							expectedType: s2,
+							actualType: type1,
+							suggestion: `The type ${typeToString(type1, state.substitution)} is not compatible with any of the types in ${typeToString(s2, state.substitution)}. Check your type definitions.`,
+						},
+						location || { line: 1, column: 1 }
+					)
+				)
+			);
+		}
+	}
+
+	return state;
+}
+
+function unifyUnionWithType(
+	s1: Type,
+	s2: Type,
+	state: TypeState,
+	location?: { line: number; column: number },
+	context?: {
+		reason?: string;
+		operation?: string;
+		hint?: string;
+		constraintContext?: Constraint[];
+	}
+): TypeState {
+	// Determine which is the union type and which is the other type
+	const [unionType, otherType] = isTypeKind(s1, 'union') ? [s1, s2] : [s2, s1];
+	const unionIsFirst = isTypeKind(s1, 'union');
+
+	// Check for subtyping with context awareness
+	if (!isTypeKind(otherType, 'union')) {
+		const isOperator = context?.reason === 'operator_application';
+		const isFunctionApp = context?.reason === 'function_application';
+
+		// For operators, always require pattern matching on union types
+		if (isOperator && unionIsFirst) {
+			throw new Error(
+				formatTypeError(
+					createTypeError(
+						`Cannot directly use operators on union types. Use pattern matching to narrow the type first.`,
+						{
+							expectedType: otherType,
+							actualType: unionType,
+							suggestion: `Union types like ${typeToString(unionType, state.substitution)} require pattern matching before operations. Try:
+	match value (
+		String s => /* handle string case */;
+		Float f => /* handle float case */
+	)`,
+						},
+						location || { line: 1, column: 1 }
+					)
+				)
+			);
+		}
+
+		// For function applications, only reject the unsafe union -> concrete direction
+		if (isFunctionApp && !unionIsFirst) {
+			// s1 = expected (concrete), s2 = actual (union)
+			// This is the case: f(val) where f expects Float but val is String | Float
+			throw new Error(
+				formatTypeError(
+					createTypeError(
+						`Cannot directly apply functions to union types. Use pattern matching to narrow the type first.`,
+						{
+							expectedType: otherType, // The concrete type (Float)
+							actualType: unionType, // The union type (String | Float)
+							suggestion: `Union types like ${typeToString(unionType, state.substitution)} require pattern matching before function application.`,
+						},
+						location || { line: 1, column: 1 }
+					)
+				)
+			);
+		}
+
+		// For general cases, only allow concrete -> union (safe direction)
+		if (!unionIsFirst) {
+			// concrete -> union: safe subtyping direction
+			if (unionType.kind === 'union') {
+				for (const memberType of unionType.types) {
+					try {
+						// Test unification without modifying state
+						unify(otherType, memberType, state, location, context);
+						// If we get here, unification succeeded - the types are compatible
+						return state;
+					} catch {
+						// This member doesn't unify, try next
+						continue;
+					}
+				}
+			}
+		} else {
+			// union -> concrete: only allow in very specific safe contexts
+			// For now, be restrictive to maintain soundness
+			throw new Error(
+				formatTypeError(
+					createTypeError(
+						`Cannot unify union type with concrete type. Use pattern matching to narrow the type first.`,
+						{
+							expectedType: otherType,
+							actualType: unionType,
+							suggestion: `Union types like ${typeToString(unionType, state.substitution)} require pattern matching to be narrowed to specific types.`,
+						},
+						location || { line: 1, column: 1 }
+					)
+				)
+			);
+		}
+
+		// If we reach here, concrete -> union failed (no union member matched)
+		const memberTypesStr =
+			unionType.kind === 'union'
+				? unionType.types
+						.map((t: Type) => typeToString(t, state.substitution))
+						.join(' | ')
+				: typeToString(unionType, state.substitution);
 		throw new Error(
 			formatTypeError(
 				createTypeError(
-					`Union type mismatch: ${s1.types.length} vs ${s2.types.length} types`,
-					{},
+					`Type mismatch: ${typeToString(otherType, state.substitution)} is not compatible with union type (${memberTypesStr})`,
+					{
+						expectedType: unionType,
+						actualType: otherType,
+						suggestion: `The type ${typeToString(otherType, state.substitution)} must be one of: ${memberTypesStr}`,
+					},
 					location || { line: 1, column: 1 }
 				)
 			)
 		);
-	let currentState = state;
-	for (let i = 0; i < s1.types.length; i++) {
-		currentState = unify(s1.types[i], s2.types[i], currentState, location);
 	}
-	return currentState;
+
+	// If we reach here, we have either:
+	// 1. union -> concrete (should require pattern matching)
+	// 2. Both are union types (handled by unifyUnion)
+
+	// Provide context-specific error message for operations that require pattern matching
+	const isOperator = context?.reason === 'operator_application';
+	const isFunctionApp = context?.reason === 'function_application';
+
+	let message: string;
+	let suggestion: string;
+
+	if (isOperator) {
+		message = `Cannot directly use operators on union types. Use pattern matching to narrow the type first.`;
+		suggestion = `Union types like ${typeToString(unionType, state.substitution)} require pattern matching before operations. Try:
+	match value (
+		String s => /* handle string case */;
+		Float f => /* handle float case */
+	)`;
+	} else if (isFunctionApp) {
+		message = `Cannot directly apply functions to union types. Use pattern matching to narrow the type first.`;
+		suggestion = `Union types like ${typeToString(unionType, state.substitution)} require pattern matching before function application.`;
+	} else {
+		message = `Cannot unify union type with concrete type. Use pattern matching to narrow the type first.`;
+		suggestion = `Union types like ${typeToString(unionType, state.substitution)} require pattern matching to be narrowed to specific types.`;
+	}
+
+	throw new Error(
+		formatTypeError(
+			createTypeError(
+				message,
+				{
+					expectedType: otherType,
+					actualType: unionType,
+					suggestion,
+				},
+				location || { line: 1, column: 1 }
+			)
+		)
+	);
 }
 
 function unifyPrimitive(
@@ -637,15 +821,25 @@ function tryUnifyConstrainedVariant(
 		const s2Name = s2.name;
 
 		// Check if s1 is a constrained type variable
-		const s1HasConstraints = context.constraintContext.some(c => 
-			(c.kind === 'implements' || c.kind === 'hasField' || c.kind === 'is' || c.kind === 'custom' || c.kind === 'has') && 
-			c.typeVar === s1Name
+		const s1HasConstraints = context.constraintContext.some(
+			c =>
+				(c.kind === 'implements' ||
+					c.kind === 'hasField' ||
+					c.kind === 'is' ||
+					c.kind === 'custom' ||
+					c.kind === 'has') &&
+				c.typeVar === s1Name
 		);
-		const s2HasConstraints = context.constraintContext.some(c => 
-			(c.kind === 'implements' || c.kind === 'hasField' || c.kind === 'is' || c.kind === 'custom' || c.kind === 'has') && 
-			c.typeVar === s2Name
+		const s2HasConstraints = context.constraintContext.some(
+			c =>
+				(c.kind === 'implements' ||
+					c.kind === 'hasField' ||
+					c.kind === 'is' ||
+					c.kind === 'custom' ||
+					c.kind === 'has') &&
+				c.typeVar === s2Name
 		);
-		
+
 		if (s1HasConstraints) {
 			variantType = s1;
 			concreteType = s2;
@@ -660,9 +854,14 @@ function tryUnifyConstrainedVariant(
 	}
 
 	// Check if this variant type variable has constraints
-	const constraints = context.constraintContext.filter(c => 
-		(c.kind === 'implements' || c.kind === 'hasField' || c.kind === 'is' || c.kind === 'custom' || c.kind === 'has') && 
-		c.typeVar === variantType.name
+	const constraints = context.constraintContext.filter(
+		c =>
+			(c.kind === 'implements' ||
+				c.kind === 'hasField' ||
+				c.kind === 'is' ||
+				c.kind === 'custom' ||
+				c.kind === 'has') &&
+			c.typeVar === variantType.name
 	);
 	if (constraints.length === 0) {
 		return null; // No constraints on this type variable
@@ -815,7 +1014,7 @@ function unifyConstrainedWithConcrete(
 	for (const [varName, constraints] of constrainedType.constraints) {
 		for (const constraint of constraints) {
 			if (constraint.kind === 'implements') {
-			const traitName = constraint.interfaceName;
+				const traitName = constraint.interfaceName;
 
 				// Check if we have an implementation of this trait for the concrete type
 				const traitRegistry = state.traitRegistry;

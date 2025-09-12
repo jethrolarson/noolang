@@ -370,12 +370,14 @@ function typeToString(type: Type): string {
 			} else {
 				return `${type.name} ${type.args.map(typeToString).join(' ')}`;
 			}
+		case 'union':
+			return `(${type.types.map(typeToString).join(' | ')})`;
 		case 'unit':
 			return 'unit';
 		case 'unknown':
 			return 'Unknown';
 		default:
-			return 'unknown';
+			return 'Unknown';
 	}
 }
 

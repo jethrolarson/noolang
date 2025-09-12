@@ -170,25 +170,26 @@ describe('map_err type inference bug', () => {
 		expect(returnType.return.args).toHaveLength(2);
 	});
 
-	test('simple type annotation with distinct variables should work', () => {
-		// Test that type annotations with distinct variables work correctly
+	test('identity function forces type variable unification for soundness', () => {
+		// Test that identity function correctly unifies distinct type variables for type safety
 		const testCode = `
-			# Test that b and c are treated as distinct variables
+			# The identity function fn x => x must unify b and c for soundness
+			# Otherwise fn x => x : (String -> Float) would be unsound
 			test_fn = (fn x => x) : (b -> c);
 			test_fn
 		`;
 
 		const testResult = parseAndType(testCode);
 
-		// Verify the type annotation preserves distinct variables
+		// Verify the type annotation correctly unifies variables for soundness
 		assertFunctionType(testResult.type);
 		expect(testResult.type.params).toHaveLength(1);
 		assertVariableType(testResult.type.params[0]);
 		assertVariableType(testResult.type.return);
 
-		// The input and output types should be different variables (b and c)
-		// We can't check the exact names since they get freshened, but we can verify structure
-		expect(testResult.type.params[0].name).not.toBe(
+		// The input and output types SHOULD be the same variable for soundness
+		// Identity function cannot change types, so b and c must be unified
+		expect(testResult.type.params[0].name).toBe(
 			testResult.type.return.name
 		);
 	});

@@ -31,13 +31,11 @@ import {
 	type Type,
 	type FunctionType,
 	type Constraint,
+	type RecordDestructuringField,
 	floatType,
 	stringType,
 	boolType,
 	functionType,
-	userDefinedRecordType,
-	userDefinedTupleType,
-	userDefinedUnionType,
 	typeVariable,
 	unknownType,
 	unitType,
@@ -71,7 +69,7 @@ import {
 	extractFunctionConstraints,
 } from './constraint-resolution';
 import { isReservedTypeName } from './type-operations';
-import { freeTypeVars, freeTypeVarsEnv } from './type-operations';
+import { freeTypeVars } from './type-operations';
 
 import {
 	type TypeState,
@@ -1316,7 +1314,7 @@ export const typeImport = (
 
 		// Return the type of the final statement
 		return createPureTypeResult(finalType, currentState);
-	} catch (error) {
+	} catch (_error) {
 		// If import fails, we fall back to a type variable to avoid breaking the whole type check
 		// This allows gradual typing and better error messages
 		const [freshVar, newState] = freshTypeVariable(state);
@@ -1515,87 +1513,6 @@ export const typeWhere = (
 	);
 };
 
-// Resolve type references in user-defined types
-const resolveTypeReferences = (
-	type: Type,
-	environment: Map<string, { type: Type; quantifiedVars: string[] }>
-): Type => {
-	if (!type) {
-		return type;
-	}
-
-	if (type.kind === 'primitive' || type.kind === 'variant') {
-		// Check if this is a reference to a user-defined type
-		const typeDef = environment.get(type.name);
-		if (typeDef) {
-			// Resolve to the underlying type
-			const resolvedType = typeDef.type;
-			if (!resolvedType) {
-				return type;
-			}
-			return resolvedType;
-		}
-	}
-
-	// For complex types, recursively resolve references
-	switch (type.kind) {
-		case 'user-defined-record':
-		case 'user-defined-tuple':
-		case 'user-defined-union':
-			// These shouldn't exist anymore, but handle them just in case
-			const typeDef = environment.get(type.name);
-			if (typeDef) {
-				return typeDef.type;
-			}
-			return type; // fallback if no type definition found
-		case 'record':
-			const resolvedFields: { [key: string]: Type } = {};
-			for (const [fieldName, fieldType] of Object.entries(type.fields)) {
-				resolvedFields[fieldName] = resolveTypeReferences(
-					fieldType,
-					environment
-				);
-			}
-			return {
-				...type,
-				fields: resolvedFields,
-			};
-		case 'tuple':
-			return {
-				...type,
-				elements: type.elements.map(element =>
-					resolveTypeReferences(element, environment)
-				),
-			};
-		case 'union':
-			return {
-				...type,
-				types: type.types.map(t => {
-					const resolved = resolveTypeReferences(t, environment);
-					if (!resolved) {
-						return t;
-					}
-					return resolved;
-				}),
-			};
-		case 'list':
-			return {
-				...type,
-				element: resolveTypeReferences(type.element, environment),
-			};
-		case 'function':
-			return {
-				...type,
-				params: type.params.map(param =>
-					resolveTypeReferences(param, environment)
-				),
-				return: resolveTypeReferences(type.return, environment),
-			};
-		default:
-			return type;
-	}
-};
-
 // Type inference for typed expressions
 // Helper function to resolve type aliases in type annotations
 const resolveTypeAliases = (
@@ -1604,7 +1521,7 @@ const resolveTypeAliases = (
 	visited: Set<string> = new Set()
 ): Type => {
 	switch (type.kind) {
-		case 'variant':
+		case 'variant': {
 			// Prevent infinite recursion by tracking visited types
 			if (visited.has(type.name)) {
 				return type;
@@ -1624,6 +1541,7 @@ const resolveTypeAliases = (
 				resolveTypeAliases(arg, state, visited)
 			);
 			return { ...type, args: resolvedArgs };
+		}
 		case 'function':
 			return {
 				...type,
@@ -1644,12 +1562,13 @@ const resolveTypeAliases = (
 					resolveTypeAliases(elem, state, visited)
 				),
 			};
-		case 'record':
+		case 'record': {
 			const resolvedFields: { [key: string]: Type } = {};
 			for (const [key, fieldType] of Object.entries(type.fields)) {
 				resolvedFields[key] = resolveTypeAliases(fieldType, state, visited);
 			}
 			return { ...type, fields: resolvedFields };
+		}
 		case 'union':
 			return {
 				...type,
@@ -1673,12 +1592,16 @@ export const typeTyped = (
 	// Resolve any type aliases in the explicit type annotation
 	const resolvedType = resolveTypeAliases(expr.type, inferredResult.state);
 
-	// Return the resolved type (which preserves the annotation structure exactly)
-	return createTypeResult(
+	// Verify that the inferred type is compatible with the annotation
+	const currentState = unify(
+		inferredResult.type,
 		resolvedType,
-		inferredResult.effects,
-		inferredResult.state
+		inferredResult.state,
+		getExprLocation(expr)
 	);
+
+	// Return the resolved type (which preserves the annotation structure exactly)
+	return createTypeResult(resolvedType, inferredResult.effects, currentState);
 };
 
 // Type inference for constrained expressions
@@ -1899,7 +1822,7 @@ const typeNestedRecordPattern = (
 			bindings.push(...nestedResult.bindings);
 		} else {
 			throw new Error(
-				`Unknown record destructuring field kind: ${(field as any).kind}`
+				`Unknown record destructuring field kind: ${(field as RecordDestructuringField).kind}`
 			);
 		}
 	}
@@ -1949,7 +1872,7 @@ export const typeTupleDestructuring = (
 			allBindings.push(...nestedResult.bindings);
 		} else {
 			throw new Error(
-				`Unknown destructuring element kind: ${(element as any).kind}`
+				`Unknown destructuring element kind: ${(element as DestructuringElement).kind}`
 			);
 		}
 	}

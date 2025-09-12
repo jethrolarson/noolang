@@ -26,7 +26,7 @@ bool_schema = isBool |> map_err (fn e => TypeMismatch "Bool" "Unknown");
 
 # Schema combinators
 list_schema = fn element_schema data => 
-  match isList data (
+  match (isList data) (
     Ok list => (
       validated_elements = list_map element_schema list;
       first_error = list_find is_err validated_elements;
@@ -37,73 +37,6 @@ list_schema = fn element_schema data =>
     );
     Err _ => Err (TypeMismatch "List" "Unknown")
   ) : (Unknown -> Result a DecodeError) -> Unknown -> Result (List a) DecodeError;
-
-# tuple_schema = fn schemas => fn data => 
-#   match isList data (
-#     Ok list => (
-#       if (length list) != (length schemas) then (
-#         Err (InvalidValue (concat "Expected " (concat (toString (length schemas)) " elements, got " (toString (length list)))))
-#       ) else (
-#         # Zip schemas with values and validate
-#         zipped = zip schemas list;
-#         validated = list_map (fn pair => match pair ({@1 schema, @2 value} => schema value)) zipped;
-#         # Check for errors
-#         has_errors = any (fn x => match x (Ok _ => False; Err _ => True)) validated;
-#         if has_errors then (
-#           # Find first error
-#           first_error = find (fn x => match x (Ok _ => False; Err _ => True)) validated;
-#           match first_error (
-#             Some (Err error) => Err (NestedError "tuple_element" error);
-#             _ => Err (InvalidValue "Tuple validation failed")
-#           )
-#         ) else (
-#           # Extract validated values
-#           values = list_map (fn x => match x (Ok v => v; Err _ => Unit)) validated;
-#           Ok (create_tuple values)
-#         )
-#       )
-#     );
-#     Err _ => Err (TypeMismatch "Tuple" "Unknown")
-#   );
-
-# record_schema = fn field_schemas => fn data => 
-#   match data (
-#     Record fields => (
-#       # Validate each field
-#       field_names = keys field_schemas;
-#       missing_fields = filter (fn name => not (has_field name fields)) field_names;
-#       if (length missing_fields) > 0 then (
-#         Err (MissingField (head missing_fields))
-#       ) else (
-#         # Validate each field value
-#         validation_results = list_map (fn name => (
-#           field_value = get_field name fields;
-#           schema = get_field name field_schemas;
-#           result = schema field_value;
-#           match result (
-#             Ok value => Ok { @name name, @value value };
-#             Err error => Err (NestedError name error)
-#           )
-#         )) field_names;
-#         # Check for errors
-#         has_errors = any (fn x => match x (Ok _ => False; Err _ => True)) validation_results;
-#         if has_errors then (
-#           # Find first error
-#           first_error = find (fn x => match x (Ok _ => False; Err _ => True)) validation_results;
-#           match first_error (
-#             Some (Err error) => Err error;
-#             _ => Err (InvalidValue "Record validation failed")
-#           )
-#         ) else (
-#           # Build validated record
-#           validated_fields = list_map (fn x => match x (Ok field => field; Err _ => { @name "", @value Unit })) validation_results;
-#           record_fields = reduce (fn acc field => set_field field.name field.value acc) (create_record []) validated_fields;
-#           Ok record_fields
-#         )
-#       )
-#     );
-#     _ => Err (TypeMismatch "Record" "Unknown")
-#   );
 
 # union_schema = fn schemas => fn data => (
 #   # Try each schema until one succeeds
