@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Lexer } from '../lexer/lexer';
 import { parse } from '../parser/parser';
+// Inline optimizations for actual LOC reduction
 import {
 	type Expression,
 	type LiteralExpression,
@@ -172,7 +173,7 @@ export const typeVariableExpr = (
 	return createTypeResult(instantiatedType, effects, newState);
 };
 
-// Helper function to count parameters in a function type
+// Helper function to count parameters in a function type  
 const countFunctionParams = (type: Type): number => {
 	if (type.kind !== 'function') return 0;
 	return type.params.length + countFunctionParams(type.return);
@@ -865,28 +866,139 @@ export const typeIf = (expr: IfExpression, state: TypeState): TypeResult => {
 	);
 };
 
+// Helper: Handle sequence operator
+const handleSequence = (
+	expr: BinaryExpression,
+	state: TypeState
+): TypeResult => {
+	const statements = flattenStatements(expr);
+	let currentState = state,
+		finalType = null,
+		allEffects = emptyEffects();
+	for (const stmt of statements) {
+		const result = typeExpression(stmt, currentState);
+		currentState = result.state;
+		finalType = result.type;
+		allEffects = unionEffects(allEffects, result.effects);
+	}
+	return createTypeResult(finalType || unitType(), allEffects, currentState);
+};
+
+// Helper: Handle thrush operator (|)
+const handleThrush = (
+	expr: BinaryExpression,
+	leftResult: TypeResult,
+	rightResult: TypeResult,
+	state: TypeState
+): TypeResult => {
+	if (
+		rightResult.type.kind !== 'function' ||
+		rightResult.type.params.length < 1
+	)
+		throwTypeError(
+			location => nonFunctionApplicationError(rightResult.type, location),
+			getExprLocation(expr)
+		);
+	const constraintContext = rightResult.type.constraints || [];
+	const newState = unify(
+		rightResult.type.params[0],
+		leftResult.type,
+		state,
+		getExprLocation(expr),
+		{ constraintContext }
+	);
+	return createTypeResult(
+		rightResult.type.return,
+		unionEffects(leftResult.effects, rightResult.effects),
+		newState
+	);
+};
+
+// Helper: Handle dollar operator ($)
+const handleDollar = (expr: BinaryExpression, state: TypeState): TypeResult => 
+	typeApplication({ kind: 'application', func: expr.left, args: [expr.right], location: expr.location }, state);
+
+// Helper: Handle safe thrush operator (|?)
+const handleSafeThrush = (
+	expr: BinaryExpression,
+	leftResult: TypeResult,
+	rightResult: TypeResult,
+	state: TypeState
+): TypeResult => {
+	if (rightResult.type.kind !== 'function') {
+		throwTypeError(
+			location => nonFunctionApplicationError(rightResult.type, location),
+			getExprLocation(expr)
+		);
+	}
+	if (rightResult.type.params.length !== 1) {
+		throw new Error(
+			`Safe thrush operator requires function with exactly one parameter, got ${rightResult.type.params.length}`
+		);
+	}
+
+	// Try constraint resolution first
+	try {
+		const syntheticApp: ApplicationExpression = {
+			kind: 'application',
+			func: { kind: 'variable', name: 'bind', location: expr.location },
+			args: [expr.left, expr.right],
+			location: expr.location,
+		};
+		return typeApplication(syntheticApp, state);
+	} catch (error) {
+		// Fall back to direct implementation for known monads
+		if (
+			leftResult.type.kind === 'variant' &&
+			leftResult.type.args.length >= 1
+		) {
+			const monadName = leftResult.type.name;
+			const innerType = leftResult.type.args[0];
+			if (monadName === 'Option' || monadName === 'Result') {
+				const currentState = unify(
+					rightResult.type.params[0],
+					innerType,
+					state,
+					getExprLocation(expr)
+				);
+				let resultType: Type;
+				if (
+					rightResult.type.return.kind === 'variant' &&
+					rightResult.type.return.name === monadName
+				) {
+					resultType = rightResult.type.return;
+				} else {
+					if (monadName === 'Option') {
+						resultType = variantType('Option', [rightResult.type.return]);
+					} else if (
+						monadName === 'Result' &&
+						leftResult.type.args.length === 2
+					) {
+						resultType = variantType('Result', [
+							rightResult.type.return,
+							leftResult.type.args[1],
+						]);
+					} else {
+						resultType = variantType(monadName, [rightResult.type.return]);
+					}
+				}
+				return createTypeResult(
+					resultType,
+					unionEffects(leftResult.effects, rightResult.effects),
+					currentState
+				);
+			}
+		}
+		throw error;
+	}
+};
+
 // Type inference for binary expressions
 export const typeBinary = (
 	expr: BinaryExpression,
 	state: TypeState
 ): TypeResult => {
-	// Special handling for semicolon operator (sequence) - flatten to avoid O(n²) re-evaluation
-	if (expr.operator === ';') {
-		// Flatten the semicolon sequence and process each statement exactly once
-		const statements = flattenStatements(expr);
-		let currentState = state;
-		let finalType = null;
-		let allEffects = emptyEffects();
-
-		for (const statement of statements) {
-			const result = typeExpression(statement, currentState);
-			currentState = result.state;
-			finalType = result.type;
-			allEffects = unionEffects(allEffects, result.effects);
-		}
-
-		return createTypeResult(finalType || unitType(), allEffects, currentState);
-	}
+	if (expr.operator === ';') return handleSequence(expr, state);
 
 	let currentState = state;
 
@@ -898,153 +1010,13 @@ export const typeBinary = (
 	const rightResult = typeExpression(expr.right, currentState);
 	currentState = rightResult.state;
 
-	// Special handling for thrush operator (|) - function application
-	if (expr.operator === '|') {
-		// Thrush: a | b means b(a) - apply right function to left value
-		if (rightResult.type.kind !== 'function') {
-			throwTypeError(
-				location => nonFunctionApplicationError(rightResult.type, location),
-				getExprLocation(expr)
-			);
-		}
+	// Special operators
+	if (expr.operator === '|')
+		return handleThrush(expr, leftResult, rightResult, currentState);
+	if (expr.operator === '$') return handleDollar(expr, currentState);
 
-		// Check that the function can take the left value as its first argument
-		if (rightResult.type.params.length < 1) {
-			throw new Error(
-				`Thrush operator requires function with at least one parameter, got ${rightResult.type.params.length}`
-			);
-		}
-
-		// Pass along any constraints from the right function type so that
-		// unification can resolve constrained variants (e.g., f a ~ List a)
-		const constraintContext = rightResult.type.constraints || [];
-
-		currentState = unify(
-			rightResult.type.params[0],
-			leftResult.type,
-			currentState,
-			getExprLocation(expr),
-			{ constraintContext }
-		);
-
-		// Return the function's return type (which may be a partially applied function)
-		return createTypeResult(
-			rightResult.type.return,
-			unionEffects(leftResult.effects, rightResult.effects),
-			currentState
-		);
-	}
-
-	// Special handling for dollar operator ($) - low precedence function application
-	if (expr.operator === '$') {
-		// Dollar: a $ b means a(b) - apply left function to right value
-		// Delegate to the same logic as regular function application
-
-		// Create a synthetic ApplicationExpression for a $ b
-		const syntheticApp: ApplicationExpression = {
-			kind: 'application',
-			func: expr.left,
-			args: [expr.right],
-			location: expr.location,
-		};
-
-		return typeApplication(syntheticApp, currentState);
-	}
-
-	// Special handling for safe thrush operator (|?) - desugar to bind call
-	if (expr.operator === '|?') {
-		// Safe thrush: a |? f desugars to: bind a f
-		// Transform this into a function application and let constraint resolution handle it
-
-		if (rightResult.type.kind !== 'function') {
-			throwTypeError(
-				location => nonFunctionApplicationError(rightResult.type, location),
-				getExprLocation(expr)
-			);
-		}
-
-		// Check that the function can take one parameter
-		if (rightResult.type.params.length !== 1) {
-			throw new Error(
-				`Safe thrush operator requires function with exactly one parameter, got ${rightResult.type.params.length}`
-			);
-		}
-
-		// Try constraint resolution first, fall back to direct implementation
-		try {
-			// Create a synthetic function application: bind(left)(right)
-
-			const bindVar: VariableExpression = {
-				kind: 'variable',
-				name: 'bind',
-				location: expr.location,
-			};
-
-			const syntheticApp: ApplicationExpression = {
-				kind: 'application',
-				func: bindVar,
-				args: [expr.left, expr.right],
-				location: expr.location,
-			};
-
-			// This will trigger constraint resolution for 'bind'
-			return typeApplication(syntheticApp, currentState);
-		} catch (error) {
-			// If constraint resolution fails, fall back to direct implementation for known monads
-			if (
-				leftResult.type.kind === 'variant' &&
-				leftResult.type.args.length >= 1
-			) {
-				const monadName = leftResult.type.name;
-				const innerType = leftResult.type.args[0];
-
-				if (monadName === 'Option' || monadName === 'Result') {
-					// Unify the function parameter with the inner type
-					currentState = unify(
-						rightResult.type.params[0],
-						innerType,
-						currentState,
-						getExprLocation(expr)
-					);
-
-					// The result type follows monadic bind semantics
-					let resultType: Type;
-					if (
-						rightResult.type.return.kind === 'variant' &&
-						rightResult.type.return.name === monadName
-					) {
-						// Function returns same monad type -> bind flattens
-						resultType = rightResult.type.return;
-					} else {
-						// Function returns T -> wrap in the monad
-						if (monadName === 'Option') {
-							resultType = variantType('Option', [rightResult.type.return]);
-						} else if (
-							monadName === 'Result' &&
-							leftResult.type.args.length === 2
-						) {
-							// Preserve error type for Result
-							resultType = variantType('Result', [
-								rightResult.type.return,
-								leftResult.type.args[1],
-							]);
-						} else {
-							resultType = variantType(monadName, [rightResult.type.return]);
-						}
-					}
-
-					return createTypeResult(
-						resultType,
-						unionEffects(leftResult.effects, rightResult.effects),
-						currentState
-					);
-				}
-			}
-
-			// Re-throw the original error if we can't handle it
-			throw error;
-		}
-	}
+	if (expr.operator === '|?')
+		return handleSafeThrush(expr, leftResult, rightResult, currentState);
 
 	// Get operator type from environment
 	const operatorScheme = currentState.environment.get(expr.operator);
