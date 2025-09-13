@@ -827,22 +827,6 @@ export const typeIf = (expr: IfExpression, state: TypeState): TypeResult => {
 	);
 };
 
-const handleSequence = (
-	expr: BinaryExpression,
-	state: TypeState
-): TypeResult => {
-	const statements = flattenStatements(expr);
-	let currentState = state,
-		finalType = null,
-		allEffects = emptyEffects();
-	for (const stmt of statements) {
-		const result = typeExpression(stmt, currentState);
-		currentState = result.state;
-		finalType = result.type;
-		allEffects = unionEffects(allEffects, result.effects);
-	}
-	return createTypeResult(finalType || unitType(), allEffects, currentState);
-};
 
 const handleThrush = (
 	expr: BinaryExpression,
@@ -954,7 +938,23 @@ export const typeBinary = (
 	expr: BinaryExpression,
 	state: TypeState
 ): TypeResult => {
-	if (expr.operator === ';') return handleSequence(expr, state);
+	// Special handling for semicolon operator (sequence) - flatten to avoid O(n²) re-evaluation
+	if (expr.operator === ';') {
+		// Flatten the semicolon sequence and process each statement exactly once
+		const statements = flattenStatements(expr);
+		let currentState = state;
+		let finalType = null;
+		let allEffects = emptyEffects();
+
+		for (const statement of statements) {
+			const result = typeExpression(statement, currentState);
+			currentState = result.state;
+			finalType = result.type;
+			allEffects = unionEffects(allEffects, result.effects);
+		}
+
+		return createTypeResult(finalType || unitType(), allEffects, currentState);
+	}
 
 	let currentState = state;
 

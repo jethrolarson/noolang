@@ -1,5 +1,6 @@
 import * as defaultFs from 'node:fs';
 import * as defaultPath from 'node:path';
+import { execSync } from 'node:child_process';
 import type {
 	Expression,
 	Program,
@@ -945,6 +946,47 @@ export class Evaluator {
 					throw new Error('mutGet requires a mutable reference');
 				}
 				return ref.value;
+			})
+		);
+
+		// Process execution - exec(command, args) -> Result String ExecError
+		this.environment.set(
+			'exec',
+			createNativeFunction('exec', (command: Value) => (args: Value) => {
+				if (!isString(command)) {
+					throw new Error('exec requires a string command');
+				}
+				if (!isList(args)) {
+					throw new Error('exec requires a list of string arguments');
+				}
+				
+				// Validate all arguments are strings
+				const argStrings: string[] = [];
+				for (const arg of args.values) {
+					if (!isString(arg)) {
+						throw new Error('exec arguments must all be strings');
+					}
+					argStrings.push(arg.value);
+				}
+
+				try {
+					// Build command with arguments
+					const fullCommand = argStrings.length > 0 
+						? `${command.value} ${argStrings.map(arg => `"${arg}"`).join(' ')}`
+						: command.value;
+					
+					const output = execSync(fullCommand, { 
+						encoding: 'utf8',
+						stdio: 'pipe'
+					});
+					
+					// Return Ok(output)
+					return createConstructor('Ok', [createString(output.toString())]);
+				} catch (error: any) {
+					// Return Err(error message)
+					const errorMsg = error.message || 'Process execution failed';
+					return createConstructor('Err', [createString(errorMsg)]);
+				}
 			})
 		);
 

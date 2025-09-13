@@ -491,7 +491,7 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a'],
 	});
 
-	// Process execution with FFI effects
+	// Process execution - exec(command, args) -> Result String ExecError
 	newEnv.set('exec', {
 		type: functionType(
 			[stringType(), listTypeWithElement(stringType())],
