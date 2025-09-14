@@ -97,10 +97,6 @@ import {
 	addTraitImplementation,
 } from './trait-system';
 
-// Note: Main typeExpression is now in expression-dispatcher.ts
-// This file only contains the individual type inference functions
-
-// Type inference for literals
 export const typeLiteral = (
 	expr: LiteralExpression,
 	state: TypeState
@@ -117,27 +113,20 @@ export const typeLiteral = (
 	}
 };
 
-// Type inference for variables
 export const typeVariableExpr = (
 	expr: VariableExpression,
 	state: TypeState
 ): TypeResult => {
 	const scheme = state.environment.get(expr.name);
 	if (!scheme) {
-		// NEW: Check if this is a trait function before throwing error
 		if (isTraitFunction(state.traitRegistry, expr.name)) {
-			// Get the trait function's type and constraint information
-			const traitInfo = getTraitFunctionInfo(state.traitRegistry, expr.name);
+				const traitInfo = getTraitFunctionInfo(state.traitRegistry, expr.name);
 			if (traitInfo) {
-				// Use standard type scheme instantiation instead of manual freshening
-				// First, collect all type variables from the trait function type
 				const typeVars = new Set<string>();
 				collectTypeVariables(traitInfo.functionType, typeVars);
 
-				// Add the trait type parameter if not already collected
 				typeVars.add(traitInfo.typeParam);
 
-				// Create a type scheme and instantiate it properly
 				const scheme: TypeScheme = {
 					quantifiedVars: Array.from(typeVars),
 					type: traitInfo.functionType,
@@ -167,22 +156,18 @@ export const typeVariableExpr = (
 
 	const [instantiatedType, newState] = instantiate(scheme, state);
 
-	// Handle effects from TypeScheme
 	const effects = scheme.effects || emptyEffects();
 	return createTypeResult(instantiatedType, effects, newState);
 };
 
-// Helper function to count parameters in a function type
 const countFunctionParams = (type: Type): number => {
 	if (type.kind !== 'function') return 0;
 	return type.params.length + countFunctionParams(type.return);
 };
 
-// Flatten a constraint expression into a list of atomic constraints
 const flattenConstraintExpr = (expr: ConstraintExpr): Constraint[] => {
 	switch (expr.kind) {
 		case 'is':
-			// NOTE: Constraint name validation removed
 			return [expr];
 		case 'hasField':
 		case 'implements':
@@ -206,7 +191,6 @@ const flattenConstraintExpr = (expr: ConstraintExpr): Constraint[] => {
 	}
 };
 
-// Collect free variables used in an expression
 const collectFreeVars = (
 	expr: Expression,
 	boundVars: Set<string> = new Set()
@@ -339,7 +323,6 @@ const collectFreeVars = (
 	return freeVars;
 };
 
-// Helper: Create function environment with closure culling
 function createFunctionEnvironment(
 	expr: FunctionExpression,
 	state: TypeState
@@ -425,7 +408,6 @@ function createFunctionEnvironment(
 	return functionEnv;
 }
 
-// Helper: Create parameter types and type function body
 function createParameterTypesAndTypeBody(
 	expr: FunctionExpression,
 	functionEnv: Map<string, TypeScheme>,
@@ -452,7 +434,6 @@ function createParameterTypesAndTypeBody(
 	return { paramTypes, bodyResult, currentState };
 }
 
-// Helper: Handle constrained function bodies
 function handleConstrainedFunctionBody(
 	expr: FunctionExpression,
 	paramTypes: Type[],
@@ -512,7 +493,6 @@ function handleConstrainedFunctionBody(
 	return funcType;
 }
 
-// Helper: Build normal function type
 function buildNormalFunctionType(
 	paramTypes: Type[],
 	bodyResult: TypeResult,
@@ -564,35 +544,24 @@ function buildNormalFunctionType(
 	return funcType;
 }
 
-// Main function type inference (now much more focused)
 export const typeFunction = (
 	expr: FunctionExpression,
 	state: TypeState
 ): TypeResult => {
 	const originalBody = expr.body;
 
-	// 1. Create function environment with closure culling
 	const functionEnv = createFunctionEnvironment(expr, state);
-
-	// 2. Create parameter types and type the body
 	const { paramTypes, bodyResult, currentState } =
 		createParameterTypesAndTypeBody(expr, functionEnv, state);
-
-	// 3. Collect implicit constraints from the original function body
 	const implicitConstraints = collectImplicitConstraints(
 		bodyResult.type,
 		paramTypes,
-		currentState,
 		originalBody,
 		expr.params
 	);
-
-	// 4. Substitute parameter types with current substitutions to detect monomorphic cases
 	const substitutedParamTypes = paramTypes.map(t =>
 		substitute(t, currentState.substitution)
 	);
-
-	// 5. Build function type based on whether body is constrained, using substituted params
 	const funcType =
 		expr.body.kind === 'constrained'
 			? handleConstrainedFunctionBody(
@@ -610,11 +579,9 @@ export const typeFunction = (
 	return createTypeResult(funcType, bodyResult.effects, currentState);
 };
 
-// Helper function to collect implicit constraints from function bodies
 function collectImplicitConstraints(
 	bodyType: Type,
 	paramTypes: Type[],
-	state: TypeState,
 	bodyExpr?: Expression,
 	paramNames?: string[]
 ): Constraint[] {
@@ -648,7 +615,6 @@ function collectImplicitConstraints(
 	return constraints;
 }
 
-// Helper function to check if an expression uses a specific operator
 function usesOperator(expr: Expression, targetOperator: string): boolean {
 	switch (expr.kind) {
 		case 'binary':
@@ -707,10 +673,8 @@ function usesOperator(expr: Expression, targetOperator: string): boolean {
 	}
 }
 
-// Helper function to check if an expression uses the + operator (for backward compatibility)
-function usesAddOperator(expr: Expression): boolean {
-	return usesOperator(expr, '+');
-}
+const usesAddOperator = (expr: Expression): boolean => usesOperator(expr, '+');
+
 
 function collectTypeVariables(type: Type, vars: Set<string>): void {
 	switch (type.kind) {
@@ -734,7 +698,6 @@ function collectTypeVariables(type: Type, vars: Set<string>): void {
 	}
 }
 
-// Type inference for definitions
 export const typeDefinition = (
 	expr: DefinitionExpression,
 	state: TypeState
@@ -819,7 +782,6 @@ export const typeDefinition = (
 	return createTypeResult(finalType, valueResult.effects, finalState);
 };
 
-// Type inference for if expressions
 export const typeIf = (expr: IfExpression, state: TypeState): TypeResult => {
 	let currentState = state;
 
@@ -865,7 +827,113 @@ export const typeIf = (expr: IfExpression, state: TypeState): TypeResult => {
 	);
 };
 
-// Type inference for binary expressions
+
+const handleThrush = (
+	expr: BinaryExpression,
+	leftResult: TypeResult,
+	rightResult: TypeResult,
+	state: TypeState
+): TypeResult => {
+	if (
+		rightResult.type.kind !== 'function' ||
+		rightResult.type.params.length < 1
+	)
+		throwTypeError(
+			location => nonFunctionApplicationError(rightResult.type, location),
+			getExprLocation(expr)
+		);
+	const constraintContext = rightResult.type.constraints || [];
+	const newState = unify(
+		rightResult.type.params[0],
+		leftResult.type,
+		state,
+		getExprLocation(expr),
+		{ constraintContext }
+	);
+	return createTypeResult(
+		rightResult.type.return,
+		unionEffects(leftResult.effects, rightResult.effects),
+		newState
+	);
+};
+
+const handleDollar = (expr: BinaryExpression, state: TypeState): TypeResult => 
+	typeApplication({ kind: 'application', func: expr.left, args: [expr.right], location: expr.location }, state);
+
+const handleSafeThrush = (
+	expr: BinaryExpression,
+	leftResult: TypeResult,
+	rightResult: TypeResult,
+	state: TypeState
+): TypeResult => {
+	if (rightResult.type.kind !== 'function') {
+		throwTypeError(
+			location => nonFunctionApplicationError(rightResult.type, location),
+			getExprLocation(expr)
+		);
+	}
+	if (rightResult.type.params.length !== 1) {
+		throw new Error(
+			`Safe thrush operator requires function with exactly one parameter, got ${rightResult.type.params.length}`
+		);
+	}
+
+	// Try constraint resolution first
+	try {
+		const syntheticApp: ApplicationExpression = {
+			kind: 'application',
+			func: { kind: 'variable', name: 'bind', location: expr.location },
+			args: [expr.left, expr.right],
+			location: expr.location,
+		};
+		return typeApplication(syntheticApp, state);
+	} catch (error) {
+		// Fall back to direct implementation for known monads
+		if (
+			leftResult.type.kind === 'variant' &&
+			leftResult.type.args.length >= 1
+		) {
+			const monadName = leftResult.type.name;
+			const innerType = leftResult.type.args[0];
+			if (monadName === 'Option' || monadName === 'Result') {
+				const currentState = unify(
+					rightResult.type.params[0],
+					innerType,
+					state,
+					getExprLocation(expr)
+				);
+				let resultType: Type;
+				if (
+					rightResult.type.return.kind === 'variant' &&
+					rightResult.type.return.name === monadName
+				) {
+					resultType = rightResult.type.return;
+				} else {
+					if (monadName === 'Option') {
+						resultType = variantType('Option', [rightResult.type.return]);
+					} else if (
+						monadName === 'Result' &&
+						leftResult.type.args.length === 2
+					) {
+						resultType = variantType('Result', [
+							rightResult.type.return,
+							leftResult.type.args[1],
+						]);
+					} else {
+						resultType = variantType(monadName, [rightResult.type.return]);
+					}
+				}
+				return createTypeResult(
+					resultType,
+					unionEffects(leftResult.effects, rightResult.effects),
+					currentState
+				);
+			}
+		}
+		throw error;
+	}
+};
+
 export const typeBinary = (
 	expr: BinaryExpression,
 	state: TypeState
@@ -898,153 +966,13 @@ export const typeBinary = (
 	const rightResult = typeExpression(expr.right, currentState);
 	currentState = rightResult.state;
 
-	// Special handling for thrush operator (|) - function application
-	if (expr.operator === '|') {
-		// Thrush: a | b means b(a) - apply right function to left value
-		if (rightResult.type.kind !== 'function') {
-			throwTypeError(
-				location => nonFunctionApplicationError(rightResult.type, location),
-				getExprLocation(expr)
-			);
-		}
+	// Special operators
+	if (expr.operator === '|')
+		return handleThrush(expr, leftResult, rightResult, currentState);
+	if (expr.operator === '$') return handleDollar(expr, currentState);
 
-		// Check that the function can take the left value as its first argument
-		if (rightResult.type.params.length < 1) {
-			throw new Error(
-				`Thrush operator requires function with at least one parameter, got ${rightResult.type.params.length}`
-			);
-		}
-
-		// Pass along any constraints from the right function type so that
-		// unification can resolve constrained variants (e.g., f a ~ List a)
-		const constraintContext = rightResult.type.constraints || [];
-
-		currentState = unify(
-			rightResult.type.params[0],
-			leftResult.type,
-			currentState,
-			getExprLocation(expr),
-			{ constraintContext }
-		);
-
-		// Return the function's return type (which may be a partially applied function)
-		return createTypeResult(
-			rightResult.type.return,
-			unionEffects(leftResult.effects, rightResult.effects),
-			currentState
-		);
-	}
-
-	// Special handling for dollar operator ($) - low precedence function application
-	if (expr.operator === '$') {
-		// Dollar: a $ b means a(b) - apply left function to right value
-		// Delegate to the same logic as regular function application
-
-		// Create a synthetic ApplicationExpression for a $ b
-		const syntheticApp: ApplicationExpression = {
-			kind: 'application',
-			func: expr.left,
-			args: [expr.right],
-			location: expr.location,
-		};
-
-		return typeApplication(syntheticApp, currentState);
-	}
-
-	// Special handling for safe thrush operator (|?) - desugar to bind call
-	if (expr.operator === '|?') {
-		// Safe thrush: a |? f desugars to: bind a f
-		// Transform this into a function application and let constraint resolution handle it
-
-		if (rightResult.type.kind !== 'function') {
-			throwTypeError(
-				location => nonFunctionApplicationError(rightResult.type, location),
-				getExprLocation(expr)
-			);
-		}
-
-		// Check that the function can take one parameter
-		if (rightResult.type.params.length !== 1) {
-			throw new Error(
-				`Safe thrush operator requires function with exactly one parameter, got ${rightResult.type.params.length}`
-			);
-		}
-
-		// Try constraint resolution first, fall back to direct implementation
-		try {
-			// Create a synthetic function application: bind(left)(right)
-
-			const bindVar: VariableExpression = {
-				kind: 'variable',
-				name: 'bind',
-				location: expr.location,
-			};
-
-			const syntheticApp: ApplicationExpression = {
-				kind: 'application',
-				func: bindVar,
-				args: [expr.left, expr.right],
-				location: expr.location,
-			};
-
-			// This will trigger constraint resolution for 'bind'
-			return typeApplication(syntheticApp, currentState);
-		} catch (error) {
-			// If constraint resolution fails, fall back to direct implementation for known monads
-			if (
-				leftResult.type.kind === 'variant' &&
-				leftResult.type.args.length >= 1
-			) {
-				const monadName = leftResult.type.name;
-				const innerType = leftResult.type.args[0];
-
-				if (monadName === 'Option' || monadName === 'Result') {
-					// Unify the function parameter with the inner type
-					currentState = unify(
-						rightResult.type.params[0],
-						innerType,
-						currentState,
-						getExprLocation(expr)
-					);
-
-					// The result type follows monadic bind semantics
-					let resultType: Type;
-					if (
-						rightResult.type.return.kind === 'variant' &&
-						rightResult.type.return.name === monadName
-					) {
-						// Function returns same monad type -> bind flattens
-						resultType = rightResult.type.return;
-					} else {
-						// Function returns T -> wrap in the monad
-						if (monadName === 'Option') {
-							resultType = variantType('Option', [rightResult.type.return]);
-						} else if (
-							monadName === 'Result' &&
-							leftResult.type.args.length === 2
-						) {
-							// Preserve error type for Result
-							resultType = variantType('Result', [
-								rightResult.type.return,
-								leftResult.type.args[1],
-							]);
-						} else {
-							resultType = variantType(monadName, [rightResult.type.return]);
-						}
-					}
-
-					return createTypeResult(
-						resultType,
-						unionEffects(leftResult.effects, rightResult.effects),
-						currentState
-					);
-				}
-			}
-
-			// Re-throw the original error if we can't handle it
-			throw error;
-		}
-	}
+	if (expr.operator === '|?')
+		return handleSafeThrush(expr, leftResult, rightResult, currentState);
 
 	// Get operator type from environment
 	const operatorScheme = currentState.environment.get(expr.operator);

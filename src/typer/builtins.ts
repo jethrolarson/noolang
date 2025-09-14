@@ -491,6 +491,16 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a'],
 	});
 
+	// Process execution - exec(command, args) -> Result String ExecError
+	newEnv.set('exec', {
+		type: functionType(
+			[stringType(), listTypeWithElement(stringType())],
+			resultType(stringType(), typeVariable('ExecError')),
+			new Set(['ffi'])
+		),
+		quantifiedVars: ['ExecError'],
+	});
+
 	const newState = { ...state, environment: newEnv };
 
 	// Built-in trait implementations are handled directly in the evaluator's

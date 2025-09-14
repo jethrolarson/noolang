@@ -1,10 +1,6 @@
 import { type Type, type Constraint, type StructureFieldType } from '../ast';
 import { mapObject } from './helpers';
 
-
-// Cache for substitution results to avoid repeated work
-const substituteCache = new Map<string, Type>();
-
 // Apply substitution to a type
 export const substitute = (
 	type: Type,
@@ -15,30 +11,11 @@ export const substitute = (
 		throw new Error('Cannot substitute undefined type');
 	}
 	
-	let result: Type;
-	// Generate cache key - only for type variables as they're most common
-	if (type.kind === 'variable' && substitution.size < 20) {
-		const cacheKey = `${type.name}:${Array.from(substitution.entries())
-			.map(([k, v]) => `${k}=${v.kind}`)
-			.join(',')}`;
-		const cached = substituteCache.get(cacheKey);
-		if (cached) {
-			result = cached;
-		} else {
-			result = substituteWithCache(substitution, new Set())(type);
-			if (substituteCache.size < 1000) {
-				// Prevent unbounded cache growth
-				substituteCache.set(cacheKey, result);
-			}
-		}
-	} else {
-		result = substituteWithCache(substitution, new Set())(type);
-	}
-
-	return result;
+	// No cache - just do the substitution directly
+	return substituteImpl(substitution, new Set())(type);
 };
 
-const substituteWithCache =
+const substituteImpl =
 	(substitution: Map<string, Type>, seen: Set<string>) =>
 	(type: Type): Type => {
 		switch (type.kind) {
@@ -50,7 +27,7 @@ const substituteWithCache =
 				const sub = substitution.get(type.name);
 				if (sub) {
 					seen.add(type.name);
-					const result = substituteWithCache(substitution, seen)(sub);
+					const result = substituteImpl(substitution, seen)(sub);
 					seen.delete(type.name);
 					return result;
 				}
@@ -59,8 +36,8 @@ const substituteWithCache =
 			case 'function':
 				return {
 					...type,
-					params: type.params.map(substituteWithCache(substitution, seen)),
-					return: substituteWithCache(substitution, seen)(type.return),
+					params: type.params.map(substituteImpl(substitution, seen)),
+					return: substituteImpl(substitution, seen)(type.return),
 					constraints: type.constraints?.map(c =>
 						substituteConstraint(c, substitution)
 					),
@@ -68,25 +45,25 @@ const substituteWithCache =
 			case 'list':
 				return {
 					...type,
-					element: substituteWithCache(substitution, seen)(type.element),
+					element: substituteImpl(substitution, seen)(type.element),
 				};
 			case 'tuple':
 				return {
 					...type,
-					elements: type.elements.map(substituteWithCache(substitution, seen)),
+					elements: type.elements.map(substituteImpl(substitution, seen)),
 				};
 			case 'record':
 				return {
 					...type,
 					fields: mapObject(
 						type.fields,
-						substituteWithCache(substitution, seen)
+						substituteImpl(substitution, seen)
 					),
 				};
 			case 'union':
 				return {
 					...type,
-					types: type.types.map(substituteWithCache(substitution, seen)),
+					types: type.types.map(substituteImpl(substitution, seen)),
 				};
 			case 'variant': {
 				// Check if the variant name itself should be substituted
@@ -98,7 +75,7 @@ const substituteWithCache =
 						if (type.args.length === 1) {
 							return {
 								kind: 'list',
-								element: substituteWithCache(substitution, seen)(type.args[0])
+								element: substituteImpl(substitution, seen)(type.args[0])
 							};
 						}
 					} else if (substitutedName.kind === 'variant') {
@@ -106,7 +83,7 @@ const substituteWithCache =
 						return {
 							...type,
 							name: substitutedName.name,
-							args: type.args.map(substituteWithCache(substitution, seen)),
+							args: type.args.map(substituteImpl(substitution, seen)),
 						};
 					}
 					// For other substitution types, fall through to normal arg substitution
@@ -115,13 +92,13 @@ const substituteWithCache =
 				// Normal case: just substitute the arguments
 				return {
 					...type,
-					args: type.args.map(substituteWithCache(substitution, seen)),
+					args: type.args.map(substituteImpl(substitution, seen)),
 				};
 			}
 			case 'constrained':
 				return {
 					...type,
-					baseType: substituteWithCache(substitution, seen)(type.baseType),
+					baseType: substituteImpl(substitution, seen)(type.baseType),
 					// Keep constraints as-is for now - they reference type variables by name
 				};
 			default:
