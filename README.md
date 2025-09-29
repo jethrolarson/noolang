@@ -985,7 +985,7 @@ runCommand = fn cmd args => exec cmd args : String -> List String -> Result Stri
 result = exec "echo" ["Hello World"];
 match result (
   Ok output => print output;
-  Err error => log error
+  Err error => print error
 );
 ```
 
