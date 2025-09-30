@@ -152,6 +152,165 @@ Special characters ([`src/lexer/lexer.ts:237-242`](../src/lexer/lexer.ts#L237-L2
 #     # Comments
 ```
 
+## Built-in Functions
+
+Noolang provides a comprehensive set of built-in functions for common operations, I/O, and system interaction.
+
+### System Operations
+
+#### Process Execution
+
+The `exec` function enables type-safe shell command execution, returning a `Result` type for proper error handling.
+
+```noolang
+# Type signature: String -> List String -> Result String ExecError
+exec : String -> List String -> Result String ExecError
+```
+
+**Basic Usage:**
+
+```noolang
+# Execute a simple command
+result = exec "echo" ["hello world"];
+match result (
+    Ok output => println output;    # Prints: hello world
+    Err error => println error      # Handle execution errors
+)
+```
+
+**Working with Command Arguments:**
+
+```noolang
+# Execute commands with multiple arguments
+lsResult = exec "ls" ["-la", "/tmp"];
+match lsResult (
+    Ok output => println ("Directory listing:\n" + output);
+    Err error => println ("Failed to list directory: " + error)
+)
+```
+
+**Practical Automation Examples:**
+
+```noolang
+# Get current user and date
+getUserInfo = fn => 
+    match exec "whoami" [] (
+        Ok user => match exec "date" [] (
+            Ok date => Ok (user + " at " + date);
+            Err error => Err ("Date failed: " + error)
+        );
+        Err error => Err ("User lookup failed: " + error)
+    );
+
+# Use the automation function
+userInfo = getUserInfo ();
+match userInfo (
+    Ok info => println ("Current session: " + info);
+    Err error => println ("System info error: " + error)
+)
+```
+
+**Error Handling:**
+
+```noolang
+# Handle command failures gracefully
+result = exec "nonexistentcommand" [];
+match result (
+    Ok output => println "This won't execute";
+    Err error => println "Expected error: Command not found"
+)
+```
+
+**Type Safety:**
+
+All arguments must be strings, and the result is always wrapped in a `Result` type:
+
+```noolang
+# ✓ Valid usage
+exec "echo" ["arg1", "arg2"]
+
+# ✗ Type error - non-string arguments
+exec "echo" [123]
+
+# ✗ Type error - non-list arguments  
+exec "echo" "single-string"
+```
+
+### I/O Operations
+
+#### Console Output
+
+```noolang
+# Print with newline
+println "Hello World!";
+println 42;
+
+# Print without newline  
+print "Processing... ";
+print "Done!";
+```
+
+#### File Operations
+
+```noolang
+# Read file contents
+content = readFile "example.txt";
+println content;
+
+# Write to file
+writeFile "output.txt" "Hello from Noolang!";
+```
+
+#### Logging
+
+```noolang
+# Write to log
+log "Application started";
+log ("User count: " + toString userCount);
+```
+
+### Utility Functions
+
+#### Type Conversion
+
+```noolang
+# Convert any value to string representation
+toString 42;        # "42"
+toString True;      # "True" 
+toString [1, 2, 3]; # "[1, 2, 3]"
+
+# Type erasure (convert to Unknown type)
+forget 42;          # Unknown value
+```
+
+#### String Operations
+
+```noolang
+# String concatenation
+concat "Hello" " World";   # "Hello World"
+```
+
+#### Mathematical Functions
+
+```noolang
+# Absolute value
+abs (-5);    # 5
+
+# Min/Max
+min 3 7;     # 3
+max 3 7;     # 7
+```
+
+#### Random Number Generation
+
+```noolang
+# Random float between 0 and 1
+randomValue = random;
+
+# Random float in range
+randomInRange = randomRange 1.0 100.0;
+```
+
 ## Expressions
 
 ### Function Definition
