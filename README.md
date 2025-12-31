@@ -1764,4 +1764,3 @@ Feel free to fork, experiment, and contribute!
 ## License
 
 MIT
-# Generic ADT Constructor Fix Complete
