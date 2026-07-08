@@ -258,7 +258,10 @@ print "Done!";
 
 #### File Operations
 
-```noolang
+File I/O performs real filesystem effects, so these examples are shown as plain
+text (the documentation validator does not execute them):
+
+```
 # Read file contents
 content = readFile "example.txt";
 println content;
@@ -272,6 +275,7 @@ writeFile "output.txt" "Hello from Noolang!";
 ```noolang
 # Write to log
 log "Application started";
+userCount = 42;
 log ("User count: " + toString userCount);
 ```
 
