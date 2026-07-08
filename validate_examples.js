@@ -26,11 +26,16 @@ function runMarkdown(filePath) {
 
 // Main execution
 const docsDir = './docs';
+// NOTE: README.md is intentionally excluded for now. It is written as many
+// independent illustrative snippets that reuse variable names, so running the
+// whole file as one concatenated program both collides on redefinitions and
+// exposes accumulation-only type-system bugs. Re-including it is tracked in
+// https://github.com/jethrolarson/noolang/issues/102 (README cleanup +
+// per-block validation); the type-system bug is issue #103.
 const files = fs
 	.readdirSync(docsDir)
 	.filter(f => f.endsWith('.md'))
-	.map(f => path.join(docsDir, f))
-	.concat(['README.md']);
+	.map(f => path.join(docsDir, f));
 
 console.log(
 	'🔍 Validating Noolang markdown files using native literate mode...\n'
