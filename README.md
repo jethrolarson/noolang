@@ -131,6 +131,11 @@ add 1 2;
 ((add 1) 2);
 # in javascript this could be seen as `const add = x => y => x + y; add(1)(2);`
 
+```
+
+#### Where Expressions and Sequencing
+
+```noolang
 # use where expressions do define local variables for an expression
 x + y where (x = 1; y = 2);  # => 3
 
@@ -142,12 +147,21 @@ x + y where (x = 1; y = 2);  # => 3
 
 #[1, 2, 3] | map (add 1); # => [2, 3, 4]
 
+```
+
+#### Tuples and Conditionals
+
+```noolang
 # tuples are of fixed length and have different types per element
 {1, "hello", True}; # => {1, "hello", True} : {Float, String, Bool}
 
 # Conditional expressions
 if True then 1 else 2;
+```
 
+#### Records and Accessors
+
+```noolang
 # Records
 user = { @name "Alice", @age 30, @address { @street "123 Main St", @city "Anytown" } };
 
@@ -171,12 +185,21 @@ user | @address | @street; # => "123 Main St"
 user_street = @address |> @street;
 user_street user; # => "123 Main St"
 
+```
+
+#### Destructuring
+
+```noolang
 # Destructuring for clean data extraction
 {x, y} = {10, 20}; 
 x + y;  # => 30
 {@name, @age} = {@name "Alice", @age 30}; 
 name;  # => "Alice"
+```
 
+#### Recursion and Mutation
+
+```noolang
 # Recursion
 factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1));
 
@@ -184,9 +207,11 @@ factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1));
 mut counter = 0;
 mut! counter = counter + 1;
 
-# List operations
-# [1, 2, 3] | map (add 1) | head; # => Option 2
+```
 
+#### Variants (ADTs), Options, and Pattern Matching
+
+```noolang
 # Variant Types (ADTs) are a way to define a type with a fixed set of possible values
 variant Color = Red | Green | Blue;
 favorite = Red;
@@ -203,6 +228,11 @@ result = match (Some 42) (Some x => x; None => 0);
 #point = Point 10 20;
 #x = match point (Point x y => x);
 
+```
+
+#### Recursive Variants
+
+```noolang
 # Recursive variants (Binary Tree)
 variant Tree a = Node a (Tree a) (Tree a) | Leaf;
 tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
@@ -212,6 +242,11 @@ sum = fn t => match t (
 );
 tree_sum = sum tree;  # => 15
 
+```
+
+#### User-Defined Types
+
+```noolang
 # User-Defined Types
 type User = {@name String, @age Float, @active Bool};
 type Point = {Float, Float};
@@ -226,11 +261,15 @@ userName = user | @name;  # "Alice"
 userAge = user | @age;    # 30
 x_coord = match point ({x, y} => x);  # 10.5
 
+```
+
+#### Pattern Matching
+
+```noolang
 # Tuple pattern matching
 coordinates = {10, 20, 30};
 sum = match coordinates (
     {x, y, z} => x + y + z;
-    {x, y} => x + y;
     _ => 0
 )
 
@@ -249,6 +288,11 @@ result = match data (
     None => -1
 )
 
+```
+
+#### Destructuring Patterns
+
+```noolang
 # Destructuring patterns for data extraction
 {x, y} = {10, 20};
 {@name, @age} = {@name "Bob", @age 25};
@@ -258,8 +302,13 @@ result = match data (
 {outer, {inner, rest}} = {1, {2, 3}};
 {@user {@name, @age}} = {@user {@name "Charlie", @age 35}};
 {@coords {x, y}, @metadata {@name author}} = {@coords {5, 10}, @metadata {@name "Dave"}};
+```
 
-# Import spreading with destructuring  
+Imports can be spread with destructuring too (illustrative module paths, shown
+as text; the field names would shadow built-in functions if run here):
+
+```
+# Import spreading with destructuring
 {@add, @multiply} = import "examples/math_module";
 {@square sq, @cube cb} = import "examples/power_module";  # With renaming
 ```
