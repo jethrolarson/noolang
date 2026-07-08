@@ -408,6 +408,11 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: [],
 	});
 
+	newEnv.set('primitive_string_equals', {
+		type: createBinaryFunctionType(stringType(), stringType(), boolType()),
+		quantifiedVars: [],
+	});
+
 	// Primitive Subtract trait implementations for type checking
 	newEnv.set('primitive_float_subtract', {
 		type: createBinaryFunctionType(floatType(), floatType(), floatType()),

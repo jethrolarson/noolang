@@ -1634,6 +1634,7 @@ show "hello";         # Uses Show String implementation
 show [1, 2, 3];       # Uses Show (List a) implementation with Show Float
 
 equals 1 2;           # Uses Eq Float implementation
+equals "a" "b";       # Uses Eq String implementation
 ```
 
 ### Conditional Implementations
