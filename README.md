@@ -1032,9 +1032,9 @@ Define custom types with multiple constructors:
 # Simple enum-like types
 variant Color = Red | Green | Blue;
 
-# Types with parameters
-variant Option a = Some a | None;
-variant Result a b = Ok a | Err b;
+# Types with parameters (Option and Result are built in, so define your own)
+variant Maybe a = Just a | Nothing;
+variant Either a b = Left a | Right b;
 
 # Types with multiple parameters
 variant Shape = Circle Float | Rectangle Float Float;
@@ -1076,6 +1076,9 @@ invalid = parse_number "abc"; # Err "Invalid"
 Use `match` expressions to destructure ADTs and handle different cases:
 
 ```noolang
+variant Shape = Circle Float | Rectangle Float Float | Triangle Float Float Float;
+variant Point a = Point a a;
+
 # Basic pattern matching
 handle_option = fn opt => match opt (
   Some value => value * 2;
@@ -1086,7 +1089,7 @@ handle_option = fn opt => match opt (
 area = fn shape => match shape (
   Circle radius => radius * radius * 3;
   Rectangle width height => width * height;
-  Triangle a b c => (a * b) / 2
+  Triangle a b c => (a * b) * 0.5
 );
 
 # Extracting values from constructors
@@ -1100,7 +1103,7 @@ get_coordinate = fn point => match point (
 ADT constructors are automatically created as curried functions:
 
 ```noolang
-type Point a = Point a a;
+variant Point a = Point a a;
 
 # Constructors work as functions
 origin = Point 0 0;
@@ -1114,6 +1117,12 @@ complete = point_10 20;    # Point 10 20
 ADTs work seamlessly with Noolang's existing features:
 
 ```noolang
+variant Shape = Circle Float | Rectangle Float Float;
+area = fn shape => match shape (
+  Circle radius => radius * radius * 3;
+  Rectangle width height => width * height
+);
+
 # With higher-order functions
 options = [Some 1, None, Some 3];
 extract = fn opt => match opt (Some x => x; None => 0);
