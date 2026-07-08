@@ -279,7 +279,7 @@ name = "Alice" : String;
 flag = True : Bool;
 
 # Function type annotations
-add = fn x y => x + y : Float -> Float -> Float;
+addNums = fn x y => x + y : Float -> Float -> Float;
 double = fn x => x * 2 : Float -> Float;
 
 # Complex type annotations with effects
@@ -291,7 +291,10 @@ readConfig = fn path => readFile path : String -> String !read;
 
 Function types use arrow syntax with effects:
 
-```noolang
+Illustrative signatures (some use hypothetical functions like `random`, so
+this block is shown as text):
+
+```
 # Pure functions
 identity = fn x => x : a -> a;
 add = fn x y => x + y : Float -> Float -> Float;
