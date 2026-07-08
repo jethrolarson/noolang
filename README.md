@@ -336,7 +336,10 @@ applyTwice = fn f x => f (f x) : (a -> a) -> a -> a;
 
 ### When to Use Type Annotations
 
-```noolang
+These illustrate *where* annotations help, using placeholder names, so they are
+shown as plain text rather than executed:
+
+```
 # Always useful for exported functions
 exported_fn = fn x y => complex_calculation x y : InputType -> InputType -> OutputType;
 
@@ -365,7 +368,7 @@ show_all = map show : List a -> List String given a implements Show;
 
 ```noolang
 # This evaluates to 15 (the result of the right side)
-x = 10; x + 5
+x = 10; x + 5;
 
 # This evaluates to [8, 10, 12] (the result of map)
 print "hello"; map (fn x => x * 2) [4, 5, 6]
@@ -374,11 +377,11 @@ print "hello"; map (fn x => x * 2) [4, 5, 6]
 ### Literals
 
 ```noolang
-42          # Integer
-"hello"     # String
-{}          # Unit
-[1, 2, 3]   # List (comma-separated)
-{ @name "Alice", @age 30 }  # Record (comma-separated fields)
+42;          # Integer
+"hello";     # String
+{};          # Unit
+[1, 2, 3];   # List (comma-separated)
+{ @name "Alice", @age 30 };  # Record (comma-separated fields)
 {1, 2, 3};   # Tuple (comma-separated)
 ```
 
@@ -459,7 +462,9 @@ Some 0 |? (fn x => x + 5) |? (fn x => x * 2) |? safe_divide;   # None
 
 ### Conditional Expressions
 
-```noolang
+The general form (shown as a template, not executed):
+
+```
 if condition then value1 else value2
 ```
 
@@ -469,7 +474,7 @@ Local definitions within expressions:
 
 ```noolang
 # Simple where expression
-x + y where (x = 1)
+x + 1 where (x = 1)
 
 # Multiple definitions
 x + y where (x = 1; y = 2)
@@ -744,9 +749,10 @@ numbers = import "examples/list_module";  # numbers : List Float
 
 ### Import Destructuring
 
-Destructuring works seamlessly with properly typed imports:
+Destructuring works seamlessly with properly typed imports (illustrative
+module paths, shown as text):
 
-```noolang
+```
 # Basic destructuring
 {@add, @multiply} = import "examples/math_module";
 
@@ -760,7 +766,9 @@ result = sq 4 + cb 2;  # => 24 : Float
 
 ### Import Path Resolution
 
-```noolang
+Illustrative paths (shown as text, not executed):
+
+```
 # Relative paths
 math = import "lib/math";           # Resolves to lib/math.noo
 utils = import "../shared/utils";   # Parent directory
@@ -804,9 +812,10 @@ The import system provides comprehensive error handling:
 
 ### Integration with Language Features
 
-Imports work seamlessly with all Noolang features:
+Imports work seamlessly with all Noolang features (illustrative, shown as
+text):
 
-```noolang
+```
 # With pattern matching (if importing ADTs)
 option = import "examples/option_module";
 value = match option (Some x => x; None => 0);
