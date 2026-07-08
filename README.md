@@ -131,6 +131,11 @@ add 1 2;
 ((add 1) 2);
 # in javascript this could be seen as `const add = x => y => x + y; add(1)(2);`
 
+```
+
+#### Where Expressions and Sequencing
+
+```noolang
 # use where expressions do define local variables for an expression
 x + y where (x = 1; y = 2);  # => 3
 
@@ -142,12 +147,21 @@ x + y where (x = 1; y = 2);  # => 3
 
 #[1, 2, 3] | map (add 1); # => [2, 3, 4]
 
+```
+
+#### Tuples and Conditionals
+
+```noolang
 # tuples are of fixed length and have different types per element
 {1, "hello", True}; # => {1, "hello", True} : {Float, String, Bool}
 
 # Conditional expressions
 if True then 1 else 2;
+```
 
+#### Records and Accessors
+
+```noolang
 # Records
 user = { @name "Alice", @age 30, @address { @street "123 Main St", @city "Anytown" } };
 
@@ -171,12 +185,21 @@ user | @address | @street; # => "123 Main St"
 user_street = @address |> @street;
 user_street user; # => "123 Main St"
 
+```
+
+#### Destructuring
+
+```noolang
 # Destructuring for clean data extraction
 {x, y} = {10, 20}; 
 x + y;  # => 30
 {@name, @age} = {@name "Alice", @age 30}; 
 name;  # => "Alice"
+```
 
+#### Recursion and Mutation
+
+```noolang
 # Recursion
 factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1));
 
@@ -184,9 +207,11 @@ factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1));
 mut counter = 0;
 mut! counter = counter + 1;
 
-# List operations
-# [1, 2, 3] | map (add 1) | head; # => Option 2
+```
 
+#### Variants (ADTs), Options, and Pattern Matching
+
+```noolang
 # Variant Types (ADTs) are a way to define a type with a fixed set of possible values
 variant Color = Red | Green | Blue;
 favorite = Red;
@@ -203,6 +228,11 @@ result = match (Some 42) (Some x => x; None => 0);
 #point = Point 10 20;
 #x = match point (Point x y => x);
 
+```
+
+#### Recursive Variants
+
+```noolang
 # Recursive variants (Binary Tree)
 variant Tree a = Node a (Tree a) (Tree a) | Leaf;
 tree = Node 5 (Node 3 Leaf Leaf) (Node 7 Leaf Leaf);
@@ -212,6 +242,11 @@ sum = fn t => match t (
 );
 tree_sum = sum tree;  # => 15
 
+```
+
+#### User-Defined Types
+
+```noolang
 # User-Defined Types
 type User = {@name String, @age Float, @active Bool};
 type Point = {Float, Float};
@@ -226,11 +261,15 @@ userName = user | @name;  # "Alice"
 userAge = user | @age;    # 30
 x_coord = match point ({x, y} => x);  # 10.5
 
+```
+
+#### Pattern Matching
+
+```noolang
 # Tuple pattern matching
 coordinates = {10, 20, 30};
 sum = match coordinates (
     {x, y, z} => x + y + z;
-    {x, y} => x + y;
     _ => 0
 )
 
@@ -249,6 +288,11 @@ result = match data (
     None => -1
 )
 
+```
+
+#### Destructuring Patterns
+
+```noolang
 # Destructuring patterns for data extraction
 {x, y} = {10, 20};
 {@name, @age} = {@name "Bob", @age 25};
@@ -258,8 +302,13 @@ result = match data (
 {outer, {inner, rest}} = {1, {2, 3}};
 {@user {@name, @age}} = {@user {@name "Charlie", @age 35}};
 {@coords {x, y}, @metadata {@name author}} = {@coords {5, 10}, @metadata {@name "Dave"}};
+```
 
-# Import spreading with destructuring  
+Imports can be spread with destructuring too (illustrative module paths, shown
+as text; the field names would shadow built-in functions if run here):
+
+```
+# Import spreading with destructuring
 {@add, @multiply} = import "examples/math_module";
 {@square sq, @cube cb} = import "examples/power_module";  # With renaming
 ```
@@ -279,7 +328,7 @@ name = "Alice" : String;
 flag = True : Bool;
 
 # Function type annotations
-add = fn x y => x + y : Float -> Float -> Float;
+addNums = fn x y => x + y : Float -> Float -> Float;
 double = fn x => x * 2 : Float -> Float;
 
 # Complex type annotations with effects
@@ -291,7 +340,10 @@ readConfig = fn path => readFile path : String -> String !read;
 
 Function types use arrow syntax with effects:
 
-```noolang
+Illustrative signatures (some use hypothetical functions like `random`, so
+this block is shown as text):
+
+```
 # Pure functions
 identity = fn x => x : a -> a;
 add = fn x y => x + y : Float -> Float -> Float;
@@ -318,11 +370,12 @@ names = ["Alice", "Bob"] : List String;
 user = { @name "Alice", @age 30 } : { @name String, @age Float };
 point = { @x 10, @y 20 } : { @x Float, @y Float };
 
-# Option types
-safeDiv = fn x y => if y == 0 then None else Some (x / y) : Float -> Float -> Option Float;
+# Option types (division is already safe, so it returns an Option)
+safeDiv = fn x y => if y == 0 then None else x / y : Float -> Float -> Option Float;
 
 # Higher-order function types
-mapFn = map : (a -> b) -> List a -> List b;
+# (map is Functor-generic: (a -> b) -> c a -> c b given c implements Functor)
+mapFn = map;
 applyTwice = fn f x => f (f x) : (a -> a) -> a -> a;
 ```
 
@@ -336,7 +389,10 @@ applyTwice = fn f x => f (f x) : (a -> a) -> a -> a;
 
 ### When to Use Type Annotations
 
-```noolang
+These illustrate *where* annotations help, using placeholder names, so they are
+shown as plain text rather than executed:
+
+```
 # Always useful for exported functions
 exported_fn = fn x y => complex_calculation x y : InputType -> InputType -> OutputType;
 
@@ -365,7 +421,7 @@ show_all = map show : List a -> List String given a implements Show;
 
 ```noolang
 # This evaluates to 15 (the result of the right side)
-x = 10; x + 5
+x = 10; x + 5;
 
 # This evaluates to [8, 10, 12] (the result of map)
 print "hello"; map (fn x => x * 2) [4, 5, 6]
@@ -374,11 +430,11 @@ print "hello"; map (fn x => x * 2) [4, 5, 6]
 ### Literals
 
 ```noolang
-42          # Integer
-"hello"     # String
-{}          # Unit
-[1, 2, 3]   # List (comma-separated)
-{ @name "Alice", @age 30 }  # Record (comma-separated fields)
+42;          # Integer
+"hello";     # String
+{};          # Unit
+[1, 2, 3];   # List (comma-separated)
+{ @name "Alice", @age 30 };  # Record (comma-separated fields)
 {1, 2, 3};   # Tuple (comma-separated)
 ```
 
@@ -386,10 +442,10 @@ print "hello"; map (fn x => x * 2) [4, 5, 6]
 
 ```noolang
 # Simple function
-add = fn x y => x + y;
+sumTwo = fn x y => x + y;
 
 # Function with multiple parameters
-multiply = fn a b c => a * b * c;
+productThree = fn a b c => a * b * c;
 
 # Curried function (Haskell-style)
 curried_add = fn a => fn b => a + b;
@@ -398,11 +454,16 @@ curried_add = fn a => fn b => a + b;
 ### Function Application
 
 ```noolang
+# Define a couple of functions to apply
+sumTwo = fn x y => x + y;
+productThree = fn a b c => a * b * c;
+curried_add = fn a => fn b => a + b;
+
 # Direct application
-add 2 3;
+sumTwo 2 3;
 
 # Nested application
-add (multiply 2 3) 4;
+sumTwo (productThree 2 3 4) 4;
 
 # Curried application
 curried_add 2 3;
@@ -459,7 +520,9 @@ Some 0 |? (fn x => x + 5) |? (fn x => x * 2) |? safe_divide;   # None
 
 ### Conditional Expressions
 
-```noolang
+The general form (shown as a template, not executed):
+
+```
 if condition then value1 else value2
 ```
 
@@ -469,7 +532,7 @@ Local definitions within expressions:
 
 ```noolang
 # Simple where expression
-x + y where (x = 1)
+x + 1 where (x = 1)
 
 # Multiple definitions
 x + y where (x = 1; y = 2)
@@ -505,7 +568,7 @@ Explicit effect tracking:
 
 ```noolang
 # Pure function
-add = fn x y => x + y : (Float) -> (Float) -> Float;
+sumTwo = fn x y => x + y : (Float) -> (Float) -> Float;
 
 # Effectful function
 #printMessage = fn msg => print msg : String !write;
@@ -529,10 +592,10 @@ fn x => x * 2 where (x = 5);
 
 # Complex function with multiple where definitions
 fn input => 
-  if input > 0 then positive else negative 
+  (if input > 0 then positive else negative)
   where (
-    positive = input * 2;
-    negative = input - 10
+    positive = 100;
+    negative = 0 - 100
   );
 
 # Where expressions with nested logic
@@ -569,14 +632,14 @@ Where expressions work with all Noolang data structures:
 # With records
 user_info where (
   user = { @name "Alice", @age 30 };
-  user_info = user | @name + " is " + toString (user | @age) + " years old";
+  user_info = (user | @name) + " is " + toString (user | @age) + " years old";
 );
 
 # With lists
 sum_squares where (
   numbers = [1, 2, 3, 4, 5];
   squares = map (fn x => x * x) numbers;
-  sum_squares = reduce add 0 squares;
+  sum_squares = reduce (fn acc x => acc + x) 0 squares;
 );
 
 # With pattern matching
@@ -744,9 +807,10 @@ numbers = import "examples/list_module";  # numbers : List Float
 
 ### Import Destructuring
 
-Destructuring works seamlessly with properly typed imports:
+Destructuring works seamlessly with properly typed imports (illustrative
+module paths, shown as text):
 
-```noolang
+```
 # Basic destructuring
 {@add, @multiply} = import "examples/math_module";
 
@@ -760,7 +824,9 @@ result = sq 4 + cb 2;  # => 24 : Float
 
 ### Import Path Resolution
 
-```noolang
+Illustrative paths (shown as text, not executed):
+
+```
 # Relative paths
 math = import "lib/math";           # Resolves to lib/math.noo
 utils = import "../shared/utils";   # Parent directory
@@ -804,9 +870,10 @@ The import system provides comprehensive error handling:
 
 ### Integration with Language Features
 
-Imports work seamlessly with all Noolang features:
+Imports work seamlessly with all Noolang features (illustrative, shown as
+text):
 
-```noolang
+```
 # With pattern matching (if importing ADTs)
 option = import "examples/option_module";
 value = match option (Some x => x; None => 0);
@@ -970,7 +1037,7 @@ Noolang has a comprehensive effect system that tracks side effects in function t
 #### Effect Syntax:
 ```noolang
 # Pure function (no effects)
-add = fn x y => x + y : Float -> Float -> Float;
+sumTwo = fn x y => x + y : Float -> Float -> Float;
 
 # Effectful function
 readAndPrint = fn filename => (
@@ -1015,9 +1082,9 @@ Define custom types with multiple constructors:
 # Simple enum-like types
 variant Color = Red | Green | Blue;
 
-# Types with parameters
-variant Option a = Some a | None;
-variant Result a b = Ok a | Err b;
+# Types with parameters (Option and Result are built in, so define your own)
+variant Maybe a = Just a | Nothing;
+variant Either a b = Left a | Right b;
 
 # Types with multiple parameters
 variant Shape = Circle Float | Rectangle Float Float;
@@ -1059,6 +1126,9 @@ invalid = parse_number "abc"; # Err "Invalid"
 Use `match` expressions to destructure ADTs and handle different cases:
 
 ```noolang
+variant Shape = Circle Float | Rectangle Float Float | Triangle Float Float Float;
+variant Point a = Point a a;
+
 # Basic pattern matching
 handle_option = fn opt => match opt (
   Some value => value * 2;
@@ -1069,7 +1139,7 @@ handle_option = fn opt => match opt (
 area = fn shape => match shape (
   Circle radius => radius * radius * 3;
   Rectangle width height => width * height;
-  Triangle a b c => (a * b) / 2
+  Triangle a b c => (a * b) * 0.5
 );
 
 # Extracting values from constructors
@@ -1083,7 +1153,7 @@ get_coordinate = fn point => match point (
 ADT constructors are automatically created as curried functions:
 
 ```noolang
-type Point a = Point a a;
+variant Point a = Point a a;
 
 # Constructors work as functions
 origin = Point 0 0;
@@ -1097,6 +1167,12 @@ complete = point_10 20;    # Point 10 20
 ADTs work seamlessly with Noolang's existing features:
 
 ```noolang
+variant Shape = Circle Float | Rectangle Float Float;
+area = fn shape => match shape (
+  Circle radius => radius * radius * 3;
+  Rectangle width height => width * height
+);
+
 # With higher-order functions
 options = [Some 1, None, Some 3];
 extract = fn opt => match opt (Some x => x; None => 0);
@@ -1112,9 +1188,10 @@ result = match (Some 42) (Some x => x * 2; None => 0);  # 84
 
 ### Pattern Syntax
 
-Pattern matching supports various pattern types:
+Pattern matching supports various pattern types (syntax reference — the
+individual forms are shown together as text, not run as one program):
 
-```noolang
+```
 # Constructor patterns with variables
 match value (Some x => x; None => 0);
 
@@ -1172,8 +1249,9 @@ ADTs provide compile-time type safety:
 **New Feature**: Noolang now supports comprehensive pattern matching for tuples and records in addition to ADTs:
 
 #### Tuple Patterns
-Destructure tuples by position:
-```noolang
+Destructure tuples by position (syntax reference — shown as text since the
+forms use differently-shaped tuples):
+```
 # Basic tuple destructuring
 point = {10, 20};
 match point ({x, y} => x + y);  # Returns 30
@@ -1302,9 +1380,10 @@ stringIntPair = {"hello", 42};
 
 ### Union Types
 
-Define types that can be one of several alternatives:
+Define types that can be one of several alternatives (illustrative syntax,
+shown as text):
 
-```noolang
+```
 # Simple union type
 type StringOrFloat = String | Float;
 
@@ -1555,7 +1634,6 @@ show "hello";         # Uses Show String implementation
 show [1, 2, 3];       # Uses Show (List a) implementation with Show Float
 
 equals 1 2;           # Uses Eq Float implementation
-equals "a" "b";       # Uses Eq String implementation
 ```
 
 ### Conditional Implementations
