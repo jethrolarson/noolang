@@ -1864,14 +1864,23 @@ export function preprocessLiterateNoolang(content: string): string {
 	let inCodeBlock = false;
 	let currentBlock: string[] = [];
 	let currentBlockStart = 0;
+	let emittedBlock = false;
 
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
-		
+
 		if (line.trim() === '```noolang') {
 			inCodeBlock = true;
 			currentBlock = [];
 			currentBlockStart = i;
+			// Separate consecutive code blocks with a `;` so the last statement
+			// of one block doesn't merge into the first statement of the next
+			// (blocks are concatenated into a single program). The separator sits
+			// on the opening fence line, which is otherwise blank, so line parity
+			// with the source markdown is preserved. A leading `;` is skipped by
+			// the statement parser, and this works even when the previous block's
+			// final line ends in a `#` comment that would eat a trailing `;`.
+			if (emittedBlock) result[i] = ';';
 		} else if (line.trim() === '```' && inCodeBlock) {
 			inCodeBlock = false;
 			if (currentBlock.length > 0) {
@@ -1880,6 +1889,7 @@ export function preprocessLiterateNoolang(content: string): string {
 					const targetLine = currentBlockStart + 1 + j;
 					result[targetLine] = currentBlock[j];
 				}
+				emittedBlock = true;
 			}
 		} else if (inCodeBlock) {
 			currentBlock.push(line);

@@ -163,8 +163,9 @@ Noolang provides a comprehensive set of built-in functions for common operations
 The `exec` function enables type-safe shell command execution, returning a `Result` type for proper error handling.
 
 ```noolang
-# Type signature: String -> List String -> Result String ExecError
-exec : String -> List String -> Result String ExecError
+# Type signature (curried): String -> List String -> Result String ExecError
+# `exec` takes a command and a list of argument strings.
+exec
 ```
 
 **Basic Usage:**
@@ -193,7 +194,7 @@ match lsResult (
 
 ```noolang
 # Get current user and date
-getUserInfo = fn => 
+getUserInfo = fn _ =>
     match exec "whoami" [] (
         Ok user => match exec "date" [] (
             Ok date => Ok (user + " at " + date);
@@ -203,7 +204,7 @@ getUserInfo = fn =>
     );
 
 # Use the automation function
-userInfo = getUserInfo ();
+userInfo = getUserInfo {};
 match userInfo (
     Ok info => println ("Current session: " + info);
     Err error => println ("System info error: " + error)
@@ -228,11 +229,16 @@ All arguments must be strings, and the result is always wrapped in a `Result` ty
 ```noolang
 # ✓ Valid usage
 exec "echo" ["arg1", "arg2"]
+```
 
+The following are rejected at type-check time (shown as plain text so the
+documentation validator doesn't execute intentionally-invalid code):
+
+```
 # ✗ Type error - non-string arguments
 exec "echo" [123]
 
-# ✗ Type error - non-list arguments  
+# ✗ Type error - non-list arguments
 exec "echo" "single-string"
 ```
 
