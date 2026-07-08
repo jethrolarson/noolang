@@ -321,11 +321,12 @@ names = ["Alice", "Bob"] : List String;
 user = { @name "Alice", @age 30 } : { @name String, @age Float };
 point = { @x 10, @y 20 } : { @x Float, @y Float };
 
-# Option types
-safeDiv = fn x y => if y == 0 then None else Some (x / y) : Float -> Float -> Option Float;
+# Option types (division is already safe, so it returns an Option)
+safeDiv = fn x y => if y == 0 then None else x / y : Float -> Float -> Option Float;
 
 # Higher-order function types
-mapFn = map : (a -> b) -> List a -> List b;
+# (map is Functor-generic: (a -> b) -> c a -> c b given c implements Functor)
+mapFn = map;
 applyTwice = fn f x => f (f x) : (a -> a) -> a -> a;
 ```
 
@@ -1138,9 +1139,10 @@ result = match (Some 42) (Some x => x * 2; None => 0);  # 84
 
 ### Pattern Syntax
 
-Pattern matching supports various pattern types:
+Pattern matching supports various pattern types (syntax reference — the
+individual forms are shown together as text, not run as one program):
 
-```noolang
+```
 # Constructor patterns with variables
 match value (Some x => x; None => 0);
 
@@ -1198,8 +1200,9 @@ ADTs provide compile-time type safety:
 **New Feature**: Noolang now supports comprehensive pattern matching for tuples and records in addition to ADTs:
 
 #### Tuple Patterns
-Destructure tuples by position:
-```noolang
+Destructure tuples by position (syntax reference — shown as text since the
+forms use differently-shaped tuples):
+```
 # Basic tuple destructuring
 point = {10, 20};
 match point ({x, y} => x + y);  # Returns 30
@@ -1328,9 +1331,10 @@ stringIntPair = {"hello", 42};
 
 ### Union Types
 
-Define types that can be one of several alternatives:
+Define types that can be one of several alternatives (illustrative syntax,
+shown as text):
 
-```noolang
+```
 # Simple union type
 type StringOrFloat = String | Float;
 
@@ -1581,7 +1585,6 @@ show "hello";         # Uses Show String implementation
 show [1, 2, 3];       # Uses Show (List a) implementation with Show Float
 
 equals 1 2;           # Uses Eq Float implementation
-equals "a" "b";       # Uses Eq String implementation
 ```
 
 ### Conditional Implementations
