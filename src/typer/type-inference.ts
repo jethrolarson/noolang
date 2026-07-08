@@ -828,36 +828,24 @@ export const typeIf = (expr: IfExpression, state: TypeState): TypeResult => {
 };
 
 
-const handleThrush = (
-	expr: BinaryExpression,
-	leftResult: TypeResult,
-	rightResult: TypeResult,
-	state: TypeState
-): TypeResult => {
-	if (
-		rightResult.type.kind !== 'function' ||
-		rightResult.type.params.length < 1
-	)
-		throwTypeError(
-			location => nonFunctionApplicationError(rightResult.type, location),
-			getExprLocation(expr)
-		);
-	const constraintContext = rightResult.type.constraints || [];
-	const newState = unify(
-		rightResult.type.params[0],
-		leftResult.type,
-		state,
-		getExprLocation(expr),
-		{ constraintContext }
+// Thrush `a | f` is equivalent to the application `f a`. Delegating to
+// typeApplication (rather than a bespoke unify) reuses the full constraint
+// resolution machinery, so trait-constrained functions like `map` resolve
+// their higher-kinded variable (e.g. Functor `c` -> `List`) instead of leaking
+// a free `c Float`. That leak previously broke chains such as
+// `[1,2,3] | map show | join ", "`.
+const handleThrush = (expr: BinaryExpression, state: TypeState): TypeResult =>
+	typeApplication(
+		{
+			kind: 'application',
+			func: expr.right,
+			args: [expr.left],
+			location: expr.location,
+		},
+		state
 	);
-	return createTypeResult(
-		rightResult.type.return,
-		unionEffects(leftResult.effects, rightResult.effects),
-		newState
-	);
-};
 
-const handleDollar = (expr: BinaryExpression, state: TypeState): TypeResult => 
+const handleDollar = (expr: BinaryExpression, state: TypeState): TypeResult =>
 	typeApplication({ kind: 'application', func: expr.left, args: [expr.right], location: expr.location }, state);
 
 const handleSafeThrush = (
@@ -967,8 +955,7 @@ export const typeBinary = (
 	currentState = rightResult.state;
 
 	// Special operators
-	if (expr.operator === '|')
-		return handleThrush(expr, leftResult, rightResult, currentState);
+	if (expr.operator === '|') return handleThrush(expr, currentState);
 	if (expr.operator === '$') return handleDollar(expr, currentState);
 
 	if (expr.operator === '|?')
