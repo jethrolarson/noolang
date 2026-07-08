@@ -99,20 +99,20 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a'],
 	});
 	newEnv.set('<', {
-		type: functionType([floatType(), floatType()], boolType()),
-		quantifiedVars: [],
+		type: functionType([typeVariable('a'), typeVariable('a')], boolType()),
+		quantifiedVars: ['a'],
 	});
 	newEnv.set('>', {
-		type: functionType([floatType(), floatType()], boolType()),
-		quantifiedVars: [],
+		type: functionType([typeVariable('a'), typeVariable('a')], boolType()),
+		quantifiedVars: ['a'],
 	});
 	newEnv.set('<=', {
-		type: functionType([floatType(), floatType()], boolType()),
-		quantifiedVars: [],
+		type: functionType([typeVariable('a'), typeVariable('a')], boolType()),
+		quantifiedVars: ['a'],
 	});
 	newEnv.set('>=', {
-		type: functionType([floatType(), floatType()], boolType()),
-		quantifiedVars: [],
+		type: functionType([typeVariable('a'), typeVariable('a')], boolType()),
+		quantifiedVars: ['a'],
 	});
 
 	const tailType = functionType(
@@ -411,6 +411,48 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	newEnv.set('primitive_string_equals', {
 		type: createBinaryFunctionType(stringType(), stringType(), boolType()),
 		quantifiedVars: [],
+	});
+
+	newEnv.set('primitive_string_less_than', {
+		type: createBinaryFunctionType(stringType(), stringType(), boolType()),
+		quantifiedVars: [],
+	});
+
+	newEnv.set('primitive_string_greater_than', {
+		type: createBinaryFunctionType(stringType(), stringType(), boolType()),
+		quantifiedVars: [],
+	});
+
+	newEnv.set('primitive_string_less_than_or_equal', {
+		type: createBinaryFunctionType(stringType(), stringType(), boolType()),
+		quantifiedVars: [],
+	});
+
+	newEnv.set('primitive_string_greater_than_or_equal', {
+		type: createBinaryFunctionType(stringType(), stringType(), boolType()),
+		quantifiedVars: [],
+	});
+
+	newEnv.set('primitive_float_less_than', {
+		type: createBinaryFunctionType(floatType(), floatType(), boolType()),
+		quantifiedVars: [],
+	});
+
+	// List equality helper: (a -> a -> Bool) -> List a -> List a -> Bool
+	// The predicate is curried (single-param returning single-param returning Bool)
+	newEnv.set('primitive_list_all2', {
+		type: functionType(
+			[
+				functionType(
+					[typeVariable('a')],
+					functionType([typeVariable('a')], boolType())
+				),
+				listTypeWithElement(typeVariable('a')),
+				listTypeWithElement(typeVariable('a')),
+			],
+			boolType()
+		),
+		quantifiedVars: ['a'],
 	});
 
 	// Primitive Subtract trait implementations for type checking
