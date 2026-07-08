@@ -554,7 +554,7 @@ export const typeFunction = (
 	const { paramTypes, bodyResult, currentState } =
 		createParameterTypesAndTypeBody(expr, functionEnv, state);
 	const implicitConstraints = collectImplicitConstraints(
-		bodyResult.type,
+		substitute(bodyResult.type, currentState.substitution),
 		paramTypes,
 		originalBody,
 		expr.params
@@ -587,18 +587,21 @@ function collectImplicitConstraints(
 ): Constraint[] {
 	const constraints: Constraint[] = [];
 
-	const allTypeVars = new Set<string>();
-	for (const paramType of paramTypes) {
-		collectTypeVariables(paramType, allTypeVars);
-	}
-	collectTypeVariables(bodyType, allTypeVars);
-
-	// Collect trait constraints (existing functionality)
+	// `+` returns the same type as its operands, so an Add constraint only
+	// applies when that result type is still polymorphic. `bodyType` here is
+	// already substituted: if the operands resolved to a concrete type (e.g.
+	// String or Float) the constraint is discharged and must not be attached.
+	// Attaching it to an arbitrary type variable (previously the sorted-first
+	// of all param/body vars) leaked `implements Add` onto unrelated variables
+	// such as an unused parameter, e.g. `fn _ => "a" + "b"` wrongly inferring
+	// `a -> String given a implements Add` instead of `a -> String`.
+	// Peel curried returns so nested functions (`fn x => fn y => x + y`) still
+	// constrain their ultimate result variable.
 	if (bodyExpr && usesAddOperator(bodyExpr)) {
-		const typeVarList = Array.from(allTypeVars).sort();
-		if (typeVarList.length > 0) {
-			const canonicalVar = typeVarList[0];
-			constraints.push(implementsConstraint(canonicalVar, 'Add'));
+		let resultType = bodyType;
+		while (resultType.kind === 'function') resultType = resultType.return;
+		if (resultType.kind === 'variable') {
+			constraints.push(implementsConstraint(resultType.name, 'Add'));
 		}
 	}
 
