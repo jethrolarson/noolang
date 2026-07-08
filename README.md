@@ -392,10 +392,10 @@ print "hello"; map (fn x => x * 2) [4, 5, 6]
 
 ```noolang
 # Simple function
-add = fn x y => x + y;
+sumTwo = fn x y => x + y;
 
 # Function with multiple parameters
-multiply = fn a b c => a * b * c;
+productThree = fn a b c => a * b * c;
 
 # Curried function (Haskell-style)
 curried_add = fn a => fn b => a + b;
@@ -404,11 +404,16 @@ curried_add = fn a => fn b => a + b;
 ### Function Application
 
 ```noolang
+# Define a couple of functions to apply
+sumTwo = fn x y => x + y;
+productThree = fn a b c => a * b * c;
+curried_add = fn a => fn b => a + b;
+
 # Direct application
-add 2 3;
+sumTwo 2 3;
 
 # Nested application
-add (multiply 2 3) 4;
+sumTwo (productThree 2 3 4) 4;
 
 # Curried application
 curried_add 2 3;
@@ -513,7 +518,7 @@ Explicit effect tracking:
 
 ```noolang
 # Pure function
-add = fn x y => x + y : (Float) -> (Float) -> Float;
+sumTwo = fn x y => x + y : (Float) -> (Float) -> Float;
 
 # Effectful function
 #printMessage = fn msg => print msg : String !write;
@@ -537,10 +542,10 @@ fn x => x * 2 where (x = 5);
 
 # Complex function with multiple where definitions
 fn input => 
-  if input > 0 then positive else negative 
+  (if input > 0 then positive else negative)
   where (
-    positive = input * 2;
-    negative = input - 10
+    positive = 100;
+    negative = 0 - 100
   );
 
 # Where expressions with nested logic
@@ -577,14 +582,14 @@ Where expressions work with all Noolang data structures:
 # With records
 user_info where (
   user = { @name "Alice", @age 30 };
-  user_info = user | @name + " is " + toString (user | @age) + " years old";
+  user_info = (user | @name) + " is " + toString (user | @age) + " years old";
 );
 
 # With lists
 sum_squares where (
   numbers = [1, 2, 3, 4, 5];
   squares = map (fn x => x * x) numbers;
-  sum_squares = reduce add 0 squares;
+  sum_squares = reduce (fn acc x => acc + x) 0 squares;
 );
 
 # With pattern matching
@@ -982,7 +987,7 @@ Noolang has a comprehensive effect system that tracks side effects in function t
 #### Effect Syntax:
 ```noolang
 # Pure function (no effects)
-add = fn x y => x + y : Float -> Float -> Float;
+sumTwo = fn x y => x + y : Float -> Float -> Float;
 
 # Effectful function
 readAndPrint = fn filename => (
