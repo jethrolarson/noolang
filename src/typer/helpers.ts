@@ -174,8 +174,14 @@ const typesEqualUncached = (t1: Type, t2: Type): boolean => {
 			if (keys1.length !== keys2.length) {
 				return false;
 			}
-			return keys1.every(key =>
-				typesEqual(t1.fields[key], t2_record.fields[key])
+			// Same field count does not guarantee the same field names, so a key
+			// present in t1 may be absent from t2. Require the key to exist before
+			// recursing; otherwise t2_record.fields[key] is undefined and the
+			// comparison crashes.
+			return keys1.every(
+				key =>
+					Object.prototype.hasOwnProperty.call(t2_record.fields, key) &&
+					typesEqual(t1.fields[key], t2_record.fields[key])
 			);
 		}
 

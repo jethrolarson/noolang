@@ -1,0 +1,53 @@
+# Shell Automation with exec - Type-Safe System Operations
+# 
+# This example demonstrates how to use the `exec` builtin function
+# for type-safe shell scripting and system automation.
+
+# Basic command execution
+simple_echo = exec "echo" ["Hello from Noolang!"];
+match simple_echo (
+    Ok output => println ("Command output: " + output);
+    Err error => println ("Command failed: " + error)
+);
+
+# Directory operations
+list_files = exec "ls" ["-la"];
+match list_files (
+    Ok files => println ("Current directory contents:\n" + files);
+    Err error => println ("Failed to list files: " + error)
+);
+
+# System information gathering  
+hostname_result = exec "hostname" [];
+match hostname_result (
+    Ok hostname => println ("Hostname: " + hostname);
+    Err error => println ("Hostname error: " + error)
+);
+
+user_result = exec "whoami" [];
+match user_result (
+    Ok user => println ("User: " + user);
+    Err error => println ("User error: " + error)  
+);
+
+date_result = exec "date" [];
+match date_result (
+    Ok date => println ("Date: " + date);
+    Err error => println ("Date error: " + error)
+);
+
+# Error handling demonstration
+bad_command = exec "this_command_does_not_exist" [];
+match bad_command (
+    Ok output => println ("Unexpected success: " + output);
+    Err error => println ("Expected error caught: " + error)
+);
+
+# Command with arguments
+echo_with_args = exec "echo" ["arg1", "arg2", "arg3"];
+match echo_with_args (
+    Ok output => println ("Multi-arg output: " + output);
+    Err error => println ("Multi-arg error: " + error)
+);
+
+println "Shell automation demo completed!"

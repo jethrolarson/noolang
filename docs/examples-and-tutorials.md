@@ -244,6 +244,43 @@ Complex recursive data structures:
 - Expression evaluators
 - Parser combinators
 
+### Shell Automation ([`examples/shell_automation.noo`](../examples/shell_automation.noo))
+
+Type-safe system operations using the `exec` builtin:
+
+```noolang
+# Execute shell commands with proper error handling
+result = exec "echo" ["Hello from Noolang!"];
+match result (
+    Ok output => println ("Command output: " + output);
+    Err error => println ("Command failed: " + error)
+);
+
+# System information gathering
+hostname_result = exec "hostname" [];
+match hostname_result (
+    Ok hostname => println ("Hostname: " + hostname);
+    Err error => println ("Hostname error: " + error)
+);
+
+# Error handling for non-existent commands
+bad_command = exec "this_command_does_not_exist" [];
+match bad_command (
+    Ok output => println ("Unexpected success: " + output);
+    Err error => println ("Expected error caught: " + error)
+);
+```
+
+Key features demonstrated:
+- **Type-safe process execution** - All shell operations return `Result` types
+- **Proper error handling** - Pattern matching on `Ok`/`Err` variants
+- **Command arguments** - Pass arguments as a list of strings
+- **Practical automation** - Real-world system information gathering
+
+**Try it**: `bun start examples/shell_automation.noo`
+
+The `exec` function enables Noolang to serve as a type-safe shell scripting language, providing the foundation for system automation while maintaining the safety guarantees of the type system.
+
 ## Standard Library Tour ([`stdlib.noo`](../stdlib.noo))
 
 Essential built-in functions and traits:

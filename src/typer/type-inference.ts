@@ -554,7 +554,7 @@ export const typeFunction = (
 	const { paramTypes, bodyResult, currentState } =
 		createParameterTypesAndTypeBody(expr, functionEnv, state);
 	const implicitConstraints = collectImplicitConstraints(
-		bodyResult.type,
+		substitute(bodyResult.type, currentState.substitution),
 		paramTypes,
 		originalBody,
 		expr.params
@@ -587,18 +587,21 @@ function collectImplicitConstraints(
 ): Constraint[] {
 	const constraints: Constraint[] = [];
 
-	const allTypeVars = new Set<string>();
-	for (const paramType of paramTypes) {
-		collectTypeVariables(paramType, allTypeVars);
-	}
-	collectTypeVariables(bodyType, allTypeVars);
-
-	// Collect trait constraints (existing functionality)
+	// `+` returns the same type as its operands, so an Add constraint only
+	// applies when that result type is still polymorphic. `bodyType` here is
+	// already substituted: if the operands resolved to a concrete type (e.g.
+	// String or Float) the constraint is discharged and must not be attached.
+	// Attaching it to an arbitrary type variable (previously the sorted-first
+	// of all param/body vars) leaked `implements Add` onto unrelated variables
+	// such as an unused parameter, e.g. `fn _ => "a" + "b"` wrongly inferring
+	// `a -> String given a implements Add` instead of `a -> String`.
+	// Peel curried returns so nested functions (`fn x => fn y => x + y`) still
+	// constrain their ultimate result variable.
 	if (bodyExpr && usesAddOperator(bodyExpr)) {
-		const typeVarList = Array.from(allTypeVars).sort();
-		if (typeVarList.length > 0) {
-			const canonicalVar = typeVarList[0];
-			constraints.push(implementsConstraint(canonicalVar, 'Add'));
+		let resultType = bodyType;
+		while (resultType.kind === 'function') resultType = resultType.return;
+		if (resultType.kind === 'variable') {
+			constraints.push(implementsConstraint(resultType.name, 'Add'));
 		}
 	}
 
@@ -828,36 +831,24 @@ export const typeIf = (expr: IfExpression, state: TypeState): TypeResult => {
 };
 
 
-const handleThrush = (
-	expr: BinaryExpression,
-	leftResult: TypeResult,
-	rightResult: TypeResult,
-	state: TypeState
-): TypeResult => {
-	if (
-		rightResult.type.kind !== 'function' ||
-		rightResult.type.params.length < 1
-	)
-		throwTypeError(
-			location => nonFunctionApplicationError(rightResult.type, location),
-			getExprLocation(expr)
-		);
-	const constraintContext = rightResult.type.constraints || [];
-	const newState = unify(
-		rightResult.type.params[0],
-		leftResult.type,
-		state,
-		getExprLocation(expr),
-		{ constraintContext }
+// Thrush `a | f` is equivalent to the application `f a`. Delegating to
+// typeApplication (rather than a bespoke unify) reuses the full constraint
+// resolution machinery, so trait-constrained functions like `map` resolve
+// their higher-kinded variable (e.g. Functor `c` -> `List`) instead of leaking
+// a free `c Float`. That leak previously broke chains such as
+// `[1,2,3] | map show | join ", "`.
+const handleThrush = (expr: BinaryExpression, state: TypeState): TypeResult =>
+	typeApplication(
+		{
+			kind: 'application',
+			func: expr.right,
+			args: [expr.left],
+			location: expr.location,
+		},
+		state
 	);
-	return createTypeResult(
-		rightResult.type.return,
-		unionEffects(leftResult.effects, rightResult.effects),
-		newState
-	);
-};
 
-const handleDollar = (expr: BinaryExpression, state: TypeState): TypeResult => 
+const handleDollar = (expr: BinaryExpression, state: TypeState): TypeResult =>
 	typeApplication({ kind: 'application', func: expr.left, args: [expr.right], location: expr.location }, state);
 
 const handleSafeThrush = (
@@ -967,8 +958,7 @@ export const typeBinary = (
 	currentState = rightResult.state;
 
 	// Special operators
-	if (expr.operator === '|')
-		return handleThrush(expr, leftResult, rightResult, currentState);
+	if (expr.operator === '|') return handleThrush(expr, currentState);
 	if (expr.operator === '$') return handleDollar(expr, currentState);
 
 	if (expr.operator === '|?')

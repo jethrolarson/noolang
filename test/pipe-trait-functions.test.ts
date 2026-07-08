@@ -63,24 +63,33 @@ describe('Pipe operator with trait functions', () => {
 		expect(result.finalType).toBe('List Float');
 	});
 
-	// TODO: These should work when pipe operator is fixed for multi-argument trait functions
-	test.skip('pipe with map should work like this', () => {
+	test('pipe with map resolves the Functor constructor to List', () => {
 		const code = `[1, 2, 3] | map (fn x => x * 2)`;
-		
+
 		const result = runCode(code);
 		expect(result.finalValue).toEqual([2, 4, 6]);
 		expect(result.finalType).toBe('List Float');
 	});
 
-	test.skip('chained pipes with trait functions should work like this', () => {
+	test('chained pipes with trait functions keep resolving the constructor', () => {
 		const code = `
-		[1, 2, 3] 
+		[1, 2, 3]
 		| map (fn x => x * 2)
 		| map (fn x => x + 1)
 		`;
-		
+
 		const result = runCode(code);
 		expect(result.finalValue).toEqual([3, 5, 7]);
 		expect(result.finalType).toBe('List Float');
+	});
+
+	test('chaining across different trait functions (map show | join)', () => {
+		// Regression: `map show` must resolve to `List String` (not a free `c String`)
+		// so the following `join` (which needs `List String`) unifies.
+		const code = `[1, 2, 3] | map show | join ", "`;
+
+		const result = runCode(code);
+		expect(result.finalValue).toBe('1, 2, 3');
+		expect(result.finalType).toBe('String');
 	});
 });

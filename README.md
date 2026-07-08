@@ -99,7 +99,7 @@ The REPL includes comprehensive debugging tools:
 
 **Note**: Some examples in the `examples/` directory have known issues due to current type system limitations. See `docs/LANGUAGE_WEAKNESSES.md` for details. 
 
-**Working examples include**: `basic.noo`, `adt_demo.noo`, `recursive_adts.noo`, `safe_thrush_demo.noo`, `simple_adt.noo`, `card_game.noo`, `math_functions.noo`, and all import examples (`math_module.noo`, `power_module.noo`, `number_module.noo`, `string_module.noo`, `function_module.noo`, `list_module.noo`).
+**Working examples include**: `basic.noo`, `adt_demo.noo`, `recursive_adts.noo`, `safe_thrush_demo.noo`, `simple_adt.noo`, `card_game.noo`, `math_functions.noo`, `shell_automation.noo` (type-safe shell scripting), and all import examples (`math_module.noo`, `power_module.noo`, `number_module.noo`, `string_module.noo`, `function_module.noo`, `list_module.noo`).
 
 ```noolang
 # Function definition (this is a comment)
@@ -977,6 +977,16 @@ readAndPrint = fn filename => (
   content = readFile filename;
   print content
 ) : String -> String !read !write;
+
+# System operations with FFI effects
+runCommand = fn cmd args => exec cmd args : String -> List String -> Result String ExecError !ffi;
+
+# Practical usage
+result = exec "echo" ["Hello World"];
+match result (
+  Ok output => print output;
+  Err error => print error
+);
 ```
 
 Effects automatically propagate through function composition and are validated by the type system.
