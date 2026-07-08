@@ -14,6 +14,11 @@ const evaluate = (code: string) => {
 	return evaluator.evaluateProgram(program).finalResult;
 };
 
+const typeCheck = (code: string) => {
+	const program = parse(new Lexer(code).tokenize());
+	return typeAndDecorate(program);
+};
+
 // ========================================
 // String comparison operators
 // ========================================
@@ -120,4 +125,23 @@ test('Ord Float - less_than trait function works on floats', () => {
 	const result = evaluate('less_than 1 2');
 	assertConstructorValue(result);
 	expect(result.name).toBe('True');
+});
+
+// ========================================
+// Ord constraint is enforced at type-check time
+// ========================================
+
+test('Ord - comparing records (no Ord impl) is rejected at type-check', () => {
+	expect(() => typeCheck('{@a 1} < {@a 2}')).toThrow();
+});
+
+test('Ord - comparing a user variant with no Ord impl is rejected at type-check', () => {
+	const code = 'variant Foo = Bar; (Bar) < (Bar)';
+	expect(() => typeCheck(code)).toThrow();
+});
+
+test('Ord - String and Float still type-check under Ord constraint', () => {
+	expect(() => typeCheck('"a" < "b"')).not.toThrow();
+	expect(() => typeCheck('1 < 2')).not.toThrow();
+	expect(() => typeCheck('3.0 <= 4.0')).not.toThrow();
 });

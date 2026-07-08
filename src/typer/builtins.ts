@@ -98,20 +98,41 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		type: functionType([typeVariable('a'), typeVariable('a')], boolType()),
 		quantifiedVars: ['a'],
 	});
+	// Ordering operators - require the type to implement Ord
+	const lessThanType = functionType(
+		[typeVariable('a'), typeVariable('a')],
+		boolType()
+	);
+	lessThanType.constraints = [implementsConstraint('a', 'Ord')];
 	newEnv.set('<', {
-		type: functionType([typeVariable('a'), typeVariable('a')], boolType()),
+		type: lessThanType,
 		quantifiedVars: ['a'],
 	});
+	const greaterThanType = functionType(
+		[typeVariable('a'), typeVariable('a')],
+		boolType()
+	);
+	greaterThanType.constraints = [implementsConstraint('a', 'Ord')];
 	newEnv.set('>', {
-		type: functionType([typeVariable('a'), typeVariable('a')], boolType()),
+		type: greaterThanType,
 		quantifiedVars: ['a'],
 	});
+	const lessThanOrEqualType = functionType(
+		[typeVariable('a'), typeVariable('a')],
+		boolType()
+	);
+	lessThanOrEqualType.constraints = [implementsConstraint('a', 'Ord')];
 	newEnv.set('<=', {
-		type: functionType([typeVariable('a'), typeVariable('a')], boolType()),
+		type: lessThanOrEqualType,
 		quantifiedVars: ['a'],
 	});
+	const greaterThanOrEqualType = functionType(
+		[typeVariable('a'), typeVariable('a')],
+		boolType()
+	);
+	greaterThanOrEqualType.constraints = [implementsConstraint('a', 'Ord')];
 	newEnv.set('>=', {
-		type: functionType([typeVariable('a'), typeVariable('a')], boolType()),
+		type: greaterThanOrEqualType,
 		quantifiedVars: ['a'],
 	});
 
