@@ -93,6 +93,10 @@ implement Eq Float (
   equals = primitive_float_equals
 );
 
+implement Eq String (
+  equals = primitive_string_equals
+);
+
 # ========================================
 # UTILITY FUNCTIONS
 # ========================================

@@ -1072,6 +1072,19 @@ export class Evaluator {
 		);
 
 		this.environment.set(
+			'primitive_string_equals',
+			createNativeFunction(
+				'primitive_string_equals',
+				(a: Value) => (b: Value) => {
+					if (isString(a) && isString(b)) {
+						return createBool(a.value === b.value);
+					}
+					throw new Error('primitive_string_equals requires two strings');
+				}
+			)
+		);
+
+		this.environment.set(
 			'primitive_float_divide',
 			createNativeFunction(
 				'primitive_float_divide',
