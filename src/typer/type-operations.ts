@@ -353,7 +353,6 @@ export const createTypeState = (): TypeState => ({
 	counter: 0,
 	constraints: [],
 	adtRegistry: new Map(),
-	accessorCache: new Map(),
 	traitRegistry: createTraitRegistry(), // NEW: Simple trait system
 	protectedTypeNames: new Set(),
 });

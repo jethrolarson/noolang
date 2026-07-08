@@ -1264,13 +1264,14 @@ export const typeAccessor = (
 	expr: AccessorExpression,
 	state: TypeState
 ): TypeResult => {
-	// Check cache first
+	// NOTE: Accessor types must NOT be cached/shared across use sites. Accessors
+	// are polymorphic ({ @field a, ... } -> a): each use needs fresh type
+	// variables. A previous accessorCache reused the same type variables for
+	// every occurrence of an accessor, so the first application pinned the
+	// record variable to a concrete record type in the substitution, and later
+	// applications on differently-shaped records failed with spurious
+	// "Required field missing" errors (issue #103).
 	const fieldName = expr.field;
-	const cacheKey = expr.optional ? `${fieldName}?` : fieldName;
-	const cachedType = state.accessorCache.get(cacheKey);
-	if (cachedType) {
-		return createPureTypeResult(cachedType, state);
-	}
 
 	// Accessors return functions that take any record with the required field and return the field type
 	// @bar should have type {bar: a, ...} -> a (allows extra fields)
@@ -1305,13 +1306,7 @@ export const typeAccessor = (
 		];
 	}
 
-	// Cache the result for future use (keyed by optional flag)
-	const resultState = {
-		...finalState,
-		accessorCache: new Map(finalState.accessorCache).set(cacheKey, funcType),
-	};
-
-	return createPureTypeResult(funcType, resultState);
+	return createPureTypeResult(funcType, finalState);
 };
 
 // Type inference for tuples
