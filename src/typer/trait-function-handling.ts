@@ -122,8 +122,13 @@ function handlePartialTraitFunctionApplication(
 		if (type.kind === 'variable') {
 			freeVars.add(type.name);
 		} else if (type.kind === 'variant') {
-			// Include variant names (like 'f' in 'f a') as variables to be freshened
-			freeVars.add(type.name);
+			// Only include lowercase variant names as type variables to be freshened.
+			// These represent type parameters like 'f' in 'f a' (for Functor-style traits).
+			// Concrete type constructors like 'Bool', 'Option', 'List' start with uppercase
+			// and must NOT be freshened — doing so replaces them with unresolved type vars.
+			if (type.name.length > 0 && type.name[0] === type.name[0].toLowerCase() && type.name[0] !== type.name[0].toUpperCase()) {
+				freeVars.add(type.name);
+			}
 			type.args.forEach(collectVars);
 		} else if (type.kind === 'function') {
 			type.params.forEach(collectVars);
