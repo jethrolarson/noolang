@@ -1244,11 +1244,17 @@ export const typeImport = (
 
 		// Return the type of the final statement
 		return createPureTypeResult(finalType, currentState);
-	} catch (_error) {
-		// If import fails, we fall back to a type variable to avoid breaking the whole type check
-		// This allows gradual typing and better error messages
-		const [freshVar, newState] = freshTypeVariable(state);
-		return createPureTypeResult(freshVar, newState);
+	} catch (error) {
+		// Do NOT swallow import failures. A type error (or missing file) inside an
+		// imported module must surface — otherwise the import's type silently
+		// becomes an unconstrained type variable that unifies with anything, so
+		// misuse of a broken module type-checks. Surface with context.
+		const reason = error instanceof Error ? error.message : String(error);
+		throwTypeError(
+			location =>
+				createTypeError(`Failed to import '${expr.path}': ${reason}`, {}, location),
+			getExprLocation(expr)
+		);
 	}
 };
 
