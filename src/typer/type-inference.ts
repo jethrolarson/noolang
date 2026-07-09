@@ -1932,11 +1932,21 @@ export const typeRecordDestructuring = (
 		}
 	}
 
-	// Create record type and unify with value
+	// Require the value to have AT LEAST the destructured fields (a subset),
+	// like match record patterns already do — rather than an exact-shape match.
+	// Mirror accessors: constrain a fresh record variable to "has these fields"
+	// and unify the value with it, so extra fields on the value are allowed.
 	const expectedRecordType = recordType(fieldTypes);
+	const [recordVar, varState] = freshTypeVariable(currentState);
+	currentState = varState;
+	if (recordVar.kind === 'variable') {
+		recordVar.constraints = [
+			hasStructureConstraint(recordVar.name, { fields: fieldTypes }),
+		];
+	}
 	currentState = unify(
 		valueResult.type,
-		expectedRecordType,
+		recordVar,
 		currentState,
 		getExprLocation(expr)
 	);
