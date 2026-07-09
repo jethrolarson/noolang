@@ -21,7 +21,13 @@ import { substitute } from './substitute';
 import { unify } from './unify';
 import { freshTypeVariable, isReservedTypeName } from './type-operations';
 import { typeExpression } from './expression-dispatcher';
-import { isTypeKind, typeToString } from './helpers';
+import {
+	isTypeKind,
+	typeToString,
+	throwTypeError,
+	getExprLocation,
+} from './helpers';
+import { createTypeError } from './type-errors';
 
 // Type inference for ADT type definitions
 export const typeTypeDefinition = (
@@ -267,7 +273,52 @@ export const typeMatch = (
 		resultType = substitute(resultType, currentState.substitution);
 	}
 
+	checkExhaustiveness(expr, exprResult.type, currentState);
+
 	return createTypeResult(resultType, allEffects, currentState);
+};
+
+// A match on a concrete variant must cover every constructor, unless it has a
+// catch-all (wildcard `_` or a bare variable pattern). If the scrutinee type is
+// still polymorphic (a type variable) or not a known variant, we can't and
+// don't check.
+const checkExhaustiveness = (
+	expr: MatchExpression,
+	scrutineeType: Type,
+	state: TypeState
+): void => {
+	const resolved = substitute(scrutineeType, state.substitution);
+	if (resolved.kind !== 'variant' || !state.adtRegistry.has(resolved.name)) {
+		return;
+	}
+
+	const hasCatchAll = expr.cases.some(
+		c => c.pattern.kind === 'wildcard' || c.pattern.kind === 'variable'
+	);
+	if (hasCatchAll) return;
+
+	const covered = new Set<string>();
+	for (const c of expr.cases) {
+		if (c.pattern.kind === 'constructor') covered.add(c.pattern.name);
+	}
+
+	const allConstructors = state.adtRegistry.get(resolved.name)!.constructors;
+	const missing = [...allConstructors.keys()].filter(name => !covered.has(name));
+	if (missing.length > 0) {
+		throwTypeError(
+			location =>
+				createTypeError(
+					`Non-exhaustive match on ${resolved.name}: missing case${
+						missing.length > 1 ? 's' : ''
+					} ${missing.join(', ')}. Add ${
+						missing.length > 1 ? 'them' : 'it'
+					} or a wildcard \`_\` case.`,
+					{},
+					location
+				),
+			getExprLocation(expr)
+		);
+	}
 };
 
 // Type a single match case
