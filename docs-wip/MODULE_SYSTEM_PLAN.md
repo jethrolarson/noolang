@@ -64,6 +64,48 @@ checker and once in the evaluator:
 - Package manager / remote/versioned dependencies.
 - Changing the "module = last expression" model or the `import "..."` syntax.
 
+## Design principles (pitfalls to avoid)
+
+The JS and Python module systems accreted well-known footguns. Noolang's model
+already avoids several by construction; the rest are explicit design choices.
+
+**Strengths to preserve:**
+
+- **One module format, forever.** JS's original sin is CJS-vs-ESM duality (plus
+  AMD/UMD) and interop hazards. Noolang has exactly one shape — *a module is a
+  file whose last expression is its value.* Never add a second format.
+- **Modules are values, not magic namespaces.** `import "..."` returns an
+  ordinary value (usually a record). Exports are explicit, named, typed, and
+  statically knowable — no `module.exports =` reassignment or monkey-patching.
+  Selective import is just subset destructuring (`{@add} = import "./math"`), so
+  we never need JS's three import forms.
+
+**Choices that avoid specific pitfalls:**
+
+- **Deterministic, file-relative resolution** (vs. Python `sys.path` / Node CWD
+  dependence): an import resolves against the importing file's directory.
+- **Relative imports must be explicit** (Deno's rule): `./x`, `../x` for local
+  files; a *bare* specifier (`std/list`) is only ever a named/registered module,
+  never a sibling file. Kills the Python "local `random.py` shadows the stdlib"
+  footgun.
+- **No directory walking, no per-package manifest resolution** (vs. Node's
+  `node_modules` walk-up + `package.json` `main`/`exports` maze): relative
+  specifiers resolve against the importing file; bare specifiers resolve through
+  a single, explicit **import map** (one optional project file mapping name →
+  path). No `index.noo` auto-resolution; one extension, handled consistently.
+- **Circular imports are a clean error — for free.** Because a module *is its
+  evaluated value*, `A → B → A` is genuinely unresolvable; there is no partial
+  module to hand back. Detect the cycle and report the chain, rather than JS/
+  Python's silent half-initialized modules.
+- **Effect-tracked loads (Noolang's advantage).** The effect system can *see* a
+  module's load-time effects. Default toward imports being referentially
+  transparent (pure to import); surface load effects in the type when present —
+  something neither JS nor Python can express. This directly avoids the
+  "top-level code runs on import, order matters" class of bugs.
+- **Single source of truth for names.** The import map keeps one name→path
+  mapping, which is also the right foundation if a package manager is ever added
+  (avoids npm's duplicate-version / diamond issues).
+
 ## Phased plan
 
 ### Phase 1 — File-relative resolution + shared resolver + cache
@@ -99,19 +141,18 @@ The whole payoff for the stated pain; self-contained.
 
 ### Phase 2 — Module roots / named paths
 
-Resolve **non-relative** specs from a project root or small search path so
-`import "std/list"` works from anywhere in the tree.
+Resolve **bare** (non-relative) specifiers so `import "std/list"` works from
+anywhere in the tree, without a `node_modules`-style algorithm.
 
-**Design decision (needs a call):**
-- (a) **Project-root marker** — nearest ancestor directory containing a marker
-  (e.g. `noolang.json` or `.noolang-root`); non-relative specs resolve from
-  there. *Recommended default.*
-- (b) **Search path** — an env var / CLI flag list of roots (like `NODE_PATH`).
-- (c) Convention-only — a reserved `std/` prefix mapping to the bundled stdlib
-  dir, everything else relative.
-
-Recommendation: (a) + relative paths covers the common cases with the least
-magic; (b) can be layered on later.
+**Decided (per the design principles above): Deno-style explicit resolution.**
+- **Relative specifiers must start with `./` or `../`** and resolve against the
+  importing file. A specifier without that prefix is *never* a sibling file.
+- **Bare specifiers resolve through a single import map** — an optional project
+  file (e.g. `noolang.json`) mapping names/prefixes to paths, plus a built-in
+  `std/*` → bundled stdlib mapping. One source of truth; no directory walking,
+  no per-package manifest resolution, no `index.noo` magic.
+- A missing/omitted import map means only `std/*` and relative imports resolve;
+  bare non-`std` specifiers error clearly ("no import-map entry for X").
 
 ### Phase 3 (optional) — Namespacing
 
