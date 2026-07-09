@@ -31,6 +31,7 @@ import {
 	type Type,
 	type FunctionType,
 	type Constraint,
+	type Effect,
 	type RecordDestructuringField,
 	floatType,
 	stringType,
@@ -53,6 +54,7 @@ import {
 	undefinedVariableError,
 	nonFunctionApplicationError,
 	traitFunctionShadowingError,
+	createTypeError,
 } from './type-errors';
 import {
 	getExprLocation,
@@ -519,10 +521,15 @@ function buildNormalFunctionType(
 		bodyType = bodyType.baseType;
 	}
 
-	// Build the function type normally
+	// Build the function type normally. The body's effects are latent: they are
+	// performed when the function is fully applied, so they belong on the
+	// innermost arrow (the last parameter, whose application returns the body),
+	// not on the definition itself.
 	let funcType = bodyType;
 	for (let i = paramTypes.length - 1; i >= 0; i--) {
-		funcType = functionType([paramTypes[i]], funcType);
+		const effects =
+			i === paramTypes.length - 1 ? bodyResult.effects : emptyEffects();
+		funcType = functionType([paramTypes[i]], funcType, effects);
 	}
 
 	// Combine implicit constraints with body constraints
@@ -576,6 +583,11 @@ export const typeFunction = (
 					implicitConstraints
 				);
 
+	// The latent effects now live on the function type (see
+	// buildNormalFunctionType) so they fire on application and show in the
+	// inferred type. They are also surfaced here as a conservative whole-program
+	// over-approximation (higher-order effect propagation is not yet tracked via
+	// effect variables).
 	return createTypeResult(funcType, bodyResult.effects, currentState);
 };
 
@@ -1492,12 +1504,23 @@ const resolveTypeAliases = (
 	}
 };
 
+// Collect the latent effects along a (possibly curried) function type's spine.
+const collectSpineEffects = (type: Type): Set<Effect> => {
+	const effects = new Set<Effect>();
+	let t: Type = type;
+	while (t.kind === 'function') {
+		if (t.effects) for (const e of t.effects) effects.add(e);
+		t = t.return;
+	}
+	return effects;
+};
+
 export const typeTyped = (
 	expr: TypedExpression,
 	state: TypeState
 ): TypeResult => {
-	// For typed expressions, trust the explicit type annotation completely
-	// This preserves the exact type annotation as written by the user
+	// For typed expressions, trust the explicit type annotation's structure but
+	// still validate that it does not hide effects performed by the expression.
 
 	// Infer the expression to get effects only
 	const inferredResult = typeExpression(expr.expression, state);
@@ -1512,6 +1535,28 @@ export const typeTyped = (
 		inferredResult.state,
 		getExprLocation(expr)
 	);
+
+	// Effect enforcement: a function annotation may over-declare effects (a
+	// conservative claim) but must not omit an effect the body performs.
+	const inferredType = substitute(inferredResult.type, currentState.substitution);
+	if (inferredType.kind === 'function' && resolvedType.kind === 'function') {
+		const performed = collectSpineEffects(inferredType);
+		const declared = collectSpineEffects(resolvedType);
+		const omitted = [...performed].filter(e => !declared.has(e));
+		if (omitted.length > 0) {
+			throwTypeError(
+				location =>
+					createTypeError(
+						`Type annotation omits effect${omitted.length > 1 ? 's' : ''} !${omitted.join(
+							' !'
+						)} performed by the expression`,
+						{},
+						location
+					),
+				getExprLocation(expr)
+			);
+		}
+	}
 
 	// Return the resolved type (which preserves the annotation structure exactly)
 	return createTypeResult(resolvedType, inferredResult.effects, currentState);
