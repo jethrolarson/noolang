@@ -1,6 +1,8 @@
 # Module System — Implementation Plan
 
-Status: **Draft for review.** No code changes yet.
+Status: **Draft for review (revised after design review).** No code changes yet.
+The plan now treats modules as a *state* problem (hermetic checking + a merged
+declarations manifest), not just a *path* problem — see "The core reframe".
 
 ## Motivation
 
@@ -106,87 +108,162 @@ already avoids several by construction; the rest are explicit design choices.
   mapping, which is also the right foundation if a package manager is ever added
   (avoids npm's duplicate-version / diamond issues).
 
+## The core reframe (from the design review)
+
+A [design review of the first draft](https://github.com/jethrolarson/noolang/pull/109)
+reproduced concrete failures against the interpreter and reframed the problem:
+**resolution is the easy part; the hard part is shared mutable state.** Modules
+today type-check *in the importer's `TypeState`* and register `implement`/
+`variant` declarations into *process-global registries* (`TypeState.traitRegistry`,
+`adtRegistry`). So a naive path-keyed "cache the value" makes those side effects
+load-bearing and produces real unsoundness:
+
+- **Trait incoherence.** A diamond import of a module that defines an instance
+  hit a "duplicate implementation" error that the old `typeImport` catch-all
+  swallowed, returning a fresh type variable → misuse of the module type-checked.
+  Conflicting instances across modules resolved first-import-wins, silently.
+  *(The catch-all is already removed — see the merged import-error fix — which
+  un-masks these; the merge model below is what actually resolves them.)*
+- **Context-dependent module types.** A module's inferred type depended on which
+  importer checked it first (environment leaked both ways). Caching `{type}` by
+  path would freeze that accident.
+- **Name-keyed type identity.** Two modules each defining `variant Box` collided
+  silently in the by-name `adtRegistry`; first wins.
+- **Effect erasure.** `typeImport` returned a pure result, discarding a module's
+  top-level effects entirely.
+
+So the design must treat loading a module as producing a **hermetically-checked
+result plus a declarations manifest that is merged with conflict detection** —
+not as running code into shared registries.
+
+## Module loading model
+
+`loadModule(realpath) → { exportType, exportValue, manifest }`, memoized by the
+**canonical real path** (`fs.realpathSync`, so symlink/case aliases are one
+entry).
+
+- **Hermetic checking.** Each module type-checks in a **fresh `TypeState`**
+  seeded with builtins + stdlib **only**, plus the merged manifests of the
+  modules it *itself* imports — never the importer's environment. The export
+  type is fully substituted and generalized before caching, so it is identical
+  regardless of who imports it or in what order.
+- **Declarations manifest.** The result carries the module's `variant`
+  definitions, `constraint` (trait) definitions, and `implement` instances —
+  each tagged with its defining canonical path.
+- **Merge with conflict detection** (on import, into the importer's registries):
+  - **Instances** keyed by `(trait, type)`: same defining path ⇒ dedupe (so
+    diamonds are fine by construction); different defining paths for the same
+    `(trait, type)` ⇒ **hard error naming both files** (global coherence).
+  - **ADT identity** = `(canonical path, type name)`: same path dedupes;
+    different path, same name ⇒ clear error (or qualified coexistence) — never a
+    silent overwrite.
+  - Optional but recommended (cheapest to add now): a **weak orphan rule** — an
+    instance must live with either the trait or the type it implements.
+- **Effects: imports are pure.** Top-level module effects are a **hard error**
+  (`import` is then provably referentially transparent, and once-only caching is
+  sound). A module that needs runtime data exports an *effect-typed function*
+  the importer runs. (Leaves the door open for an explicit `import!` with defined
+  run-once semantics later; do not build it now.)
+- **Cycles: hard error.** Because a module *is* its evaluated value, `A → B → A`
+  has no answer. Detect via an in-progress set and error with the chain and the
+  remedy ("merge the files, or extract a shared third module — mutual recursion
+  is expressible within one file"). Door left open for type-only imports later.
+
 ## Phased plan
 
-### Phase 1 — File-relative resolution + shared resolver + cache
+### Phase 1 — File-relative resolution + hermetic loader + manifest merge
 
-The whole payoff for the stated pain; self-contained.
+This now includes the *state* fixes, not just paths — they are the point.
 
-- **New `src/module-resolver.ts`** (shared by typer and evaluator):
-  - `resolveModulePath(importerDir: string, spec: string): string` — append
-    `.noo` if missing; if `spec` is relative, resolve against `importerDir`;
-    if absolute, use as-is. Throw a clear error if the file does not exist.
-  - A module **cache** keyed by resolved absolute path, storing finished
-    results (`{ ast, type, value }` as needed by each consumer) — **not** shared
-    mutable substitution/type state (that was what made the old cache unsound).
-  - An **in-progress set** for cycle detection → clear `Import cycle: a -> b -> a`
-    error.
-- **Thread the importing file's directory** through both pipelines:
-  - Add a `currentDir` (or `currentFilePath`) to `TypeState` and to the
-    `Evaluator`. Set it when a file is loaded (CLI/REPL/file runner); fall back
-    to `process.cwd()` for `-e` and REPL input that has no source file.
-  - Resolve imports against `currentDir`, and set the imported module's own
-    `currentDir` to its directory while checking/evaluating it (so nested
-    imports chain correctly).
-- **`typeImport` / `evaluateImport`** delegate to the resolver + cache instead
-  of raw `fs.readFileSync(path.resolve(...))`.
-- **Tests:**
-  - A module in a nested directory that imports a sibling — works only with
-    file-relative resolution (would fail under the old CWD behavior).
-  - A→B→A cycle produces a clear error rather than infinite loop / stack blow.
-  - A module imported twice is read/evaluated once (assert via a counter or
-    an effect run once).
-  - Regression: existing `examples/*_module.noo` imports still work from repo
-    root.
+- **New `src/module-loader.ts`** (shared by typer and evaluator): `resolve`
+  (below) + `loadModule` implementing the model above — realpath-keyed cache,
+  hermetic `TypeState`, manifest extraction, and merge-with-conflict-detection.
+- **Thread the importing file's directory** through both pipelines: add a
+  `currentDir` to `TypeState` and the `Evaluator`, set when a file is loaded
+  (CWD fallback for `-e`/REPL). Resolve imports against it; a module's own
+  `currentDir` is its directory while it loads.
+- **Replace `typeImport`/`evaluateImport`** to delegate to the loader; unify the
+  typer's CWD resolution with the evaluator's file-dir resolution (they diverge
+  today — same program can pass or fail by directory).
+- **Tests:** nested-dir sibling import (needs file-relative); A→B→A cycle → clear
+  error; module imported twice loads once; **diamond with `implement`+`variant`
+  in the shared module — no duplicate error *and* misuse on both paths is a type
+  error**; **a module's inferred type is identical across importers/orders**;
+  **conflicting instances across two modules ⇒ deterministic error naming both**;
+  **effectful top-level module ⇒ error**; symlink/case aliases hit one cache
+  entry; regression: existing `examples/*_module.noo` imports still work.
 
-### Phase 2 — Module roots / named paths
+### Phase 2 — Bare specifiers, import map, resolution edge cases
 
-Resolve **bare** (non-relative) specifiers so `import "std/list"` works from
-anywhere in the tree, without a `node_modules`-style algorithm.
+Deno-style explicit resolution (unchanged from the decision above), plus the
+edge cases the review flagged:
 
-**Decided (per the design principles above): Deno-style explicit resolution.**
-- **Relative specifiers must start with `./` or `../`** and resolve against the
-  importing file. A specifier without that prefix is *never* a sibling file.
-- **Bare specifiers resolve through a single import map** — an optional project
-  file (e.g. `noolang.json`) mapping names/prefixes to paths, plus a built-in
-  `std/*` → bundled stdlib mapping. One source of truth; no directory walking,
-  no per-package manifest resolution, no `index.noo` magic.
-- A missing/omitted import map means only `std/*` and relative imports resolve;
-  bare non-`std` specifiers error clearly ("no import-map entry for X").
+- **Relative specifiers must start with `./`/`../`**; bare specifiers resolve
+  through a single **import map** (`noolang.json`) + a built-in `std/*` mapping.
+  No directory walking, no `index.noo` magic.
+- **Cache key is the canonical `realpath`**; consider erroring on a case-mismatch
+  so macOS-passing code does not break Linux CI.
+- **Absolute-path imports** are a portability trap — warn or forbid; machine
+  paths belong in the import map.
+- **Fold the three existing stdlib-resolution strategies** (`evaluator.ts`,
+  `type-operations.ts`, plus the typer) into the single `std/*` mapping; today
+  running a file from another directory fails to find `stdlib.noo`.
+- Import-map entries resolve relative to the **map file**, not CWD; `./x` and
+  `./x.noo` share a cache entry.
 
-### Phase 3 (optional) — Namespacing
+### Phase 3 (optional) — Signatures, namespacing, content-addressing
 
-Qualified access beyond record destructuring (e.g. `Math.add`), if desired.
-Deferred until Phases 1–2 land and we see whether destructuring is enough.
+Opportunities the value-based model unlocks cheaply:
+
+- **Module signatures** — exports are already statically-known record types; an
+  optional signature (at the import site or in the import map) buys separate
+  compilation, an explicit cache contract, opaque types, and future type-level
+  cycle tolerance.
+- **Namespacing is just syntax** — `Math = import "./math"; Math | @add` already
+  works; qualified-access sugar over records avoids a second namespace concept.
+- **Content-addressing** — once imports are pure and results are
+  `(type, value, manifest)`, keying by content hash enables incremental checking
+  and a diamond-free lockfile/package story.
+- **Capability-passing** — with top-level effects rejected, "export effect-typed
+  functions" becomes the blessed pattern; Noolang can *enforce* what JS/Python
+  only recommend.
 
 ## Key files
 
-- `src/module-resolver.ts` — **new**, shared resolution + cache + cycle detection.
-- `src/typer/type-inference.ts` — `typeImport` uses the resolver; `TypeState`
-  gains `currentDir`.
-- `src/evaluator/evaluator.ts` — `evaluateImport` uses the resolver; `Evaluator`
-  tracks `currentDir`.
-- `src/typer/types.ts` — `TypeState` shape (`currentDir`).
-- `src/cli.ts` / `src/repl.ts` — set `currentDir` from the file being run
-  (CWD fallback for `-e`/REPL).
+- `src/module-loader.ts` — **new**: resolution, realpath cache, hermetic
+  `loadModule`, manifest extraction + merge, cycle detection.
+- `src/typer/trait-system.ts` — registry **merge** entry point (dedupe by source
+  path; conflict = error) instead of raw in-place `implement`.
+- `src/typer/type-inference.ts` — `typeImport` calls the loader; ADT registry
+  keyed by `(path, name)`.
+- `src/evaluator/evaluator.ts` — `evaluateImport` calls the loader; `Evaluator`
+  tracks `currentDir`; drop the ad-hoc stdlib resolution.
+- `src/typer/types.ts` — `TypeState` gains `currentDir`; registries carry source
+  path per declaration.
+- `src/cli.ts` / `src/repl.ts` — set `currentDir` from the file being run.
 
 ## Risks
 
-- **`TypeState` surface change.** Adding `currentDir` touches state
-  construction and every entry point that builds a `TypeState`. Mechanical but
-  broad; do it in one pass with a sensible default.
-- **Cache soundness.** The previous cache was removed because it shared mutable
-  substitution state across modules. This cache must store *finished* results
-  (fully-substituted types / evaluated values) keyed by absolute path, and each
-  importing context instantiates from those results as if freshly imported —
-  no shared mutable type state.
-- **REPL / `-e` with no file.** Must keep working via a CWD fallback; add a test
-  for `import` from `-e`.
+- **Registry keying is the crux.** `traitRegistry`/`adtRegistry` must track the
+  defining path per declaration and merge (not overwrite). This is the change
+  that makes coherence and identity sound; get it right first.
+- **Hermetic checking may surface latent bugs** where modules currently rely on
+  importer context (the review demonstrated both forward and reverse leaks).
+  Expect to fix real unsoundness, not just add plumbing.
+- **`TypeState` surface change** (`currentDir` + per-decl source paths) touches
+  every state constructor — one mechanical pass with sensible defaults.
+- **REPL / `-e` with no file** keeps working via a CWD fallback; test `import`
+  from `-e`.
 
 ## Suggested execution order
 
-1. `module-resolver.ts` with resolution + existence errors + unit tests.
-2. Thread `currentDir` (default CWD) through `TypeState` and `Evaluator`; wire
-   `typeImport`/`evaluateImport` to the resolver. File-relative tests.
-3. Add caching + cycle detection + tests.
-4. Phase 2 root resolution once the convention is chosen.
+1. **Registry merge with source-path keying + conflict detection**, with unit
+   tests for dedupe / conflict / ADT identity — the soundness core, independent
+   of resolution.
+2. **Hermetic `loadModule`** (fresh `TypeState`, generalized export, realpath
+   cache, cycle detection) + the "identical type across importers" and diamond
+   tests.
+3. **File-relative resolution** + `currentDir` threading; unify typer/evaluator
+   resolution; reject effectful top-level modules.
+4. **Phase 2** import map + edge cases; fold stdlib resolution into `std/*`.
+5. **Phase 3** opportunities as desired.
