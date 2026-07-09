@@ -172,18 +172,21 @@ implement Functor Option (
   )
 );
 
-#implement Eq Option (
-#  equals = fn opt1 opt2 => match opt1 (
-#    Some x => match opt2 (
-#      Some y => equals x y;
-#      None => False
-#    );
-#    None => match opt2 (   
-#      Some y => False;
-#      None => True
-#    )
-#  )
-#);
+implement Eq (Option a) given a implements Eq (
+  equals = fn o1 o2 => (
+    inner_eq = equals : a -> a -> Bool;
+    match o1 (
+      Some x => match o2 (
+        Some y => inner_eq x y;
+        None => False
+      );
+      None => match o2 (
+        Some y => False;
+        None => True
+      )
+    )
+  )
+);
 
 implement Applicative Option (
   apply = fn f opt => match opt (
@@ -250,19 +253,22 @@ is_err = fn res => match res (
   Err _ => True
 );
 
-#implement Eq Result (
-#  equals = fn res1 res2 => match res1 (
-#    Ok x => match res2 (
-#      Ok y => equals x y;
-#      Err e => False
-#    );
-#
-#    Err e => match res2 (
-#      Ok y => False;
-#      Err e => equals e e
-#    )
-#  )
-#);
+implement Eq (Result a b) given (a implements Eq) and (b implements Eq) (
+  equals = fn r1 r2 => (
+    eq_a = equals : a -> a -> Bool;
+    eq_b = equals : b -> b -> Bool;
+    match r1 (
+      Ok x => match r2 (
+        Ok y => eq_a x y;
+        Err e => False
+      );
+      Err e1 => match r2 (
+        Ok y => False;
+        Err e2 => eq_b e1 e2
+      )
+    )
+  )
+);
 
 implement Applicative Result (
   apply = fn f res => match res (
@@ -312,3 +318,23 @@ implement Show (List a) given a implements Show (
 
 # Note: Eq implementations are handled by built-in primitive functions
 # No need to duplicate them here
+
+implement Eq (List a) given a implements Eq (
+  equals = fn l1 l2 => primitive_list_all2 (equals : a -> a -> Bool) l1 l2
+);
+
+# ========================================
+# ORD TRAIT - Ordering / comparison
+# ========================================
+
+constraint Ord a (
+  less_than : a -> a -> Bool
+);
+
+implement Ord Float (
+  less_than = primitive_float_less_than
+);
+
+implement Ord String (
+  less_than = primitive_string_less_than
+);

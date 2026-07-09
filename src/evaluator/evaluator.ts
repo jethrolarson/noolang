@@ -266,6 +266,7 @@ export class Evaluator {
 			'<',
 			createNativeFunction('<', (a: Value) => (b: Value) => {
 				if (isNumber(a) && isNumber(b)) return createBool(a.value < b.value);
+				if (isString(a) && isString(b)) return createBool(a.value < b.value);
 				throw new Error(`Cannot compare ${typeof a} and ${typeof b}`);
 			})
 		);
@@ -273,6 +274,7 @@ export class Evaluator {
 			'>',
 			createNativeFunction('>', (a: Value) => (b: Value) => {
 				if (isNumber(a) && isNumber(b)) return createBool(a.value > b.value);
+				if (isString(a) && isString(b)) return createBool(a.value > b.value);
 				throw new Error(`Cannot compare ${typeof a} and ${typeof b}`);
 			})
 		);
@@ -280,6 +282,7 @@ export class Evaluator {
 			'<=',
 			createNativeFunction('<=', (a: Value) => (b: Value) => {
 				if (isNumber(a) && isNumber(b)) return createBool(a.value <= b.value);
+				if (isString(a) && isString(b)) return createBool(a.value <= b.value);
 				throw new Error(`Cannot compare ${typeof a} and ${typeof b}`);
 			})
 		);
@@ -287,6 +290,7 @@ export class Evaluator {
 			'>=',
 			createNativeFunction('>=', (a: Value) => (b: Value) => {
 				if (isNumber(a) && isNumber(b)) return createBool(a.value >= b.value);
+				if (isString(a) && isString(b)) return createBool(a.value >= b.value);
 				throw new Error(`Cannot compare ${typeof a} and ${typeof b}`);
 			})
 		);
@@ -1080,6 +1084,101 @@ export class Evaluator {
 						return createBool(a.value === b.value);
 					}
 					throw new Error('primitive_string_equals requires two strings');
+				}
+			)
+		);
+
+		this.environment.set(
+			'primitive_string_less_than',
+			createNativeFunction(
+				'primitive_string_less_than',
+				(a: Value) => (b: Value) => {
+					if (isString(a) && isString(b)) {
+						return createBool(a.value < b.value);
+					}
+					throw new Error('primitive_string_less_than requires two strings');
+				}
+			)
+		);
+
+		this.environment.set(
+			'primitive_string_greater_than',
+			createNativeFunction(
+				'primitive_string_greater_than',
+				(a: Value) => (b: Value) => {
+					if (isString(a) && isString(b)) {
+						return createBool(a.value > b.value);
+					}
+					throw new Error('primitive_string_greater_than requires two strings');
+				}
+			)
+		);
+
+		this.environment.set(
+			'primitive_string_less_than_or_equal',
+			createNativeFunction(
+				'primitive_string_less_than_or_equal',
+				(a: Value) => (b: Value) => {
+					if (isString(a) && isString(b)) {
+						return createBool(a.value <= b.value);
+					}
+					throw new Error('primitive_string_less_than_or_equal requires two strings');
+				}
+			)
+		);
+
+		this.environment.set(
+			'primitive_string_greater_than_or_equal',
+			createNativeFunction(
+				'primitive_string_greater_than_or_equal',
+				(a: Value) => (b: Value) => {
+					if (isString(a) && isString(b)) {
+						return createBool(a.value >= b.value);
+					}
+					throw new Error('primitive_string_greater_than_or_equal requires two strings');
+				}
+			)
+		);
+
+		this.environment.set(
+			'primitive_float_less_than',
+			createNativeFunction(
+				'primitive_float_less_than',
+				(a: Value) => (b: Value) => {
+					if (isNumber(a) && isNumber(b)) {
+						return createBool(a.value < b.value);
+					}
+					throw new Error('primitive_float_less_than requires two numbers');
+				}
+			)
+		);
+
+		this.environment.set(
+			'primitive_list_all2',
+			createNativeFunction(
+				'primitive_list_all2',
+				(pred: Value) => (list1: Value) => (list2: Value) => {
+					if (isList(list1) && isList(list2)) {
+						if (list1.values.length !== list2.values.length) return createBool(false);
+						for (let i = 0; i < list1.values.length; i++) {
+							let result: Value;
+							if (isFunction(pred) || isNativeFunction(pred)) {
+								const partial = applyValueFunction(pred, list1.values[i]);
+								result = applyValueFunction(partial, list2.values[i]);
+							} else if (isTraitFunctionValue(pred)) {
+								result = this.resolveTraitFunctionWithArgs(
+									pred.name,
+									[list1.values[i], list2.values[i]],
+									pred.traitRegistry
+								);
+							} else {
+								throw new Error('primitive_list_all2: predicate must be a function');
+							}
+							if (!isBool(result) || !boolValue(result)) return createBool(false);
+						}
+						return createBool(true);
+					}
+					throw new Error('primitive_list_all2 requires a function and two lists');
 				}
 			)
 		);
