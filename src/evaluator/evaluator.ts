@@ -549,6 +549,19 @@ export class Evaluator {
 								'reduce function must return a function after first argument'
 							);
 						}, initial);
+					} else if (isTraitFunctionValue(func) && isList(list)) {
+						// Handle bare trait functions (e.g. `add`, `multiply`) as reducers.
+						// Resolve the trait implementation for each (acc, item) pair directly.
+						return list.values.reduce((acc: Value, item: Value) => {
+							const allArgs = func.partialArgs
+								? [...func.partialArgs, acc, item]
+								: [acc, item];
+							return this.resolveTraitFunctionWithArgs(
+								func.name,
+								allArgs,
+								func.traitRegistry
+							);
+						}, initial);
 					}
 					throw new Error(
 						createHOFError('reduce', ['a function', 'initial value', 'a list'])
