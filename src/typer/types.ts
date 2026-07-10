@@ -49,6 +49,17 @@ export type TypeState = {
 	adtRegistry: ADTRegistry; // Track ADT definitions
 	traitRegistry: TraitRegistry;
 	protectedTypeNames: Set<string>; // Names of types reserved/protected from shadowing
+	/**
+	 * Directory of the file being type-checked (for file-relative import resolution).
+	 * Undefined when checking inline code (REPL / -e); CWD is used as fallback.
+	 */
+	currentDir?: string;
+	/**
+	 * Accumulated manifest of all modules imported into this TypeState so far.
+	 * Used by typeImport to detect coherence conflicts across multiple imports
+	 * (e.g., two modules defining the same (trait, type) instance).
+	 */
+	importerManifest?: import('./module-manifest').Manifest;
 };
 
 // Type inference result with separated effects

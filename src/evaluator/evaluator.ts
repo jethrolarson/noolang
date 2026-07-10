@@ -134,7 +134,7 @@ export class Evaluator {
 	private currentFileDir?: string; // Track the directory of the current file being evaluated
 	private fs: typeof defaultFs;
 	private path: typeof defaultPath;
-	private traitRegistry: TraitRegistry;
+	public traitRegistry: TraitRegistry;
 
 	constructor(opts: {
 		fs?: typeof defaultFs;
@@ -1636,8 +1636,33 @@ export class Evaluator {
 				return this.evaluateMatch(expr as MatchExpression);
 			case 'constraint-definition':
 				return createUnit();
-			case 'implement-definition':
+			case 'implement-definition': {
+				// Evaluate each implementation function NOW, while this.environment
+				// contains the defining module's bindings. Store as pre-evaluated
+				// closures (evaluatedFunctions) so cross-module dispatch does not
+				// re-evaluate the AST in a foreign environment (§4 instance closure).
+				const implExprTyped = expr as import('../ast').ImplementDefinitionExpression;
+				const typeName = this.getImplementationTypeName(implExprTyped.typeExpr);
+				const traitImpls = this.traitRegistry.implementations.get(
+					implExprTyped.constraintName
+				);
+				if (traitImpls) {
+					const impl = traitImpls.get(typeName);
+					if (impl && !impl.evaluatedFunctions) {
+						const evaluated = new Map<string, unknown>();
+						for (const [fnName, fnAstExpr] of impl.functions) {
+							try {
+								evaluated.set(fnName, this.evaluateExpression(fnAstExpr));
+							} catch (_) {
+								// If it fails (e.g. helper not yet in scope), skip —
+								// dispatch will fall back to AST evaluation.
+							}
+						}
+						impl.evaluatedFunctions = evaluated;
+					}
+				}
 				return createUnit();
+			}
 			default:
 				throw new Error(
 					`Unknown expression kind: ${(expr as Expression).kind}`
@@ -2234,32 +2259,90 @@ export class Evaluator {
 		}
 	}
 
-	private evaluateImport(expr: ImportExpression): Value {
-		try {
-			const filePath = expr.path.endsWith('.noo')
-				? expr.path
-				: `${expr.path}.noo`;
+	/**
+	 * Legacy direct import evaluation — used when a custom (mock) fs is present.
+	 * Preserves backward compatibility for tests that inject a fake filesystem.
+	 */
+	private evaluateImportDirect(expr: ImportExpression): Value {
+		const filePath = expr.path.endsWith('.noo') ? expr.path : `${expr.path}.noo`;
+		let fullPath: string;
+		if (this.path.isAbsolute(filePath)) {
+			fullPath = filePath;
+		} else if (this.currentFileDir) {
+			fullPath = this.path.resolve(this.currentFileDir, filePath);
+		} else {
+			fullPath = this.path.resolve(filePath);
+		}
+		const content = this.fs.readFileSync(fullPath, 'utf8');
+		const lexer = new Lexer(content);
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		const tempEvaluator = new Evaluator({
+			fs: this.fs,
+			path: this.path,
+			traitRegistry: this.traitRegistry,
+		});
+		const result = tempEvaluator.evaluateProgram(program, fullPath);
+		return result.finalResult;
+	}
 
-			let fullPath: string;
-			if (this.path.isAbsolute(filePath)) {
-				fullPath = filePath;
-			} else if (this.currentFileDir) {
-				fullPath = this.path.resolve(this.currentFileDir, filePath);
-			} else {
-				fullPath = this.path.resolve(filePath);
+	private evaluateImport(expr: ImportExpression): Value {
+		// Guard: if using a custom (mock) fs, fall back to direct evaluation
+		// so existing tests with mock filesystems continue to work.
+		if (this.fs !== defaultFs) {
+			return this.evaluateImportDirect(expr);
+		}
+
+		try {
+			// Delegate to the hermetic module loader (Phase 1 Step 2).
+			// Resolve relative to the current file's directory if available.
+			const { resolveModulePath, loadModule } = require('../module-loader') as typeof import('../module-loader');
+			const realpath = resolveModulePath(expr.path, this.currentFileDir);
+			const cached = loadModule(realpath);
+
+			// Merge instance closures (§4) from imported module into this evaluator's
+			// traitRegistry so cross-module dispatch uses pre-evaluated closures.
+			for (const [traitName, byType] of cached.instanceClosures) {
+				if (!this.traitRegistry.implementations.has(traitName)) {
+					this.traitRegistry.implementations.set(traitName, new Map());
+				}
+				const traitImpls = this.traitRegistry.implementations.get(traitName)!;
+				for (const [typeName, byFn] of byType) {
+					if (!traitImpls.has(typeName)) {
+						// New implementation from imported module — add with evaluated closures
+						traitImpls.set(typeName, {
+							typeName,
+							functions: new Map(), // No AST expressions needed; use evaluatedFunctions
+							evaluatedFunctions: byFn,
+						});
+					} else {
+						// Already have an entry (e.g., from stdlib or earlier import)
+						// Patch in evaluated closures if not already present
+						const existing = traitImpls.get(typeName)!;
+						if (!existing.evaluatedFunctions) {
+							existing.evaluatedFunctions = byFn;
+						}
+					}
+				}
 			}
 
-			const content = this.fs.readFileSync(fullPath, 'utf8');
-			const lexer = new Lexer(content);
-			const tokens = lexer.tokenize();
-			const program = parse(tokens);
-			const tempEvaluator = new Evaluator({
-				fs: this.fs,
-				path: this.path,
-				traitRegistry: this.traitRegistry,
-			});
-			const result = tempEvaluator.evaluateProgram(program, fullPath);
-			return result.finalResult;
+			// Also merge trait definition metadata so dispatch can find function names
+			for (const [traitName, traitDef] of cached.traitDefDiff) {
+				if (!this.traitRegistry.definitions.has(traitName)) {
+					this.traitRegistry.definitions.set(traitName, traitDef);
+					for (const fnName of traitDef.functions.keys()) {
+						const existing = this.traitRegistry.functionTraits.get(fnName) ?? [];
+						if (!existing.includes(traitName)) {
+							this.traitRegistry.functionTraits.set(fnName, [...existing, traitName]);
+						}
+					}
+					if (!this.traitRegistry.implementations.has(traitName)) {
+						this.traitRegistry.implementations.set(traitName, new Map());
+					}
+				}
+			}
+
+			return cached.exportValue;
 		} catch (error) {
 			let errorMessage: string;
 			if (error instanceof Error) {
@@ -2276,25 +2359,19 @@ export class Evaluator {
 			} else {
 				errorMessage = String(error);
 			}
-			const cwd = process.cwd();
+
 			const filePath = expr.path.endsWith('.noo')
 				? expr.path
 				: `${expr.path}.noo`;
-
-			let fullPath: string;
-			if (this.path.isAbsolute(filePath)) {
-				fullPath = filePath;
-			} else if (this.currentFileDir) {
-				fullPath = this.path.resolve(this.currentFileDir, filePath);
-			} else {
-				fullPath = this.path.resolve(filePath);
-			}
+			const fullPath = this.currentFileDir
+				? this.path.resolve(this.currentFileDir, filePath)
+				: this.path.resolve(filePath);
 
 			const structuredError = createError(
 				'ImportError',
 				`Failed to import '${
 					expr.path
-				}': ${errorMessage}\n  Tried to resolve: ${fullPath}\n  Current working directory: ${cwd}\n  Importing file directory: ${
+				}': ${errorMessage}\n  Tried to resolve: ${fullPath}\n  Current working directory: ${process.cwd()}\n  Importing file directory: ${
 					this.currentFileDir || 'unknown'
 				}\n  Suggestion: Use a path relative to the importing file, e.g., 'math_functions' or '../std/math'`,
 				{
@@ -2600,12 +2677,19 @@ export class Evaluator {
 					const traitImpls = traitRegistry.implementations.get(traitName);
 					if (traitImpls) {
 						const impl = traitImpls.get(dispatchTypeName);
-						if (impl && impl.functions.has(functionName)) {
-							// Found the implementation! Create a curried function call
-							const implExpr = impl.functions.get(functionName)!;
-
-							// Apply the implementation to all accumulated arguments
-							let result = this.evaluateExpression(implExpr);
+						const hasEvaledFn = impl?.evaluatedFunctions?.has(functionName);
+						const hasAstFn = impl?.functions.has(functionName);
+						if (impl && (hasEvaledFn || hasAstFn)) {
+							// Apply the implementation to all accumulated arguments.
+							// Prefer pre-evaluated closure (§4) to avoid re-evaluation in
+							// a foreign environment (which would miss home-module helpers).
+							let result: Value;
+							if (hasEvaledFn) {
+								result = impl.evaluatedFunctions!.get(functionName) as Value;
+							} else {
+								const implExpr = impl.functions.get(functionName)!;
+								result = this.evaluateExpression(implExpr);
+							}
 							for (const argValue of argValues) {
 								if (isFunction(result)) {
 									result = result.fn(argValue);
@@ -2641,6 +2725,27 @@ export class Evaluator {
 		throw new Error(
 			`No implementation of trait function ${functionName} for ${typeStr}`
 		);
+	}
+
+	/**
+	 * Get the type name from an implement-definition's type expression at runtime.
+	 * Mirrors the typer's getTypeName from trait-system.ts.
+	 */
+	private getImplementationTypeName(typeExpr: import('../ast').Type): string {
+		switch (typeExpr.kind) {
+			case 'primitive':
+				return typeExpr.name;
+			case 'variant':
+				return typeExpr.name;
+			case 'list':
+				return 'List';
+			case 'variable':
+				return typeExpr.name;
+			case 'constrained':
+				return this.getImplementationTypeName(typeExpr.baseType);
+			default:
+				return typeExpr.kind;
+		}
 	}
 
 	private getValueTypeName(value: Value): string {
