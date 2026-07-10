@@ -267,3 +267,64 @@ Opportunities the value-based model unlocks cheaply:
    resolution; reject effectful top-level modules.
 4. **Phase 2** import map + edge cases; fold stdlib resolution into `std/*`.
 5. **Phase 3** opportunities as desired.
+
+## Verification & acceptance
+
+This is a *soundness* feature, so "good" is not "the tests pass" — it is **the
+unsound programs are provably rejected, and it did not get slow doing it.**
+Verify both, explicitly.
+
+### Goal → proof (traceability)
+
+Every guarantee should map to the test that closes it. "Fail-closed" tests
+assert the checker *rejects* an unsound program.
+
+| Guarantee | Proof (test) | Kind |
+|-----------|--------------|------|
+| Trait coherence | two files define conflicting instances of the same `(trait, type)` → hard error naming both files | fail-closed |
+| Diamond safety | A→B→D, A→C→D, D defines an instance → no false duplicate error; and misusing D's value type-errors on *both* paths | positive + fail-closed |
+| Type identity | two files each `variant Box = …` → error; a variant flowing through a diamond is the *same* type on both sides | fail-closed + positive |
+| Hermetic / determinism | a module's inferred export type is identical regardless of importer or import order | **property (headline)** |
+| Pure imports | a module performing a top-level effect (`print` at load) → error; *exporting* an effectful function is fine | fail-closed + positive |
+| Cycle | A↔B → clear error with the chain, not a hang | fail-closed |
+| Runtime closure | an instance whose member calls a helper local to its defining file, dispatched from another file → runs correctly | positive |
+| Resolution | nested-dir relative import resolves; symlink/case aliases hit one cache entry; bare non-`std` with no map entry → clear error | positive + fail-closed |
+| No regression | existing `examples/*_module.noo` imports still work | positive |
+
+### The headline acceptance test
+
+One test matters more than the rest: **a module's inferred type is identical no
+matter who imports it, or in what order.** That property is the direct,
+falsifiable evidence that hermetic checking works — it *is* the reframe made
+testable. If it fails, the design is broken. Treat it as the gate.
+
+### Fail-closed is load-bearing
+
+The negative rows above are the *point* of the feature. The worst regression is
+not a broken test — it is a **fail-closed test that quietly starts passing**
+(the checker begins accepting something unsound, silently, exactly like the old
+error-swallowing `import`). Any change that flips a fail-closed test green is a
+red alert, not a passing build. Each should be shown red→green: wrongly accepted
+before the merge/keying logic existed, correctly rejected after.
+
+### Performance guard
+
+The make-or-break perf constraint — sharing the frozen builtins+stdlib base
+across every module's hermetic check (see the design's cost discussion) — needs
+a guard, not a hope:
+
+- Benchmark: total type-check time across **N modules that each import stdlib**
+  must scale ~linearly in N with a small per-module constant — **not**
+  `N × (stdlib type-check cost)`. Wire it into the existing CI
+  `performance-comparison` job so a reintroduced per-module stdlib re-check
+  shows up as a step-change, not a silent 10× slowdown.
+- Sanity assertion that trait dispatch stays a map lookup (O(1)) as the instance
+  registry grows with imports.
+
+### Definition of done (Phase 1)
+
+- The headline property test (identical module type across importers/orders) is
+  green.
+- Every fail-closed test rejects what it should, each demonstrated red→green.
+- The full existing suite stays green; `examples/*_module.noo` unbroken.
+- The stdlib-sharing perf guard is within budget.
