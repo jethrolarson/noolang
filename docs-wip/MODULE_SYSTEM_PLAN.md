@@ -149,21 +149,41 @@ entry).
   regardless of who imports it or in what order.
 - **Declarations manifest.** The result carries the module's `variant`
   definitions, `constraint` (trait) definitions, and `implement` instances —
-  each tagged with its defining canonical path.
-- **Merge with conflict detection** (on import, into the importer's registries):
+  each tagged with its defining canonical path. The manifest is **transitive**:
+  a module's exported manifest = its own declarations ∪ the merged manifests of
+  the modules it imports. (Own-declarations-only breaks the A→B→D / A→C→D
+  diamond — A would never learn D's instance.)
+- **Instance values are closures over their home module** (the runtime mirror).
+  Each `implement` member is captured, at load, as a closure over its defining
+  module's evaluated environment — not stored as raw AST re-evaluated in the
+  dispatcher's environment. Otherwise an instance member that calls a helper
+  local to its own file fails with `Undefined variable` when dispatched from
+  another module. This is a **Phase-1 value-side deliverable**, part of the same
+  work item as the merge — not a later cleanup.
+- **Merge with conflict detection** (on import, into the importer's registries).
+  The merge **trusts, dedupes, and conflicts — it never re-validates** an
+  instance in the importer's context (each was already checked hermetically at
+  its own load; re-checking in an importer that lacks some third module's types
+  would spuriously fail). Merge is pure set-union-with-hard-conflict
+  (commutative/associative), keyed on canonical realpaths, so it is
+  order-independent:
   - **Instances** keyed by `(trait, type)`: same defining path ⇒ dedupe (so
     diamonds are fine by construction); different defining paths for the same
     `(trait, type)` ⇒ **hard error naming both files** (global coherence).
   - **ADT identity** = `(canonical path, type name)`: same path dedupes;
-    different path, same name ⇒ clear error (or qualified coexistence) — never a
-    silent overwrite.
-  - Optional but recommended (cheapest to add now): a **weak orphan rule** — an
-    instance must live with either the trait or the type it implements.
+    different path, same name ⇒ **hard error** (never a silent overwrite;
+    qualified coexistence is a Phase-3 namespacing feature, not this).
+  - **Weak orphan rule** (cheapest to add now): an instance must live with
+    either the trait or the type it implements. Treat all of `std/*` as one
+    coherence unit so a stdlib instance is never an orphan of another stdlib
+    module.
 - **Effects: imports are pure.** Top-level module effects are a **hard error**
   (`import` is then provably referentially transparent, and once-only caching is
   sound). A module that needs runtime data exports an *effect-typed function*
   the importer runs. (Leaves the door open for an explicit `import!` with defined
-  run-once semantics later; do not build it now.)
+  run-once semantics later; do not build it now.) A top-level `mut` binding is
+  likewise **rejected** — it would otherwise become a cross-importer singleton
+  via the memoized module value.
 - **Cycles: hard error.** Because a module *is* its evaluated value, `A → B → A`
   has no answer. Detect via an in-progress set and error with the chain and the
   remedy ("merge the files, or extract a shared third module — mutual recursion
