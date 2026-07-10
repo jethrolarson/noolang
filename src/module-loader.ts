@@ -100,6 +100,19 @@ function cloneTypeStateForModule(base: TypeState): TypeState {
 	return {
 		environment,
 		substitution: new Map(), // Always fresh for each module
+		// Counter starts from base.counter for every module. Two different
+		// modules can therefore mint the SAME fresh-var names (α5, α6, …) —
+		// but that is sound and order-independent because:
+		//   1. Each module is checked in isolation with its OWN substitution map,
+		//      so identical names in module A and module B never interact.
+		//   2. The export type is generalized (closed — all free vars quantified)
+		//      before caching, so the cached scheme carries no importer-visible
+		//      free variables that could collide.
+		//   3. At each import site, `instantiate` re-freshens the scheme's
+		//      quantified vars using the IMPORTER's own monotonic counter, so
+		//      distinct imports (and distinct import orders) get distinct vars.
+		// This is what the "identical type across importers/orders" headline test
+		// exercises. The counter is never reset to a colliding fixed value.
 		counter: base.counter,
 		constraints: [],
 		adtRegistry,
@@ -144,13 +157,6 @@ export type ModuleCache = {
 	 * Includes ADT constructor functions, etc.
 	 */
 	envDiff: Map<string, TypeScheme>;
-	/**
-	 * Pre-evaluated closure Values for each implement member (§4).
-	 * These are evaluated at load time against the defining module's runtime
-	 * environment, so they capture helpers local to the module.
-	 * traitName → typeName → fnName → Value
-	 */
-	instanceClosures: Map<string, Map<string, Map<string, Value>>>;
 };
 
 // ─── caches ───────────────────────────────────────────────────────────────────
@@ -293,53 +299,56 @@ function extractDiffsAndManifest(
 // ─── instance closure capture ─────────────────────────────────────────────────
 
 /**
- * After evaluating a module, capture pre-evaluated closure Values for each
- * implement member defined in this module's statements (§4).
+ * After the module's `evaluateProgram` has fully run, capture a pre-evaluated
+ * closure Value for each implement member defined in this module's statements (§4).
  *
- * The evaluator must have already run `evaluateProgram` so that its environment
- * contains the module's local bindings (including helpers). We call
- * `evaluator.evaluateExpression(fnExpr)` for each implementation function
- * expression while the evaluator still holds the module's environment.
+ * We mutate `evaluatedFunctions` DIRECTLY on the shared `TraitImplementation`
+ * objects (the same references held by `traitImplDiff` and the module's
+ * traitRegistry). This guarantees the AST `functions` map and the
+ * `evaluatedFunctions` map travel together and can never fall out of sync —
+ * the dispatch AST fallback stays real.
+ *
+ * We evaluate AFTER the whole program has run, so every module-level binding
+ * (including helpers referenced by an instance member) is in scope.
+ *
+ * We do NOT swallow evaluation errors. Trait members are function-typed, so
+ * capturing them is just closure creation (lazy — it never touches the body's
+ * free variables); any throw here is a genuine, otherwise-hidden error and must
+ * surface. Undefined-helper references are already rejected earlier by the typer
+ * (Noolang does not hoist top-level bindings), so a type-valid module cannot
+ * throw here in practice — but if one ever does, we fail loudly rather than
+ * silently dropping the member.
  */
 function captureInstanceClosures(
 	stmts: Expression[],
 	evaluator: Evaluator,
 	frozenBaseTraitImpls: Map<string, Map<string, TraitImplementation>>
-): Map<string, Map<string, Map<string, Value>>> {
-	const closures = new Map<string, Map<string, Map<string, Value>>>();
-
+): void {
 	for (const stmt of stmts) {
 		if (stmt.kind !== 'implement-definition') continue;
 
 		const typeName = getTypeName(stmt.typeExpr);
 		const traitName = stmt.constraintName;
 
-		// Skip if this impl was already in the frozen base (it's a stdlib impl)
+		// Skip if this impl was already in the frozen base (it's a stdlib impl,
+		// dispatched via its native/AST path — not a module-local closure).
 		const baseImpls = frozenBaseTraitImpls.get(traitName);
 		if (baseImpls?.has(typeName)) continue;
 
-		// Look up the TraitImplementation from the evaluator's traitRegistry
+		// Look up the shared TraitImplementation object.
 		const traitImpls = evaluator.traitRegistry.implementations.get(traitName);
 		const impl = traitImpls?.get(typeName);
 		if (!impl) continue;
 
-		if (!closures.has(traitName)) closures.set(traitName, new Map());
-		const byType = closures.get(traitName)!;
-		if (!byType.has(typeName)) byType.set(typeName, new Map());
-		const byFn = byType.get(typeName)!;
-
-		// Evaluate each function expression against the module's current environment
+		const evaluated = new Map<string, unknown>();
 		for (const [fnName, fnExpr] of impl.functions) {
-			try {
-				const closureValue = evaluator.evaluateExpression(fnExpr);
-				byFn.set(fnName, closureValue);
-			} catch (_) {
-				// If evaluation fails, skip — the Value won't be pre-cached
-			}
+			// No try/catch: a throw here is a real error, surfaced with context.
+			evaluated.set(fnName, evaluator.evaluateExpression(fnExpr) as Value);
 		}
+		// Attach onto the shared impl object so functions + evaluatedFunctions
+		// stay together in the cache's traitImplDiff.
+		impl.evaluatedFunctions = evaluated;
 	}
-
-	return closures;
 }
 
 // ─── main loader ──────────────────────────────────────────────────────────────
@@ -469,7 +478,9 @@ export function loadModule(realpath: string): ModuleCache {
 
 		// ── Instance closure capture (§4) ──────────────────────────────────────
 
-		const instanceClosures = captureInstanceClosures(
+		// Attaches `evaluatedFunctions` onto the shared impl objects in
+		// traitImplDiff (kept in sync with their AST `functions` map).
+		captureInstanceClosures(
 			stmts,
 			evaluator,
 			frozenBase.traitRegistry.implementations
@@ -485,7 +496,6 @@ export function loadModule(realpath: string): ModuleCache {
 			traitDefDiff,
 			traitImplDiff,
 			envDiff,
-			instanceClosures,
 		};
 
 		moduleCache.set(realpath, entry);

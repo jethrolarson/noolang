@@ -77,6 +77,30 @@ fn x => x + 1
 		expect(r2.type.kind).toBe('function');
 	});
 
+	test('two independent polymorphic modules imported together do not cross-contaminate type vars', () => {
+		// Each module's hermetic check mints fresh type variables starting from the
+		// same base counter, so they can share var names internally. This must not
+		// corrupt the importer: instantiate re-freshens at each site.
+		writeTmp('poly_a.noo', `
+{@idA fn x => x, @constA fn x y => x}
+`);
+		writeTmp('poly_b.noo', `
+{@idB fn x => x, @pairB fn x y => {x, y}}
+`);
+		const pa = path.join(TMPDIR, 'poly_a');
+		const pb = path.join(TMPDIR, 'poly_b');
+		const code = `
+a = import "${pa}";
+b = import "${pb}";
+n = (@idA a) 5;
+s = (@idB b) "hi";
+{n, s}
+`;
+		const result = runCode(code);
+		// n = 5, s = "hi" → tuple {5, "hi"}
+		expect(result.finalValue).toEqual([5, 'hi']);
+	});
+
 	test('import order does not change the export type', () => {
 		// Module with a clear type
 		const mPath = writeTmp('ordered.noo', `
@@ -266,6 +290,93 @@ bump 42
 		// Should evaluate correctly: 42 + 100 = 142
 		const result = runCode(code);
 		expect(result.finalValue).toBe(142);
+	});
+
+	test('instance member referencing a helper defined LATER errors clearly (never silently vanishes)', () => {
+		// Noolang does not hoist top-level bindings: an instance member that
+		// references a helper defined AFTER the `implement` is a forward reference.
+		// The typer rejects it with a clear "Undefined variable" error — it must
+		// NOT be silently swallowed/omitted from the captured closures.
+		writeTmp('forward_ref_impl.noo', `
+constraint Bumper2 a (
+  bump2 : a -> Float
+);
+implement Bumper2 Float (
+  bump2 = fn x => laterHelper x
+);
+laterHelper = fn x => x + 100;
+{@laterHelper laterHelper}
+`);
+		const implPath = path.join(TMPDIR, 'forward_ref_impl');
+		expect(() => parseAndType(`import "${implPath}"`)).toThrow(
+			/laterHelper|Undefined/i
+		);
+	});
+
+	test('instance member referencing a truly-undefined name errors (never silently vanishes)', () => {
+		writeTmp('bad_impl.noo', `
+constraint Bumper3 a (
+  bump3 : a -> Float
+);
+implement Bumper3 Float (
+  bump3 = fn x => definitelyNotDefinedAnywhere x
+);
+{}
+`);
+		const implPath = path.join(TMPDIR, 'bad_impl');
+		expect(() => parseAndType(`import "${implPath}"`)).toThrow(
+			/definitelyNotDefinedAnywhere|Undefined/i
+		);
+	});
+
+	test('instance with multiple members dispatches each correctly cross-module (functions+closures in sync)', () => {
+		// Two members, each calling a distinct local helper. Both must dispatch
+		// correctly from an importer — proving the AST functions map and the
+		// evaluatedFunctions map stay in sync (point 2).
+		writeTmp('multi_member_impl.noo', `
+inc = fn x => x + 1;
+dec = fn x => x - 1;
+constraint TwoWay a (
+  up : a -> Float;
+  down : a -> Float
+);
+implement TwoWay Float (
+  up = fn x => inc x;
+  down = fn x => dec x
+);
+{@inc inc}
+`);
+		const implPath = path.join(TMPDIR, 'multi_member_impl');
+		const code = `
+m = import "${implPath}";
+(up 10) + (down 10)
+`;
+		// up 10 = 11, down 10 = 9 → 20
+		const result = runCode(code);
+		expect(result.finalValue).toBe(20);
+	});
+
+	test('instance for a variant (non-primitive) type dispatches cross-module', () => {
+		// Proves the runtime type-name key agrees with the typer's key for a
+		// variant impl target (point 3: getTypeName agreement).
+		writeTmp('variant_impl.noo', `
+variant Wrap a = Wrap a;
+unwrapHelper = fn w => match w ( Wrap v => v );
+constraint Unwrapper f (
+  unwrapW : f a -> a
+);
+implement Unwrapper Wrap (
+  unwrapW = fn w => unwrapHelper w
+);
+{@makeWrap fn x => Wrap x}
+`);
+		const implPath = path.join(TMPDIR, 'variant_impl');
+		const code = `
+m = import "${implPath}";
+unwrapW ((@makeWrap m) 99)
+`;
+		const result = runCode(code);
+		expect(result.finalValue).toBe(99);
 	});
 });
 

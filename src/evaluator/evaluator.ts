@@ -1636,33 +1636,15 @@ export class Evaluator {
 				return this.evaluateMatch(expr as MatchExpression);
 			case 'constraint-definition':
 				return createUnit();
-			case 'implement-definition': {
-				// Evaluate each implementation function NOW, while this.environment
-				// contains the defining module's bindings. Store as pre-evaluated
-				// closures (evaluatedFunctions) so cross-module dispatch does not
-				// re-evaluate the AST in a foreign environment (§4 instance closure).
-				const implExprTyped = expr as import('../ast').ImplementDefinitionExpression;
-				const typeName = this.getImplementationTypeName(implExprTyped.typeExpr);
-				const traitImpls = this.traitRegistry.implementations.get(
-					implExprTyped.constraintName
-				);
-				if (traitImpls) {
-					const impl = traitImpls.get(typeName);
-					if (impl && !impl.evaluatedFunctions) {
-						const evaluated = new Map<string, unknown>();
-						for (const [fnName, fnAstExpr] of impl.functions) {
-							try {
-								evaluated.set(fnName, this.evaluateExpression(fnAstExpr));
-							} catch (_) {
-								// If it fails (e.g. helper not yet in scope), skip —
-								// dispatch will fall back to AST evaluation.
-							}
-						}
-						impl.evaluatedFunctions = evaluated;
-					}
-				}
+			case 'implement-definition':
+				// Registration into the traitRegistry happens in the typer
+				// (typeImplementDefinition → addTraitImplementation), which shares
+				// its registry with this evaluator. Instance-closure capture (§4)
+				// is performed once, post-evaluation, by the module loader against
+				// the fully-populated module environment — not eagerly here (which
+				// would capture before later bindings exist). Within a single
+				// non-module program, dispatch uses the AST `functions` fallback.
 				return createUnit();
-			}
 			default:
 				throw new Error(
 					`Unknown expression kind: ${(expr as Expression).kind}`
@@ -2300,27 +2282,30 @@ export class Evaluator {
 			const realpath = resolveModulePath(expr.path, this.currentFileDir);
 			const cached = loadModule(realpath);
 
-			// Merge instance closures (§4) from imported module into this evaluator's
-			// traitRegistry so cross-module dispatch uses pre-evaluated closures.
-			for (const [traitName, byType] of cached.instanceClosures) {
+			// Merge the imported module's trait implementations (§4) into this
+			// evaluator's traitRegistry so cross-module dispatch works. Each impl
+			// carries BOTH its AST `functions` and its pre-evaluated
+			// `evaluatedFunctions` closures — so the AST fallback is real and the
+			// two maps cannot fall out of sync.
+			//
+			// (In the normal pipeline the evaluator shares its registry with the
+			// typer, which already merged these via mergeModuleCacheIntoTypeState;
+			// this loop makes the evaluator self-contained and idempotent.)
+			for (const [traitName, byType] of cached.traitImplDiff) {
 				if (!this.traitRegistry.implementations.has(traitName)) {
 					this.traitRegistry.implementations.set(traitName, new Map());
 				}
 				const traitImpls = this.traitRegistry.implementations.get(traitName)!;
-				for (const [typeName, byFn] of byType) {
+				for (const [typeName, impl] of byType) {
 					if (!traitImpls.has(typeName)) {
-						// New implementation from imported module — add with evaluated closures
-						traitImpls.set(typeName, {
-							typeName,
-							functions: new Map(), // No AST expressions needed; use evaluatedFunctions
-							evaluatedFunctions: byFn,
-						});
+						// Add the shared impl reference (has functions + evaluatedFunctions).
+						traitImpls.set(typeName, impl);
 					} else {
-						// Already have an entry (e.g., from stdlib or earlier import)
-						// Patch in evaluated closures if not already present
+						// Existing entry: backfill evaluated closures if missing so a
+						// later dispatch prefers the home-module closure over re-eval.
 						const existing = traitImpls.get(typeName)!;
-						if (!existing.evaluatedFunctions) {
-							existing.evaluatedFunctions = byFn;
+						if (!existing.evaluatedFunctions && impl.evaluatedFunctions) {
+							existing.evaluatedFunctions = impl.evaluatedFunctions;
 						}
 					}
 				}
@@ -2725,27 +2710,6 @@ export class Evaluator {
 		throw new Error(
 			`No implementation of trait function ${functionName} for ${typeStr}`
 		);
-	}
-
-	/**
-	 * Get the type name from an implement-definition's type expression at runtime.
-	 * Mirrors the typer's getTypeName from trait-system.ts.
-	 */
-	private getImplementationTypeName(typeExpr: import('../ast').Type): string {
-		switch (typeExpr.kind) {
-			case 'primitive':
-				return typeExpr.name;
-			case 'variant':
-				return typeExpr.name;
-			case 'list':
-				return 'List';
-			case 'variable':
-				return typeExpr.name;
-			case 'constrained':
-				return this.getImplementationTypeName(typeExpr.baseType);
-			default:
-				return typeExpr.kind;
-		}
 	}
 
 	private getValueTypeName(value: Value): string {
