@@ -134,7 +134,7 @@ export class Evaluator {
 	private currentFileDir?: string; // Track the directory of the current file being evaluated
 	private fs: typeof defaultFs;
 	private path: typeof defaultPath;
-	private traitRegistry: TraitRegistry;
+	public traitRegistry: TraitRegistry;
 
 	constructor(opts: {
 		fs?: typeof defaultFs;
@@ -1637,6 +1637,13 @@ export class Evaluator {
 			case 'constraint-definition':
 				return createUnit();
 			case 'implement-definition':
+				// Registration into the traitRegistry happens in the typer
+				// (typeImplementDefinition → addTraitImplementation), which shares
+				// its registry with this evaluator. Instance-closure capture (§4)
+				// is performed once, post-evaluation, by the module loader against
+				// the fully-populated module environment — not eagerly here (which
+				// would capture before later bindings exist). Within a single
+				// non-module program, dispatch uses the AST `functions` fallback.
 				return createUnit();
 			default:
 				throw new Error(
@@ -2234,32 +2241,93 @@ export class Evaluator {
 		}
 	}
 
-	private evaluateImport(expr: ImportExpression): Value {
-		try {
-			const filePath = expr.path.endsWith('.noo')
-				? expr.path
-				: `${expr.path}.noo`;
+	/**
+	 * Legacy direct import evaluation — used when a custom (mock) fs is present.
+	 * Preserves backward compatibility for tests that inject a fake filesystem.
+	 */
+	private evaluateImportDirect(expr: ImportExpression): Value {
+		const filePath = expr.path.endsWith('.noo') ? expr.path : `${expr.path}.noo`;
+		let fullPath: string;
+		if (this.path.isAbsolute(filePath)) {
+			fullPath = filePath;
+		} else if (this.currentFileDir) {
+			fullPath = this.path.resolve(this.currentFileDir, filePath);
+		} else {
+			fullPath = this.path.resolve(filePath);
+		}
+		const content = this.fs.readFileSync(fullPath, 'utf8');
+		const lexer = new Lexer(content);
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		const tempEvaluator = new Evaluator({
+			fs: this.fs,
+			path: this.path,
+			traitRegistry: this.traitRegistry,
+		});
+		const result = tempEvaluator.evaluateProgram(program, fullPath);
+		return result.finalResult;
+	}
 
-			let fullPath: string;
-			if (this.path.isAbsolute(filePath)) {
-				fullPath = filePath;
-			} else if (this.currentFileDir) {
-				fullPath = this.path.resolve(this.currentFileDir, filePath);
-			} else {
-				fullPath = this.path.resolve(filePath);
+	private evaluateImport(expr: ImportExpression): Value {
+		// Guard: if using a custom (mock) fs, fall back to direct evaluation
+		// so existing tests with mock filesystems continue to work.
+		if (this.fs !== defaultFs) {
+			return this.evaluateImportDirect(expr);
+		}
+
+		try {
+			// Delegate to the hermetic module loader (Phase 1 Step 2).
+			// Resolve relative to the current file's directory if available.
+			const { resolveModulePath, loadModule } = require('../module-loader') as typeof import('../module-loader');
+			const realpath = resolveModulePath(expr.path, this.currentFileDir);
+			const cached = loadModule(realpath);
+
+			// Merge the imported module's trait implementations (§4) into this
+			// evaluator's traitRegistry so cross-module dispatch works. Each impl
+			// carries BOTH its AST `functions` and its pre-evaluated
+			// `evaluatedFunctions` closures — so the AST fallback is real and the
+			// two maps cannot fall out of sync.
+			//
+			// (In the normal pipeline the evaluator shares its registry with the
+			// typer, which already merged these via mergeModuleCacheIntoTypeState;
+			// this loop makes the evaluator self-contained and idempotent.)
+			for (const [traitName, byType] of cached.traitImplDiff) {
+				if (!this.traitRegistry.implementations.has(traitName)) {
+					this.traitRegistry.implementations.set(traitName, new Map());
+				}
+				const traitImpls = this.traitRegistry.implementations.get(traitName)!;
+				for (const [typeName, impl] of byType) {
+					if (!traitImpls.has(typeName)) {
+						// Add the shared impl reference (has functions + evaluatedFunctions).
+						traitImpls.set(typeName, impl);
+					} else {
+						// Existing entry: backfill evaluated closures if missing so a
+						// later dispatch prefers the home-module closure over re-eval.
+						const existing = traitImpls.get(typeName)!;
+						if (!existing.evaluatedFunctions && impl.evaluatedFunctions) {
+							existing.evaluatedFunctions = impl.evaluatedFunctions;
+						}
+					}
+				}
 			}
 
-			const content = this.fs.readFileSync(fullPath, 'utf8');
-			const lexer = new Lexer(content);
-			const tokens = lexer.tokenize();
-			const program = parse(tokens);
-			const tempEvaluator = new Evaluator({
-				fs: this.fs,
-				path: this.path,
-				traitRegistry: this.traitRegistry,
-			});
-			const result = tempEvaluator.evaluateProgram(program, fullPath);
-			return result.finalResult;
+			// Also merge trait definition metadata so dispatch can find function names
+			for (const [traitName, traitDef] of cached.traitDefDiff) {
+				if (!this.traitRegistry.definitions.has(traitName)) {
+					this.traitRegistry.definitions.set(traitName, traitDef);
+					for (const fnName of traitDef.functions.keys()) {
+						const existing = this.traitRegistry.functionTraits.get(fnName) ?? [];
+						if (!existing.includes(traitName)) {
+							this.traitRegistry.functionTraits.set(fnName, [...existing, traitName]);
+						}
+					}
+					if (!this.traitRegistry.implementations.has(traitName)) {
+						this.traitRegistry.implementations.set(traitName, new Map());
+					}
+				}
+			}
+
+			return cached.exportValue;
 		} catch (error) {
 			let errorMessage: string;
 			if (error instanceof Error) {
@@ -2276,25 +2344,19 @@ export class Evaluator {
 			} else {
 				errorMessage = String(error);
 			}
-			const cwd = process.cwd();
+
 			const filePath = expr.path.endsWith('.noo')
 				? expr.path
 				: `${expr.path}.noo`;
-
-			let fullPath: string;
-			if (this.path.isAbsolute(filePath)) {
-				fullPath = filePath;
-			} else if (this.currentFileDir) {
-				fullPath = this.path.resolve(this.currentFileDir, filePath);
-			} else {
-				fullPath = this.path.resolve(filePath);
-			}
+			const fullPath = this.currentFileDir
+				? this.path.resolve(this.currentFileDir, filePath)
+				: this.path.resolve(filePath);
 
 			const structuredError = createError(
 				'ImportError',
 				`Failed to import '${
 					expr.path
-				}': ${errorMessage}\n  Tried to resolve: ${fullPath}\n  Current working directory: ${cwd}\n  Importing file directory: ${
+				}': ${errorMessage}\n  Tried to resolve: ${fullPath}\n  Current working directory: ${process.cwd()}\n  Importing file directory: ${
 					this.currentFileDir || 'unknown'
 				}\n  Suggestion: Use a path relative to the importing file, e.g., 'math_functions' or '../std/math'`,
 				{
@@ -2600,12 +2662,19 @@ export class Evaluator {
 					const traitImpls = traitRegistry.implementations.get(traitName);
 					if (traitImpls) {
 						const impl = traitImpls.get(dispatchTypeName);
-						if (impl && impl.functions.has(functionName)) {
-							// Found the implementation! Create a curried function call
-							const implExpr = impl.functions.get(functionName)!;
-
-							// Apply the implementation to all accumulated arguments
-							let result = this.evaluateExpression(implExpr);
+						const hasEvaledFn = impl?.evaluatedFunctions?.has(functionName);
+						const hasAstFn = impl?.functions.has(functionName);
+						if (impl && (hasEvaledFn || hasAstFn)) {
+							// Apply the implementation to all accumulated arguments.
+							// Prefer pre-evaluated closure (§4) to avoid re-evaluation in
+							// a foreign environment (which would miss home-module helpers).
+							let result: Value;
+							if (hasEvaledFn) {
+								result = impl.evaluatedFunctions!.get(functionName) as Value;
+							} else {
+								const implExpr = impl.functions.get(functionName)!;
+								result = this.evaluateExpression(implExpr);
+							}
 							for (const argValue of argValues) {
 								if (isFunction(result)) {
 									result = result.fn(argValue);

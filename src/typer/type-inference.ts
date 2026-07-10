@@ -2,6 +2,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Lexer } from '../lexer/lexer';
 import { parse } from '../parser/parser';
+import { loadModule, resolveModulePath, mergeModuleCacheIntoTypeState } from '../module-loader';
+import { emptyManifest, mergeManifests } from './module-manifest';
 import {
 	type Expression,
 	type LiteralExpression,
@@ -1198,57 +1200,38 @@ export const typeMutation = (
 	return createTypeResult(unitType(), valueResult.effects, newState); // Mutations return unit
 };
 
-// Type inference for imports
+// Type inference for imports — delegates to the hermetic module loader (Phase 1 Step 2).
 export const typeImport = (
 	expr: ImportExpression,
 	state: TypeState
 ): TypeResult => {
 	try {
-		const filePath = expr.path.endsWith('.noo')
-			? expr.path
-			: `${expr.path}.noo`;
+		// Resolve path: use state.currentDir if present (file-relative), else CWD.
+		const realpath = resolveModulePath(expr.path, state.currentDir);
 
-		let fullPath: string;
-		if (path.isAbsolute(filePath)) {
-			fullPath = filePath;
-		} else {
-			// For type checking, we need to resolve relative to current working directory
-			// In a real implementation, we'd want to track the current file being checked
-			fullPath = path.resolve(filePath);
-		}
+		// Load (or retrieve from cache) the hermetically-checked module.
+		const cached = loadModule(realpath);
 
-		// Read and parse the imported file
-		const content = fs.readFileSync(fullPath, 'utf8');
-		const lexer = new Lexer(content);
-		const tokens = lexer.tokenize();
-		const program = parse(tokens);
+		// Coherence conflict detection: merge the module's transitive manifest
+		// with the importer's accumulated manifest. mergeManifests throws on any
+		// (trait, type) or ADT conflict, naming both conflicting paths.
+		const currentImporterManifest = state.importerManifest ?? emptyManifest();
+		const mergedImporterManifest = mergeManifests(currentImporterManifest, cached.manifest);
 
-		// Type check the imported program - get the type of the final statement
-		if (program.statements.length === 0) {
-			// Empty program returns empty list type
-			return createPureTypeResult(
-				listTypeWithElement(typeVariable('a')),
-				state
-			);
-		}
+		// Merge the module's declarations into the importer's TypeState.
+		let newState = mergeModuleCacheIntoTypeState(cached, state);
 
-		// Process all statements and return the type of the final one
-		let currentState = state;
-		let finalType: Type = typeVariable('a');
+		// Store the updated importer manifest for subsequent imports.
+		newState = { ...newState, importerManifest: mergedImporterManifest };
 
-		for (const statement of program.statements) {
-			const result = typeExpression(statement, currentState);
-			currentState = result.state;
-			finalType = result.type;
-		}
+		// Instantiate the export type scheme with fresh type variables so each
+		// import site gets independent polymorphism.
+		const [instantiatedType, finalState] = instantiate(cached.exportType, newState);
 
-		// Return the type of the final statement
-		return createPureTypeResult(finalType, currentState);
+		return createPureTypeResult(instantiatedType, finalState);
 	} catch (error) {
-		// Do NOT swallow import failures. A type error (or missing file) inside an
-		// imported module must surface — otherwise the import's type silently
-		// becomes an unconstrained type variable that unifies with anything, so
-		// misuse of a broken module type-checks. Surface with context.
+		// Do NOT swallow import failures. Surface with context so misuse of a
+		// broken module does not silently type-check.
 		const reason = error instanceof Error ? error.message : String(error);
 		throwTypeError(
 			location =>

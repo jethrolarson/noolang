@@ -20,8 +20,16 @@ export type TraitDefinition = {
 // Simple trait implementation - concrete functions for a specific type
 export type TraitImplementation = {
 	typeName: string; // e.g., "Option", "List", "Float"
-	functions: Map<string, Expression>; // function name -> implementation expression
+	functions: Map<string, Expression>; // function name -> implementation expression (AST)
 	givenConstraints?: ConstraintExpr; // Optional given constraints for conditional implementations
+	/**
+	 * Pre-evaluated closure Values for each function, captured against the
+	 * defining module's runtime environment (§4 instance closure capture).
+	 * When present, dispatch uses these directly instead of re-evaluating the
+	 * AST expression in the importer's environment — fixing the "Undefined variable"
+	 * bug when an implementation member calls a helper local to its defining file.
+	 */
+	evaluatedFunctions?: Map<string, unknown>; // Map<string, Value> — typed as unknown to avoid circular dep
 };
 
 // Registry holding all traits and their implementations
