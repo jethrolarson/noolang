@@ -239,49 +239,22 @@ export function tryResolveConstraints(
 								}
 							}
 						}
-						// Apply substitution to return type (used only by the special
-						// case below to detect an unsubstituted accessor return var).
-						let resolvedType = substitute(returnType, substitution);
+						// The field variables bound above are the whole result: the
+						// return type is substituted once, from mergedSubstitution, after
+						// every constraint has contributed.
+						//
+						// There used to be a SPECIAL CASE here that, when the return type
+						// was still an unbound variable, bound it to the FIRST field
+						// variable it could find in the constraint's structure. For an
+						// accessor whose constraint names exactly one field that happened
+						// to be right; for anything else it silently picked the wrong
+						// field. That is what made `fn p => getCity (getAddress p)` report
+						// the address record where the city String belonged. Composition
+						// (constraint-composition.ts) plus the lift guard in
+						// buildNormalFunctionType now keep the leaf variable genuinely
+						// linked to the return type, so guessing is neither needed nor
+						// safe.
 
-						// SPECIAL CASE: If the return type is still a variable and we have field type substitutions,
-						// check if the return type should be unified with the field type (common in accessor functions)
-						if (
-							resolvedType.kind === 'variable' &&
-							resolvedType === returnType
-						) {
-							// The return type wasn't substituted, but we have field substitutions
-							// In accessor functions, the return type should match the field type
-							// Handle both simple and nested field constraints
-							function findResultVariable(
-								fields: Record<string, StructureFieldType>
-							): Type | null {
-								for (const [_fieldName, fieldType] of Object.entries(fields)) {
-									if (
-										fieldType.kind === 'variable' &&
-										substitution.has(fieldType.name)
-									) {
-										// Found a direct variable that was substituted
-										return substitution.get(fieldType.name)!;
-									} else if (fieldType.kind === 'nested') {
-										// Recursively search nested structure
-										const nestedResult = findResultVariable(
-											fieldType.structure.fields
-										);
-										if (nestedResult) return nestedResult;
-									}
-								}
-								return null;
-							}
-
-							const resultType = findResultVariable(requiredStructure.fields);
-							if (resultType) {
-								substitution.set(resolvedType.name, resultType);
-								resolvedType = resultType;
-							}
-						}
-						// Reference resolvedType so it is not flagged as unused; the
-						// authoritative result comes from mergedSubstitution below.
-						void resolvedType;
 						// Accumulate this constraint's substitution and continue.
 						for (const [k, v] of substitution) mergedSubstitution.set(k, v);
 						resolvedAny = true;

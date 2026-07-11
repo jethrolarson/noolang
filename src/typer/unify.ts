@@ -1,4 +1,4 @@
-import { Type, Constraint } from '../ast';
+import { Type, Constraint, type RecordStructure } from '../ast';
 import { substitute } from './substitute';
 import { TypeState } from './types';
 import { isTypeKind, typesEqual, constraintsEqual } from './helpers';
@@ -439,6 +439,90 @@ function unifyUnit(
 	return state;
 }
 
+/**
+ * Check a concrete type against a structural constraint, recursing into nested
+ * structures.
+ *
+ * A nested structure is what a chained accessor composes to — `p has {@address
+ * {@city b}}` — so validation has to descend into `@address` and check the inner
+ * record too. This previously threw "Nested record structures not yet
+ * implemented", which was survivable only because nested constraints never
+ * reached unification.
+ */
+export function validateStructuralConstraint(
+	actual: Type,
+	structure: RecordStructure,
+	state: TypeState,
+	location?: { line: number; column: number }
+): TypeState {
+	const required = Object.keys(structure.fields).map(f => `@${f}`);
+
+	if (!isTypeKind(actual, 'record')) {
+		throw new Error(
+			formatTypeError(
+				createTypeError(
+					`Cannot access ${required.join(', ')} on ${typeToString(
+						actual,
+						state.substitution
+					)}`,
+					{
+						actualType: actual,
+						suggestion: `Field access requires a record with ${required.join(
+							', '
+						)}.`,
+					},
+					location || { line: 1, column: 1 }
+				)
+			)
+		);
+	}
+
+	let newState = state;
+
+	for (const [fieldName, expectedFieldType] of Object.entries(
+		structure.fields
+	)) {
+		if (!(fieldName in actual.fields)) {
+			const present = Object.keys(actual.fields).map(f => `@${f}`);
+			throw new Error(
+				formatTypeError(
+					createTypeError(
+						`Record has no field @${fieldName}`,
+						{
+							actualType: actual,
+							suggestion:
+								present.length > 0
+									? `This record has ${present.join(
+											', '
+										)}. Check the field name.`
+									: `This record has no fields.`,
+						},
+						location || { line: 1, column: 1 }
+					)
+				)
+			);
+		}
+
+		const actualFieldType = substitute(
+			actual.fields[fieldName],
+			newState.substitution
+		);
+
+		if (expectedFieldType.kind === 'nested') {
+			newState = validateStructuralConstraint(
+				actualFieldType,
+				expectedFieldType.structure,
+				newState,
+				location
+			);
+		} else {
+			newState = unify(actualFieldType, expectedFieldType, newState, location);
+		}
+	}
+
+	return newState;
+}
+
 // --- Unification helpers ---
 function unifyVariable(
 	s1: Type,
@@ -449,17 +533,29 @@ function unifyVariable(
 	if (!isTypeKind(s1, 'variable')) {
 		throw new Error('unifyVariable called with non-variable s1');
 	}
-	// Optimized constraint collection - avoid array spreading
+	// Collect the constraints s1 carries, walking its substitution chain.
+	//
+	// Both sources are read. The store is authoritative — it is keyed by NAME and
+	// so survives the structure-copying that instantiation performs. The variable
+	// OBJECTS are still consulted because parts of the typer (typeAccessor,
+	// propagateConstraintToTypeVariable, the type printer) continue to hang
+	// constraints there, and a constraint recorded only on an object would
+	// otherwise stop being enforced.
 	const constraintsToCheck: Constraint[] = [];
+	const pushUnique = (c: Constraint) => {
+		if (!constraintsToCheck.some(existing => constraintsEqual(c, existing))) {
+			constraintsToCheck.push(c);
+		}
+	};
 	const seenVars = new Set<string>();
 	let currentVar: Type = s1;
 	while (isTypeKind(currentVar, 'variable')) {
 		if (seenVars.has(currentVar.name)) break;
 		seenVars.add(currentVar.name);
-		if (currentVar.constraints) {
-			// Use forEach instead of spread for better performance
-			currentVar.constraints.forEach(c => constraintsToCheck.push(c));
-		}
+		currentVar.constraints?.forEach(pushUnique);
+		getConstraints(state.constraints, currentVar.name, state.substitution).forEach(
+			pushUnique
+		);
 		const next = state.substitution.get(currentVar.name);
 		if (!next) break;
 		currentVar = next;
@@ -529,77 +625,12 @@ function unifyVariable(
 					location
 				);
 			} else if (constraint.kind === 'has') {
-				if (isTypeKind(s2, 'record')) {
-					// Validate that s2 has all required fields with correct types
-					for (const [fieldName, expectedFieldType] of Object.entries(
-						constraint.structure.fields
-					)) {
-						if (!(fieldName in s2.fields)) {
-							const present = Object.keys(s2.fields).map(f => `@${f}`);
-							throw new Error(
-								formatTypeError(
-									createTypeError(
-										`Record has no field @${fieldName}`,
-										{
-											actualType: s2,
-											suggestion:
-												present.length > 0
-													? `This record has ${present.join(
-															', '
-														)}. Check the field name.`
-													: `This record has no fields.`,
-										},
-										location || { line: 1, column: 1 }
-									)
-								)
-							);
-						}
-
-						// Handle StructureFieldType (can be Type or nested structure)
-						if (
-							typeof expectedFieldType === 'object' &&
-							expectedFieldType !== null &&
-							'kind' in expectedFieldType
-						) {
-							if (expectedFieldType.kind === 'nested') {
-								// TODO: Handle nested record structures
-								throw new Error('Nested record structures not yet implemented');
-							} else {
-								// It's a regular Type
-								newState = unify(
-									s2.fields[fieldName],
-									expectedFieldType as Type,
-									newState,
-									location
-								);
-							}
-						} else {
-							throw new Error(
-								`Invalid field type in constraint: ${typeof expectedFieldType}`
-							);
-						}
-					}
-				} else {
-					// s2 is not a record type, but the constraint requires record structure
-					const fieldNames = Object.keys(constraint.structure.fields)
-						.map(f => `@${f}`)
-						.join(', ');
-					throw new Error(
-						formatTypeError(
-							createTypeError(
-								`Cannot access ${fieldNames} on ${typeToString(
-									s2,
-									state.substitution
-								)}`,
-								{
-									actualType: s2,
-									suggestion: `Field access requires a record with ${fieldNames}.`,
-								},
-								location || { line: 1, column: 1 }
-							)
-						)
-					);
-				}
+				newState = validateStructuralConstraint(
+					s2,
+					constraint.structure,
+					newState,
+					location
+				);
 			} else if (constraint.kind === 'is') {
 				// NOTE: Legacy constraint checking removed - handled by new trait system
 				// TODO: Implement proper constraint checking in Phase 2
