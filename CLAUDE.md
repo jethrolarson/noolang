@@ -53,10 +53,20 @@ the existing `Eq Float`/`Add String` wiring:
 - Unit is `{}` (not `()`). Records `{@field val}`, tuples `{a, b}`, lists `[a, b]`.
 - `/` and `%` return `Option Float` (safe division).
 - Record patterns in `match` bind a *subset* of fields; destructuring bindings
-  (`{@a} = r`) currently require an *exact* match. There is no variant
-  exhaustiveness checking yet (non-exhaustive `match` is accepted).
-- Effects are tracked in function types (`!write`, `!read`, `!log`, `!ffi`, …);
-  annotations may over-declare but must not omit an effect the body performs.
+  (`{@a} = r`) also bind a *subset* — naming a field the record lacks is a type
+  error.
+- A `match` on a concrete variant must cover every constructor or include a
+  catch-all (`_` wildcard or a bare variable); non-exhaustive matches are a type
+  error.
+- `<` `>` `<=` `>=` are polymorphic via an `Ord` constraint (Float, String);
+  `equals` / `==` are polymorphic via `Eq` (Float, String, Bool, Option,
+  Result, List).
+- Effects are tracked in function types (`!write`, `!read`, `!log`, `!ffi`, …)
+  and inferred automatically; annotations may over-declare but must not omit a
+  performed effect.
+- Module system: a `.noo` file's last expression is its exported value; relative
+  specifiers (`./`, `../`) are file-relative; bare specifiers resolve via
+  `noolang.json`; see `docs/language-reference.md` §Import System.
 
 ## Docs & CI
 

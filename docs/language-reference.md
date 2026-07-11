@@ -442,6 +442,59 @@ person = { @name "Alice", @age 30, @city "NYC" };
 { @name "Alice", @age 30 };
 ```
 
+### Pattern Matching and Exhaustiveness
+
+`match expr (Pattern => branch; ...)` dispatches on a value. When the
+scrutinee has a concrete variant type (including built-ins like `Option`,
+`Result`, and `Bool`), every constructor must be covered or a catch-all must
+be present — otherwise the match is a **type error**.
+
+```noolang
+# Exhaustive match — all Option constructors covered
+unwrapOr = fn opt default => match opt (
+    Some x => x;
+    None => default
+);
+unwrapOr (Some 42.0) 0.0
+```
+
+```noolang
+# Wildcard catch-all satisfies exhaustiveness
+describe = fn opt => match opt (
+    Some x => "got " + show x;
+    _ => "nothing"
+);
+describe None
+```
+
+The following would be a type error (missing `None` case):
+
+```
+# TypeError: Non-exhaustive match on Option: missing case None.
+match (Some 1) (Some x => x)
+```
+
+A bare variable catch-all also works: `other => ...` matches anything not
+already covered and binds the value.
+
+### Destructuring Bindings
+
+Record destructuring binds a **subset** of fields — extra fields in the record
+are simply ignored. Only naming a field the record does not have is an error.
+
+```noolang
+# Bind just @a — @b is ignored
+rec = {@a 10.0, @b 20.0};
+{@a} = rec;
+a
+```
+
+```noolang
+# Rename on destructure
+{@name n, @age} = {@name "Alice", @age 30.0};
+n + " is " + show age
+```
+
 ## Type Names and Shadowing
 
 - Type names are global and cannot be redefined. Defining a `variant` or `type` with a name that already exists is a type error.
@@ -466,11 +519,77 @@ x = 5;  # End of line comment
 
 ## Import System
 
-```noolang
-# Import system is planned but not yet implemented
-# Currently all stdlib functions are available globally
-result = show 42;
+Noolang has a module system where each `.noo` file is a module. A module's
+**last expression** is its exported value — typically a record of named
+bindings.
+
 ```
+# math.noo — the last expression is the exported record
+addFn = fn x y => x + y;
+multiplyFn = fn x y => x * y;
+{@add addFn, @multiply multiplyFn}
+```
+
+### Importing modules
+
+Use `import "specifier"` to import another module.
+
+```
+# Import the whole module as a record
+math = import "./math";
+result = (@add math) 2 3;   # 5
+
+# Selective import via subset destructuring (recommended)
+{@add} = import "./math";
+result = add 2 3;           # 5
+
+# Rename while importing
+{@add myAdd} = import "./math";
+result = myAdd 2 3;         # 5
+```
+
+### Specifier rules
+
+| Form | Resolves to |
+|------|-------------|
+| `"./path"` or `"../path"` | File relative to the importing module |
+| `"bare-name"` or `"prefix/name"` | Entry in `noolang.json` import map |
+| `"std/*"` | Reserved for future stdlib modules (not yet importable) |
+
+Relative specifiers **must** begin with `./` or `../`. A bare specifier that
+has no matching import-map entry is a compile-time error.
+
+### Import map (`noolang.json`)
+
+Place a `noolang.json` at your project root to give short names to paths:
+
+```
+{
+  "imports": {
+    "math": "./lib/math",
+    "utils/": "./src/utils/"
+  }
+}
+```
+
+Then `import "math"` resolves to `./lib/math.noo` relative to the map file.
+
+### Rules and restrictions
+
+**Imports are pure.** A module may not perform top-level effects (`print`,
+`writeFile`, etc.). Doing so is a type error at import time. To share
+effectful operations, export an effect-typed function instead.
+
+**Circular imports error.** Because a module *is* its evaluated value,
+`A → B → A` is unresolvable. The error message includes the full cycle chain.
+
+**Coherence.** Only one `implement` block per `(Trait, Type)` pair is allowed
+across a program. Conflicting instances from different modules are an error.
+
+### Standard library
+
+All standard library functions (`map`, `filter`, `equals`, `show`, etc.) are
+loaded automatically at startup — you do not need to import them.
 
 ## Operator Precedence
 
