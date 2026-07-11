@@ -155,6 +155,16 @@ describe('Structural Constraints', () => {
 			expect(result.type.element.name).toBe('String');
 		});
 
+		test('Mapping a lambda that wraps an accessor', () => {
+			// The accessor constraint is recorded on the lambda's PARAMETER variable;
+			// it must be lifted onto the lambda's function type or `map` drops it and
+			// the element type stays unresolved.
+			const result = parseAndType(`map (fn p => @age p) [{@age 3}]`);
+			assertListType(result.type);
+			assertPrimitiveType(result.type.element);
+			expect(result.type.element.name).toBe('Float');
+		});
+
 		test('should handle accessor with polymorphic return type', () => {
 			const result = parseAndType(`
         getValue = @value;
