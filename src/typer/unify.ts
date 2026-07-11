@@ -535,12 +535,23 @@ function unifyVariable(
 						constraint.structure.fields
 					)) {
 						if (!(fieldName in s2.fields)) {
+							const present = Object.keys(s2.fields).map(f => `@${f}`);
 							throw new Error(
-								`Record missing required field @${fieldName} for constraint ${constraint.typeVar} has {${Object.keys(
-									constraint.structure.fields
+								formatTypeError(
+									createTypeError(
+										`Record has no field @${fieldName}`,
+										{
+											actualType: s2,
+											suggestion:
+												present.length > 0
+													? `This record has ${present.join(
+															', '
+														)}. Check the field name.`
+													: `This record has no fields.`,
+										},
+										location || { line: 1, column: 1 }
+									)
 								)
-									.map(f => `@${f}`)
-									.join(', ')}}`
 							);
 						}
 
@@ -574,7 +585,19 @@ function unifyVariable(
 						.map(f => `@${f}`)
 						.join(', ');
 					throw new Error(
-						`Type ${s2.kind === 'primitive' ? s2.name : s2.kind} cannot satisfy constraint ${constraint.typeVar} has {${fieldNames}} - expected a record type`
+						formatTypeError(
+							createTypeError(
+								`Cannot access ${fieldNames} on ${typeToString(
+									s2,
+									state.substitution
+								)}`,
+								{
+									actualType: s2,
+									suggestion: `Field access requires a record with ${fieldNames}.`,
+								},
+								location || { line: 1, column: 1 }
+							)
+						)
 					);
 				}
 			} else if (constraint.kind === 'is') {

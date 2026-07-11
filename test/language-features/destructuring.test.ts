@@ -101,7 +101,7 @@ test('should throw error for missing fields in record destructuring', () => {
 	// Destructuring binds a subset of a record's fields, but naming a field the
 	// record does not have is still rejected (now at type-check time).
 	const source = '{@name, @missing} = {@name "Test"}';
-	expect(() => runCode(source)).toThrow(/missing required field @missing/);
+	expect(() => runCode(source)).toThrow(/Record has no field @missing/);
 });
 
 test('should throw error for tuple length mismatch', () => {

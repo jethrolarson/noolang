@@ -365,3 +365,40 @@ describe('Pipeline Operator Composition', () => {
 		expect(userRecord.fields.age.name).toBe('Float');
 	});
 });
+
+describe('Accessor error messages', () => {
+	// These errors are what a user sees when field access goes wrong. They used to
+	// read `constraint α223 has {@city}` — an internal type-variable name, which
+	// means nothing to anyone outside the typer.
+	const messageFor = (code: string): string => {
+		try {
+			parseAndType(code);
+		} catch (e) {
+			return e instanceof Error ? e.message : String(e);
+		}
+		throw new Error(`Expected ${code} to fail type checking`);
+	};
+
+	test('never leaks an internal type-variable name', () => {
+		const messages = [
+			messageFor(`getAddr = @address; getAddr 1`),
+			messageFor(`getCity = @city; getCity {@name "A"}`),
+		];
+		for (const message of messages) {
+			expect(message).not.toMatch(/α\d+/);
+			expect(message).not.toMatch(/constraint \w+ has/);
+		}
+	});
+
+	test('names the offending type when the target is not a record', () => {
+		const message = messageFor(`getAddr = @address; getAddr 1`);
+		expect(message).toMatch(/Cannot access @address on Float/);
+	});
+
+	test('lists the fields the record does have', () => {
+		const message = messageFor(`getCity = @city; getCity {@name "A", @age 3}`);
+		expect(message).toMatch(/Record has no field @city/);
+		expect(message).toMatch(/@name/);
+		expect(message).toMatch(/@age/);
+	});
+});
