@@ -64,6 +64,7 @@ import {
 	mapSet,
 	typeToString,
 	propagateConstraintToTypeVariable,
+	constraintsEqual,
 } from './helpers';
 import { unify } from './unify';
 import { substitute } from './substitute';
@@ -534,8 +535,50 @@ function buildNormalFunctionType(
 		funcType = functionType([paramTypes[i]], funcType, effects);
 	}
 
-	// Combine implicit constraints with body constraints
+	// Body inference attaches structural constraints straight to the parameter's
+	// type variable (`fn p => @age p` records `has {@age b}` on p's variable).
+	// Higher-order callers such as `map` collect constraints from the function
+	// TYPE, not from its parameter variables, so an unlifted constraint is simply
+	// dropped — `map (fn p => @age p) xs` inferred `List a`. Lift them, retargeted
+	// at the parameter's own variable so they cannot point at a stale
+	// pre-unification variable.
+	//
+	// Only lift a constraint whose field type IS this function's return variable.
+	// Such a constraint fully determines the result, so resolving it against a
+	// concrete argument yields the right type. A partial constraint must NOT be
+	// lifted: for `fn person => getCity (getAddress person)` the parameter only
+	// records `has {@address x}` (the chain through the let-bound accessors is not
+	// composed), and constraint resolution would then bind the bare return
+	// variable to the ADDRESS record rather than the city String — confidently
+	// wrong, where leaving it unresolved is merely incomplete.
+	const returnVarName = bodyType.kind === 'variable' ? bodyType.name : null;
+	const paramConstraints: Constraint[] = [];
+	if (returnVarName) {
+		for (const paramType of paramTypes) {
+			if (paramType.kind === 'variable' && paramType.constraints) {
+				for (const constraint of paramType.constraints) {
+					if (constraint.kind !== 'has') continue;
+					const determinesReturn = Object.values(
+						constraint.structure.fields
+					).some(
+						fieldType =>
+							fieldType.kind === 'variable' && fieldType.name === returnVarName
+					);
+					if (determinesReturn) {
+						paramConstraints.push({ ...constraint, typeVar: paramType.name });
+					}
+				}
+			}
+		}
+	}
+
+	// Combine implicit constraints with body and lifted parameter constraints
 	const allConstraints = [...implicitConstraints, ...bodyConstraints];
+	for (const constraint of paramConstraints) {
+		if (!allConstraints.some(existing => constraintsEqual(existing, constraint))) {
+			allConstraints.push(constraint);
+		}
+	}
 
 	// Apply constraints if we have any
 	if (allConstraints.length > 0 && funcType.kind === 'function') {
