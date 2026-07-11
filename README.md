@@ -918,12 +918,12 @@ Noolang provides a set of built-in functions organized by category:
 - **`%`** - Modulus: `Float -> Float -> Float`
 
 #### Comparison Operations (Pure)
-- **`==`** - Equality: `a -> a -> Bool` (polymorphic)
+- **`==`** / **`equals`** - Equality: `a -> a -> Bool given a implements Eq` — covers Float, String, Bool, Option, Result, List
 - **`!=`** - Inequality: `a -> a -> Bool` (polymorphic)
-- **`<`** - Less than: `Float -> Float -> Bool`
-- **`>`** - Greater than: `Float -> Float -> Bool`
-- **`<=`** - Less than or equal: `Float -> Float -> Bool`
-- **`>=`** - Greater than or equal: `Float -> Float -> Bool`
+- **`<`** - Less than: `a -> a -> Bool given a implements Ord` — Float, String
+- **`>`** - Greater than: `a -> a -> Bool given a implements Ord` — Float, String
+- **`<=`** - Less than or equal: `a -> a -> Bool given a implements Ord` — Float, String
+- **`>=`** - Greater than or equal: `a -> a -> Bool given a implements Ord` — Float, String
 
 #### Function Application and Composition (Pure)
 - **`|`** - Thrush operator (function application): `a -> (a -> b) -> b`

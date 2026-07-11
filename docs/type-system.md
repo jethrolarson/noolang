@@ -145,6 +145,80 @@ numberStrings = showAll [1, 2, 3];        # ["1", "2", "3"]
 boolStrings = showAll [True, False];      # ["True", "False"]
 ```
 
+#### Eq Constraint
+
+The `Eq` constraint enables equality comparison. `equals` and `==` work on
+Float, String, Bool, Option, Result, and List:
+
+```noolang
+# Eq for primitive types
+equals 1.0 1.0;          # True
+equals "hello" "world";  # False
+1.0 == 1.0;              # True
+"a" == "b";              # False
+```
+
+```noolang
+# Eq for Option, Result, List
+equals (Some 1.0) (Some 1.0);    # True
+equals None (Some 1.0);          # False
+equals (Ok 1.0) (Ok 1.0);        # True
+equals [1.0, 2.0] [1.0, 2.0];   # True
+```
+
+#### Ord Constraint
+
+The `Ord` constraint provides ordering operators `<`, `>`, `<=`, and `>=`.
+These are polymorphic over Float and String:
+
+```noolang
+# Ord for Float
+2.0 < 3.0;     # True
+3.0 > 2.0;     # True
+1.0 <= 1.0;    # True
+2.0 >= 1.0;    # True
+```
+
+```noolang
+# Ord for String (lexicographic)
+"a" < "b";     # True
+"b" > "a";     # True
+"abc" <= "abd"; # True
+```
+
+### Effect Inference and Enforcement
+
+Effects are automatically inferred into function types. A function that calls
+`print` or `println` gets effect `!write`; `readFile` adds `!read`; `log`
+adds `!log`, and so on. Effects propagate through function composition.
+
+```noolang
+# Effect is inferred — no annotation needed
+printTwice = fn x => (print x; print x);
+# Type: a -> a !write
+printTwice "hello"
+```
+
+When you add an explicit type annotation, it is **checked against the inferred
+effects**:
+
+- You **may** declare more effects than the body performs (over-declaration is
+  allowed for forward-compatibility).
+- You **must not** omit an effect the body actually performs.
+
+```noolang
+# Over-declaring is allowed — annotation adds !read even though body only writes
+verbose = fn x => print x : String -> String !write !read;
+verbose "ok"
+```
+
+The following would be a type error (annotation omits `!write`):
+
+```
+# TypeError: Type annotation omits effect !write performed by the expression
+bad = fn x => print x : String -> String;
+```
+
 ## Type System Integration
 
 ### Pipeline Operators
