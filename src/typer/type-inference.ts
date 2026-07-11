@@ -66,7 +66,11 @@ import {
 	propagateConstraintToTypeVariable,
 	constraintsEqual,
 } from './helpers';
-import { addConstraint } from './constraint-store';
+import { addConstraint, resolveVarName } from './constraint-store';
+import {
+	composeConstraintChain,
+	extractResultTypeVar,
+} from './constraint-composition';
 import { unify } from './unify';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
@@ -502,7 +506,8 @@ function handleConstrainedFunctionBody(
 function buildNormalFunctionType(
 	paramTypes: Type[],
 	bodyResult: TypeResult,
-	implicitConstraints: Constraint[]
+	implicitConstraints: Constraint[],
+	state: TypeState
 ): Type {
 	// Extract constraints from the body result type if it's constrained
 	const bodyConstraints: Constraint[] = [];
@@ -536,39 +541,42 @@ function buildNormalFunctionType(
 		funcType = functionType([paramTypes[i]], funcType, effects);
 	}
 
-	// Body inference attaches structural constraints straight to the parameter's
-	// type variable (`fn p => @age p` records `has {@age b}` on p's variable).
-	// Higher-order callers such as `map` collect constraints from the function
-	// TYPE, not from its parameter variables, so an unlifted constraint is simply
-	// dropped — `map (fn p => @age p) xs` inferred `List a`. Lift them, retargeted
-	// at the parameter's own variable so they cannot point at a stale
-	// pre-unification variable.
+	// Body inference records an accessor's structural constraint against the
+	// ARGUMENT it constrains — so `fn p => @age p` records `p has {@age b}`, and
+	// `fn p => getCity (getAddr p)` records two separate links, `p has {@address
+	// x}` and `x has {@city b}`. Higher-order callers such as `map` read
+	// constraints from the function TYPE, not from the store, so anything not
+	// lifted onto the type is simply dropped.
 	//
-	// Only lift a constraint whose field type IS this function's return variable.
-	// Such a constraint fully determines the result, so resolving it against a
-	// concrete argument yields the right type. A partial constraint must NOT be
-	// lifted: for `fn person => getCity (getAddress person)` the parameter only
-	// records `has {@address x}` (the chain through the let-bound accessors is not
-	// composed), and constraint resolution would then bind the bare return
-	// variable to the ADDRESS record rather than the city String — confidently
-	// wrong, where leaving it unresolved is merely incomplete.
+	// Compose each parameter's chain out of the store (following the constraint
+	// graph, so a chain through let-bound accessors folds up exactly like an
+	// inline one), then lift it.
+	//
+	// Lift ONLY when the composed constraint's leaf variable IS this function's
+	// return variable. Such a constraint fully determines the result, so resolving
+	// it against a concrete argument yields the right type. Lifting a constraint
+	// that does NOT determine the return is actively harmful: constraint
+	// resolution binds a bare return variable to the FIRST substituted field
+	// variable, which for a partial constraint is the wrong field — it made
+	// `fn person => getCity (getAddress person)` infer the ADDRESS RECORD rather
+	// than the city String. Confidently wrong beats honestly unresolved only in
+	// the sense that it is worse.
 	const returnVarName = bodyType.kind === 'variable' ? bodyType.name : null;
 	const paramConstraints: Constraint[] = [];
 	if (returnVarName) {
 		for (const paramType of paramTypes) {
-			if (paramType.kind === 'variable' && paramType.constraints) {
-				for (const constraint of paramType.constraints) {
-					if (constraint.kind !== 'has') continue;
-					const determinesReturn = Object.values(
-						constraint.structure.fields
-					).some(
-						fieldType =>
-							fieldType.kind === 'variable' && fieldType.name === returnVarName
-					);
-					if (determinesReturn) {
-						paramConstraints.push({ ...constraint, typeVar: paramType.name });
-					}
-				}
+			if (paramType.kind !== 'variable') continue;
+			const composed = composeConstraintChain(
+				paramType.name,
+				state.constraints,
+				state.substitution
+			);
+			if (!composed) continue;
+			if (
+				extractResultTypeVar(composed) ===
+				resolveVarName(returnVarName, state.substitution)
+			) {
+				paramConstraints.push({ ...composed, typeVar: paramType.name });
 			}
 		}
 	}
@@ -626,7 +634,8 @@ export const typeFunction = (
 			: buildNormalFunctionType(
 					substitutedParamTypes,
 					bodyResult,
-					implicitConstraints
+					implicitConstraints,
+					currentState
 				);
 
 	// The latent effects now live on the function type (see
@@ -663,15 +672,10 @@ function collectImplicitConstraints(
 		}
 	}
 
-	// DEPTH-FIRST: Generate structural constraints inline with unified variables
-	if (bodyExpr && paramNames) {
-		const structuralConstraints = generateDepthFirstConstraints(
-			bodyExpr,
-			paramNames,
-			paramTypes
-		);
-		constraints.push(...structuralConstraints);
-	}
+	// Structural constraints are no longer derived from the syntax here.
+	// buildNormalFunctionType composes them out of the constraint store, which
+	// follows the constraint graph and therefore handles let-bound chains that no
+	// syntactic pattern could see.
 
 	return constraints;
 }
@@ -2023,77 +2027,3 @@ export const typeRecordDestructuring = (
 };
 
 // DEPTH-FIRST constraint generation - replaces collectAccessorConstraints
-function generateDepthFirstConstraints(
-	expr: Expression,
-	paramNames: string[],
-	paramTypes: Type[]
-): Constraint[] {
-	const constraints: Constraint[] = [];
-
-	// Create mapping from parameter names to their type variables
-	const paramTypeVars = new Map<string, string>();
-	for (let i = 0; i < paramNames.length && i < paramTypes.length; i++) {
-		const paramType = paramTypes[i];
-		if (paramType.kind === 'variable') {
-			paramTypeVars.set(paramNames[i], paramType.name);
-		}
-	}
-
-	// Analyze expression for accessor composition patterns
-	function analyzeExpression(e: Expression): void {
-		if (!e) return;
-
-		if (
-			e.kind === 'application' &&
-			e.func.kind === 'accessor' &&
-			e.args.length === 1
-		) {
-			const outerField = e.func.field;
-			const innerArg = e.args[0];
-
-			// Check for composition: @outer (@inner param)
-			if (
-				innerArg.kind === 'application' &&
-				innerArg.func.kind === 'accessor' &&
-				innerArg.args.length === 1 &&
-				innerArg.args[0].kind === 'variable' &&
-				paramTypeVars.has(innerArg.args[0].name)
-			) {
-				const innerField = innerArg.func.field;
-				const paramName = innerArg.args[0].name;
-				const paramTypeVar = paramTypeVars.get(paramName)!;
-
-				// Generate multiplicative constraint directly
-				const resultVar = `α${Math.random().toString(36).substr(2, 9)}`;
-				const composedConstraint = hasStructureConstraint(paramTypeVar, {
-					fields: {
-						[innerField]: {
-							kind: 'nested',
-							structure: {
-								fields: {
-									[outerField]: { kind: 'variable', name: resultVar },
-								},
-							},
-						},
-					},
-				});
-
-				constraints.push(composedConstraint);
-				return; // Don't recurse - we handled the composition
-			}
-		}
-
-		// Recurse into sub-expressions for other cases
-		if (e.kind === 'application') {
-			analyzeExpression(e.func);
-			e.args.forEach(analyzeExpression);
-		} else if (e.kind === 'binary') {
-			analyzeExpression(e.left);
-			analyzeExpression(e.right);
-		}
-		// Add other cases as needed
-	}
-
-	analyzeExpression(expr);
-	return constraints;
-}

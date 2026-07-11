@@ -194,11 +194,35 @@ describe('Structural Constraints', () => {
           @address {@street "123 Main", @city "NYC"}
         }
       `);
-			// TODO: Fix constraint resolution for chained accessor function calls
-			// Currently returns a type variable instead of String
-			assertVariableType(result.type);
-			// assertPrimitiveType(result.type);
-			// expect(result.type.name).toBe('String'); // Should be this when fixed
+			// The chain composes out of the constraint store, so the city field type
+			// now reaches the result instead of stalling as a type variable.
+			assertPrimitiveType(result.type);
+			expect(result.type.name).toBe('String');
+		});
+
+		test('chained accessors compose into a nested constraint (let-bound)', () => {
+			// Follows the constraint GRAPH, so a chain through let-bound accessors
+			// composes the same as an inline one. The leaf must be the function's own
+			// return variable: a composed constraint whose leaf is some unrelated
+			// variable cannot resolve, and one that names the WRONG field resolves to
+			// a confidently wrong type.
+			const result = parseAndType(
+				`getAddr = @address; getCity = @city; fn p => getCity (getAddr p)`
+			);
+			expect(typeToString(result.type, result.state.substitution)).toBe(
+				'a -> b given a has {@address {@city b}}'
+			);
+		});
+
+		test('inline chained accessors compose without inventing a variable', () => {
+			// Regression: composition used to be derived syntactically and minted its
+			// result variable with Math.random(), so the constraint's leaf was
+			// disconnected from the return type — it read `{@name c}` against a
+			// return of `b`.
+			const result = parseAndType(`fn obj => @name (@user obj)`);
+			expect(typeToString(result.type, result.state.substitution)).toBe(
+				'a -> b given a has {@user {@name b}}'
+			);
 		});
 
 		test('should work with accessor partial application', () => {

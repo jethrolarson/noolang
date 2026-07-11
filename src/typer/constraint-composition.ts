@@ -2,7 +2,13 @@ import {
 	hasStructureConstraint,
 	type HasStructureConstraint,
 	type StructureFieldType,
+	type Type,
 } from '../ast';
+import {
+	getConstraints,
+	resolveVarName,
+	type ConstraintStore,
+} from './constraint-store';
 
 /**
  * Compose two structural constraints to create a nested constraint.
@@ -57,6 +63,56 @@ export function composeStructuralConstraints(
 	return hasStructureConstraint(innerConstraint.typeVar, {
 		fields: composedFields,
 	});
+}
+
+/**
+ * Fold a variable's structural constraints, and those of the variables its
+ * fields point at, into a single nested constraint.
+ *
+ * `getCity (getAddress p)` records two separate links — `p has {@address x}`
+ * and `x has {@city y}` — because each accessor constrains its own argument.
+ * Walking that graph and nesting each field's own constraint into its position
+ * yields `p has {@address {@city y}}`, with `y` still the variable the body
+ * actually returns.
+ *
+ * Follows the constraint GRAPH, not the syntax tree, so a chain through
+ * let-bound accessors composes exactly like an inline one.
+ *
+ * Returns null when the variable has no structural constraint. `seen` guards
+ * against a cyclic constraint graph.
+ */
+export function composeConstraintChain(
+	varName: string,
+	store: ConstraintStore,
+	substitution: Map<string, Type>,
+	seen: Set<string> = new Set()
+): HasStructureConstraint | null {
+	const key = resolveVarName(varName, substitution);
+	if (seen.has(key)) return null;
+
+	const base = getConstraints(store, key, substitution).find(
+		(c): c is HasStructureConstraint => c.kind === 'has'
+	);
+	if (!base) return null;
+
+	const nextSeen = new Set(seen).add(key);
+	let composed: HasStructureConstraint = hasStructureConstraint(key, {
+		fields: { ...base.structure.fields },
+	});
+
+	for (const [, fieldType] of Object.entries(base.structure.fields)) {
+		if (fieldType.kind !== 'variable') continue;
+		const nested = composeConstraintChain(
+			fieldType.name,
+			store,
+			substitution,
+			nextSeen
+		);
+		if (!nested) continue;
+		composed = composeStructuralConstraints(composed, nested, fieldType.name);
+	}
+
+	return composed;
 }
 
 /**
