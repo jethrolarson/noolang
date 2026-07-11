@@ -21,6 +21,7 @@ import type { Expression, Type } from './ast';
 import { flattenStatements } from './typer/type-operations';
 import { createTypeState, loadStdlib, generalize } from './typer/type-operations';
 import { substitute } from './typer/substitute';
+import { createConstraintStore } from './typer/constraint-store';
 import { initializeBuiltins } from './typer/builtins';
 import { typeExpression } from './typer/expression-dispatcher';
 import {
@@ -114,7 +115,7 @@ function cloneTypeStateForModule(base: TypeState): TypeState {
 		// This is what the "identical type across importers/orders" headline test
 		// exercises. The counter is never reset to a colliding fixed value.
 		counter: base.counter,
-		constraints: [],
+		constraints: createConstraintStore(),
 		adtRegistry,
 		traitRegistry,
 		protectedTypeNames: new Set(base.protectedTypeNames),

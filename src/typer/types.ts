@@ -1,5 +1,6 @@
 import type { Constraint, Type, Effect } from '../ast';
 import type { TraitRegistry } from './trait-system';
+import type { ConstraintStore } from './constraint-store';
 
 // ADT registry for tracking defined algebraic data types
 export type ADTRegistry = Map<
@@ -45,7 +46,12 @@ export type TypeState = {
 	environment: TypeEnvironment;
 	substitution: Map<string, Type>;
 	counter: number;
-	constraints: Constraint[]; // Track constraints during inference
+	/**
+	 * Structural constraints keyed by type-variable name. See constraint-store.ts
+	 * for why name-keyed rather than hung off variable objects. Replaces a
+	 * `Constraint[]` field that was declared, initialised, and never used.
+	 */
+	constraints: ConstraintStore;
 	adtRegistry: ADTRegistry; // Track ADT definitions
 	traitRegistry: TraitRegistry;
 	protectedTypeNames: Set<string>; // Names of types reserved/protected from shadowing
