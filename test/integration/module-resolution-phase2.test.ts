@@ -96,32 +96,29 @@ describe('RELDIR: nested-directory relative import resolves correctly', () => {
 // ─── SYMLINK: symlink alias hits one cache entry ───────────────────────────────
 
 describe('SYMLINK: symlink alias hits one cache entry', () => {
-	test('symlink and original path resolve to same cache entry (module loads once)', () => {
-		const origPath = writeTmp('sym_orig.noo', `{@val 42}`);
+	test('symlink and original resolve to one cache entry (type identity — no false ADT conflict)', () => {
+		// A module that DEFINES a type. Behavioural proof of realpath dedup:
+		// without canonical-realpath cache keying, importing it via two aliases
+		// yields two definingPaths for `Box` → the coherence merge would raise an
+		// ADT-identity conflict. Dedup ⇒ one path ⇒ no error.
+		const origPath = writeTmp('sym_orig.noo', `variant Box = Box Float; { @mk Box }`);
 
-		// Create a symlink in same directory
 		const symlinkPath = path.join(TMPDIR, 'sym_alias.noo');
 		fs.symlinkSync(origPath, symlinkPath);
 
 		const origSpec = path.join(TMPDIR, 'sym_orig');
 		const symlinkSpec = path.join(TMPDIR, 'sym_alias');
 
-		// Import the same module via two different paths (original + symlink).
-		// If the cache key is canonical realpath, both should hit the same entry
-		// and produce consistent values.
 		const code = `
-a = import "${origSpec}";
-b = import "${symlinkSpec}";
-(@val a) + (@val b)
+{ @mk mk1 } = import "${origSpec}";
+{ @mk mk2 } = import "${symlinkSpec}";
+mk1 1
 `;
-		// Both should be 42 → sum = 84
-		const result = runCode(code);
-		expect(result.finalValue).toBe(84);
+		// No ADT-identity conflict ⇒ the aliases collapsed to one cache entry.
+		expect(() => runCode(code)).not.toThrow();
 
-		// Verify the canonical realpath is the same for both
-		const realOrig = fs.realpathSync(origPath);
-		const realAlias = fs.realpathSync(symlinkPath);
-		expect(realOrig).toBe(realAlias);
+		// Mechanism sanity: both aliases canonicalise to the same real path.
+		expect(fs.realpathSync(origPath)).toBe(fs.realpathSync(symlinkPath));
 	});
 });
 
