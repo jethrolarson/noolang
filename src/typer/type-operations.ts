@@ -16,6 +16,7 @@ import { createTraitRegistry } from './trait-system';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
 import { constraintsEqual } from './helpers';
+import { createConstraintStore } from './constraint-store';
 
 // Fresh type variable generation - optimized to avoid string concatenation
 export const freshTypeVariable = (
@@ -149,22 +150,34 @@ export const freshenTypeVariables = (
 		case 'variable': {
 			const freshVar = mapping.get(type.name);
 			if (freshVar) {
-				// Copy constraints from the original variable to the fresh one
+				// Copy constraints from the original variable to the fresh one,
+				// FRESHENED. Copying them verbatim left them naming the SCHEME's
+				// variables, so an instantiated accessor's constraint still pointed at
+				// the scheme's field variable instead of this instantiation's. The
+				// chain in `getCity (getAddr p)` broke exactly there: the recorded
+				// constraint named a variable that nothing else in the program used.
+				let currentState = state;
 				if (freshVar.kind === 'variable') {
 					freshVar.constraints = freshVar.constraints || [];
 					if (type.constraints) {
 						for (const c of type.constraints) {
+							const [freshened, nextState] = freshenConstraint(
+								c,
+								mapping,
+								currentState
+							);
+							currentState = nextState;
 							if (
 								!freshVar.constraints.some(existing =>
-									constraintsEqual(existing, c)
+									constraintsEqual(existing, freshened)
 								)
 							) {
-								freshVar.constraints.push(c);
+								freshVar.constraints.push(freshened);
 							}
 						}
 					}
 				}
-				return [freshVar, state];
+				return [freshVar, currentState];
 			}
 			return [type, state];
 		}
@@ -191,30 +204,13 @@ export const freshenTypeVariables = (
 			let newConstraints: Constraint[] | undefined = undefined;
 			if (type.constraints && type.constraints.length > 0) {
 				newConstraints = type.constraints.map(constraint => {
-					let updated: Constraint = constraint;
-					// Update constraint variable names using the mapping
-					if ('typeVar' in constraint) {
-						const mappedVar = mapping.get(constraint.typeVar);
-						if (mappedVar && mappedVar.kind === 'variable') {
-							updated = { ...constraint, typeVar: mappedVar.name };
-						}
-					}
-					// Freshen the type variables INSIDE a structural constraint's
-					// structure so they stay linked to the (also freshened) return
-					// type. Without this, `getName = @name` instantiated to
-					// `a -> b given a has {@name c}` — the return `b` decoupled from
-					// the field var `c`, so `map getName xs` could never infer the
-					// element type.
-					if (updated.kind === 'has') {
-						const [freshStructure, nextState] = freshenRecordStructure(
-							updated.structure,
-							mapping,
-							currentState
-						);
-						currentState = nextState;
-						updated = { ...updated, structure: freshStructure };
-					}
-					return updated;
+					const [freshened, nextState] = freshenConstraint(
+						constraint,
+						mapping,
+						currentState
+					);
+					currentState = nextState;
+					return freshened;
 				});
 			}
 
@@ -319,6 +315,40 @@ export const freshenTypeVariables = (
 	}
 };
 
+/**
+ * Freshen a constraint against an instantiation's variable mapping: both the
+ * variable it constrains and the variables inside its structure.
+ *
+ * Both callers need this. Freshening only the `typeVar` leaves the structure
+ * naming the scheme's variables, which silently severs a constraint from the
+ * type it is supposed to describe.
+ */
+export const freshenConstraint = (
+	constraint: Constraint,
+	mapping: Map<string, Type>,
+	state: TypeState
+): [Constraint, TypeState] => {
+	let updated: Constraint = constraint;
+
+	if ('typeVar' in constraint) {
+		const mappedVar = mapping.get(constraint.typeVar);
+		if (mappedVar && mappedVar.kind === 'variable') {
+			updated = { ...constraint, typeVar: mappedVar.name };
+		}
+	}
+
+	if (updated.kind === 'has') {
+		const [freshStructure, nextState] = freshenRecordStructure(
+			updated.structure,
+			mapping,
+			state
+		);
+		return [{ ...updated, structure: freshStructure }, nextState];
+	}
+
+	return [updated, state];
+};
+
 // Freshen the type variables inside a structural-constraint RecordStructure,
 // reusing the same variable mapping as the enclosing type so field vars stay
 // linked to the freshened return type. Handles nested structures recursively.
@@ -399,7 +429,7 @@ export const createTypeState = (): TypeState => ({
 	environment: new Map(),
 	substitution: new Map(),
 	counter: 0,
-	constraints: [],
+	constraints: createConstraintStore(),
 	adtRegistry: new Map(),
 	traitRegistry: createTraitRegistry(), // NEW: Simple trait system
 	protectedTypeNames: new Set(),
@@ -410,7 +440,7 @@ export const createTypeState = (): TypeState => ({
 export const cleanSubstitutions = (state: TypeState): TypeState => ({
 	...state,
 	substitution: new Map(), // Clear substitutions but keep environment
-	constraints: [], // Clear constraints as well
+	constraints: createConstraintStore(), // Clear constraints as well
 });
 
 // Centralized reserved type names (cannot be shadowed by user-defined types or variants)

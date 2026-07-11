@@ -66,6 +66,7 @@ import {
 	propagateConstraintToTypeVariable,
 	constraintsEqual,
 } from './helpers';
+import { addConstraint } from './constraint-store';
 import { unify } from './unify';
 import { substitute } from './substitute';
 import { typeExpression } from './expression-dispatcher';
@@ -1334,6 +1335,7 @@ export const typeAccessor = (
 	const funcType = functionType([recordVar], returnType);
 	// Add structural constraint only for non-optional accessors.
 	// Optional accessors must NOT require the field to exist.
+	let stateWithConstraint = finalState;
 	if (!expr.optional && recordVar.kind === 'variable') {
 		// For validation: add to the type variable itself
 		recordVar.constraints = [
@@ -1348,9 +1350,23 @@ export const typeAccessor = (
 				fields: { [fieldName]: fieldType },
 			}),
 		];
+
+		// Name-keyed store: the authoritative record, independent of the object
+		// identity that the two assignments above depend on.
+		stateWithConstraint = {
+			...finalState,
+			constraints: addConstraint(
+				finalState.constraints,
+				recordVar.name,
+				hasStructureConstraint(recordVar.name, {
+					fields: { [fieldName]: fieldType },
+				}),
+				finalState.substitution
+			),
+		};
 	}
 
-	return createPureTypeResult(funcType, finalState);
+	return createPureTypeResult(funcType, stateWithConstraint);
 };
 
 // Type inference for tuples

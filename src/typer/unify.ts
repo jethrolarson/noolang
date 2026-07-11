@@ -9,6 +9,7 @@ import {
 	unificationError,
 } from './type-errors';
 import { mapSet, typeToString, occursIn } from './helpers';
+import { addConstraints, getConstraints } from './constraint-store';
 // Legacy constraint imports removed
 import { functionApplicationError } from './type-errors';
 import { getTypeName } from './trait-system';
@@ -487,9 +488,35 @@ function unifyVariable(
 				)
 			)
 		);
+	const newSubstitution = mapSet(state.substitution, s1.name, s2);
+
+	// Carry s1's constraints over to s2 in the name-keyed store, mirroring the
+	// object-level merge above. Binding s1 := s2 makes s2 the representative, so
+	// s1's constraints become s2's. Constraints already recorded against s1's own
+	// name are included: the object-level chain walk above only sees constraints
+	// that happen to hang off the variable OBJECTS it can reach.
+	let newConstraints = state.constraints;
+	// Read s1's entry against the OLD substitution: under the new one s1 already
+	// resolves to s2, which would hand back s2's own constraints instead.
+	const storedForS1 = getConstraints(
+		state.constraints,
+		s1.name,
+		state.substitution
+	);
+	const carried = [...constraintsToCheck, ...storedForS1];
+	if (isTypeKind(s2, 'variable') && carried.length > 0) {
+		newConstraints = addConstraints(
+			newConstraints,
+			s2.name,
+			carried,
+			newSubstitution
+		);
+	}
+
 	let newState = {
 		...state,
-		substitution: mapSet(state.substitution, s1.name, s2),
+		substitution: newSubstitution,
+		constraints: newConstraints,
 	};
 	// If s2 is not a variable, propagate or check constraints
 	if (!isTypeKind(s2, 'variable')) {
