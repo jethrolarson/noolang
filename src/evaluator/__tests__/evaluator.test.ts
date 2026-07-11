@@ -290,7 +290,7 @@ describe('Evaluator', () => {
 	});
 
 	test('should evaluate basic import', () => {
-		const result = runCode('import "test/test_import"');
+		const result = runCode('import "./test/test_import"');
 		expect(result.finalValue).toBe(42);
 	});
 

@@ -59,7 +59,7 @@ test('should work with import destructuring', () => {
 	fs.writeFileSync('temp_test_module.noo', moduleSource);
 	
 	try {
-		const source = '{@add, @multiply} = import "temp_test_module"; add 3 4 + multiply 2 5';
+		const source = '{@add, @multiply} = import "./temp_test_module"; add 3 4 + multiply 2 5';
 		expect(runCode(source).finalValue).toEqual(17);
 	} finally {
 		// Clean up
@@ -80,7 +80,7 @@ test('should work with import destructuring and renaming', () => {
 	fs.writeFileSync('temp_test_module2.noo', moduleSource);
 	
 	try {
-		const source = '{@square sq, @cube cb} = import "temp_test_module2"; sq 4 + cb 2';
+		const source = '{@square sq, @cube cb} = import "./temp_test_module2"; sq 4 + cb 2';
 		expect(runCode(source).finalValue).toEqual(24);
 	} finally {
 		// Clean up
