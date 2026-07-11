@@ -6,6 +6,8 @@ import {
 	typeVariable,
 	type VariableType,
 	type Constraint,
+	type RecordStructure,
+	type StructureFieldType,
 } from '../ast';
 import { parse } from '../parser/parser';
 import { Lexer } from '../lexer/lexer';
@@ -185,28 +187,42 @@ export const freshenTypeVariables = (
 			);
 			
 			// Handle function-level constraints
+			currentState = finalState;
 			let newConstraints: Constraint[] | undefined = undefined;
 			if (type.constraints && type.constraints.length > 0) {
 				newConstraints = type.constraints.map(constraint => {
+					let updated: Constraint = constraint;
 					// Update constraint variable names using the mapping
 					if ('typeVar' in constraint) {
 						const mappedVar = mapping.get(constraint.typeVar);
 						if (mappedVar && mappedVar.kind === 'variable') {
-							return {
-								...constraint,
-								typeVar: mappedVar.name,
-							};
+							updated = { ...constraint, typeVar: mappedVar.name };
 						}
 					}
-					return constraint;
+					// Freshen the type variables INSIDE a structural constraint's
+					// structure so they stay linked to the (also freshened) return
+					// type. Without this, `getName = @name` instantiated to
+					// `a -> b given a has {@name c}` — the return `b` decoupled from
+					// the field var `c`, so `map getName xs` could never infer the
+					// element type.
+					if (updated.kind === 'has') {
+						const [freshStructure, nextState] = freshenRecordStructure(
+							updated.structure,
+							mapping,
+							currentState
+						);
+						currentState = nextState;
+						updated = { ...updated, structure: freshStructure };
+					}
+					return updated;
 				});
 			}
-			
+
 			const freshenedFunction = { ...type, params: newParams, return: newReturn };
 			if (newConstraints) {
 				freshenedFunction.constraints = newConstraints;
 			}
-			return [freshenedFunction, finalState];
+			return [freshenedFunction, currentState];
 		}
 		case 'list': {
 			const [newElem, nextState] = freshenTypeVariables(
@@ -301,6 +317,38 @@ export const freshenTypeVariables = (
 		default:
 			return [type, state];
 	}
+};
+
+// Freshen the type variables inside a structural-constraint RecordStructure,
+// reusing the same variable mapping as the enclosing type so field vars stay
+// linked to the freshened return type. Handles nested structures recursively.
+export const freshenRecordStructure = (
+	structure: RecordStructure,
+	mapping: Map<string, Type>,
+	state: TypeState
+): [RecordStructure, TypeState] => {
+	let currentState = state;
+	const newFields: { [fieldName: string]: StructureFieldType } = {};
+	for (const [fieldName, fieldType] of Object.entries(structure.fields)) {
+		if (fieldType.kind === 'nested') {
+			const [nested, nextState] = freshenRecordStructure(
+				fieldType.structure,
+				mapping,
+				currentState
+			);
+			currentState = nextState;
+			newFields[fieldName] = { kind: 'nested', structure: nested };
+		} else {
+			const [newField, nextState] = freshenTypeVariables(
+				fieldType,
+				mapping,
+				currentState
+			);
+			currentState = nextState;
+			newFields[fieldName] = newField;
+		}
+	}
+	return [{ fields: newFields }, currentState];
 };
 
 // Helper to flatten semicolon-separated binary expressions into individual statements

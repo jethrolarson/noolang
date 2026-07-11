@@ -148,7 +148,7 @@ describe('Structural Constraints', () => {
 			// Accessors in function bodies should work correctly
 		});
 
-		test.skip('Mapping accessors over lists', () => {
+		test('Mapping accessors over lists', () => {
 			const result = parseAndType(`map @name [{@name 'bob'}]`);
 			assertListType(result.type);
 			assertPrimitiveType(result.type.element);
@@ -191,7 +191,7 @@ describe('Structural Constraints', () => {
 			// expect(result.type.name).toBe('String'); // Should be this when fixed
 		});
 
-		test.skip('should work with accessor partial application', () => {
+		test('should work with accessor partial application', () => {
 			const result = parseAndType(`
         getName = @name;
         mapGetName = map getName;
@@ -199,11 +199,23 @@ describe('Structural Constraints', () => {
         result = mapGetName people
       `);
 			assertListType(result.type);
-			// TODO: Fix constraint propagation for accessors in higher-order functions
-			// Currently returns List a instead of List String
-			assertVariableType(result.type.element);
-			// assertPrimitiveType(result.type.element);
-			// expect(result.type.element.name).toBe('String'); // Should be this when fixed
+			// Accessor constraint now propagates through the higher-order map even
+			// when the accessor is let-bound and map is partially applied.
+			assertPrimitiveType(result.type.element);
+			expect(result.type.element.name).toBe('String');
+		});
+
+		test('let-bound accessor keeps return var linked to its field var', () => {
+			// Regression: instantiating a generalized accessor scheme used to
+			// decouple the return type variable from the field type variable inside
+			// its `has` constraint (`a -> b given a has {@name c}`), so the field
+			// type could never flow to the result. They must share one variable.
+			const result = parseAndType(`getName = @name; getName`);
+			const typeString = typeToString(
+				result.type,
+				result.state.substitution
+			);
+			expect(typeString).toBe('a -> b given a has {@name b}');
 		});
 	});
 
