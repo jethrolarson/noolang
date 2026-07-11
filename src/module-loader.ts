@@ -175,17 +175,148 @@ export function clearModuleCache(): void {
 // ─── path resolution ──────────────────────────────────────────────────────────
 
 /**
+ * Import-map entry from a noolang.json `imports` object.
+ * Values are paths (or prefix paths) that resolve relative to the map file's directory.
+ */
+export type ImportMap = {
+	/** Directory containing the noolang.json that was found. */
+	mapDir: string;
+	/** The parsed `imports` mapping: specifier (or prefix ending with /) → path. */
+	imports: Record<string, string>;
+};
+
+/**
+ * Walk up from `startDir` looking for a `noolang.json` file with an `imports`
+ * field. Returns the first one found, or null if none exists up to the FS root.
+ *
+ * Import-map entries resolve relative to the directory of the map file.
+ */
+export function findImportMap(startDir: string): ImportMap | null {
+	let dir = startDir;
+	while (true) {
+		const candidate = nodePath.join(dir, 'noolang.json');
+		if (fs.existsSync(candidate)) {
+			try {
+				const raw = JSON.parse(fs.readFileSync(candidate, 'utf8')) as unknown;
+				if (
+					raw !== null &&
+					typeof raw === 'object' &&
+					'imports' in raw &&
+					typeof (raw as Record<string, unknown>).imports === 'object' &&
+					(raw as Record<string, unknown>).imports !== null
+				) {
+					return {
+						mapDir: dir,
+						imports: (raw as { imports: Record<string, string> }).imports,
+					};
+				}
+			} catch {
+				// Malformed JSON — skip and keep walking up
+			}
+		}
+		const parent = nodePath.dirname(dir);
+		if (parent === dir) break; // Reached filesystem root
+		dir = parent;
+	}
+	return null;
+}
+
+/**
+ * Look up a bare specifier in an import map.
+ * Checks exact matches first, then prefix matches (keys ending with `/`).
+ * Returns the absolute resolved path (still needs `.noo` extension and realpathSync),
+ * or null if no match.
+ */
+function lookupImportMap(map: ImportMap, specifier: string): string | null {
+	// Exact match
+	if (specifier in map.imports) {
+		return nodePath.resolve(map.mapDir, map.imports[specifier]);
+	}
+	// Prefix match: map entries ending with / match specifiers starting with that prefix
+	for (const [key, value] of Object.entries(map.imports)) {
+		if (key.endsWith('/') && specifier.startsWith(key)) {
+			const rest = specifier.slice(key.length);
+			const base = value.endsWith('/') ? value : `${value}/`;
+			return nodePath.resolve(map.mapDir, `${base}${rest}`);
+		}
+	}
+	return null;
+}
+
+/**
  * Resolve an import path to a canonical realpath.
- * Appends `.noo` if missing. Resolves relative to `currentDir` if given,
- * else relative to process.cwd().
+ *
+ * Resolution rules (Deno-style, explicit):
+ *
+ * 1. **Relative** (`./` or `../`): resolved against `currentDir` (or CWD if not given).
+ *    These are the ONLY specifiers that resolve as file-relative paths.
+ *
+ * 2. **Absolute** (`/...`): portability trap — machine paths belong in the import map.
+ *    Decision: emit a warning (stderr) and proceed. This keeps existing tests (which
+ *    use absolute paths for temp files) working while clearly flagging the misuse.
+ *
+ * 3. **`std` / `std/*`**: reserved prefix for the modular standard library.
+ *    The stdlib is currently loaded monolithically as the frozen base — it has NOT
+ *    been split into importable `std/*` modules yet. Throws a clear "deferred" error.
+ *
+ * 4. **Bare specifiers** (everything else, including `foo/bar`): resolved through
+ *    a `noolang.json` import map. The map is found by walking up from `currentDir`
+ *    (or CWD). Map entries resolve relative to the map file's directory.
+ *    No matching entry → clear error naming the specifier and suggesting fixes.
  */
 export function resolveModulePath(importPath: string, currentDir?: string): string {
-	const withExt = importPath.endsWith('.noo') ? importPath : `${importPath}.noo`;
+	// ── 1. Relative specifier ──────────────────────────────────────────────────
+	if (importPath.startsWith('./') || importPath.startsWith('../')) {
+		const base = currentDir ?? process.cwd();
+		const withExt = importPath.endsWith('.noo') ? importPath : `${importPath}.noo`;
+		const absolute = nodePath.resolve(base, withExt);
+		return fs.realpathSync(absolute);
+	}
+
+	// ── 2. Absolute path ───────────────────────────────────────────────────────
+	if (nodePath.isAbsolute(importPath)) {
+		// Portability advisory: absolute paths are machine-local and will fail on
+		// other machines / CI. We warn rather than error to preserve backward
+		// compatibility for tests and tooling that use absolute temp paths.
+		process.stderr.write(
+			`[noolang warning] Absolute import path '${importPath}' is not portable. ` +
+				`Consider a relative path (./...) or an import-map entry in noolang.json.\n`
+		);
+		const withExt = importPath.endsWith('.noo') ? importPath : `${importPath}.noo`;
+		return fs.realpathSync(withExt);
+	}
+
+	// ── 3. std/* — reserved, deferred ─────────────────────────────────────────
+	if (importPath === 'std' || importPath.startsWith('std/')) {
+		throw new Error(
+			`'std/*' imports are reserved for the Noolang standard library.\n` +
+				`The standard library is currently loaded monolithically at startup ` +
+				`and has not yet been split into importable modules.\n` +
+				`(Deferred: 'std/*' will be routed properly when stdlib is modularized into ` +
+				`separate files. For now, all stdlib functions are available globally.)`
+		);
+	}
+
+	// ── 4. Bare specifier — import map ────────────────────────────────────────
 	const base = currentDir ?? process.cwd();
-	const absolute = nodePath.isAbsolute(withExt)
-		? withExt
-		: nodePath.resolve(base, withExt);
-	return fs.realpathSync(absolute);
+	const importMap = findImportMap(base);
+	if (importMap) {
+		const resolved = lookupImportMap(importMap, importPath);
+		if (resolved !== null) {
+			const withExt = resolved.endsWith('.noo') ? resolved : `${resolved}.noo`;
+			return fs.realpathSync(withExt);
+		}
+	}
+
+	// ── 5. No match → clear error ──────────────────────────────────────────────
+	throw new Error(
+		`Cannot resolve bare specifier '${importPath}': ` +
+			`no matching entry in import map (noolang.json).\n` +
+			`Suggestions:\n` +
+			`  - Use a relative path: './path/to/module' or '../path/to/module'\n` +
+			`  - Add an entry to noolang.json in your project root:\n` +
+			`    { "imports": { "${importPath}": "./path/to/module" } }`
+	);
 }
 
 // ─── manifest + diff extraction ───────────────────────────────────────────────

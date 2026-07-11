@@ -1261,9 +1261,12 @@ export class Evaluator {
 	}
 
 	private loadStdlib(): void {
-		// Try multiple possible paths for stdlib.noo
+		// Try multiple possible paths for stdlib.noo.
+		// Primary: __dirname-relative (src/evaluator/../../stdlib.noo = project root).
+		// This is CWD-independent and is the authoritative path.
+		// Fallbacks are kept for environments where __dirname behaves unexpectedly.
 		const possiblePaths = [
-			this.path.join(__dirname, '..', 'stdlib.noo'),
+			this.path.join(__dirname, '..', '..', 'stdlib.noo'),
 			this.path.join(process.cwd(), 'stdlib.noo'),
 			this.path.join(process.cwd(), 'src', '..', 'stdlib.noo'),
 		];

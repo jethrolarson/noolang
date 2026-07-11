@@ -21,7 +21,7 @@ test('import of a module containing a type error surfaces the error at type-chec
 	// module's value would type-check as String; with the fix it must throw.
 	withModule('_test_bad_import_module', 'bad = 1 + "hello";\n{@val bad}\n', () => {
 		expect(() =>
-			parseAndType('m = import "_test_bad_import_module"; concat (m | @val) "x"')
+			parseAndType('m = import "./_test_bad_import_module"; concat (m | @val) "x"')
 		).toThrow();
 	});
 });
@@ -31,7 +31,7 @@ test('import of a valid module still works', () => {
 		'_test_ok_import_module',
 		'addFn = fn x y => x + y;\n{@add addFn}\n',
 		() => {
-			const r = runCode('{@add} = import "_test_ok_import_module"; add 2 3');
+			const r = runCode('{@add} = import "./_test_ok_import_module"; add 2 3');
 			expect(r.finalValue).toBe(5);
 		}
 	);

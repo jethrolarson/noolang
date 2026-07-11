@@ -26,7 +26,7 @@ describe('Import Type Inference', () => {
     const modulePath = path.join(testModuleDir, 'simple_number.noo');
     fs.writeFileSync(modulePath, moduleSource);
     
-    const source = 'x = import "temp_test_modules/simple_number"; x';
+    const source = 'x = import "./temp_test_modules/simple_number"; x';
     const result = parseAndType(source);
     
     expect(result.type?.kind).toBe('primitive');
@@ -38,7 +38,7 @@ describe('Import Type Inference', () => {
     const modulePath = path.join(testModuleDir, 'simple_string.noo');
     fs.writeFileSync(modulePath, moduleSource);
     
-    const source = 'x = import "temp_test_modules/simple_string"; x';
+    const source = 'x = import "./temp_test_modules/simple_string"; x';
     const result = parseAndType(source);
     
     expect(result.type?.kind).toBe('primitive');
@@ -50,7 +50,7 @@ describe('Import Type Inference', () => {
     const modulePath = path.join(testModuleDir, 'person_record.noo');
     fs.writeFileSync(modulePath, moduleSource);
     
-    const source = 'person = import "temp_test_modules/person_record"; person';
+    const source = 'person = import "./temp_test_modules/person_record"; person';
     const result = parseAndType(source);
     
     expect(result.type?.kind).toBe('record');
@@ -68,7 +68,7 @@ describe('Import Type Inference', () => {
     const modulePath = path.join(testModuleDir, 'increment.noo');
     fs.writeFileSync(modulePath, moduleSource);
     
-    const source = 'inc = import "temp_test_modules/increment"; inc';
+    const source = 'inc = import "./temp_test_modules/increment"; inc';
     const result = parseAndType(source);
     
     expect(result.type?.kind).toBe('function');
@@ -89,7 +89,7 @@ describe('Import Type Inference', () => {
     const modulePath = path.join(testModuleDir, 'math_functions.noo');
     fs.writeFileSync(modulePath, moduleSource);
     
-    const source = 'math = import "temp_test_modules/math_functions"; math';
+    const source = 'math = import "./temp_test_modules/math_functions"; math';
     const result = parseAndType(source);
     
     expect(result.type?.kind).toBe('record');
@@ -105,7 +105,7 @@ describe('Import Type Inference', () => {
     const modulePath = path.join(testModuleDir, 'number_list.noo');
     fs.writeFileSync(modulePath, moduleSource);
     
-    const source = 'numbers = import "temp_test_modules/number_list"; numbers';
+    const source = 'numbers = import "./temp_test_modules/number_list"; numbers';
     const result = parseAndType(source);
     
     expect(result.type?.kind).toBe('list');
@@ -123,7 +123,7 @@ describe('Import Type Inference', () => {
     const modulePath = path.join(testModuleDir, 'power_functions.noo');
     fs.writeFileSync(modulePath, moduleSource);
     
-    const source = '{@square, @cube} = import "temp_test_modules/power_functions"; square 4 + cube 2';
+    const source = '{@square, @cube} = import "./temp_test_modules/power_functions"; square 4 + cube 2';
     const result = runCode(source);
     
     expect(result.finalValue).toBe(24); // 4² + 2³ = 16 + 8 = 24
@@ -135,7 +135,7 @@ describe('Import Type Inference', () => {
     const modulePath = path.join(testModuleDir, 'doubler.noo');
     fs.writeFileSync(modulePath, moduleSource);
     
-    const source = 'doubler = import "temp_test_modules/doubler"; doubler 5';
+    const source = 'doubler = import "./temp_test_modules/doubler"; doubler 5';
     const result = runCode(source);
     
     expect(result.finalValue).toBe(10); // 5 * 2 = 10
