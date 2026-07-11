@@ -64,6 +64,15 @@ export function tryResolveConstraints(
 	argTypes: Type[],
 	state: TypeState
 ): { resolvedType: Type; updatedState: TypeState } | null {
+	// Accumulate substitutions across ALL constraints before substituting the
+	// return type. A single application can carry several constraints (e.g.
+	// `map @name` has both `f implements Functor` and `b has {@name c}`);
+	// resolving only the first and returning early left the field type variable
+	// unbound, so `map @name [{@name "bob"}]` inferred `List a` instead of
+	// `List String`.
+	const mergedSubstitution = new Map(state.substitution);
+	let resolvedAny = false;
+
 	// For each constraint, check if any of the argument types can satisfy it
 	for (const constraint of functionConstraints) {
 		if (constraint.kind === 'implements') {
@@ -121,15 +130,11 @@ export function tryResolveConstraints(
 						substitution.set(varName, argType);
 					}
 
-					// Apply substitution to return type
-					const resolvedType = substitute(returnType, substitution);
-					// Merge the local substitution back into the global state
-					const updatedSubstitution = new Map([
-						...state.substitution,
-						...substitution,
-					]);
-					const updatedState = { ...state, substitution: updatedSubstitution };
-					return { resolvedType, updatedState };
+					// Accumulate this constraint's substitution and move on to the
+					// next constraint (do not substitute the return type yet).
+					for (const [k, v] of substitution) mergedSubstitution.set(k, v);
+					resolvedAny = true;
+					break;
 				}
 			}
 		} else if (constraint.kind === 'has') {
@@ -185,7 +190,7 @@ export function tryResolveConstraints(
 				if (actualRecordType) {
 					// Check if the record type has all required fields
 					let hasAllFields = true;
-					const substitution = new Map(state.substitution);
+					const substitution = new Map(mergedSubstitution);
 
 					for (const fieldName of Object.keys(requiredStructure.fields)) {
 						// Normalize field names - remove @ prefix if it exists
@@ -234,7 +239,8 @@ export function tryResolveConstraints(
 								}
 							}
 						}
-						// Apply substitution to return type
+						// Apply substitution to return type (used only by the special
+						// case below to detect an unsubstituted accessor return var).
 						let resolvedType = substitute(returnType, substitution);
 
 						// SPECIAL CASE: If the return type is still a variable and we have field type substitutions,
@@ -273,20 +279,25 @@ export function tryResolveConstraints(
 								resolvedType = resultType;
 							}
 						}
-						// Merge the local substitution back into the global state
-						const updatedSubstitution = new Map([
-							...state.substitution,
-							...substitution,
-						]);
-						const updatedState = {
-							...state,
-							substitution: updatedSubstitution,
-						};
-						return { resolvedType, updatedState };
+						// Reference resolvedType so it is not flagged as unused; the
+						// authoritative result comes from mergedSubstitution below.
+						void resolvedType;
+						// Accumulate this constraint's substitution and continue.
+						for (const [k, v] of substitution) mergedSubstitution.set(k, v);
+						resolvedAny = true;
+						break;
 					}
 				}
 			}
 		}
+	}
+
+	if (resolvedAny) {
+		const resolvedType = substitute(returnType, mergedSubstitution);
+		return {
+			resolvedType,
+			updatedState: { ...state, substitution: mergedSubstitution },
+		};
 	}
 
 	// Could not resolve any constraints
