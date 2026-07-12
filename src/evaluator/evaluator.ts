@@ -135,16 +135,19 @@ export class Evaluator {
 	private fs: typeof defaultFs;
 	private path: typeof defaultPath;
 	public traitRegistry: TraitRegistry;
+	private programArgs: string[];
 
 	constructor(opts: {
 		fs?: typeof defaultFs;
 		path?: typeof defaultPath;
 		traitRegistry: TraitRegistry;
 		skipStdlib?: boolean;
+		programArgs?: string[];
 	}) {
 		this.fs = opts.fs ?? defaultFs;
 		this.path = opts.path ?? defaultPath;
 		this.traitRegistry = opts.traitRegistry;
+		this.programArgs = opts.programArgs ?? [];
 		this.environment = new Map();
 		this.environmentStack = [];
 		this.initializeBuiltins();
@@ -728,6 +731,125 @@ export class Evaluator {
 				createString(valueToString(value))
 			)
 		);
+
+		this.environment.set(
+			'split',
+			createNativeFunction('split', (delimiter: Value) => (str: Value) => {
+				if (!isString(delimiter) || !isString(str)) {
+					throw new Error('split requires two strings');
+				}
+				const parts =
+					delimiter.value === ''
+						? str.value.split('')
+						: str.value.split(delimiter.value);
+				return createList(parts.map(createString));
+			})
+		);
+
+		this.environment.set(
+			'chars',
+			createNativeFunction('chars', (str: Value) => {
+				if (!isString(str)) throw new Error('chars requires a string');
+				return createList(Array.from(str.value).map(createString));
+			})
+		);
+
+		this.environment.set(
+			'trim',
+			createNativeFunction('trim', (str: Value) => {
+				if (!isString(str)) throw new Error('trim requires a string');
+				return createString(str.value.trim());
+			})
+		);
+
+		this.environment.set(
+			'toUpper',
+			createNativeFunction('toUpper', (str: Value) => {
+				if (!isString(str)) throw new Error('toUpper requires a string');
+				return createString(str.value.toUpperCase());
+			})
+		);
+
+		this.environment.set(
+			'toLower',
+			createNativeFunction('toLower', (str: Value) => {
+				if (!isString(str)) throw new Error('toLower requires a string');
+				return createString(str.value.toLowerCase());
+			})
+		);
+
+		this.environment.set(
+			'indexOf',
+			createNativeFunction(
+				'indexOf',
+				(needle: Value) => (haystack: Value) => {
+					if (!isString(needle) || !isString(haystack)) {
+						throw new Error('indexOf requires two strings');
+					}
+					const idx = haystack.value.indexOf(needle.value);
+					return idx === -1
+						? createConstructor('None', [])
+						: createConstructor('Some', [createNumber(idx)]);
+				}
+			)
+		);
+
+		this.environment.set(
+			'startsWith',
+			createNativeFunction(
+				'startsWith',
+				(prefix: Value) => (str: Value) => {
+					if (!isString(prefix) || !isString(str)) {
+						throw new Error('startsWith requires two strings');
+					}
+					return createBool(str.value.startsWith(prefix.value));
+				}
+			)
+		);
+
+		this.environment.set(
+			'endsWith',
+			createNativeFunction('endsWith', (suffix: Value) => (str: Value) => {
+				if (!isString(suffix) || !isString(str)) {
+					throw new Error('endsWith requires two strings');
+				}
+				return createBool(str.value.endsWith(suffix.value));
+			})
+		);
+
+		this.environment.set(
+			'replace',
+			createNativeFunction(
+				'replace',
+				(search: Value) => (replacement: Value) => (str: Value) => {
+					if (
+						!isString(search) ||
+						!isString(replacement) ||
+						!isString(str)
+					) {
+						throw new Error('replace requires three strings');
+					}
+					return createString(
+						str.value.split(search.value).join(replacement.value)
+					);
+				}
+			)
+		);
+
+		this.environment.set(
+			'substring',
+			createNativeFunction(
+				'substring',
+				(start: Value) => (end: Value) => (str: Value) => {
+					if (!isNumber(start) || !isNumber(end) || !isString(str)) {
+						throw new Error('substring requires two numbers and a string');
+					}
+					return createString(str.value.slice(start.value, end.value));
+				}
+			)
+		);
+
+		this.environment.set('argv', createList(this.programArgs.map(createString)));
 
 		// Unknown utilities (pure)
 		this.environment.set(

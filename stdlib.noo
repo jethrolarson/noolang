@@ -280,6 +280,19 @@ head = fn list => if (length list) == 0
 join = fn separator list =>
   reduce (fn acc x => if acc == "" then x else concat acc (concat separator x)) "" list;
 
+filter = list_filter;
+
+# Insertion sort via the Ord constraint (`<`); fine at toy/script scale.
+insert_sorted = fn x list => match (head list) (
+  None => [x];
+  Some h => if x < h then cons x list else cons h (insert_sorted x (tail list))
+);
+
+sort = fn list => match (head list) (
+  None => [];
+  Some h => insert_sorted h (sort (tail list))
+);
+
 implement Functor List (
   map = fn f list => list_map f list
 );
