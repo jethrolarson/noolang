@@ -5,7 +5,6 @@ import {
 	assertPrimitiveType,
 	assertVariantType,
 	parseAndType,
-	assertConstrainedType,
 	assertImplementsConstraint,
 } from '../../../test/utils';
 
@@ -100,8 +99,10 @@ test('should infer constraints in if expressions', () => {
 	);
 });
 
-// TODO fix where not working in function bodies
-test.skip('should infer constraints in where expressions', () => {
+// `x + 1` pins x to Float (numeric literals are all Float now, Int was
+// removed), so `Float -> Bool` is correct here, not a constrained type -
+// see docs-wip/GENERALIZATION_BUG.md.
+test('where-bound result concretely typed when literals pin the type', () => {
 	const code = `
 			fn x => result where (
 				y = x + 1;
@@ -110,19 +111,35 @@ test.skip('should infer constraints in where expressions', () => {
 		`;
 	const typeResult = parseAndType(code);
 
-	expect(typeResult.type.kind).toBe('constrained');
-	assertConstrainedType(typeResult.type);
+	assertFunctionType(typeResult.type);
+	assertPrimitiveType(typeResult.type.params[0]);
+	expect(typeResult.type.params[0].name).toBe('Float');
+	assertVariantType(typeResult.type.return);
+	expect(typeResult.type.return.name).toBe('Bool');
+});
 
-	const constraintEntries = Array.from(typeResult.type.constraints.entries());
-	expect(constraintEntries.length).toBeGreaterThan(0);
+// Regression for the generalize/freeTypeVarsEnv bug (GENERALIZATION_BUG.md):
+// a where-bound (or semicolon-let-bound) result must stay linked to the
+// enclosing function's parameters, not get quantified as an unrelated var
+// with its constraint dropped.
+test('where-bound result stays linked to params and keeps its constraint', () => {
+	const code = 'fn x y => result where (result = x + y)';
+	const typeResult = parseAndType(code);
 
-	const constraints = constraintEntries[0][1];
-	const traitNames = constraints.map(c => {
-		assertImplementsConstraint(c);
-		return c.interfaceName;
-	});
-	expect(traitNames).toContain('Add');
-	expect(traitNames).toContain('Eq');
+	assertFunctionType(typeResult.type);
+	expect(typeResult.type.constraints?.length).toBeGreaterThan(0);
+	assertImplementsConstraint(typeResult.type.constraints![0]);
+	expect(typeResult.type.constraints![0].interfaceName).toBe('Add');
+});
+
+test('semicolon-let-bound result stays linked to params and keeps its constraint', () => {
+	const code = 'fn x y => (result = x + y; result)';
+	const typeResult = parseAndType(code);
+
+	assertFunctionType(typeResult.type);
+	expect(typeResult.type.constraints?.length).toBeGreaterThan(0);
+	assertImplementsConstraint(typeResult.type.constraints![0]);
+	expect(typeResult.type.constraints![0].interfaceName).toBe('Add');
 });
 
 test('should work with concrete types that implement traits', () => {
@@ -141,33 +158,4 @@ test('should work with concrete types that implement traits', () => {
 	assertPrimitiveType(appliedResult.type);
 	expect(appliedResult.type.name).toBe('Float');
 });
-
-// TODO fix where not working in function bodies
-test.skip('should handle complex nested expressions', () => {
-	const code = `
-		fn x => where (
-			temp = x + 10;
-			check = temp == 50;
-			result = if check then x * 2 else x - 5
-		) result
-	`;
-	const typeResult = parseAndType(code);
-
-	expect(typeResult.type.kind).toBe('constrained');
-	assertConstrainedType(typeResult.type);
-
-	const constraintEntries = Array.from(typeResult.type.constraints.entries());
-	expect(constraintEntries.length).toBeGreaterThan(0);
-
-	const constraints = constraintEntries[0][1];
-	const traitNames = constraints.map(c => {
-		assertImplementsConstraint(c);
-		return c.interfaceName;
-	});
-	expect(traitNames).toContain('Add');
-	expect(traitNames).toContain('Eq');
-	expect(traitNames).toContain('Mul');
-	expect(traitNames).toContain('Sub');
-});
-
 
