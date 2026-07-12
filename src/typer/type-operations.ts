@@ -88,10 +88,16 @@ export const freeTypeVars = (
 };
 
 // Collect all free type variables in the environment
-export const freeTypeVarsEnv = (env: TypeEnvironment): Set<string> => {
+export const freeTypeVarsEnv = (
+	env: TypeEnvironment,
+	substitution?: Map<string, Type>
+): Set<string> => {
 	const acc = new Set<string>();
 	for (const scheme of env.values()) {
-		freeTypeVars(scheme.type, acc);
+		const type = substitution ? substitute(scheme.type, substitution) : scheme.type;
+		for (const varName of freeTypeVars(type)) {
+			if (!scheme.quantifiedVars.includes(varName)) acc.add(varName);
+		}
 	}
 	return acc;
 };
@@ -105,7 +111,11 @@ export const generalize = (
 	// Apply current substitution to the type before generalizing
 	const substitutedType = substitute(type, substitution);
 	const typeVars = freeTypeVars(substitutedType);
-	const envVars = freeTypeVarsEnv(env);
+	// Environment variables must be resolved through the same substitution:
+	// a param bound during body inference (α216 := α220) otherwise still reads
+	// as α216 in the env while the value's type says α220, so α220 looks free
+	// and gets wrongly quantified. See docs-wip/GENERALIZATION_BUG.md.
+	const envVars = freeTypeVarsEnv(env, substitution);
 	const quantifiedVars: string[] = [];
 
 	for (const varName of typeVars) {

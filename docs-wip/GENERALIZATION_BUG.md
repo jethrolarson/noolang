@@ -1,7 +1,10 @@
 # Generalization ignores the substitution — unsound, and not a one-liner
 
-Found 2026-07-11 while chasing the two skipped `where`-inference tests. Not
-fixed. Attempted, reverted, written down instead.
+Found 2026-07-11 while chasing the two skipped `where`-inference tests.
+**Fixed 2026-07-11** (same session, continued). See "Resolution" at the
+bottom — the 205-test regression predicted below turned out to be a single
+upstream cascade (stdlib failing to *load* at all breaks every test that
+touches it), not 205 independent breakages.
 
 ## The bug
 
@@ -75,3 +78,58 @@ So `where` is not broken in the way those tests claim, and un-skipping them as
 written would be wrong. Rewrite them against the real bug above — a `where`
 binding whose type must stay linked to the enclosing function's parameters —
 or delete them.
+
+## Resolution (2026-07-11)
+
+Shipped the fix described above: `freeTypeVarsEnv` now takes the substitution,
+resolves each scheme's type through it, and excludes the scheme's own
+`quantifiedVars` (previously a stored polymorphic scheme's bound var names
+leaked into "env vars" too, though harmlessly in practice since fresh-var
+names are monotonic and never collide).
+
+**The predicted 205-test regression was a mirage.** `stdlib.noo` failing to
+*load* fails every test that touches stdlib (nearly all of them) — one root
+cause, not 205. The actual failure was real, just singular: `Monad Option`'s
+and `Monad Result`'s `bind` both had an "auto-wrap non-Option/Result values"
+arm —
+
+```
+result = f x;
+match result (
+  Some y => result;
+  None => result;
+  _ => Some result   # auto-wrap
+)
+```
+
+— which requires unifying `result`'s type (`b`, from `f x`) with `Option b`
+(the wrapped fallback). That's `b ~ Option b`, an infinite type. The occurs
+check firing here is **correct** — this was never sound. It only typechecked
+before because the old buggy `generalize` over-generalized `b` and let each
+match arm re-instantiate it independently, hiding the paradox. Confirmed by
+reproducing the identical failure on `Monad Result` after fixing `Monad
+Option`, proving one bug pattern, not many.
+
+Fix, two parts:
+
+1. `type-operations.ts` — `freeTypeVarsEnv`/`generalize` as described above.
+2. `stdlib.noo` — removed the auto-wrap arm from both `bind` impls; a lawful
+   `bind` requires `f` to always return the monad's own type. `Some x => f x`,
+   full stop.
+
+Removing (2) broke `|?` (safe thrush), which had been leaning on `bind`'s
+auto-wrap to let a plain (non-Option-returning) right-hand function chain —
+`Some 5 |? add_ten` expects `Some 15` even though `add_ten : Float -> Float`.
+That coercion can't live in `bind` (same occurs-check reason), so it moved to
+`|?`'s own evaluator branch (`evaluator.ts`, the `'|?'` case), which now
+applies the right-hand function directly and wraps the result only if it
+isn't already the monad's own constructor — mirroring logic the *typer*
+already had in `handleSafeThrush`'s fallback path, which was computing the
+right type all along while the evaluator silently returned the wrong
+*value* (type said `Option Float`, runtime value was a bare `Float` — a
+live instance of the "green and wrong" hazard).
+
+Net: full suite green (1153 pass / 8 skip / 0 fail — 2 stale skips deleted),
+typecheck clean, docs 6/6 + README 57/57. Regression tests added in
+`trait-function-return-types.test.ts` for both the `where`- and
+semicolon-let-bound cases.

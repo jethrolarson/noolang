@@ -1947,38 +1947,54 @@ export class Evaluator {
 				);
 			}
 		} else if (expr.operator === '|?') {
-			// The |? operator should be desugared to a bind call by the type checker
-			// However, if constraint resolution failed, we might still see |? here
-			// Fall back to calling the trait bind function directly
+			// |? auto-wraps a plain (non-Option/Result-returning) right-hand
+			// function's result, unlike a lawful Monad.bind (which cannot express
+			// that: unifying the result type with its own wrapped form is an
+			// infinite type, caught by the occurs check). So this can't delegate
+			// to bind — it applies the payload directly and wraps on the way out.
 			const left = this.evaluateExpression(expr.left);
 			const right = this.evaluateExpression(expr.right);
 
-			// Check that right operand is a function
 			if (!isAnyFunction(right)) {
 				throw new Error(
 					`Cannot apply non-function in safe thrush: ${valueToString(right)}`
 				);
 			}
+			if (!isConstructor(left)) {
+				throw new Error(
+					`Safe thrush operator (|?) requires an Option or Result, got ${valueToString(left)}`
+				);
+			}
 
-			// Try to resolve bind as a trait function
-			if (this.isTraitFunction('bind')) {
-				try {
-					// Use trait function resolution for bind
-					const result = this.resolveTraitFunctionWithArgs(
-						'bind',
-						[left, right],
-						this.traitRegistry
-					);
-					if (result) {
-						return result;
-					}
-				} catch (_e) {
-					// Fall through to legacy lookup
+			const applyRight = (arg: Value): Value =>
+				isFunction(right) || isNativeFunction(right)
+					? right.fn(arg)
+					: (() => {
+							throw new Error(
+								`Cannot apply non-function in safe thrush: ${valueToString(right)}`
+							);
+						})();
+
+			if (left.name === 'None' || left.name === 'Err') {
+				return left;
+			}
+			if (left.name === 'Some') {
+				const result = applyRight(left.args[0]);
+				if (isConstructor(result) && (result.name === 'Some' || result.name === 'None')) {
+					return result;
 				}
+				return { tag: 'constructor', name: 'Some', args: [result] };
+			}
+			if (left.name === 'Ok') {
+				const result = applyRight(left.args[0]);
+				if (isConstructor(result) && (result.name === 'Ok' || result.name === 'Err')) {
+					return result;
+				}
+				return { tag: 'constructor', name: 'Ok', args: [result] };
 			}
 
 			throw new Error(
-				'Safe thrush operator (|?) failed: no bind function available'
+				`Safe thrush operator (|?) requires an Option or Result, got ${left.name}`
 			);
 		} else if (expr.operator === '$') {
 			// Handle dollar operator (low precedence function application)

@@ -733,6 +733,16 @@ function usesOperator(expr: Expression, targetOperator: string): boolean {
 				usesOperator(expr.expression, targetOperator) ||
 				expr.cases.some(case_ => usesOperator(case_.expression, targetOperator))
 			);
+		case 'definition':
+		case 'tuple-destructuring':
+		case 'record-destructuring':
+		case 'mutable-definition':
+			// A `;`-sequence desugars to nested binary(';') nodes whose left side
+			// is one of these binding kinds (see parseSequence) — without this,
+			// `(result = x + y; result)` never saw the `+` and lost its Add
+			// constraint even after the generalization fix linked `result`'s
+			// type back to the params.
+			return usesOperator(expr.value, targetOperator);
 		default:
 			return false;
 	}
