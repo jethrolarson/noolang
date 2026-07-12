@@ -1,6 +1,31 @@
 # Structural constraint store — design note
 
-Status: proposal. Written 2026-07-11, after PRs #121 and #122.
+Status: **landed**, except where noted below. Written 2026-07-11 after PRs #121
+and #122; delivered by #123 (store), #124 (composition), #125 (error messages)
+and #126 (cleanup).
+
+What shipped, against the plan below:
+
+- Steps 1–2 (store, then composition driven from it): done, #123 and #124.
+  `generateDepthFirstConstraints` is deleted.
+- Step 3 (`constraint-resolution` reads the store): done in the form that
+  mattered — unification now collects constraints from the store as well as the
+  objects, and the `findResultVariable` trap described under Hazards is deleted.
+- Step 4 (remove constraint mutation from `unify`; drop `.constraints` from
+  variable objects): **not done, deliberately.** The store is authoritative and
+  enforcement reads both sources, so identity divergence can no longer drop a
+  constraint — the bug this was meant to prevent. Actually removing the object
+  path means rewiring the type printer and `propagateConstraintToTypeVariable`
+  for zero behavioural gain, in an area that goes green and wrong. Worth doing
+  only alongside a reason to touch those two.
+
+One landmine remains, unreached: nested structures cannot arrive at unification
+today (composed constraints live on function types, not on variables), so the
+recursive validator added in #126 is exercised by direct unit tests rather than
+by any expression. If a future change routes a composed constraint through
+`unifyVariable`, that path is ready — but nothing proves it end to end.
+
+The rest of this note is the original proposal, kept for the reasoning.
 
 ## The goal
 
