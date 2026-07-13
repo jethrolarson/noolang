@@ -3,15 +3,11 @@ import { expectSuccess } from '../../../test/utils';
 
 describe('sort_by (stdlib)', () => {
 	test('sorts numbers ascending with an explicit less-than predicate', () => {
-		expectSuccess('sort_by (fn a b => a < b) [3, 1, 4, 1, 5]', [
-			1, 1, 3, 4, 5,
-		]);
+		expectSuccess('sort_by (<) [3, 1, 4, 1, 5]', [1, 1, 3, 4, 5]);
 	});
 
 	test('sorts descending when the predicate is reversed', () => {
-		expectSuccess('sort_by (fn a b => a > b) [3, 1, 4, 1, 5]', [
-			5, 4, 3, 1, 1,
-		]);
+		expectSuccess('sort_by (>) [3, 1, 4, 1, 5]', [5, 4, 3, 1, 1]);
 	});
 
 	test('sorts tuples by a derived key', () => {

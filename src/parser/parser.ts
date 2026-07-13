@@ -33,6 +33,7 @@ import {
 	type ImplementationFunction,
 	type MutationExpression,
 	type IfExpression,
+	type BinaryExpression,
 } from '../ast';
 import {
 	parseTypeDefinition,
@@ -235,15 +236,66 @@ const parseRecord = C.map(
 	}
 );
 
-// --- Parenthesized Expressions ---
-const parseParenExpr: C.Parser<Expression> = C.map(
-	C.seq(
+// --- Operator Sectioning: (op) desugars to fn a b => a op b ---
+// Gives parenthesized syntax to pass an operator as a first-class function,
+// e.g. `sort_by (<) list` instead of `sort_by (fn a b => a < b) list`.
+// Desugars rather than referencing the operator's own (uncurried, 2-param)
+// environment binding, so it goes through the same binary-operator typing
+// path as ordinary infix use instead of needing that binding re-typed.
+//
+// The lexer's OPERATOR token also covers '=', '=>', '->' (assignment/arrow
+// punctuation, not binary operators), so sectioning is restricted to the
+// actual BinaryExpression operator set rather than accepting any OPERATOR.
+const sectionableOperators = new Set<BinaryExpression['operator']>([
+	'+', '-', '*', '/', '%', '==', '!=', '<', '>', '<=', '>=',
+	'|', '|?', '|>', '<|', '$',
+]);
+
+const parseOperatorSection: C.Parser<Expression> = tokens => {
+	const seqResult = C.seq(
 		C.punctuation('('),
-		C.lazy(() => parseSequence), // Use parseSequence to allow full semicolon-separated sequences
+		C.token('OPERATOR'),
 		C.punctuation(')')
-	),
-	([_open, expr, _close]) => expr
-);
+	)(tokens);
+	if (!seqResult.success) return seqResult;
+
+	const [_open, op] = seqResult.value;
+	if (!sectionableOperators.has(op.value as BinaryExpression['operator'])) {
+		return {
+			success: false,
+			error: `'${op.value}' cannot be used as a sectioned operator`,
+			position: op.location.start.line,
+		};
+	}
+
+	const fn: FunctionExpression = {
+		kind: 'function',
+		params: ['__section_a', '__section_b'],
+		body: {
+			kind: 'binary',
+			operator: op.value as BinaryExpression['operator'],
+			left: { kind: 'variable', name: '__section_a', location: op.location },
+			right: { kind: 'variable', name: '__section_b', location: op.location },
+			location: op.location,
+		},
+		location: op.location,
+	};
+	return { success: true, value: fn, remaining: seqResult.remaining };
+};
+
+// --- Parenthesized Expressions ---
+const parseParenExpr: C.Parser<Expression> = tokens => {
+	const sectionResult = parseOperatorSection(tokens);
+	if (sectionResult.success) return sectionResult;
+	return C.map(
+		C.seq(
+			C.punctuation('('),
+			C.lazy(() => parseSequence), // Use parseSequence to allow full semicolon-separated sequences
+			C.punctuation(')')
+		),
+		([_open, expr, _close]) => expr
+	)(tokens);
+};
 
 // --- Lambda Expression ---
 const parseLambdaExpression: C.Parser<Expression> = tokens => {
