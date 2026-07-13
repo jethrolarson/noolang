@@ -90,6 +90,42 @@ test('Lexer - Strings - should handle escape sequence at end of input', () => {
 	]);
 });
 
+test('Lexer - Strings - \\n escapes to a real newline character', () => {
+	const tokens = getTokenValues('"a\\nb"');
+	expect(tokens).toEqual([
+		{ type: 'STRING', value: 'a\nb' },
+		{ type: 'EOF', value: '' },
+	]);
+});
+
+test('Lexer - Strings - \\t escapes to a real tab character', () => {
+	const tokens = getTokenValues('"a\\tb"');
+	expect(tokens).toEqual([
+		{ type: 'STRING', value: 'a\tb' },
+		{ type: 'EOF', value: '' },
+	]);
+});
+
+test('Lexer - Operators - should tokenize && and ||', () => {
+	const tokens = getTokenValues('a && b || c');
+	expect(tokens).toEqual([
+		{ type: 'IDENTIFIER', value: 'a' },
+		{ type: 'OPERATOR', value: '&&' },
+		{ type: 'IDENTIFIER', value: 'b' },
+		{ type: 'OPERATOR', value: '||' },
+		{ type: 'IDENTIFIER', value: 'c' },
+		{ type: 'EOF', value: '' },
+	]);
+});
+
+test('Lexer - Strings - \\r escapes to a real carriage-return character', () => {
+	const tokens = getTokenValues('"a\\rb"');
+	expect(tokens).toEqual([
+		{ type: 'STRING', value: 'a\rb' },
+		{ type: 'EOF', value: '' },
+	]);
+});
+
 test('Lexer - Identifiers and Keywords - should tokenize basic identifiers', () => {
 	const tokens = getTokenValues('variable');
 	expect(tokens).toEqual([
@@ -109,7 +145,7 @@ test('Lexer - Identifiers and Keywords - should tokenize identifiers with unders
 test('Lexer - Identifiers and Keywords - should recognize keywords', () => {
 	const keywords = [
 		'if', 'then', 'else', 'let', 'in', 'fn', 'import', 'mut', 'where',
-		'variant', 'match', 'with', 'given', 'is', 'and', 'or', 'implements',
+		'variant', 'match', 'with', 'given', 'is', 'implements',
 		'constraint', 'implement'
 	];
 
@@ -120,6 +156,20 @@ test('Lexer - Identifiers and Keywords - should recognize keywords', () => {
 			{ type: 'EOF', value: '' },
 		]);
 	}
+});
+
+test("Lexer - Identifiers and Keywords - 'and'/'or' are ordinary identifiers, not keywords", () => {
+	// Contextually significant only inside constraint syntax (given a
+	// implements X and b implements Y), parsed there by value match, not
+	// reserved as a KEYWORD token type - see parse-type.ts.
+	expect(getTokenValues('and')).toEqual([
+		{ type: 'IDENTIFIER', value: 'and' },
+		{ type: 'EOF', value: '' },
+	]);
+	expect(getTokenValues('or')).toEqual([
+		{ type: 'IDENTIFIER', value: 'or' },
+		{ type: 'EOF', value: '' },
+	]);
 });
 
 test('Lexer - Identifiers and Keywords - should recognize primitive type keywords', () => {
@@ -414,8 +464,7 @@ test('Lexer - Complex expressions - should handle mixed operators and punctuatio
 		{ type: 'OPERATOR', value: '==' },
 		{ type: 'IDENTIFIER', value: 'y' },
 		{ type: 'PUNCTUATION', value: ')' },
-		{ type: 'PUNCTUATION', value: '&' },
-		{ type: 'PUNCTUATION', value: '&' },
+		{ type: 'OPERATOR', value: '&&' },
 		{ type: 'IDENTIFIER', value: 'z' },
 		{ type: 'EOF', value: '' },
 	]);

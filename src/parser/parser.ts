@@ -248,7 +248,7 @@ const parseRecord = C.map(
 // actual BinaryExpression operator set rather than accepting any OPERATOR.
 const sectionableOperators = new Set<BinaryExpression['operator']>([
 	'+', '-', '*', '/', '%', '==', '!=', '<', '>', '<=', '>=',
-	'|', '|?', '|>', '<|', '$',
+	'|', '|?', '|>', '<|', '$', '&&', '||',
 ]);
 
 const parseOperatorSection: C.Parser<Expression> = tokens => {
@@ -405,13 +405,53 @@ const parseLambdaBodyComparison: C.Parser<Expression> = tokens => {
 	)(tokens);
 };
 
-const parseLambdaBodyCompose: C.Parser<Expression> = C.map(
+const parseLambdaBodyLogicalAnd: C.Parser<Expression> = C.map(
 	C.seq(
 		parseLambdaBodyComparison,
+		C.many(C.seq(C.operator('&&'), parseLambdaBodyComparison))
+	),
+	([left, rest]) => {
+		let result = left;
+		for (const [_op, right] of rest) {
+			result = {
+				kind: 'binary',
+				operator: '&&',
+				left: result,
+				right,
+				location: result.location,
+			};
+		}
+		return result;
+	}
+);
+
+const parseLambdaBodyLogicalOr: C.Parser<Expression> = C.map(
+	C.seq(
+		parseLambdaBodyLogicalAnd,
+		C.many(C.seq(C.operator('||'), parseLambdaBodyLogicalAnd))
+	),
+	([left, rest]) => {
+		let result = left;
+		for (const [_op, right] of rest) {
+			result = {
+				kind: 'binary',
+				operator: '||',
+				left: result,
+				right,
+				location: result.location,
+			};
+		}
+		return result;
+	}
+);
+
+const parseLambdaBodyCompose: C.Parser<Expression> = C.map(
+	C.seq(
+		parseLambdaBodyLogicalOr,
 		C.many(
 			C.seq(
 				C.choice2(C.operator('|>'), C.operator('<|')),
-				parseLambdaBodyComparison
+				parseLambdaBodyLogicalOr
 			)
 		)
 	),
@@ -826,12 +866,48 @@ const parseComparison = C.map(
 	}
 );
 
+// --- Logical AND (&&) ---
+const parseLogicalAnd = C.map(
+	C.seq(parseComparison, C.many(C.seq(C.operator('&&'), parseComparison))),
+	([left, rest]) => {
+		let result = left;
+		for (const [_op, right] of rest) {
+			result = {
+				kind: 'binary',
+				operator: '&&',
+				left: result,
+				right,
+				location: result.location,
+			};
+		}
+		return result;
+	}
+);
+
+// --- Logical OR (||) ---
+const parseLogicalOr = C.map(
+	C.seq(parseLogicalAnd, C.many(C.seq(C.operator('||'), parseLogicalAnd))),
+	([left, rest]) => {
+		let result = left;
+		for (const [_op, right] of rest) {
+			result = {
+				kind: 'binary',
+				operator: '||',
+				left: result,
+				right,
+				location: result.location,
+			};
+		}
+		return result;
+	}
+);
+
 // --- Composition (|>, <|) ---
 const parseCompose = C.map(
 	C.seq(
-		parseComparison,
+		parseLogicalOr,
 		C.many(
-			C.seq(C.choice2(C.operator('|>'), C.operator('<|')), parseComparison)
+			C.seq(C.choice2(C.operator('|>'), C.operator('<|')), parseLogicalOr)
 		)
 	),
 	([left, rest]) => {
