@@ -293,6 +293,33 @@ sort = fn list => match (head list) (
   Some h => insert_sorted h (sort (tail list))
 );
 
+# Association-list helpers: List {key, value} as a small linear map.
+# Deliberately not a dedicated Map/Dict type - this covers the common
+# case (tally, group-by) without adding a new collection primitive;
+# revisit only if a real program needs O(1) lookup at real scale.
+assoc_get = fn key list => match (head list) (
+  None => None;
+  Some pair => (
+    {a, b} = pair;
+    if a == key then Some b else assoc_get key (tail list)
+  )
+);
+
+assoc_set = fn key value list => match (head list) (
+  None => [{key, value}];
+  Some pair => (
+    {a, b} = pair;
+    if a == key
+      then cons {key, value} (tail list)
+      else cons pair (assoc_set key value (tail list))
+  )
+);
+
+assoc_update = fn key f default list => match (assoc_get key list) (
+  Some v => assoc_set key (f v) list;
+  None => assoc_set key default list
+);
+
 implement Functor List (
   map = fn f list => list_map f list
 );
