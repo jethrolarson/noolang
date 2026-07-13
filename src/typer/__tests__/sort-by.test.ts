@@ -27,6 +27,6 @@ describe('sort_by (stdlib)', () => {
 	});
 
 	test('sort_by on an empty list returns an empty list', () => {
-		expectSuccess('sort_by (fn a b => a < b) ([] : List Float)', []);
+		expectSuccess('sort_by (<) ([] : List Float)', []);
 	});
 });
