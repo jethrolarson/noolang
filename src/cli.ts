@@ -439,7 +439,10 @@ async function main() {
 		const { program: decoratedProgram, state } = typeAndDecorate(program);
 		const typeTime = performance.now();
 
-		const evaluator = new Evaluator({ traitRegistry: state.traitRegistry });
+		const evaluator = new Evaluator({
+			traitRegistry: state.traitRegistry,
+			programArgs: fileArgs.slice(1),
+		});
 
 		const finalResult = evaluator.evaluateProgram(decoratedProgram);
 		const evalTime = performance.now();

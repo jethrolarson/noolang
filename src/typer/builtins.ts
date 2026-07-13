@@ -397,6 +397,73 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a'],
 	});
 
+	// String decomposition/manipulation (pure) - delimiter/needle/count args
+	// come first, subject string last, mirroring `at`'s index-then-list order
+	// so these compose naturally with `|`.
+	newEnv.set('split', {
+		type: createBinaryFunctionType(
+			stringType(),
+			stringType(),
+			listTypeWithElement(stringType())
+		),
+		quantifiedVars: [],
+	});
+	newEnv.set('chars', {
+		type: createUnaryFunctionType(
+			stringType(),
+			listTypeWithElement(stringType())
+		),
+		quantifiedVars: [],
+	});
+	newEnv.set('trim', {
+		type: createUnaryFunctionType(stringType(), stringType()),
+		quantifiedVars: [],
+	});
+	newEnv.set('toUpper', {
+		type: createUnaryFunctionType(stringType(), stringType()),
+		quantifiedVars: [],
+	});
+	newEnv.set('toLower', {
+		type: createUnaryFunctionType(stringType(), stringType()),
+		quantifiedVars: [],
+	});
+	newEnv.set('indexOf', {
+		type: createBinaryFunctionType(
+			stringType(),
+			stringType(),
+			optionType(floatType())
+		),
+		quantifiedVars: [],
+	});
+	newEnv.set('startsWith', {
+		type: createBinaryFunctionType(stringType(), stringType(), boolType()),
+		quantifiedVars: [],
+	});
+	newEnv.set('endsWith', {
+		type: createBinaryFunctionType(stringType(), stringType(), boolType()),
+		quantifiedVars: [],
+	});
+	newEnv.set('replace', {
+		type: functionType(
+			[stringType(), stringType(), stringType()],
+			stringType()
+		),
+		quantifiedVars: [],
+	});
+	newEnv.set('substring', {
+		type: functionType(
+			[floatType(), floatType(), stringType()],
+			stringType()
+		),
+		quantifiedVars: [],
+	});
+
+	// Program arguments - fixed for the life of the process, no effect needed
+	newEnv.set('argv', {
+		type: listTypeWithElement(stringType()),
+		quantifiedVars: [],
+	});
+
 	// Unknown utilities (pure)
 	newEnv.set('forget', {
 		type: createUnaryFunctionType(typeVariable('a'), unknownType()),
