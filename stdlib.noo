@@ -293,6 +293,21 @@ sort = fn list => match (head list) (
   Some h => insert_sorted h (sort (tail list))
 );
 
+# Sort with an explicit less-than predicate, for keys with no Ord instance
+# (tuples, records) or a non-default ordering (descending, derived key).
+insert_sorted_by = fn less_than x list => match (head list) (
+  None => [x];
+  Some h =>
+    if less_than x h
+      then cons x list
+      else cons h (insert_sorted_by less_than x (tail list))
+);
+
+sort_by = fn less_than list => match (head list) (
+  None => [];
+  Some h => insert_sorted_by less_than h (sort_by less_than (tail list))
+);
+
 # Association-list helpers: List {key, value} as a small linear map.
 # Deliberately not a dedicated Map/Dict type - this covers the common
 # case (tally, group-by) without adding a new collection primitive;
