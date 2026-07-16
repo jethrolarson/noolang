@@ -753,7 +753,7 @@ export const parseConstraintExpr: C.Parser<ConstraintExpr> = tokens => {
 	// Parse or chains
 	while (
 		rest.length > 0 &&
-		rest[0].type === 'KEYWORD' &&
+		rest[0].type === 'IDENTIFIER' &&
 		rest[0].value === 'or'
 	) {
 		rest = rest.slice(1);
@@ -773,7 +773,7 @@ const parseConstraintAnd: C.Parser<ConstraintExpr> = tokens => {
 
 	while (
 		rest.length > 0 &&
-		rest[0].type === 'KEYWORD' &&
+		rest[0].type === 'IDENTIFIER' &&
 		rest[0].value === 'and'
 	) {
 		rest = rest.slice(1);

@@ -995,7 +995,7 @@ export class Evaluator {
 		this.environment.set(
 			'println',
 			createNativeFunction('println', (value: Value) => {
-				console.log(valueToString(value));
+				console.log(isString(value) ? value.value : valueToString(value));
 				return value;
 			})
 		);
@@ -2040,6 +2040,16 @@ export class Evaluator {
 			// Evaluate left expression and discard result
 			this.evaluateExpression(expr.left);
 			// Evaluate and return right expression
+			return this.evaluateExpression(expr.right);
+		} else if (expr.operator === '&&') {
+			// Short-circuit: only evaluate right if left is True
+			const left = this.evaluateExpression(expr.left);
+			if (!boolValue(left)) return left;
+			return this.evaluateExpression(expr.right);
+		} else if (expr.operator === '||') {
+			// Short-circuit: only evaluate right if left is False
+			const left = this.evaluateExpression(expr.left);
+			if (boolValue(left)) return left;
 			return this.evaluateExpression(expr.right);
 		} else if (expr.operator === '|') {
 			// Handle thrush operator

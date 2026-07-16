@@ -136,6 +136,16 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a'],
 	});
 
+	// Logical operators - Bool only, short-circuiting (see evaluateBinary)
+	newEnv.set('&&', {
+		type: functionType([boolType(), boolType()], boolType()),
+		quantifiedVars: [],
+	});
+	newEnv.set('||', {
+		type: functionType([boolType(), boolType()], boolType()),
+		quantifiedVars: [],
+	});
+
 	const tailType = functionType(
 		[listTypeWithElement(typeVariable('a'))],
 		listTypeWithElement(typeVariable('a'))

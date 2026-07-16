@@ -256,7 +256,9 @@ export interface BinaryExpression {
 		| '|>'
 		| '<|'
 		| ';'
-		| '$';
+		| '$'
+		| '&&'
+		| '||';
 	left: Expression;
 	right: Expression;
 	type?: Type;

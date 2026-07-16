@@ -1,0 +1,27 @@
+# Small dogfood CLI: scan given files for TODO/FIXME lines.
+# Usage: noo find_todos.noo <file> [<file> ...]
+
+has_substr = fn needle line =>
+  match (indexOf needle line) (
+    Some _ => True;
+    None => False
+  );
+
+scan_line = fn path idx line =>
+  if (has_substr "TODO" line) || (has_substr "FIXME" line)
+    then println (concat path (concat ":" (concat (toString (idx + 1)) (concat ": " (trim line)))))
+    else {};
+
+scan_lines = fn path idx lines =>
+  match (head lines) (
+    None => {};
+    Some line => (
+      scan_line path idx line;
+      scan_lines path (idx + 1) (tail lines)
+    )
+  );
+
+scan_file = fn path =>
+  scan_lines path 0 (split "\n" (readFile path));
+
+reduce (fn acc path => (scan_file path; acc)) {} argv

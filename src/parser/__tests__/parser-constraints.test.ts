@@ -7,6 +7,7 @@ import {
 	assertImplementDefinitionExpression,
 	assertVariableType,
 	assertVariantType,
+	expectSuccess,
 } from '../../../test/utils';
 
 test('should parse constraint definition', () => {
@@ -20,6 +21,25 @@ test('should parse constraint definition', () => {
 	expect(constraintDef.typeParams).toEqual(['a']);
 	expect(constraintDef.functions.length).toBe(1);
 	expect(constraintDef.functions[0].name).toBe('show');
+});
+
+test("'and'/'or' remain usable as ordinary identifiers outside constraint syntax", () => {
+	const lexer = new Lexer('and = 5; or = 10; and + or');
+	const tokens = lexer.tokenize();
+	const program = parse(tokens);
+	expect(program.statements.length).toBe(1);
+	expectSuccess('and = 5; or = 10; and + or', 15);
+});
+
+test("'given a implements X and b implements Y' constraint syntax still works", () => {
+	const lexer = new Lexer(
+		'implement Eq (Result a b) given a implements Eq and b implements Eq ( equals = fn x y => True )'
+	);
+	const tokens = lexer.tokenize();
+	const program = parse(tokens);
+	expect(program.statements.length).toBe(1);
+	const implDef = program.statements[0];
+	assertImplementDefinitionExpression(implDef);
 });
 
 test('should parse implement definition', () => {

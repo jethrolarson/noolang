@@ -106,7 +106,21 @@ export class Lexer {
 			if (this.peek() === '\\') {
 				this.advance(); // consume backslash
 				if (!this.isEOF()) {
-					value += this.advance(); // consume escaped character
+					const escaped = this.advance(); // consume escaped character
+					switch (escaped) {
+						case 'n':
+							value += '\n';
+							break;
+						case 't':
+							value += '\t';
+							break;
+						case 'r':
+							value += '\r';
+							break;
+						default:
+							// Anything else (\", \\, unknown) passes through literally.
+							value += escaped;
+					}
 				}
 			} else {
 				value += this.advance();
@@ -162,8 +176,6 @@ export class Lexer {
 			'given',
 			'is',
 			'has',
-			'and',
-			'or',
 			'implements',
 			'constraint',
 			'implement',
@@ -193,6 +205,8 @@ export class Lexer {
 			'|?',
 			'|>',
 			'<|',
+			'&&',
+			'||',
 			'==',
 			'!=',
 			'<=',
@@ -225,7 +239,7 @@ export class Lexer {
 		}
 
 		// If no multi-character operator matched, try single character
-		if (!value && /[+\-*/%<>=!|$]/.test(this.peek())) {
+		if (!value && /[+\-*/%<>=!|$&]/.test(this.peek())) {
 			value = this.advance();
 		}
 
@@ -334,7 +348,7 @@ export class Lexer {
 			return this.readNumber();
 		}
 
-		if (/[+\-*/%<>=!|$]/.test(char)) {
+		if (/[+\-*/%<>=!|$&]/.test(char)) {
 			return this.readOperator();
 		}
 
