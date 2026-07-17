@@ -23,7 +23,9 @@ test('Effect inference - a pure function has no effect', () => {
 });
 
 test('Effect inference - readFile body surfaces !read', () => {
-	expect(typeStr('fn p => readFile p')).toBe('String -> String !read');
+	expect(typeStr('fn p => readFile p')).toBe(
+		'String -> Result String ReadError !read'
+	);
 });
 
 test('Effect inference - effects propagate through a wrapping call', () => {

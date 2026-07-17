@@ -333,7 +333,7 @@ double = fn x => x * 2 : Float -> Float;
 
 # Complex type annotations with effects
 logger = fn msg => print msg : String -> String !write;
-readConfig = fn path => readFile path : String -> String !read;
+readConfig = fn path => readFile path : String -> Result String ReadError !read;
 ```
 
 ### Function Type Syntax
@@ -1039,10 +1039,10 @@ Noolang has a comprehensive effect system that tracks side effects in function t
 # Pure function (no effects)
 sumTwo = fn x y => x + y : Float -> Float -> Float;
 
-# Effectful function
+# Effectful function — readFile returns Result, so handle both cases
 readAndPrint = fn filename => (
   content = readFile filename;
-  print content
+  match content ( Ok text => print text; Err e => print (show e) )
 ) : String -> String !read !write;
 
 # System operations with FFI effects

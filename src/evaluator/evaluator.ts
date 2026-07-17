@@ -49,6 +49,8 @@ import {
 	createConstructor,
 	createList,
 	createRecord,
+	readErrorValue,
+	writeErrorValue,
 	isNumber,
 	isString,
 	isBool,
@@ -134,6 +136,9 @@ export class Evaluator {
 	private currentFileDir?: string; // Track the directory of the current file being evaluated
 	private fs: typeof defaultFs;
 	private path: typeof defaultPath;
+	// Constructor name -> variant type name, so trait dispatch resolves
+	// `show (Bar "hi")` against the impl for `Foo`, not a phantom `Bar` type
+	private constructorVariants: Map<string, string> = new Map();
 	public traitRegistry: TraitRegistry;
 	private programArgs: string[];
 
@@ -1008,9 +1013,9 @@ export class Evaluator {
 				}
 				try {
 					const content = this.fs.readFileSync(path.value, 'utf-8');
-					return createString(content);
+					return createConstructor('Ok', [createString(content)]);
 				} catch (error) {
-					throw new Error(`Failed to read file: ${error}`);
+					return createConstructor('Err', [readErrorValue(error, path.value)]);
 				}
 			})
 		);
@@ -1026,9 +1031,9 @@ export class Evaluator {
 				}
 				try {
 					this.fs.writeFileSync(path.value, content.value);
-					return createUnit();
+					return createConstructor('Ok', [createUnit()]);
 				} catch (error) {
-					throw new Error(`Failed to write file: ${error}`);
+					return createConstructor('Err', [writeErrorValue(error, path.value)]);
 				}
 			})
 		);
@@ -2872,10 +2877,10 @@ export class Evaluator {
 		if (isRecord(value)) return 'Record';
 		if (isTuple(value)) return 'Tuple';
 		if (isConstructor(value)) {
-			// For ADT constructors, use the constructor name
-			if (value.name === 'Some' || value.name === 'None') return 'Option';
-			if (value.name === 'Ok' || value.name === 'Err') return 'Result';
-			return value.name;
+			// Resolve the constructor to its variant type; fall back to the
+			// constructor name for values whose definition this evaluator never
+			// saw (e.g. constructed by an imported module)
+			return this.constructorVariants.get(value.name) ?? value.name;
 		}
 		return 'Unknown';
 	}
@@ -2883,6 +2888,7 @@ export class Evaluator {
 	private evaluateTypeDefinition(expr: TypeDefinitionExpression): Value {
 		// Type definitions add constructors to the environment
 		for (const _constructor of expr.constructors) {
+			this.constructorVariants.set(_constructor.name, expr.name);
 			if (_constructor.args.length === 0) {
 				// Nullary constructor: just create the constructor value
 				const constructorValue = {

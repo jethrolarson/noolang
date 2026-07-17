@@ -261,13 +261,22 @@ print "Done!";
 File I/O performs real filesystem effects, so these examples are shown as plain
 text (the documentation validator does not execute them):
 
+File operations return `Result` — a missing file or a failed write is a value
+to handle, not a crash. `readFile : String -> Result String ReadError !read`;
+`writeFile : String -> String -> Result {} WriteError !write`.
+
 ```
 # Read file contents
-content = readFile "example.txt";
-println content;
+match (readFile "example.txt") (
+  Ok content => println content;
+  Err e => println (show e)      # e.g. FileNotFound(example.txt)
+);
 
 # Write to file
-writeFile "output.txt" "Hello from Noolang!";
+match (writeFile "output.txt" "Hello from Noolang!") (
+  Ok _ => println "written";
+  Err e => println (show e)
+)
 ```
 
 #### Logging
