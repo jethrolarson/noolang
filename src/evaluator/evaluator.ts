@@ -1,6 +1,6 @@
 import * as defaultFs from 'node:fs';
 import * as defaultPath from 'node:path';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import type {
 	Expression,
 	Program,
@@ -1114,22 +1114,26 @@ export class Evaluator {
 				}
 
 				try {
-					// Build command with arguments
-					const fullCommand = argStrings.length > 0 
-						? `${command.value} ${argStrings.map(arg => `"${arg}"`).join(' ')}`
-						: command.value;
-					
-					const output = execSync(fullCommand, { 
+					const output = execFileSync(command.value, argStrings, {
 						encoding: 'utf8',
-						stdio: 'pipe'
+						stdio: 'pipe',
 					});
-					
-					// Return Ok(output)
 					return createConstructor('Ok', [createString(output.toString())]);
 				} catch (error: any) {
-					// Return Err(error message)
-					const errorMsg = error.message || 'Process execution failed';
-					return createConstructor('Err', [createString(errorMsg)]);
+					// A numeric status means the process ran and exited nonzero;
+					// anything else (spawn failure, signal kill) is ExecFailed
+					if (typeof error?.status === 'number') {
+						return createConstructor('Err', [
+							createConstructor('CommandFailed', [
+								createNumber(error.status),
+								createString(String(error.stderr ?? '')),
+							]),
+						]);
+					}
+					const errorMsg = error?.message || 'Process execution failed';
+					return createConstructor('Err', [
+						createConstructor('ExecFailed', [createString(errorMsg)]),
+					]);
 				}
 			})
 		);

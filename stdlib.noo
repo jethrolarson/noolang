@@ -207,6 +207,17 @@ implement Show Result (
 variant ReadError = FileNotFound String | ReadPermissionDenied String | ReadFailed String;
 variant WriteError = WritePermissionDenied String | WriteFailed String;
 
+# Process failure: CommandFailed exitCode stderr (the process ran and exited
+# nonzero) vs ExecFailed message (the process could not run at all)
+variant ExecError = CommandFailed Float String | ExecFailed String;
+
+implement Show ExecError (
+  show = fn err => match err (
+    CommandFailed code stderr => concat "CommandFailed(" (concat (show code) (concat ", " (concat stderr ")")));
+    ExecFailed message => concat "ExecFailed(" (concat message ")")
+  )
+);
+
 implement Show ReadError (
   show = fn err => match err (
     FileNotFound path => concat "FileNotFound(" (concat path ")");

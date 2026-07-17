@@ -644,10 +644,14 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	newEnv.set('exec', {
 		type: functionType(
 			[stringType(), listTypeWithElement(stringType())],
-			resultType(stringType(), typeVariable('ExecError')),
+			resultType(stringType(), {
+				kind: 'variant',
+				name: 'ExecError',
+				args: [],
+			}),
 			new Set(['ffi'])
 		),
-		quantifiedVars: ['ExecError'],
+		quantifiedVars: [],
 	});
 
 	const newState = { ...state, environment: newEnv };
