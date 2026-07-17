@@ -29,18 +29,17 @@ describe('exec builtin function', () => {
 		}));
 	});
 
-	test('exec with nonexistent command should return Err', () => {
+	test('exec with nonexistent command should return Err (ExecFailed message)', () => {
 		expectSuccess(`
 			result = exec "nonexistentcommand12345" [];
-			result
-		`, expect.objectContaining({
-			tag: 'constructor',
-			name: 'Err',
-			args: [expect.objectContaining({
-				tag: 'string',
-				value: expect.stringContaining('Command failed')
-			})]
-		}));
+			match result (
+				Ok _ => "ok";
+				Err e => match e (
+					CommandFailed code stderr => "ran anyway";
+					ExecFailed message => message
+				)
+			)
+		`, expect.stringContaining('nonexistentcommand12345'));
 	});
 
 	test('exec type signature should be correct', () => {
