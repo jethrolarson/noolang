@@ -172,6 +172,40 @@ export const isTraitFunctionValue = (
 	value: Value
 ): value is TraitFunctionValue => value.tag === 'trait-function';
 
+// Map node fs errors onto the stdlib ReadError/WriteError variants
+const errnoCode = (error: unknown): string | undefined =>
+	error instanceof Error && 'code' in error
+		? String((error as NodeJS.ErrnoException).code)
+		: undefined;
+
+export const readErrorValue = (
+	error: unknown,
+	path: string
+): ConstructorValue => {
+	switch (errnoCode(error)) {
+		case 'ENOENT':
+			return createConstructor('FileNotFound', [createString(path)]);
+		case 'EACCES':
+		case 'EPERM':
+			return createConstructor('ReadPermissionDenied', [createString(path)]);
+		default:
+			return createConstructor('ReadFailed', [createString(String(error))]);
+	}
+};
+
+export const writeErrorValue = (
+	error: unknown,
+	path: string
+): ConstructorValue => {
+	switch (errnoCode(error)) {
+		case 'EACCES':
+		case 'EPERM':
+			return createConstructor('WritePermissionDenied', [createString(path)]);
+		default:
+			return createConstructor('WriteFailed', [createString(String(error))]);
+	}
+};
+
 export function valueToString(value: Value): string {
 	if (isNumber(value)) {
 		return String(value.value);

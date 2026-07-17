@@ -218,14 +218,18 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 	});
 
 	newEnv.set('readFile', {
-		type: functionType([stringType()], stringType(), new Set(['read'])),
+		type: functionType(
+			[stringType()],
+			resultType(stringType(), { kind: 'variant', name: 'ReadError', args: [] }),
+			new Set(['read'])
+		),
 		quantifiedVars: [],
 	});
 
 	newEnv.set('writeFile', {
 		type: functionType(
 			[stringType(), stringType()],
-			unitType(),
+			resultType(unitType(), { kind: 'variant', name: 'WriteError', args: [] }),
 			new Set(['write'])
 		),
 		quantifiedVars: [],

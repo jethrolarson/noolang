@@ -202,6 +202,26 @@ implement Show Result (
   )
 );
 
+# File IO failure reasons — readFile/writeFile return Result rather than
+# crashing, matching the safe-division philosophy
+variant ReadError = FileNotFound String | ReadPermissionDenied String | ReadFailed String;
+variant WriteError = WritePermissionDenied String | WriteFailed String;
+
+implement Show ReadError (
+  show = fn err => match err (
+    FileNotFound path => concat "FileNotFound(" (concat path ")");
+    ReadPermissionDenied path => concat "ReadPermissionDenied(" (concat path ")");
+    ReadFailed message => concat "ReadFailed(" (concat message ")")
+  )
+);
+
+implement Show WriteError (
+  show = fn err => match err (
+    WritePermissionDenied path => concat "WritePermissionDenied(" (concat path ")");
+    WriteFailed message => concat "WriteFailed(" (concat message ")")
+  )
+);
+
 # Extract value from Result with default for errors
 result_get_or = fn default res => match res (
   Ok value => value;
