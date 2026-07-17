@@ -2442,6 +2442,15 @@ export class Evaluator {
 			const realpath = resolveModulePath(expr.path, this.currentFileDir);
 			const cached = loadModule(realpath);
 
+			// Trait dispatch resolves a value's constructor to its variant type
+			// name; imported variants were defined in the module's own evaluator,
+			// so their constructor→variant entries must arrive via the cache
+			for (const [typeName, adtEntry] of cached.adtDiff) {
+				for (const ctorName of adtEntry.constructors.keys()) {
+					this.constructorVariants.set(ctorName, typeName);
+				}
+			}
+
 			// Merge the imported module's trait implementations (§4) into this
 			// evaluator's traitRegistry so cross-module dispatch works. Each impl
 			// carries BOTH its AST `functions` and its pre-evaluated
