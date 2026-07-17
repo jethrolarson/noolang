@@ -217,6 +217,12 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a'],
 	});
 
+	// Process termination — never returns; {} is the closest honest return type
+	newEnv.set('exit', {
+		type: functionType([floatType()], unitType(), new Set(['ffi'])),
+		quantifiedVars: [],
+	});
+
 	newEnv.set('readFile', {
 		type: functionType(
 			[stringType()],
