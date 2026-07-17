@@ -287,15 +287,25 @@ export function resolveModulePath(importPath: string, currentDir?: string): stri
 		return fs.realpathSync(withExt);
 	}
 
-	// ── 3. std/* — reserved, deferred ─────────────────────────────────────────
-	if (importPath === 'std' || importPath.startsWith('std/')) {
+	// ── 3. std/* — modules shipped with the interpreter ───────────────────────
+	// Routed to the interpreter's own std/ directory. This is resolution sugar
+	// only: the modules themselves are plain userland noolang with no
+	// interpreter privileges (see docs-wip/TESTING_FRAMEWORK_PLAN.md). The
+	// monolithic stdlib (global env) is unrelated to this routing.
+	if (importPath === 'std') {
 		throw new Error(
-			`'std/*' imports are reserved for the Noolang standard library.\n` +
-				`The standard library is currently loaded monolithically at startup ` +
-				`and has not yet been split into importable modules.\n` +
-				`(Deferred: 'std/*' will be routed properly when stdlib is modularized into ` +
-				`separate files. For now, all stdlib functions are available globally.)`
+			`'std' is not importable — import a specific module, e.g. import "std/test".`
 		);
+	}
+	if (importPath.startsWith('std/')) {
+		const stdDir = nodePath.join(__dirname, '..', 'std');
+		const candidate = nodePath.join(stdDir, `${importPath.slice('std/'.length)}.noo`);
+		if (!fs.existsSync(candidate)) {
+			throw new Error(
+				`No std module named '${importPath}' (looked for ${candidate}).`
+			);
+		}
+		return fs.realpathSync(candidate);
 	}
 
 	// ── 4. Bare specifier — import map ────────────────────────────────────────

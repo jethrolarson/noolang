@@ -1,0 +1,77 @@
+# std/test — Noolang's test framework.
+#
+# Shipped with the interpreter but written as plain userland noolang: no
+# evaluator hooks, no typer access. Tests are values — a test file's last
+# expression is its Test tree; the runner imports it and walks it.
+# Design rationale: docs-wip/TESTING_FRAMEWORK_PLAN.md.
+#
+# Use the lowercase helpers (test_case, group, expect_*), not the raw
+# constructors. The constructors are public only because the language cannot
+# hide them; their payloads may change shape.
+
+# Fail carries a structured payload so runners can render diffs and emit
+# machine-readable output without re-parsing message strings.
+variant Expectation =
+    Pass
+  | Fail {@message String, @expected Option String, @actual Option String};
+
+# Case thunks declare the full effect row: tests may perform any effect, and
+# over-declaring is legal, so pure and effectful test bodies both fit.
+variant Test =
+    Case String ({} -> Expectation !write !read !log !state !time !rand !ffi !async)
+  | Group String (List Test);
+
+test_case = fn name thunk => Case name thunk;
+group = fn name tests => Group name tests;
+
+fail = fn message => Fail {@message message, @expected None, @actual None};
+
+# Expected comes first: partial application (expect_eq 4) and pipelines
+# (compute x | expect_eq 4) both read correctly.
+expect_eq = fn expected actual =>
+  if expected == actual
+  then Pass
+  else Fail {
+    @message "values are not equal",
+    @expected Some (show expected),
+    @actual Some (show actual)
+  };
+
+expect_neq = fn unexpected actual =>
+  if unexpected == actual
+  then Fail {
+    @message "values are equal but should not be",
+    @expected Some (concat "not " (show unexpected)),
+    @actual Some (show actual)
+  }
+  else Pass;
+
+# The label is mandatory so a failed boolean check is never mute
+expect = fn label condition =>
+  if condition then Pass else fail label;
+
+expect_ok = fn res => match res (
+  Ok _ => Pass;
+  Err e => fail (concat "expected Ok, got Err: " (show e))
+);
+
+expect_err = fn res => match res (
+  Ok x => fail (concat "expected Err, got Ok: " (show x));
+  Err _ => Pass
+);
+
+# First Fail wins — reports the earliest broken expectation
+expect_all = fn expectations =>
+  reduce (fn acc e => match acc (Pass => e; Fail info => Fail info)) Pass expectations;
+
+{
+  @test_case test_case,
+  @group group,
+  @expect_eq expect_eq,
+  @expect_neq expect_neq,
+  @expect expect,
+  @expect_ok expect_ok,
+  @expect_err expect_err,
+  @expect_all expect_all,
+  @fail fail
+}

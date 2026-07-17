@@ -231,21 +231,22 @@ describe('BARE-ERR: bare specifier with no import-map entry → clear error', ()
 	});
 });
 
-// ─── STD-STUB: std/* → clear deferred error ──────────────────────────────────
+// ─── STD: std/* resolves to modules shipped with the interpreter ─────────────
 
-describe('STD-STUB: std/* import gives clear deferred error', () => {
-	test('import "std/list" gives clear error about deferred modularization', () => {
-		// The stdlib is monolithic (loaded as frozen base), not yet split into
-		// importable std/* modules. The std/* prefix is reserved but deferred.
-		expect(() => parseAndType(`import "std/list"`)).toThrow(
-			/std\/\*|deferred|modular|stdlib/i
+describe('STD: std/* resolves to shipped modules', () => {
+	test('import "std/test" resolves to the shipped test module', () => {
+		const result = parseAndType(`{@expect_eq} = import "std/test"; expect_eq`);
+		expect(result.type).toBeDefined();
+	});
+
+	test('import of a nonexistent std module names the missing module', () => {
+		expect(() => parseAndType(`import "std/no-such-module"`)).toThrow(
+			/no-such-module/
 		);
 	});
 
-	test('import "std" (exact) also gives deferred error', () => {
-		expect(() => parseAndType(`import "std"`)).toThrow(
-			/std\/\*|deferred|modular|stdlib/i
-		);
+	test('import "std" (exact) is an error', () => {
+		expect(() => parseAndType(`import "std"`)).toThrow(/std/i);
 	});
 });
 
