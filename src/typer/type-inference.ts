@@ -67,6 +67,7 @@ import {
 	constraintsEqual,
 } from './helpers';
 import { addConstraint, resolveVarName } from './constraint-store';
+import { collectSpineEffects } from './effects-utils';
 import {
 	composeConstraintChain,
 	extractResultTypeVar,
@@ -1566,16 +1567,6 @@ const resolveTypeAliases = (
 	}
 };
 
-// Collect the latent effects along a (possibly curried) function type's spine.
-const collectSpineEffects = (type: Type): Set<Effect> => {
-	const effects = new Set<Effect>();
-	let t: Type = type;
-	while (t.kind === 'function') {
-		if (t.effects) for (const e of t.effects) effects.add(e);
-		t = t.return;
-	}
-	return effects;
-};
 
 export const typeTyped = (
 	expr: TypedExpression,

@@ -11,7 +11,8 @@ import {
 	typeToString,
 	propagateConstraintToTypeVariable,
 } from './helpers';
-import { functionApplicationError } from './type-errors';
+import { functionApplicationError, createTypeError } from './type-errors';
+import { collectSpineEffects, isFullyConcrete } from './effects-utils';
 import {
 	type TypeState,
 	type TypeResult,
@@ -89,6 +90,40 @@ export function handleRegularFunctionApplication(
 			// Pass constraint information if available
 			...(functionConstraints && { constraintContext: functionConstraints }),
 		};
+
+		// Effect subsumption: a function argument may perform fewer effects than
+		// the parameter declares, never more — otherwise effects launder through
+		// higher-order boundaries (annotated HOFs, constructor payloads). Only
+		// checked when the parameter is a concrete function type; a parameter
+		// type variable takes the argument's effects wholesale via unification.
+		if (
+			expectedParam.kind === 'function' &&
+			actualArg.kind === 'function' &&
+			isFullyConcrete(expectedParam)
+		) {
+			const declared = collectSpineEffects(expectedParam);
+			const performed = collectSpineEffects(actualArg);
+			const omitted = [...performed].filter(e => !declared.has(e));
+			if (omitted.length > 0) {
+				throwTypeError(
+					location =>
+						createTypeError(
+							`Function argument performs effect${
+								omitted.length > 1 ? 's' : ''
+							} !${omitted.join(' !')} not declared by the parameter type ${typeToString(
+								expectedParam,
+								currentState.substitution
+							)}`,
+							{},
+							location
+						),
+					{
+						line: expr.location?.start.line || 1,
+						column: expr.location?.start.column || 1,
+					}
+				);
+			}
+		}
 
 		currentState = unify(
 			actualFuncType.params[i],
