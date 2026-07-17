@@ -8,7 +8,10 @@ import { substitute } from './substitute';
 // Decorate AST nodes with inferred types - now uses single-pass typing
 export const typeAndDecorate = (
 	program: Program,
-	initialState?: TypeState
+	initialState?: TypeState,
+	// Directory of the file being typed, so relative imports resolve
+	// file-relative (per the language reference), not CWD-relative
+	currentDir?: string
 ): {
 	program: Program;
 	type: Type;
@@ -16,6 +19,9 @@ export const typeAndDecorate = (
 	state: TypeState;
 } => {
 	let state = initialState || createTypeState();
+	if (currentDir) {
+		state = { ...state, currentDir };
+	}
 	// Always ensure builtins and stdlib are loaded, regardless of whether initialState was provided
 	if (!initialState || !state.traitRegistry.definitions.size) {
 		state = initializeBuiltins(state);

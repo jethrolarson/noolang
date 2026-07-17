@@ -192,7 +192,11 @@ async function main() {
 			const lexer = new Lexer(code);
 			const tokens = lexer.tokenize();
 			const program = parse(tokens);
-			const { program: decoratedProgram, state } = typeAndDecorate(program);
+			const { program: decoratedProgram, state } = typeAndDecorate(
+				program,
+				undefined,
+				path.dirname(fullPath)
+			);
 			console.log('Types:');
 			decoratedProgram.statements.forEach((stmt, i) => {
 				console.log(
@@ -284,7 +288,11 @@ async function main() {
 			const lexer = new Lexer(code);
 			const tokens = lexer.tokenize();
 			const program = parse(tokens);
-			const { program: decoratedProgram, state } = typeAndDecorate(program);
+			const { program: decoratedProgram, state } = typeAndDecorate(
+				program,
+				undefined,
+				path.dirname(fullPath)
+			);
 			console.log('Type AST (what typeAndDecorate returns):');
 			console.log(
 				JSON.stringify({ program: decoratedProgram, state }, null, 2)
@@ -311,7 +319,11 @@ async function main() {
 			const lexer = new Lexer(combinedCode);
 			const tokens = lexer.tokenize();
 			const program = parse(tokens);
-			const { program: decoratedProgram, state } = typeAndDecorate(program);
+			const { program: decoratedProgram, state } = typeAndDecorate(
+				program,
+				undefined,
+				path.dirname(fullPath)
+			);
 
 			// Get the type of the last statement (which is our symbol reference)
 			if (decoratedProgram.statements.length > 0) {
@@ -436,7 +448,11 @@ async function main() {
 		const program = parse(tokens);
 		const parseTime = performance.now();
 
-		const { program: decoratedProgram, state } = typeAndDecorate(program);
+		const { program: decoratedProgram, state } = typeAndDecorate(
+			program,
+			undefined,
+			path.dirname(fullPath)
+		);
 		const typeTime = performance.now();
 
 		const evaluator = new Evaluator({
@@ -444,7 +460,7 @@ async function main() {
 			programArgs: fileArgs.slice(1),
 		});
 
-		const finalResult = evaluator.evaluateProgram(decoratedProgram);
+		const finalResult = evaluator.evaluateProgram(decoratedProgram, fullPath);
 		const evalTime = performance.now();
 
 		const valueStr = formatValue(finalResult.finalResult);

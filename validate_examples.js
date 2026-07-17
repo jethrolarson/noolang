@@ -2,7 +2,6 @@
 
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
 import { execSync } from 'child_process';
 
 // Run a markdown file directly using CLI's literate mode
@@ -53,7 +52,9 @@ function extractNoolangBlocks(filePath) {
 // must not be validated as a single concatenated program (see issue #102).
 function runMarkdownPerBlock(filePath) {
 	const blocks = extractNoolangBlocks(filePath);
-	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'noolang-blocks-'));
+	// Materialize blocks inside the repo: imports resolve relative to the
+	// block file, and bare specifiers need the repo's noolang.json in scope
+	const tmp = fs.mkdtempSync(path.join('.', '.noolang-blocks-'));
 	const failures = [];
 	for (const block of blocks) {
 		const f = path.join(tmp, 'block.noo');
