@@ -1006,6 +1006,16 @@ export class Evaluator {
 		);
 
 		this.environment.set(
+			'exit',
+			createNativeFunction('exit', (code: Value) => {
+				if (!isNumber(code)) {
+					throw new Error('exit requires a number');
+				}
+				process.exit(code.value);
+			})
+		);
+
+		this.environment.set(
 			'readFile',
 			createNativeFunction('readFile', (path: Value) => {
 				if (!isString(path)) {
