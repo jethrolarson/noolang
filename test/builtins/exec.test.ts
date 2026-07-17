@@ -35,7 +35,7 @@ describe('exec builtin function', () => {
 			match result (
 				Ok _ => "ok";
 				Err e => match e (
-					CommandFailed code stderr => "ran anyway";
+					CommandFailed _ => "ran anyway";
 					ExecFailed message => message
 				)
 			)
