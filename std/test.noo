@@ -64,6 +64,81 @@ expect_err = fn res => match res (
 expect_all = fn expectations =>
   reduce (fn acc e => match acc (Pass => e; Fail info => Fail info)) Pass expectations;
 
+# ========================================
+# RUNNER
+# ========================================
+
+# The executed mirror of a Test tree. Execution (run_tree) is effectful —
+# thunks carry the full effect row; everything after it is pure.
+variant TestResult =
+    CaseResult String Expectation
+  | GroupResult String (List TestResult);
+
+run_tree = fn t => match t (
+  Case name thunk => CaseResult name (thunk {});
+  Group name tests => GroupResult name (list_map run_tree tests)
+);
+
+result_counts = fn result => match result (
+  CaseResult _ e => match e (
+    Pass => {@passed 1, @failed 0};
+    Fail _ => {@passed 0, @failed 1}
+  );
+  GroupResult _ results =>
+    reduce
+      (fn acc r => (
+        counts = result_counts r;
+        {@passed (@passed acc) + (@passed counts), @failed (@failed acc) + (@failed counts)}
+      ))
+      {@passed 0, @failed 0}
+      results
+);
+
+indent = fn depth =>
+  if depth == 0 then "" else concat "  " (indent (depth - 1));
+
+# Failure detail lines, indented under the case mark
+format_failure = fn depth info => (
+  pad = concat (indent depth) "    ";
+  expected = @expected info;
+  actual = @actual info;
+  match {expected, actual} (
+    {Some e, Some a} =>
+      concat pad (concat "expected: " (concat e (concat "\n" (concat pad (concat "actual:   " a)))));
+    _ => concat pad (@message info)
+  )
+);
+
+format_at = fn depth result => match result (
+  CaseResult name e => match e (
+    Pass => concat (indent depth) (concat "✓ " name);
+    Fail info =>
+      concat (indent depth) (concat "✗ " (concat name (concat "\n" (format_failure depth info))))
+  );
+  GroupResult name results =>
+    concat (indent depth) (concat name (concat "\n"
+      (join "\n" (list_map (format_at (depth + 1)) results))))
+);
+
+format_result = format_at 0;
+
+# Print each suite's report and a final summary; return counts so the caller
+# (not the runner) decides the process exit code
+run_all = fn suites => (
+  totals = reduce
+    (fn acc entry => (
+      result = run_tree (@suite entry);
+      _p1 = println (@path entry);
+      _p2 = println (format_result result);
+      counts = result_counts result;
+      {@passed (@passed acc) + (@passed counts), @failed (@failed acc) + (@failed counts)}
+    ))
+    {@passed 0, @failed 0}
+    suites;
+  _summary = println (concat (show (@passed totals)) (concat " passed, " (concat (show (@failed totals)) " failed")));
+  totals
+);
+
 {
   @test_case test_case,
   @group group,
@@ -73,5 +148,9 @@ expect_all = fn expectations =>
   @expect_ok expect_ok,
   @expect_err expect_err,
   @expect_all expect_all,
-  @fail fail
+  @fail fail,
+  @run_tree run_tree,
+  @format_result format_result,
+  @result_counts result_counts,
+  @run_all run_all
 }
