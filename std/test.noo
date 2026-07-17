@@ -41,7 +41,7 @@ expect_neq = fn unexpected actual =>
   if unexpected == actual
   then Fail {
     @message "values are equal but should not be",
-    @expected Some (concat "not " (show unexpected)),
+    @expected Some ("not " + show unexpected),
     @actual Some (show actual)
   }
   else Pass;
@@ -52,11 +52,11 @@ expect = fn label condition =>
 
 expect_ok = fn res => match res (
   Ok _ => Pass;
-  Err e => fail (concat "expected Ok, got Err: " (show e))
+  Err e => fail ("expected Ok, got Err: " + show e)
 );
 
 expect_err = fn res => match res (
-  Ok x => fail (concat "expected Err, got Ok: " (show x));
+  Ok x => fail ("expected Err, got Ok: " + show x);
   Err _ => Pass
 );
 
@@ -95,29 +95,26 @@ result_counts = fn result => match result (
 );
 
 indent = fn depth =>
-  if depth == 0 then "" else concat "  " (indent (depth - 1));
+  if depth == 0 then "" else "  " + indent (depth - 1);
 
 # Failure detail lines, indented under the case mark
 format_failure = fn depth info => (
-  pad = concat (indent depth) "    ";
+  pad = indent depth + "    ";
   expected = @expected info;
   actual = @actual info;
   match {expected, actual} (
-    {Some e, Some a} =>
-      concat pad (concat "expected: " (concat e (concat "\n" (concat pad (concat "actual:   " a)))));
-    _ => concat pad (@message info)
+    {Some e, Some a} => pad + "expected: " + e + "\n" + pad + "actual:   " + a;
+    _ => pad + @message info
   )
 );
 
 format_at = fn depth result => match result (
   CaseResult name e => match e (
-    Pass => concat (indent depth) (concat "✓ " name);
-    Fail info =>
-      concat (indent depth) (concat "✗ " (concat name (concat "\n" (format_failure depth info))))
+    Pass => indent depth + "✓ " + name;
+    Fail info => indent depth + "✗ " + name + "\n" + format_failure depth info
   );
   GroupResult name results =>
-    concat (indent depth) (concat name (concat "\n"
-      (join "\n" (list_map (format_at (depth + 1)) results))))
+    indent depth + name + "\n" + join "\n" (list_map (format_at (depth + 1)) results)
 );
 
 format_result = format_at 0;
@@ -135,7 +132,7 @@ run_all = fn suites => (
     ))
     {@passed 0, @failed 0}
     suites;
-  _summary = println (concat (show (@passed totals)) (concat " passed, " (concat (show (@failed totals)) " failed")));
+  _summary = println (show (@passed totals) + " passed, " + show (@failed totals) + " failed");
   totals
 );
 
