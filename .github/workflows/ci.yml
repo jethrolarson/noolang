@@ -21,25 +21,11 @@ on:
       - 'package.json'
       - 'tsconfig*.json'
       - '.github/workflows/ci.yml'
+  # No paths filter on pull_request: required status checks block merging
+  # until they report, so a PR that skips the workflow would be unmergeable.
   pull_request:
     branches: 
       - main
-    paths:
-      - 'src/**'
-      - 'test/**'
-      - 'scripts/**'
-      - 'benchmarks/**'
-      - 'lsp/**'
-      - 'examples/**'
-      - 'docs/**'
-      - 'std/**'
-      - '*.noo'
-      - 'noolang.json'
-      - 'validate_examples.js'
-      - 'README.md'
-      - 'package.json'
-      - 'tsconfig*.json'
-      - '.github/workflows/ci.yml'
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
