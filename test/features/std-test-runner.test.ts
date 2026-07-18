@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { expectSuccess } from '../utils';
 
-const repoRoot = resolve(import.meta.dir, '..', '..');
+const repoRoot = resolve(__dirname, '..', '..');
 const cli = join(repoRoot, 'src', 'cli.ts');
 
 const importAll = `{@test_case, @group, @expect_eq, @fail, @run_tree, @format_result, @result_counts, @run_all} = import "std/test";`;

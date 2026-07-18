@@ -175,7 +175,7 @@ exec
 result = exec "echo" ["hello world"];
 match result (
     Ok output => println output;    # Prints: hello world
-    Err error => println error      # Handle execution errors
+    Err error => println (show error)   # CommandFailed {@code, @stdout, @stderr} | ExecFailed msg
 )
 ```
 
@@ -186,7 +186,7 @@ match result (
 lsResult = exec "ls" ["-la", "/tmp"];
 match lsResult (
     Ok output => println ("Directory listing:\n" + output);
-    Err error => println ("Failed to list directory: " + error)
+    Err error => println ("Failed to list directory: " + show error)
 )
 ```
 
@@ -198,16 +198,16 @@ getUserInfo = fn _ =>
     match exec "whoami" [] (
         Ok user => match exec "date" [] (
             Ok date => Ok (user + " at " + date);
-            Err error => Err ("Date failed: " + error)
+            Err error => Err ("Date failed: " + show error)
         );
-        Err error => Err ("User lookup failed: " + error)
+        Err error => Err ("User lookup failed: " + show error)
     );
 
 # Use the automation function
 userInfo = getUserInfo {};
 match userInfo (
     Ok info => println ("Current session: " + info);
-    Err error => println ("System info error: " + error)
+    Err error => println ("System info error: " + show error)
 )
 ```
 
