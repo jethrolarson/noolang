@@ -10,6 +10,11 @@ export type TokenType =
 	| 'KEYWORD'
 	| 'COMMENT'
 	| 'ACCESSOR'
+	| 'TEMPLATE_START'
+	| 'TEMPLATE_TEXT'
+	| 'TEMPLATE_HOLE_START'
+	| 'TEMPLATE_HOLE_END'
+	| 'TEMPLATE_END'
 	| 'EOF';
 
 export interface Token {
@@ -18,11 +23,20 @@ export interface Token {
 	location: Location;
 }
 
+// Template literals switch the lexer between two modes: inside `...` raw
+// text is read until a hole or the closing backtick; inside a ${...} hole
+// tokens lex normally, with brace depth tracked so record/tuple braces in
+// the hole don't end it. Nesting a template inside a hole pushes again.
+type LexerMode =
+	| { kind: 'template' }
+	| { kind: 'hole'; braceDepth: number };
+
 export class Lexer {
 	private input: string;
 	private position: number = 0;
 	private line: number = 1;
 	private column: number = 1;
+	private modeStack: LexerMode[] = [];
 
 	constructor(input: string) {
 		this.input = input;
@@ -284,6 +298,69 @@ export class Lexer {
 		};
 	}
 
+	// Inside `...` (template mode): emit the closing backtick, a hole
+	// opener, or a run of raw text. Whitespace and # are plain text here.
+	private readTemplateChunk(): Token {
+		const start = this.createPosition();
+
+		if (this.peek() === '`') {
+			this.advance();
+			this.modeStack.pop();
+			return {
+				type: 'TEMPLATE_END',
+				value: '`',
+				location: this.createLocation(start),
+			};
+		}
+
+		if (this.peek() === '$' && this.peekNext() === '{') {
+			this.advance();
+			this.advance();
+			this.modeStack.push({ kind: 'hole', braceDepth: 0 });
+			return {
+				type: 'TEMPLATE_HOLE_START',
+				value: '${',
+				location: this.createLocation(start),
+			};
+		}
+
+		let value = '';
+		while (
+			!this.isEOF() &&
+			this.peek() !== '`' &&
+			!(this.peek() === '$' && this.peekNext() === '{')
+		) {
+			if (this.peek() === '\\') {
+				this.advance(); // consume backslash
+				if (this.isEOF()) break;
+				const escaped = this.advance();
+				switch (escaped) {
+					case 'n':
+						value += '\n';
+						break;
+					case 't':
+						value += '\t';
+						break;
+					case 'r':
+						value += '\r';
+						break;
+					default:
+						// \` and \$ (and anything else) pass through literally,
+						// matching plain-string escape behavior.
+						value += escaped;
+				}
+			} else {
+				value += this.advance();
+			}
+		}
+
+		return {
+			type: 'TEMPLATE_TEXT',
+			value,
+			location: this.createLocation(start),
+		};
+	}
+
 	private createPosition(): Position {
 		return createPosition(this.line, this.column);
 	}
@@ -293,6 +370,13 @@ export class Lexer {
 	}
 
 	nextToken(): Token {
+		const mode = this.modeStack[this.modeStack.length - 1];
+
+		// Template mode: raw text — no whitespace or comment skipping
+		if (mode?.kind === 'template' && !this.isEOF()) {
+			return this.readTemplateChunk();
+		}
+
 		// Skip any whitespace (spaces, tabs, newlines)
 		this.skipWhitespace();
 
@@ -305,6 +389,37 @@ export class Lexer {
 		}
 
 		const char = this.peek();
+
+		if (char === '`') {
+			const start = this.createPosition();
+			this.advance();
+			this.modeStack.push({ kind: 'template' });
+			return {
+				type: 'TEMPLATE_START',
+				value: '`',
+				location: this.createLocation(start),
+			};
+		}
+
+		// Inside a ${...} hole, braces are tracked so the hole ends only at
+		// its own closing brace, not a record/tuple brace within it.
+		if (mode?.kind === 'hole') {
+			if (char === '{') {
+				mode.braceDepth++;
+			} else if (char === '}') {
+				if (mode.braceDepth === 0) {
+					const start = this.createPosition();
+					this.advance();
+					this.modeStack.pop();
+					return {
+						type: 'TEMPLATE_HOLE_END',
+						value: '}',
+						location: this.createLocation(start),
+					};
+				}
+				mode.braceDepth--;
+			}
+		}
 
 		// If the next character is still whitespace, skip it and get the next token
 		if (/\s/.test(char)) {

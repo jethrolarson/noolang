@@ -19,6 +19,36 @@
 			]
 		},
 		{
+			"name": "string.quoted.other.template.noolang",
+			"begin": "`",
+			"end": "`",
+			"patterns": [
+				{
+					"name": "constant.character.escape.noolang",
+					"match": "\\\\."
+				},
+				{
+					"name": "meta.embedded.expression.noolang",
+					"begin": "\\$\\{",
+					"end": "\\}",
+					"beginCaptures": {
+						"0": { "name": "punctuation.definition.template-expression.begin.noolang" }
+					},
+					"endCaptures": {
+						"0": { "name": "punctuation.definition.template-expression.end.noolang" }
+					},
+					"patterns": [
+						{
+							"begin": "\\{",
+							"end": "\\}",
+							"patterns": [{ "include": "$self" }]
+						},
+						{ "include": "$self" }
+					]
+				}
+			]
+		},
+		{
 			"name": "constant.numeric.noolang",
 			"match": "\\b\\d+(\\.\\d+)?\\b"
 		},

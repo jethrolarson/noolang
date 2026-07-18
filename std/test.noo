@@ -105,7 +105,7 @@ format_failure = fn depth info => (
   expected = info | @expected;
   actual = info | @actual;
   match {expected, actual} (
-    {Some e, Some a} => pad + "expected: " + e + "\n" + pad + "actual:   " + a;
+    {Some e, Some a} => `${pad}expected: ${e}\n${pad}actual:   ${a}`;
     _ => pad + (info | @message)
   )
 );
@@ -134,7 +134,7 @@ run_all = fn suites => (
     no_counts
     suites;
   {@passed passed, @failed failed} = totals;
-  _summary = println (show passed + " passed, " + show failed + " failed");
+  _summary = println `${passed} passed, ${failed} failed`;
   totals
 );
 

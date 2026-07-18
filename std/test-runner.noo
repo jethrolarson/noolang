@@ -16,11 +16,11 @@ entry_file = ".noo-test-entry.noo";
 # Import specifiers may keep their .noo extension, and the entry lives in the
 # CWD so ./-relative discovery paths resolve as written.
 entry_source = fn file =>
-  "{@run_all} = import \"std/test\";\n"
-  + "suite = import \"" + file + "\";\n"
-  + "result = run_all [{@path \"" + file + "\", @suite suite}];\n"
-  + "{@failed failed} = result;\n"
-  + "exit (if failed > 0 then 1 else 0)";
+`{@run_all} = import "std/test";
+suite = import "${file}";
+result = run_all [{@path "${file}", @suite suite}];
+{@failed failed} = result;
+exit (if failed > 0 then 1 else 0)`;
 
 # Run one suite in a child interpreter; True = suite passed
 run_suite = fn cli file => (
@@ -64,7 +64,7 @@ main = (fn _ => (
         _cleanup = exec "rm" ["-f", entry_file];
         failed = length (filter (fn passed => not passed) results);
         passed = (length results) - failed;
-        _summary = println ("suites: " + show passed + " passed, " + show failed + " failed");
+        _summary = println `suites: ${passed} passed, ${failed} failed`;
         exit (if failed > 0 then 1 else 0)
       )
     )
