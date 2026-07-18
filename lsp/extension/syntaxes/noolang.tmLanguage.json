@@ -1,0 +1,50 @@
+{
+	"name": "Noolang",
+	"scopeName": "source.noolang",
+	"fileTypes": ["noo"],
+	"patterns": [
+		{
+			"name": "comment.line.number-sign.noolang",
+			"match": "#.*$"
+		},
+		{
+			"name": "string.quoted.double.noolang",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.noolang",
+					"match": "\\\\."
+				}
+			]
+		},
+		{
+			"name": "constant.numeric.noolang",
+			"match": "\\b\\d+(\\.\\d+)?\\b"
+		},
+		{
+			"name": "keyword.control.noolang",
+			"match": "\\b(if|then|else|match|fn|import|where)\\b"
+		},
+		{
+			"name": "keyword.declaration.noolang",
+			"match": "\\b(variant|type|constraint|implement|given|is|has|implements|mut)\\b"
+		},
+		{
+			"name": "storage.modifier.effect.noolang",
+			"match": "!(write|read|log|state|time|rand|ffi|async)\\b"
+		},
+		{
+			"name": "support.class.constructor.noolang",
+			"match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+		},
+		{
+			"name": "variable.other.accessor.noolang",
+			"match": "@[A-Za-z_][A-Za-z0-9_]*"
+		},
+		{
+			"name": "keyword.operator.noolang",
+			"match": "(\\|>|<\\||\\|\\?|\\|\\||&&|==|!=|<=|>=|=>|->|\\+|\\-|\\*|/|%|<|>|=|\\||\\$|;)"
+		}
+	]
+}
