@@ -79,22 +79,21 @@ run_tree = fn t => match t (
   Group name tests => GroupResult name (list_map run_tree tests)
 );
 
+no_counts = {@passed 0, @failed 0};
+
+add_counts = fn a b => (
+  {@passed a_passed, @failed a_failed} = a;
+  {@passed b_passed, @failed b_failed} = b;
+  {@passed a_passed + b_passed, @failed a_failed + b_failed}
+);
+
 result_counts = fn result => match result (
   CaseResult _ e => match e (
     Pass => {@passed 1, @failed 0};
     Fail _ => {@passed 0, @failed 1}
   );
   GroupResult _ results =>
-    reduce
-      (fn acc r => (
-        counts = result_counts r;
-        {
-          @passed (acc | @passed) + (counts | @passed),
-          @failed (acc | @failed) + (counts | @failed)
-        }
-      ))
-      {@passed 0, @failed 0}
-      results
+    reduce (fn acc r => add_counts acc (result_counts r)) no_counts results
 );
 
 indent = fn depth =>
@@ -130,15 +129,12 @@ run_all = fn suites => (
       result = entry | @suite | run_tree;
       _p1 = entry | @path | println;
       _p2 = result | format_result | println;
-      counts = result_counts result;
-      {
-        @passed (acc | @passed) + (counts | @passed),
-        @failed (acc | @failed) + (counts | @failed)
-      }
+      add_counts acc (result_counts result)
     ))
-    {@passed 0, @failed 0}
+    no_counts
     suites;
-  _summary = println (show (totals | @passed) + " passed, " + show (totals | @failed) + " failed");
+  {@passed passed, @failed failed} = totals;
+  _summary = println (show passed + " passed, " + show failed + " failed");
   totals
 );
 
