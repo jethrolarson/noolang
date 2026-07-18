@@ -80,6 +80,30 @@ async function main() {
 		return;
 	}
 
+	// `noo test` — run the std/test framework's runner script. The subcommand
+	// is only a trigger: discovery, sub-runs, and exit codes all live in
+	// std/test-runner.noo (public capabilities only). We pass our own path so
+	// the runner can exec child interpreters for per-file isolation.
+	if (args[0] === 'test') {
+		const runnerPath = path.join(__dirname, '..', 'std', 'test-runner.noo');
+		const cliPath = path.join(__dirname, 'cli.ts');
+		const code = fs.readFileSync(runnerPath, 'utf8');
+		const lexer = new Lexer(code);
+		const tokens = lexer.tokenize();
+		const program = parse(tokens);
+		const { program: decoratedProgram, state } = typeAndDecorate(
+			program,
+			undefined,
+			path.dirname(runnerPath)
+		);
+		const evaluator = new Evaluator({
+			traitRegistry: state.traitRegistry,
+			programArgs: [cliPath, ...args.slice(1)],
+		});
+		evaluator.evaluateProgram(decoratedProgram, runnerPath);
+		return;
+	}
+
 	// Check for --tokens flag
 	if (args[0] === '--tokens' && args[1]) {
 		const expr = args[1];

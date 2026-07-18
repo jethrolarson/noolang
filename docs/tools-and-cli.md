@@ -94,6 +94,39 @@ From [`src/cli.ts:13-29`](../src/cli.ts#L13-L29):
 | `--type-ast-file <file>` | File typed AST | `bun start --type-ast-file demo.noo` |
 | `--symbol-type <file> <symbol>` | Symbol type | `bun start --symbol-type demo.noo myFunc` |
 
+## Testing: `noo test`
+
+`bun start test` discovers every `*.test.noo` under the current directory
+(skipping `node_modules` and `.git`), runs each suite in its own interpreter
+process, prints a report per suite, and exits nonzero if anything failed. The
+process boundary is the isolation mechanism: one crashing suite reports as a
+failure while the rest still run.
+
+A test file imports `std/test` and makes its **last expression** a `Test`
+value (this block is illustrative; test files are discovered and run by
+`noo test`, not imported by docs):
+
+```
+# math.test.noo
+{@test_case, @group, @expect_eq, @expect} = import "std/test";
+
+group "math" [
+  test_case "adds" (fn _ => expect_eq 4 (2 + 2)),
+  test_case "compares" (fn _ => expect "ordering holds" (1 < 2))
+]
+```
+
+Assertions return `Expectation` values — no exceptions, no assertion
+registry: `expect_eq expected actual` (diff on failure, expected first),
+`expect_neq`, `expect label condition` (label is mandatory so failures are
+never mute), `expect_ok` / `expect_err` for `Result`s, `expect_all` (first
+`Fail` wins), and `fail message`. Tests are ordinary values, so table-driven
+tests are just `group "cases" (list_map make_case table)`.
+
+Runner internals (`run_tree`, `format_result`, `result_counts`, `run_all`)
+are exported by `std/test` too — the framework is plain Noolang with no
+interpreter privileges, and its own tests are written in itself.
+
 ## Interactive REPL
 
 Start the REPL with:
