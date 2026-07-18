@@ -1,0 +1,74 @@
+# noo test — orchestrator for the std/test framework.
+#
+# Plain noolang, run as an entry script by the `noo test` CLI subcommand,
+# which passes the interpreter's cli.ts path as argv[0]. Everything here uses
+# public capabilities only (exec, writeFile, exit) — a userland test runner
+# could do exactly this.
+#
+# Per-file isolation: each *.test.noo runs in its own generated entry process,
+# so one crashing or hanging suite reports as a failed suite while the rest
+# still run. The child's report arrives on stdout either way — a failing
+# process's stdout is still data (CommandFailed carries it).
+
+entry_file = ".noo-test-entry.noo";
+
+# The generated entry: import the suite, run it, exit by failure count.
+# Import specifiers may keep their .noo extension, and the entry lives in the
+# CWD so ./-relative discovery paths resolve as written.
+entry_source = fn file =>
+  "{@run_all} = import \"std/test\";\n"
+  + "suite = import \"" + file + "\";\n"
+  + "result = run_all [{@path \"" + file + "\", @suite suite}];\n"
+  + "{@failed failed} = result;\n"
+  + "exit (if failed > 0 then 1 else 0)";
+
+# Run one suite in a child interpreter; True = suite passed
+run_suite = fn cli file => (
+  _write = writeFile entry_file (entry_source file);
+  outcome = exec "bun" [cli, entry_file];
+  match outcome (
+    Ok output => (_p = print output; True);
+    Err e => match e (
+      CommandFailed info => (
+        _out = print (info | @stdout);
+        _err = print (info | @stderr);
+        False
+      );
+      ExecFailed message => (_p = println (file + ": " + message); False)
+    )
+  )
+);
+
+discover = fn u => (
+  found = exec "find" [
+    ".", "-name", "*.test.noo",
+    "-not", "-path", "*/node_modules/*",
+    "-not", "-path", "*/.git/*"
+  ];
+  match found (
+    Ok output => output | split "\n" | filter (fn line => not (line == ""));
+    Err _ => []
+  )
+);
+
+main = (
+  cli = head argv;
+  match cli (
+    None => (_p = println "noo test: missing interpreter path argument"; exit 2);
+    Some cli_path => (
+      files = discover {};
+      if (length files) == 0
+      then (_p = println "no test files found (*.test.noo)"; exit 0)
+      else (
+        results = list_map (run_suite cli_path) files;
+        _cleanup = exec "rm" ["-f", entry_file];
+        failed = length (filter (fn passed => not passed) results);
+        passed = (length results) - failed;
+        _summary = println ("suites: " + show passed + " passed, " + show failed + " failed");
+        exit (if failed > 0 then 1 else 0)
+      )
+    )
+  )
+);
+
+main
