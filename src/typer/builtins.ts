@@ -601,12 +601,14 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['record'],
 	});
 	newEnv.set('hasValue', {
+		// `rec` was previously recordType({}) as an "any record" wildcard; the
+		// empty record now IS unit, so the wildcard must be a real variable
 		type: createBinaryFunctionType(
-			recordType({}),
+			typeVariable('rec'),
 			typeVariable('a'),
 			boolType()
 		),
-		quantifiedVars: ['a'],
+		quantifiedVars: ['rec', 'a'],
 	});
 	//FIXME this needs to apply the constraint correctly
 	newEnv.set('set', {
@@ -614,11 +616,11 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 			[
 				typeVariable('accessor'), // Accept any accessor function type
 				typeVariable('a'),
-				recordType({}),
+				typeVariable('rec'),
 			],
-			recordType({})
+			typeVariable('rec')
 		),
-		quantifiedVars: ['accessor', 'a'],
+		quantifiedVars: ['accessor', 'a', 'rec'],
 	});
 
 	// Tuple operations - only keep sound ones
