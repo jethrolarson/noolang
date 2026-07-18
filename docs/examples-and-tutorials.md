@@ -253,21 +253,21 @@ Type-safe system operations using the `exec` builtin:
 result = exec "echo" ["Hello from Noolang!"];
 match result (
     Ok output => println ("Command output: " + output);
-    Err error => println ("Command failed: " + error)
+    Err error => println ("Command failed: " + show error)
 );
 
 # System information gathering
 hostname_result = exec "hostname" [];
 match hostname_result (
     Ok hostname => println ("Hostname: " + hostname);
-    Err error => println ("Hostname error: " + error)
+    Err error => println ("Hostname error: " + show error)
 );
 
 # Error handling for non-existent commands
 bad_command = exec "this_command_does_not_exist" [];
 match bad_command (
     Ok output => println ("Unexpected success: " + output);
-    Err error => println ("Expected error caught: " + error)
+    Err error => println ("Expected error caught: " + show error)
 );
 ```
 

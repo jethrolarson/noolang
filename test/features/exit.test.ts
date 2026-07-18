@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { runCode } from '../utils';
 
-const repoRoot = resolve(import.meta.dir, '..', '..');
+const repoRoot = resolve(__dirname, '..', '..');
 const cli = join(repoRoot, 'src', 'cli.ts');
 
 test('exit has type Float -> {} with an effect', () => {

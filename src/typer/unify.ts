@@ -68,8 +68,17 @@ const unifyInternal = (
 	// Early equality check before substitution for performance
 	if (t1 === t2) return state;
 
-	const s1 = substitute(t1, state.substitution);
-	const s2 = substitute(t2, state.substitution);
+	// {} is unit, the empty record, and the empty tuple simultaneously — one
+	// type by design. Normalize the degenerate spellings to unit so they unify.
+	const normalizeUnit = (t: Type): Type => {
+		if (t.kind === 'record' && Object.keys(t.fields).length === 0)
+			return { kind: 'unit' };
+		if (t.kind === 'tuple' && t.elements.length === 0) return { kind: 'unit' };
+		return t;
+	};
+
+	const s1 = normalizeUnit(substitute(t1, state.substitution));
+	const s2 = normalizeUnit(substitute(t2, state.substitution));
 
 	if (typesEqual(s1, s2)) return state;
 

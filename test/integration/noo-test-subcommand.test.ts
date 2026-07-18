@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-const repoRoot = resolve(import.meta.dir, '..', '..');
+const repoRoot = resolve(__dirname, '..', '..');
 const cli = join(repoRoot, 'src', 'cli.ts');
 
 function makeProject(files: Record<string, string>): string {

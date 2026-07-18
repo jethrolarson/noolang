@@ -498,7 +498,8 @@ export const typeToString = (
 				const fields = Object.entries(t.fields)
 					.map(([name, fieldType]) => `@${name} ${norm(fieldType)}`)
 					.join(', ');
-				return fields.length > 0 ? `{ ${fields} }` : `{ }`;
+				// The empty record IS unit — print the one spelling for the one type
+				return fields.length > 0 ? `{ ${fields} }` : `{}`;
 			}
 			case 'union':
 				return `(${t.types.map(norm).join(' | ')})`;
