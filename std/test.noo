@@ -41,7 +41,7 @@ expect_neq = fn unexpected actual =>
   if unexpected == actual
   then Fail {
     @message "values are equal but should not be",
-    @expected Some (concat "not " (show unexpected)),
+    @expected Some ("not " + show unexpected),
     @actual Some (show actual)
   }
   else Pass;
@@ -52,11 +52,11 @@ expect = fn label condition =>
 
 expect_ok = fn res => match res (
   Ok _ => Pass;
-  Err e => fail (concat "expected Ok, got Err: " (show e))
+  Err e => fail ("expected Ok, got Err: " + show e)
 );
 
 expect_err = fn res => match res (
-  Ok x => fail (concat "expected Err, got Ok: " (show x));
+  Ok x => fail ("expected Err, got Ok: " + show x);
   Err _ => Pass
 );
 
@@ -79,45 +79,44 @@ run_tree = fn t => match t (
   Group name tests => GroupResult name (list_map run_tree tests)
 );
 
+no_counts = {@passed 0, @failed 0};
+
+add_counts = fn a b => (
+  {@passed a_passed, @failed a_failed} = a;
+  {@passed b_passed, @failed b_failed} = b;
+  {@passed a_passed + b_passed, @failed a_failed + b_failed}
+);
+
 result_counts = fn result => match result (
   CaseResult _ e => match e (
     Pass => {@passed 1, @failed 0};
     Fail _ => {@passed 0, @failed 1}
   );
   GroupResult _ results =>
-    reduce
-      (fn acc r => (
-        counts = result_counts r;
-        {@passed (@passed acc) + (@passed counts), @failed (@failed acc) + (@failed counts)}
-      ))
-      {@passed 0, @failed 0}
-      results
+    reduce (fn acc r => add_counts acc (result_counts r)) no_counts results
 );
 
 indent = fn depth =>
-  if depth == 0 then "" else concat "  " (indent (depth - 1));
+  if depth == 0 then "" else "  " + indent (depth - 1);
 
 # Failure detail lines, indented under the case mark
 format_failure = fn depth info => (
-  pad = concat (indent depth) "    ";
-  expected = @expected info;
-  actual = @actual info;
+  pad = indent depth + "    ";
+  expected = info | @expected;
+  actual = info | @actual;
   match {expected, actual} (
-    {Some e, Some a} =>
-      concat pad (concat "expected: " (concat e (concat "\n" (concat pad (concat "actual:   " a)))));
-    _ => concat pad (@message info)
+    {Some e, Some a} => pad + "expected: " + e + "\n" + pad + "actual:   " + a;
+    _ => pad + (info | @message)
   )
 );
 
 format_at = fn depth result => match result (
   CaseResult name e => match e (
-    Pass => concat (indent depth) (concat "✓ " name);
-    Fail info =>
-      concat (indent depth) (concat "✗ " (concat name (concat "\n" (format_failure depth info))))
+    Pass => indent depth + "✓ " + name;
+    Fail info => indent depth + "✗ " + name + "\n" + format_failure depth info
   );
   GroupResult name results =>
-    concat (indent depth) (concat name (concat "\n"
-      (join "\n" (list_map (format_at (depth + 1)) results))))
+    indent depth + name + "\n" + join "\n" (list_map (format_at (depth + 1)) results)
 );
 
 format_result = format_at 0;
@@ -127,15 +126,15 @@ format_result = format_at 0;
 run_all = fn suites => (
   totals = reduce
     (fn acc entry => (
-      result = run_tree (@suite entry);
-      _p1 = println (@path entry);
-      _p2 = println (format_result result);
-      counts = result_counts result;
-      {@passed (@passed acc) + (@passed counts), @failed (@failed acc) + (@failed counts)}
+      result = entry | @suite | run_tree;
+      _p1 = entry | @path | println;
+      _p2 = result | format_result | println;
+      add_counts acc (result_counts result)
     ))
-    {@passed 0, @failed 0}
+    no_counts
     suites;
-  _summary = println (concat (show (@passed totals)) (concat " passed, " (concat (show (@failed totals)) " failed")));
+  {@passed passed, @failed failed} = totals;
+  _summary = println (show passed + " passed, " + show failed + " failed");
   totals
 );
 
