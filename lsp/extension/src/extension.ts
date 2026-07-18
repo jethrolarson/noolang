@@ -32,10 +32,26 @@ export function activate(context: ExtensionContext) {
 	console.log('  Server JS path:', serverJs);
 	console.log('  Server JS exists:', require('fs').existsSync(serverJs));
 
+	// Prefer the live TypeScript CLI (via bun) over the built dist/cli.js —
+	// a stale dist means every diagnostic reflects an old version of the
+	// language. dist remains the fallback for workspaces without source.
+	const fs = require('fs') as typeof import('fs');
+	const srcCli = workspaceFolder ? path.join(workspaceFolder, 'src', 'cli.ts') : '';
+	const distCli = workspaceFolder ? path.join(workspaceFolder, 'dist', 'cli.js') : '';
+	const cliPath = srcCli && fs.existsSync(srcCli) ? srcCli : distCli;
+	// GUI-launched VS Code often lacks the shell PATH; resolve bun directly
+	const bunCandidates = [
+		path.join(process.env.HOME ?? '', '.bun', 'bin', 'bun'),
+		'/opt/homebrew/bin/bun',
+		'/usr/local/bin/bun',
+	];
+	const bunPath = bunCandidates.find(c => fs.existsSync(c)) ?? 'bun';
+
 	const env = {
 		...process.env,
 		NOOLANG_WORKSPACE: workspaceFolder ?? '',
-		NOOLANG_CLI_PATH: workspaceFolder ? path.join(workspaceFolder, 'dist', 'cli.js') : '',
+		NOOLANG_CLI_PATH: cliPath,
+		NOOLANG_CLI_RUNTIME: cliPath.endsWith('.ts') ? bunPath : 'node',
 	};
 
 	// The debug options for the server

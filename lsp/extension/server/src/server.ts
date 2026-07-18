@@ -37,6 +37,8 @@ const documents = new Map<string, string>(); // key: uri
 // Env from client
 const WORKSPACE = process.env.NOOLANG_WORKSPACE || '';
 const CLI_PATH = process.env.NOOLANG_CLI_PATH || path.join(WORKSPACE || '.', 'dist', 'cli.js');
+// bun for live .ts source, node for a built dist bundle (see extension.ts)
+const CLI_RUNTIME = process.env.NOOLANG_CLI_RUNTIME || 'node';
 
 function uriToFilePath(uri: string): string | undefined {
   try {
@@ -47,7 +49,7 @@ function uriToFilePath(uri: string): string | undefined {
 }
 
 function runNodeCli(args: string[]) {
-  return spawnSync('node', [CLI_PATH, ...args], { encoding: 'utf8' });
+  return spawnSync(CLI_RUNTIME, [CLI_PATH, ...args], { encoding: 'utf8' });
 }
 
 // --- Bridge helpers (ported from Rust logic) ---
