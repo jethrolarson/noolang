@@ -1135,8 +1135,11 @@ export class Evaluator {
 					if (typeof error?.status === 'number') {
 						return createConstructor('Err', [
 							createConstructor('CommandFailed', [
-								createNumber(error.status),
-								createString(String(error.stderr ?? '')),
+								createRecord({
+									code: createNumber(error.status),
+									stdout: createString(String(error.stdout ?? '')),
+									stderr: createString(String(error.stderr ?? '')),
+								}),
 							]),
 						]);
 					}

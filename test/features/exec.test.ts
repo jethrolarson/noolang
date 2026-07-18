@@ -16,16 +16,29 @@ test('exec success returns Ok stdout', () => {
 	);
 });
 
-test('exec nonzero exit returns Err (CommandFailed code stderr)', () => {
+test('exec nonzero exit returns Err (CommandFailed with code)', () => {
 	expectSuccess(
 		`match (exec "false" []) (
 			Ok _ => -1;
 			Err e => match e (
-				CommandFailed code stderr => code;
+				CommandFailed info => @code info;
 				ExecFailed _ => -2
 			)
 		)`,
 		1
+	);
+});
+
+test('CommandFailed preserves stdout from the failed process', () => {
+	expectSuccess(
+		`match (exec "sh" ["-c", "echo kept-output; exit 3"]) (
+			Ok _ => "ok";
+			Err e => match e (
+				CommandFailed info => @stdout info;
+				ExecFailed _ => "spawn"
+			)
+		)`,
+		expect.stringContaining('kept-output')
 	);
 });
 
@@ -34,7 +47,7 @@ test('exec failure carries stderr text', () => {
 		`match (exec "ls" ["/definitely-no-such-path-xyz"]) (
 			Ok _ => "ok";
 			Err e => match e (
-				CommandFailed code stderr => stderr;
+				CommandFailed info => @stderr info;
 				ExecFailed message => "spawn"
 			)
 		)`,

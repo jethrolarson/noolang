@@ -207,13 +207,16 @@ implement Show Result (
 variant ReadError = FileNotFound String | ReadPermissionDenied String | ReadFailed String;
 variant WriteError = WritePermissionDenied String | WriteFailed String;
 
-# Process failure: CommandFailed exitCode stderr (the process ran and exited
-# nonzero) vs ExecFailed message (the process could not run at all)
-variant ExecError = CommandFailed Float String | ExecFailed String;
+# Process failure: CommandFailed (the process ran and exited nonzero — both
+# output streams preserved, a failing process's stdout is still data) vs
+# ExecFailed message (the process could not run at all)
+variant ExecError =
+    CommandFailed {@code Float, @stdout String, @stderr String}
+  | ExecFailed String;
 
 implement Show ExecError (
   show = fn err => match err (
-    CommandFailed code stderr => concat "CommandFailed(" (concat (show code) (concat ", " (concat stderr ")")));
+    CommandFailed info => concat "CommandFailed(" (concat (show (@code info)) (concat ", " (concat (@stderr info) ")")));
     ExecFailed message => concat "ExecFailed(" (concat message ")")
   )
 );
