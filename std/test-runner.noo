@@ -51,7 +51,7 @@ discover = fn u => (
   )
 );
 
-main = (
+main = (fn _ => (
   cli = head argv;
   match cli (
     None => (_p = println "noo test: missing interpreter path argument"; exit 2);
@@ -69,6 +69,6 @@ main = (
       )
     )
   )
-);
+)) : Unit -> Unit !write !ffi;
 
-main
+main {}
