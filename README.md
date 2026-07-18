@@ -332,7 +332,7 @@ addNums = fn x y => x + y : Float -> Float -> Float;
 double = fn x => x * 2 : Float -> Float;
 
 # Complex type annotations with effects
-logger = fn msg => print msg : String -> String !write;
+logger = fn msg => print msg : String -> {} !write;
 readConfig = fn path => readFile path : String -> Result String ReadError !read;
 ```
 
@@ -963,8 +963,8 @@ Noolang provides a set of built-in functions organized by category:
 - **`tupleIsEmpty`** - Check if tuple is empty: `Tuple -> Bool`
 
 #### I/O Operations (Effectful)
-- **`print`** - Print value: `a -> a` (effect: `!write`)
-- **`println`** - Print line: `a -> a` (effect: `!write`)
+- **`print`** - Print value: `a -> {}` (effect: `!write`)
+- **`println`** - Print line: `a -> {}` (effect: `!write`)
 - **`readFile`** - Read file: `String -> String` (effect: `!read`)
 - **`writeFile`** - Write file: `String -> String -> Unit` (effect: `!write`)
 - **`log`** - Log message: `String -> Unit` (effect: `!log`)
@@ -1043,7 +1043,7 @@ sumTwo = fn x y => x + y : Float -> Float -> Float;
 readAndPrint = fn filename => (
   content = readFile filename;
   match content ( Ok text => print text; Err e => print (show e) )
-) : String -> String !read !write;
+) : String -> {} !read !write;
 
 # System operations with FFI effects
 runCommand = fn cmd args => exec cmd args : String -> List String -> Result String ExecError !ffi;

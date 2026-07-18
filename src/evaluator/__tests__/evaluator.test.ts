@@ -310,7 +310,7 @@ describe('Evaluator', () => {
 	});
 
 	test('definition with sequence on right side using parentheses', () => {
-		const result = runCode('foo = (1; 2); foo');
+		const result = runCode('foo = (_ = 1; 2); foo');
 		expect(result.finalValue).toBe(2);
 	});
 

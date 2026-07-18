@@ -15,7 +15,7 @@ const typeChecks = (code: string) => typeAndDecorate(parse(new Lexer(code).token
 // --- Effect inference: a function's body effects are latent on its type ---
 
 test('Effect inference - fn x => print x carries !write on its type', () => {
-	expect(typeStr('fn x => print x')).toBe('a -> a !write');
+	expect(typeStr('fn x => print x')).toBe('a -> {} !write');
 });
 
 test('Effect inference - a pure function has no effect', () => {
@@ -29,7 +29,7 @@ test('Effect inference - readFile body surfaces !read', () => {
 });
 
 test('Effect inference - effects propagate through a wrapping call', () => {
-	expect(typeStr('g = fn x => print x; fn y => g y')).toBe('a -> a !write');
+	expect(typeStr('g = fn x => print x; fn y => g y')).toBe('a -> {} !write');
 });
 
 // --- Effect enforcement: annotations may over-declare but not omit effects ---
@@ -42,12 +42,12 @@ test('Effect enforcement - annotation omitting a performed effect is rejected', 
 
 test('Effect enforcement - annotation omitting one of several effects is rejected', () => {
 	expect(() =>
-		typeChecks('fn n => (log "x"; print n) : Float -> Float !write')
+		typeChecks('fn n => (log "x"; print n) : Float -> {} !write')
 	).toThrow(/omits effect .*log/);
 });
 
 test('Effect enforcement - a matching effect annotation is accepted', () => {
-	expect(typeStr('fn x => print x : a -> a !write')).toBe('a -> a !write');
+	expect(typeStr('fn x => print x : a -> {} !write')).toBe('a -> {} !write');
 });
 
 test('Effect enforcement - over-declaring effects (conservative) is allowed', () => {

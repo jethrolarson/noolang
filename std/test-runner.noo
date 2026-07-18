@@ -24,17 +24,19 @@ entry_source = fn file =>
 
 # Run one suite in a child interpreter; True = suite passed
 run_suite = fn cli file => (
-  _write = writeFile entry_file (entry_source file);
+  # Deliberate discard: a failed write surfaces as the child process failing
+  # to find its entry file, which already reports the suite as failed
+  _ = writeFile entry_file (entry_source file);
   outcome = exec "bun" [cli, entry_file];
   match outcome (
-    Ok output => (_p = print output; True);
+    Ok output => (print output; True);
     Err e => match e (
       CommandFailed info => (
-        _out = print (info | @stdout);
-        _err = print (info | @stderr);
+        print (info | @stdout);
+        print (info | @stderr);
         False
       );
-      ExecFailed message => (_p = println (file + ": " + message); False)
+      ExecFailed message => (println (file + ": " + message); False)
     )
   )
 );
@@ -54,17 +56,17 @@ discover = fn u => (
 main = (fn _ => (
   cli = head argv;
   match cli (
-    None => (_p = println "noo test: missing interpreter path argument"; exit 2);
+    None => (println "noo test: missing interpreter path argument"; exit 2);
     Some cli_path => (
       files = discover {};
       if (length files) == 0
-      then (_p = println "no test files found (*.test.noo)"; exit 0)
+      then (println "no test files found (*.test.noo)"; exit 0)
       else (
         results = list_map (run_suite cli_path) files;
-        _cleanup = exec "rm" ["-f", entry_file];
+        _ = exec "rm" ["-f", entry_file];
         failed = length (filter (fn passed => not passed) results);
         passed = (length results) - failed;
-        _summary = println ("suites: " + show passed + " passed, " + show failed + " failed");
+        println ("suites: " + show passed + " passed, " + show failed + " failed");
         exit (if failed > 0 then 1 else 0)
       )
     )

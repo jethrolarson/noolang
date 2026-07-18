@@ -998,6 +998,23 @@ const handleSafeThrush = (
 	}
 };
 
+// Statement forms whose point is the binding they introduce, not the value
+// they produce — exempt from the unit-discard check on sequence items.
+const bindingStatementKinds = new Set<Expression['kind']>([
+	'definition',
+	'mutable-definition',
+	'mutation',
+	'tuple-destructuring',
+	'record-destructuring',
+	'type-definition',
+	'user-defined-type',
+	'constraint-definition',
+	'implement-definition',
+]);
+
+const isBindingStatement = (statement: Expression): boolean =>
+	bindingStatementKinds.has(statement.kind);
+
 export const typeBinary = (
 	expr: BinaryExpression,
 	state: TypeState
@@ -1006,6 +1023,7 @@ export const typeBinary = (
 	if (expr.operator === ';') {
 		// Flatten the semicolon sequence and process each statement exactly once
 		const statements = flattenStatements(expr);
+		const finalStatement = statements[statements.length - 1];
 		let currentState = state;
 		let finalType = null;
 		let allEffects = emptyEffects();
@@ -1015,6 +1033,28 @@ export const typeBinary = (
 			currentState = result.state;
 			finalType = result.type;
 			allEffects = unionEffects(allEffects, result.effects);
+
+			// In a nested (parenthesized) sequence a non-final bare expression's
+			// value is silently discarded, so it must be unit — dropping {} drops
+			// nothing, while a dropped non-unit value is usually a lost result.
+			// The top-level program sequence stays permissive (script style).
+			if (
+				expr.parenthesized &&
+				statement !== finalStatement &&
+				!isBindingStatement(statement)
+			) {
+				currentState = unify(
+					result.type,
+					unitType(),
+					currentState,
+					getExprLocation(statement),
+					{
+						reason: 'sequence_discard',
+						operation: 'discarding a non-final sequence item',
+						hint: 'A bare expression before a `;` is evaluated and its value discarded, so it must have type {}. Bind the value with a name, or write `_ = ...` to discard it deliberately.',
+					}
+				);
+			}
 		}
 
 		return createTypeResult(finalType || unitType(), allEffects, currentState);

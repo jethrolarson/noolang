@@ -391,13 +391,24 @@ export const freshenRecordStructure = (
 	return [{ fields: newFields }, currentState];
 };
 
-// Helper to flatten semicolon-separated binary expressions into individual statements
+// Helper to flatten semicolon-separated binary expressions into individual
+// statements. Parenthesized sub-sequences stay whole: they are their own
+// discard scope (typeBinary unit-checks their non-final bare items), so
+// flattening them into the parent would misattribute that check.
 export const flattenStatements = (expr: Expression): Expression[] => {
 	if (expr.kind === 'binary' && expr.operator === ';') {
-		return [...flattenStatements(expr.left), ...flattenStatements(expr.right)];
+		return [
+			...flattenSequenceChild(expr.left),
+			...flattenSequenceChild(expr.right),
+		];
 	}
 	return [expr];
 };
+
+const flattenSequenceChild = (expr: Expression): Expression[] =>
+	expr.kind === 'binary' && expr.operator === ';' && expr.parenthesized
+		? [expr]
+		: flattenStatements(expr);
 
 // Load standard library from stdlib.noo
 export const loadStdlib = (state: TypeState): TypeState => {
