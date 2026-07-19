@@ -3,6 +3,7 @@ import {
 	type Type,
 	type Constraint,
 	type FunctionType,
+	type Effect,
 } from '../ast';
 import { throwTypeError, typeToString } from './helpers';
 import {
@@ -29,7 +30,7 @@ export function handleTraitFunctionApplication(
 	funcType: Type,
 	argTypes: Type[],
 	currentState: TypeState,
-	funcResult: TypeResult
+	allEffects: Set<Effect>
 ): TypeResult | null {
 	// Check if this could be a trait function call
 	// Only call trait function application for the inner application (when func is a variable)
@@ -86,7 +87,7 @@ export function handleTraitFunctionApplication(
 					traitFuncType,
 					argTypes,
 					currentState,
-					funcResult
+					allEffects
 				);
 			}
 
@@ -96,7 +97,8 @@ export function handleTraitFunctionApplication(
 					expr,
 					traitFuncType,
 					argTypes,
-					currentState
+					currentState,
+					allEffects
 				);
 			}
 		}
@@ -110,7 +112,7 @@ function handlePartialTraitFunctionApplication(
 	traitFuncType: FunctionType,
 	argTypes: Type[],
 	currentState: TypeState,
-	funcResult: TypeResult
+	allEffects: Set<Effect>
 ): TypeResult {
 	// Freshen type variables in the trait function type to avoid conflicts with argument types
 	// Create a mapping from old variable names to fresh ones
@@ -290,7 +292,7 @@ function handlePartialTraitFunctionApplication(
 			};
 		}
 	}
-	return createTypeResult(curriedType, funcResult.effects, partialState);
+	return createTypeResult(curriedType, allEffects, partialState);
 }
 
 // Helper function to handle full trait function application
@@ -298,7 +300,8 @@ function handleFullTraitFunctionApplication(
 	expr: ApplicationExpression,
 	traitFuncType: FunctionType,
 	argTypes: Type[],
-	currentState: TypeState
+	currentState: TypeState,
+	allEffects: Set<Effect>
 ): TypeResult | null {
 	let funcName = 'unknown';
 	if (expr.func.kind === 'variable') {
@@ -438,6 +441,7 @@ function handleFullTraitFunctionApplication(
 			}
 
 			const resultEffects = unionEffects(
+				allEffects,
 				traitImplType.effects,
 				...argResults.map(r => r.effects)
 			);
@@ -561,7 +565,7 @@ function handleFullTraitFunctionApplication(
 						}
 					}
 
-					return createTypeResult(resultType, new Set(), resultState);
+					return createTypeResult(resultType, allEffects, resultState);
 				}
 			}
 		}

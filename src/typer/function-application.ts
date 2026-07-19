@@ -50,7 +50,7 @@ export const typeApplication = (
 			funcType,
 			argTypes,
 			currentState,
-			funcResult
+			allEffects
 		);
 		if (traitResult) {
 			return traitResult;
