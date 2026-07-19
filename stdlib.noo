@@ -182,8 +182,8 @@ implement Eq (Option a) given a implements Eq (
 );
 
 implement Applicative Option (
-  apply = fn f opt => match opt (
-    Some x => f x;
+  apply = fn f opt => match f (
+    Some g => map g opt;
     None => None
   )
 );
@@ -290,6 +290,12 @@ implement Eq (Result a b) given (a implements Eq) and (b implements Eq) (
   )
 );
 
+# KNOWN WRONG: matches the argument and applies the wrapped value as a
+# function. The correct body (match f; Ok g => map g res) crashes the typer —
+# two-parameter variants register at arity 1 in trait instances, and matching
+# the `f (a -> b)` parameter hits "Unknown ADT: Result" during stdlib load.
+# Unusable either way until the typer kind bug is fixed; deferred tests in
+# stdlib.test.noo.
 implement Applicative Result (
   apply = fn f res => match res (
     Ok x => f x;
@@ -310,9 +316,13 @@ head = fn list => if (length list) == 0
   else list_get 0 list;
 
 # Join list elements with a separator
-# Example: join ", " [1, 2, 3] -> "1, 2, 3"
-join = fn separator list =>
-  reduce (fn acc x => if acc == "" then x else concat acc (concat separator x)) "" list;
+# Example: join ", " ["a", "b"] -> "a, b"
+# Head/tail split, not an acc == "" sentinel: an empty string is a real
+# element and must still get its separator.
+join = fn separator list => match (head list) (
+  None => "";
+  Some h => reduce (fn acc x => acc + separator + x) h (tail list)
+);
 
 filter = list_filter;
 

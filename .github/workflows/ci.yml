@@ -91,7 +91,10 @@ jobs:
     - name: Run tests (all migrated to bun)
       run: bun test
 
-  # Run REPL-specific tests separately  
+    - name: Run noolang test suites (noo test)
+      run: bun src/cli.ts test
+
+  # Run REPL-specific tests separately
   repl-tests:
     runs-on: ubuntu-latest
     # Removed dependencies to allow parallel execution with other jobs

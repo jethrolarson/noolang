@@ -1,0 +1,42 @@
+# Regression suite for stdlib.noo, run by `noo test`.
+# Written against three bugs found by probing (2026-07-16): Applicative apply
+# crashing on Option/Result, join dropping separators before empty elements,
+# and tail throwing on the empty list.
+
+{@test_case test_case, @group group, @expect_eq expect_eq, @expect expect} = import "std/test";
+
+applicative_tests = group "Applicative apply" [
+  test_case "Option: applies wrapped function" (fn _ =>
+    expect_eq (Some 3) (apply (Some (fn x => x + 1)) (Some 2))),
+  test_case "Option: None function short-circuits" (fn _ =>
+    expect_eq None (apply None (Some 2))),
+  test_case "Option: None argument short-circuits" (fn _ =>
+    expect_eq None (apply (Some (fn x => x + 1)) None))
+  # Result apply/map tests blocked on a typer kind bug: two-parameter variants
+  # register at arity 1 in trait instances (`map f (Ok 2)` infers `Result Float`,
+  # `apply` at Result won't type at all). Needs a typer fix, not a stdlib one.
+];
+
+join_tests = group "join" [
+  test_case "separates all elements" (fn _ =>
+    expect_eq "a, b, c" (join ", " ["a", "b", "c"])),
+  test_case "keeps separator before an empty first element" (fn _ =>
+    expect_eq ", a, b" (join ", " ["", "a", "b"])),
+  test_case "keeps separator around empty middle element" (fn _ =>
+    expect_eq "a,,b" (join "," ["a", "", "b"])),
+  test_case "empty list joins to empty string" (fn _ =>
+    expect_eq "" (join ", " [])),
+  test_case "single element has no separator" (fn _ =>
+    expect_eq "a" (join ", " ["a"]))
+];
+
+tail_tests = group "tail" [
+  test_case "tail of empty list is empty, not a crash" (fn _ =>
+    expect_eq 0 (length (tail []))),
+  test_case "tail drops exactly the head" (fn _ =>
+    expect_eq [2, 3] (tail [1, 2, 3])),
+  test_case "tail of singleton is empty" (fn _ =>
+    expect_eq 0 (length (tail [1])))
+];
+
+group "stdlib regressions" [applicative_tests, join_tests, tail_tests]

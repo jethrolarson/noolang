@@ -479,9 +479,10 @@ export class Evaluator {
 		this.environment.set(
 			'tail',
 			createNativeFunction('tail', (list: Value) => {
-				if (isList(list) && list.values.length > 0)
-					return createList(list.values.slice(1));
-				throw new Error('Cannot get tail of empty list or non-list');
+				// Total on lists: tail [] = [] — matches head's no-crash safety
+				// story without breaking the guarded `match (head l) ... tail l` idiom
+				if (isList(list)) return createList(list.values.slice(1));
+				throw new Error('Cannot get tail of non-list');
 			})
 		);
 		this.environment.set(
@@ -2368,6 +2369,38 @@ export class Evaluator {
 				}
 				throw new Error(
 					`Cannot modulus ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`
+				);
+			}
+
+			if (expr.operator === '==' || expr.operator === '!=') {
+				const negate = expr.operator === '!=';
+				const asBool = (b: boolean) => createBool(negate ? !b : b);
+				if (isNumber(leftVal) && isNumber(rightVal)) {
+					return asBool(leftVal.value === rightVal.value);
+				}
+				if (isString(leftVal) && isString(rightVal)) {
+					return asBool(leftVal.value === rightVal.value);
+				}
+				if (isUnit(leftVal) && isUnit(rightVal)) {
+					return asBool(true);
+				}
+				// Structured types (variants, lists, records) go through Eq —
+				// falling through to the primitives-only native silently
+				// returned False for all of them
+				if (this.isTraitFunction('equals')) {
+					try {
+						const result = this.resolveTraitFunctionWithArgs(
+							'equals',
+							[leftVal, rightVal],
+							this.traitRegistry
+						);
+						if (isBool(result)) return asBool(boolValue(result));
+					} catch (_e) {
+						// Fall through to error
+					}
+				}
+				throw new Error(
+					`Cannot compare ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'} for equality`
 				);
 			}
 
