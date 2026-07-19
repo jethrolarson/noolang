@@ -434,6 +434,35 @@ z = 9;
 calculation = (base = x * 2; helper = 3; base + helper);
 ```
 
+Inside a parenthesized sequence, a non-final item may also be a **bare
+expression**, but only if its type is `{}` (unit) — dropping unit discards
+nothing, while silently dropping data is almost always a lost result. Effects
+of bare items propagate exactly as bindings' do:
+
+```noolang
+# println returns {}, so no throwaway binding is needed
+greet = fn name => (println ("hello " + name); name);
+```
+
+To discard a non-unit value deliberately, bind it to the wildcard `_`, which
+evaluates the right-hand side and binds nothing:
+
+```noolang
+# writeFile returns Result {} WriteError; `_ =` discards it explicitly
+touch = fn path => (_ = writeFile path ""; path);
+```
+
+The following would be a type error (a non-unit value is silently dropped —
+this also catches dead code like a mistyped accumulation line):
+
+```
+# TypeError: Cannot unify types in discarding a non-final sequence item
+f = fn x => (x + 1; x)
+```
+
+The top level of a program is exempt: unparenthesized top-level sequences may
+display values of any type, as this reference itself does throughout.
+
 ### Record Operations
 
 ```noolang

@@ -208,7 +208,7 @@ effects**:
 
 ```noolang
 # Over-declaring is allowed — annotation adds !read even though body only writes
-verbose = fn x => print x : String -> String !write !read;
+verbose = fn x => print x : String -> {} !write !read;
 verbose "ok"
 ```
 
@@ -216,7 +216,7 @@ The following would be a type error (annotation omits `!write`):
 
 ```
 # TypeError: Type annotation omits effect !write performed by the expression
-bad = fn x => print x : String -> String;
+bad = fn x => print x : String -> {};
 ```
 
 ## Type System Integration

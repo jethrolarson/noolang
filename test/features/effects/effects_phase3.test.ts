@@ -173,7 +173,7 @@ test('Effects Phase 3 - Effect Propagation in Control Flow - conditionals merge 
 	expectEffects(
 		`
 				x = 5;
-				if x > 0 then (print x; {}) else (random; {})
+				if x > 0 then (print x; {}) else (_ = random; {})
 			`,
 		['rand', 'write']
 	);
@@ -184,7 +184,7 @@ test('Effects Phase 3 - Effect Propagation in Control Flow - nested conditionals
 		`
 				x = 5;
 				if x > 0 then (
-					if x > 10 then (readFile "big.txt"; {}) else (print x; {})
+					if x > 10 then (_ = readFile "big.txt"; {}) else (print x; {})
 				) else (log "negative"; {})
 			`,
 		['log', 'read', 'write']
@@ -209,7 +209,7 @@ test('Effects Phase 3 - Effect Propagation in Pattern Matching - pattern matchin
 		`
 				result = Ok 42;
 				match result (
-					Ok value => print value;
+					Ok value => (print value; 0);
 					Err msg => (log msg; random)
 				)
 			`,
