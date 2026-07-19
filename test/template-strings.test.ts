@@ -152,7 +152,7 @@ describe('template strings — end to end', () => {
 	});
 
 	test('effects performed in a hole propagate to the template', () => {
-		const result = parseAndType('`said: ${print "hi"}`');
+		const result = parseAndType('`said: ${(print "hi"; 42)}`');
 		const typeStr = typeToString(result.type!, result.state.substitution);
 		expect(typeStr).toContain('String');
 		expect(Array.from(result.effects ?? [])).toContain('write');
@@ -162,6 +162,13 @@ describe('template strings — end to end', () => {
 		expectError(
 			'variant Secret = Hidden; `${Hidden}`',
 			/no implementation of trait function 'show' for Secret/i
+		);
+	});
+
+	test('a hole that performs an effect but yields Unit is a type error, not a silent {}', () => {
+		expectError(
+			'`said: ${print "hi"}`',
+			/no implementation of trait function 'show' for unit/i
 		);
 	});
 
