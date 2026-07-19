@@ -75,6 +75,88 @@ const parseString = C.map(
 	})
 );
 
+// --- Template Strings ---
+// `text ${expr} more` desugars to "text" + show expr + " more".
+// Each hole becomes `show <expr>` located at the hole's own expression, so
+// type errors (e.g. no Show impl) point into the source hole rather than at
+// synthesized nodes. Effects in holes propagate as in any expression.
+const parseTemplate: C.Parser<Expression> = tokens => {
+	const startResult = C.token('TEMPLATE_START')(tokens);
+	if (!startResult.success) return startResult;
+	const startToken = startResult.value;
+
+	const parts: Expression[] = [];
+	let remaining = startResult.remaining;
+
+	for (;;) {
+		const next = remaining[0];
+		if (!next || next.type === 'EOF') {
+			return {
+				success: false,
+				error: 'Unterminated template string (missing closing `)',
+				position: startToken.location.start.line,
+			};
+		}
+		if (next.type === 'TEMPLATE_END') {
+			remaining = remaining.slice(1);
+			break;
+		}
+		if (next.type === 'TEMPLATE_TEXT') {
+			parts.push({
+				kind: 'literal',
+				value: next.value,
+				location: next.location,
+			});
+			remaining = remaining.slice(1);
+			continue;
+		}
+		if (next.type === 'TEMPLATE_HOLE_START') {
+			const holeResult = C.seq(
+				C.token('TEMPLATE_HOLE_START'),
+				C.lazy(() => parseSequence),
+				C.token('TEMPLATE_HOLE_END')
+			)(remaining);
+			if (!holeResult.success) return holeResult;
+			const holeExpr = holeResult.value[1];
+			parts.push({
+				kind: 'application',
+				func: {
+					kind: 'variable',
+					name: 'show',
+					location: holeExpr.location,
+				},
+				args: [holeExpr],
+				location: holeExpr.location,
+			});
+			remaining = holeResult.remaining;
+			continue;
+		}
+		return {
+			success: false,
+			error: `Unexpected ${next.type} in template string`,
+			position: next.location.start.line,
+		};
+	}
+
+	if (parts.length === 0) {
+		return {
+			success: true,
+			value: { kind: 'literal', value: '', location: startToken.location },
+			remaining,
+		};
+	}
+	const combined = parts.reduce(
+		(left, right): Expression => ({
+			kind: 'binary',
+			operator: '+',
+			left,
+			right,
+			location: left.location,
+		})
+	);
+	return { success: true, value: combined, remaining };
+};
+
 const parseAccessor = C.map(
 	C.accessor(),
 	(token): AccessorExpression => ({
@@ -698,6 +780,8 @@ const parsePrimary: C.Parser<Expression> = tokens => {
 			return parseNumber(tokens);
 		case 'STRING':
 			return parseString(tokens);
+		case 'TEMPLATE_START':
+			return parseTemplate(tokens);
 		case 'IDENTIFIER':
 			return parseIdentifier(tokens);
 		case 'ACCESSOR':
@@ -1890,6 +1974,7 @@ const parseSequenceTerm: C.Parser<Expression> = tokens => {
 
 		case 'NUMBER':
 		case 'STRING':
+		case 'TEMPLATE_START':
 		case 'ACCESSOR':
 			// Simple literals - handle directly with parseThrush
 			return parseThrush(tokens);

@@ -27,6 +27,27 @@
 "";          # Empty string
 ```
 
+### Template Strings
+
+Backtick-delimited strings interpolate expressions with `${...}`. Each hole
+desugars to `show <expr>` concatenated into the string, so a hole accepts any
+expression whose type implements `Show` (`Show String` is identity, so string
+holes interpolate as-is). A hole whose type has no `Show` implementation is a
+type error, and effects performed inside a hole propagate as usual.
+
+Ordinary `"..."` strings are completely inert — only backticks opt in to
+interpolation. Templates may span multiple lines and contain unescaped `"`.
+Escape a literal backtick as `` \` `` and a literal `${` as `\$`; the usual
+`\n`, `\t`, `\r` escapes also work.
+
+```noolang
+name = "World";
+`Hello, ${name}!`;         # "Hello, World!"
+`1 + 2 = ${1 + 2}`;        # "1 + 2 = 3" (Float hole goes through show)
+`price: \${5}`;            # "price: ${5}" (escaped hole)
+`say "hi"`;                # unescaped double quotes are fine
+```
+
 ### Booleans
 
 ```noolang
