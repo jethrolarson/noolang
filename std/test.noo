@@ -127,14 +127,14 @@ run_all = fn suites => (
   totals = reduce
     (fn acc entry => (
       result = entry | @suite | run_tree;
-      _p1 = entry | @path | println;
-      _p2 = result | format_result | println;
+      entry | @path | println;
+      result | format_result | println;
       add_counts acc (result_counts result)
     ))
     no_counts
     suites;
   {@passed passed, @failed failed} = totals;
-  _summary = println `${passed} passed, ${failed} failed`;
+  println `${passed} passed, ${failed} failed`;
   totals
 );
 

@@ -261,6 +261,11 @@ export interface BinaryExpression {
 		| '||';
 	left: Expression;
 	right: Expression;
+	// Set on `;`-sequences built inside parentheses. Nested sequences only
+	// arise via parens, so this marks the scope where the typer requires
+	// non-final bare expressions to be unit-typed; the program's top-level
+	// sequence stays permissive for script/literate-doc display style.
+	parenthesized?: boolean;
 	type?: Type;
 	location: Location;
 }

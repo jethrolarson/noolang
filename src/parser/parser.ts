@@ -375,7 +375,10 @@ const parseParenExpr: C.Parser<Expression> = tokens => {
 			C.lazy(() => parseSequence), // Use parseSequence to allow full semicolon-separated sequences
 			C.punctuation(')')
 		),
-		([_open, expr, _close]) => expr
+		([_open, expr, _close]) =>
+			expr.kind === 'binary' && expr.operator === ';'
+				? { ...expr, parenthesized: true }
+				: expr
 	)(tokens);
 };
 
@@ -1247,7 +1250,29 @@ export const parseRecordDestructuring: C.Parser<
 };
 
 // --- Combined Definition Parser (handles regular definitions and destructuring) ---
+// --- Wildcard Binding ---
+// `_ = expr` evaluates expr and binds nothing: the explicit way to discard a
+// non-unit value in sequence position (bare expressions must be unit-typed).
+// Represented as a definition named `_`; the lexer emits bare `_` as
+// punctuation, so no variable expression can ever read the binding back.
+const parseWildcardBinding: C.Parser<DefinitionExpression> = C.map(
+	C.seq(
+		C.punctuation('_'),
+		C.operator('='),
+		C.lazy(() => parseSequenceTerm)
+	),
+	([underscore, _equals, value]): DefinitionExpression => ({
+		kind: 'definition',
+		name: '_',
+		value,
+		location: underscore.location,
+	})
+);
+
 const parseDefinition: C.Parser<Expression> = tokens => {
+	const wildcardResult = parseWildcardBinding(tokens);
+	if (wildcardResult.success) return wildcardResult;
+
 	// First try destructuring patterns
 	if (isDestructuringPattern(tokens)) {
 		return C.choice2<Expression>(
@@ -1371,6 +1396,9 @@ const parseWhereDefinition: C.Parser<
 	| RecordDestructuringExpression
 	| MutableDefinitionExpression
 > = tokens => {
+	const wildcardResult = parseWildcardBinding(tokens);
+	if (wildcardResult.success) return wildcardResult;
+
 	// Try mutable definition first
 	const mutableResult = parseMutableDefinition(tokens);
 	if (mutableResult.success) {

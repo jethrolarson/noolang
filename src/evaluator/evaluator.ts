@@ -1001,7 +1001,7 @@ export class Evaluator {
 			'println',
 			createNativeFunction('println', (value: Value) => {
 				console.log(isString(value) ? value.value : valueToString(value));
-				return value;
+				return createUnit();
 			})
 		);
 

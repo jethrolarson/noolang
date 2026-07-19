@@ -198,22 +198,16 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a', 'b'],
 	});
 
-	// Effectful functions - I/O and logging
+	// Effectful functions - I/O and logging. Both return unit (which is what
+	// the print native always did), so a bare `println ...` mid-sequence
+	// satisfies the unit-discard rule.
 	newEnv.set('print', {
-		type: functionType(
-			[typeVariable('a')],
-			typeVariable('a'),
-			new Set(['write'])
-		),
+		type: functionType([typeVariable('a')], unitType(), new Set(['write'])),
 		quantifiedVars: ['a'],
 	});
 
 	newEnv.set('println', {
-		type: functionType(
-			[typeVariable('a')],
-			typeVariable('a'),
-			new Set(['write'])
-		),
+		type: functionType([typeVariable('a')], unitType(), new Set(['write'])),
 		quantifiedVars: ['a'],
 	});
 
