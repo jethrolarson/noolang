@@ -109,6 +109,20 @@ test('Effects Phase 3 - Effect Propagation in Function Composition - nested func
 	);
 });
 
+test('Effects Phase 3 - Effect Propagation in Function Composition - effects inside a deferred trait function call still propagate through application', () => {
+	// `show`'s argument type is still a polymorphic variable (x's concrete type
+	// isn't known until `announce` is applied), so trait resolution defers the
+	// constraint instead of resolving a concrete Show impl immediately. That
+	// deferred path used to drop the argument's effects entirely.
+	expectEffects(
+		`
+				announce = fn x => show (print x; x);
+				announce 5
+			`,
+		['write']
+	);
+});
+
 test('Effects Phase 3 - Effect Propagation in Function Composition - pipeline operations propagate effects', () => {
 	expectEffects(
 		`
