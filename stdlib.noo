@@ -63,6 +63,10 @@ implement Show String (
   show = fn s => s
 );
 
+implement Show Unit (
+  show = fn _ => "{}"
+);
+
 # Add trait implementations for built-in types
 implement Add Float (
   add = primitive_float_add
