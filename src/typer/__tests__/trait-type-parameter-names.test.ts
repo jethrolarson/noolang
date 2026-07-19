@@ -71,7 +71,7 @@ test('trait functions work with creative type parameter names', () => {
 	expect(result.type.name).toBe('String');
 });
 
-test.skip('trait functions work with single uppercase letter (breaking the convention)', () => {
+test('trait functions work with single uppercase letter (breaking the convention)', () => {
 	const program = `
       constraint Mappable M (
           mapit : (a -> b) -> M a -> M b

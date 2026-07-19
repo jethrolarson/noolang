@@ -20,8 +20,7 @@ describe('Operator Functionality', () => {
 		);
 	});
 
-	// |> is broken
-	test.skip('complex operator precedence with multiple operators', () => {
+	test('complex operator precedence with multiple operators', () => {
 		expectSuccess(
 			`
         f = fn x => x * 2;

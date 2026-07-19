@@ -369,12 +369,12 @@ describe('Algebraic Data Types', () => {
 		});
 	});
 
-	test.skip('Complex Scenarios - should work when shapes are processed separately', () => {
+	test('Complex Scenarios - should work when shapes are processed separately', () => {
 		const result = runCode(`
 		variant Color = Red | Green | Blue;
 		variant Shape a = Circle a | Rectangle a a | Triangle a a a;
 		shapes = [Circle 3, Rectangle 5 4];
-		calculate_area = fn shape => match shape (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => (a * b) / 2);
+		calculate_area = fn shape => match shape (Circle radius => radius * radius * 3; Rectangle width height => width * height; Triangle a b c => match ((a * b) / 2) (Some area => area; None => 0));
 		areas = list_map calculate_area shapes;
 		areas
 	`);
