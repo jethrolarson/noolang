@@ -2902,7 +2902,6 @@ export class Evaluator {
 		if (isList(value)) return 'List';
 		if (isRecord(value)) return 'Record';
 		if (isTuple(value)) return 'Tuple';
-		if (isUnit(value)) return 'Unit';
 		if (isConstructor(value)) {
 			// Resolve the constructor to its variant type; fall back to the
 			// constructor name for values whose definition this evaluator never
