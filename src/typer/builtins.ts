@@ -89,13 +89,23 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		quantifiedVars: ['a'],
 	});
 
-	// Comparison operators
+	// Comparison operators - require the type to implement Eq
+	const equalsType = functionType(
+		[typeVariable('a'), typeVariable('a')],
+		boolType()
+	);
+	equalsType.constraints = [implementsConstraint('a', 'Eq')];
 	newEnv.set('==', {
-		type: functionType([typeVariable('a'), typeVariable('a')], boolType()),
+		type: equalsType,
 		quantifiedVars: ['a'],
 	});
+	const notEqualsType = functionType(
+		[typeVariable('a'), typeVariable('a')],
+		boolType()
+	);
+	notEqualsType.constraints = [implementsConstraint('a', 'Eq')];
 	newEnv.set('!=', {
-		type: functionType([typeVariable('a'), typeVariable('a')], boolType()),
+		type: notEqualsType,
 		quantifiedVars: ['a'],
 	});
 	// Ordering operators - require the type to implement Ord
