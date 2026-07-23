@@ -30,6 +30,16 @@ primitive.
 
 TDD: write the failing test first, confirm it's red, then fix.
 
+`stdlib.test.noo` (run via `noo test`, not `bun test`) is a narrow complement,
+not an alternative: it exercises `stdlib.noo` as an imported module, the way a
+real program does, and it's the only thing that also validates `std/test`
+itself end to end. It caught a bug (module-destructure arity corrupting
+unrelated inference) that isolated TS snippets didn't reproduce. It cannot
+assert on inferred types or error messages (`Expectation` only wraps runtime
+Pass/Fail), and every test in the file shares one type-inference pass, so it's
+more fragile than TS's per-test isolation. Default to TS; add here only for
+"does stdlib work as consumed."
+
 ## Language quick facts
 
 - ADTs use `variant Name = A | B`; `type` is for aliases (`type Point = {Float, Float}`).
