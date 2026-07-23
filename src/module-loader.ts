@@ -672,16 +672,8 @@ export function mergeModuleCacheIntoTypeState(
 	let currentState = importerState;
 	for (const [name, scheme] of cache.envDiff) {
 		if (!newEnv.has(name)) {
-			// The module was hermetically type-checked in its own TypeState,
-			// counting type variables from the same frozen base the importer
-			// also counts from. Copying a scheme's type verbatim leaves any
-			// free variable NOT in quantifiedVars carrying the module's
-			// internal name, which a later freshTypeVariable() in the
-			// importer can coincidentally re-mint (see
-			// docs-wip/IMPORT_DESTRUCTURE_ARITY_BUG.md) — silently unifying
-			// two unrelated variables. Rename every free variable in the
-			// scheme (not just the quantified ones) to a name fresh in the
-			// importer's own counter before merging it in.
+			// Free vars outside quantifiedVars keep the module's internal
+			// counter names, which the importer's own counter can collide with.
 			const [freshenedScheme, nextState] = freshenSchemeForImporter(
 				scheme,
 				currentState

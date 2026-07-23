@@ -419,14 +419,9 @@ b = import "${p}";
 	});
 });
 
-// docs-wip/IMPORT_DESTRUCTURE_ARITY_BUG.md: envDiff schemes were merged into
-// the importer's environment verbatim (mergeModuleCacheIntoTypeState), so any
-// free (non-quantified) type variable inside a scheme kept its module-internal
-// counter-based name. Because the module's hermetic check and the host file
-// start counting from the same frozen base, a host-side freshTypeVariable can
-// coincidentally mint that same name — collision depends on exact counter
-// arithmetic, which destructuring N fields shifts by N. So this is
-// parameterized over arity rather than hardcoding the one N that failed.
+// Regression: unfreshened module bindings could collide with the importer's
+// own type-variable counter. Collision was arity-coincidence-dependent, so
+// this sweeps arities rather than hardcoding the one N that failed.
 describe('ISOLATION: imported polymorphic bindings stay independently generalized', () => {
 	beforeEach(() => {
 		writeTmp(
