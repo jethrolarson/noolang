@@ -4,6 +4,10 @@
 # and tail throwing on the empty list.
 
 {@test_case test_case, @group group, @expect_eq expect_eq, @expect expect} = import "std/test";
+# Split import: destructuring a 5th field from the same statement corrupts
+# unrelated type inference elsewhere in this file. See
+# docs-wip/IMPORT_DESTRUCTURE_ARITY_BUG.md.
+{@expect_all expect_all} = import "std/test";
 
 applicative_tests = group "Applicative apply" [
   test_case "Option: applies wrapped function" (fn _ =>
@@ -39,4 +43,54 @@ tail_tests = group "tail" [
     expect_eq 0 (length (tail [1])))
 ];
 
-group "stdlib regressions" [applicative_tests, join_tests, tail_tests]
+# Tuples have no Eq instance (the trait system is nominal-type-only, and
+# tuples are structural), so these check behavior via assoc_get lookups
+# rather than comparing association lists structurally.
+assoc_tests = group "assoc_get/set/update" [
+  test_case "assoc_get finds an existing key" (fn _ =>
+    expect_eq (Some 2) (assoc_get "b" [{"a", 1}, {"b", 2}])),
+  test_case "assoc_get on a missing key is None" (fn _ =>
+    expect_eq None (assoc_get "z" [{"a", 1}])),
+  test_case "assoc_set replaces an existing key's value" (fn _ =>
+    expect_eq (Some 9) (assoc_get "b" (assoc_set "b" 9 [{"a", 1}, {"b", 2}]))),
+  test_case "assoc_set appends a new key without dropping existing ones" (fn _ =>
+    expect_all [
+      expect_eq (Some 1) (assoc_get "a" (assoc_set "c" 9 [{"a", 1}])),
+      expect_eq (Some 9) (assoc_get "c" (assoc_set "c" 9 [{"a", 1}]))
+    ]),
+  test_case "assoc_update applies f to an existing value" (fn _ =>
+    expect_eq (Some 3) (assoc_get "b" (assoc_update "b" (fn v => v + 1) 0 [{"a", 1}, {"b", 2}]))),
+  test_case "assoc_update inserts the default for a missing key" (fn _ =>
+    expect_eq (Some 0) (assoc_get "z" (assoc_update "z" (fn v => v + 1) 0 [{"a", 1}])))
+];
+
+sort_by_tests = group "sort_by/insert_sorted_by" [
+  test_case "sort_by orders using the given predicate" (fn _ =>
+    expect_eq [3, 2, 1] (sort_by (fn a b => a > b) [3, 1, 2])),
+  test_case "insert_sorted_by inserts at the right position" (fn _ =>
+    expect_eq [9, 5, 3, 1] (insert_sorted_by (fn a b => a > b) 5 [9, 3, 1]))
+];
+
+result_option_tests = group "Result/Option helpers" [
+  test_case "map_err transforms Err" (fn _ =>
+    expect_eq (Err "wrapped: boom") (map_err (fn e => "wrapped: " + e) (Err "boom"))),
+  test_case "map_err leaves Ok untouched" (fn _ =>
+    expect_eq (Ok 5) (map_err (fn e => "wrapped: " + e) (Ok 5))),
+  test_case "option_get_or unwraps Some" (fn _ =>
+    expect_eq 5 (option_get_or 0 (Some 5))),
+  test_case "option_get_or falls back on None" (fn _ =>
+    expect_eq 0 (option_get_or 0 None)),
+  test_case "result_get_or unwraps Ok" (fn _ =>
+    expect_eq 5 (result_get_or 0 (Ok 5))),
+  test_case "result_get_or falls back on Err" (fn _ =>
+    expect_eq 0 (result_get_or 0 (Err "e"))),
+  test_case "is_ok/is_err agree on Ok" (fn _ =>
+    expect_all [expect "is_ok Ok" (is_ok (Ok 5)), expect "not is_err Ok" (not (is_err (Ok 5)))]),
+  test_case "is_ok/is_err agree on Err" (fn _ =>
+    expect_all [expect "not is_ok Err" (not (is_ok (Err "e"))), expect "is_err Err" (is_err (Err "e"))])
+];
+
+group "stdlib regressions" [
+  applicative_tests, join_tests, tail_tests,
+  assoc_tests, sort_by_tests, result_option_tests
+]
