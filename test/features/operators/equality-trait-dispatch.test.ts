@@ -1,9 +1,8 @@
-import { test, describe } from 'bun:test';
-import { expectSuccess } from '../../utils';
+import { test, describe, expect } from 'bun:test';
+import { expectSuccess, expectError, runCode } from '../../utils';
 
-// Regression: == and != fell through to a primitives-only native whose
-// default case returned False, so every variant/list comparison was silently
-// wrong. They now dispatch through the Eq trait like + dispatches through Add.
+// Regression: == and != had no trait-resolution fallback, so every
+// variant/list comparison silently returned False.
 describe('==/!= trait dispatch', () => {
 	test('== on Option values uses Eq', () => {
 		expectSuccess(`(Some 3) == (Some 3)`, true);
@@ -40,5 +39,33 @@ describe('==/!= trait dispatch', () => {
 	test('== on primitives still works', () => {
 		expectSuccess(`1 == 1`, true);
 		expectSuccess(`"a" == "b"`, false);
+	});
+});
+
+// Regression: == and != were unconstrained, so a no-Eq type only failed at
+// runtime. Now Eq-constrained like Ord's < > — enforced at the call site,
+// not shown in a generalized signature (same as <).
+describe('==/!= Eq constraint', () => {
+	test('comparing a concrete no-Eq-instance type fails during type-checking', () => {
+		expectError(
+			`{@a 1} == {@a 1}`,
+			/No implementation found for operator ==/
+		);
+	});
+
+	test('!= on a concrete no-Eq-instance type also fails during type-checking', () => {
+		expectError(
+			`{@a 1} != {@a 1}`,
+			/No implementation found for operator !=/
+		);
+	});
+
+	test('a polymorphic, unresolved == use is not rejected eagerly', () => {
+		const { finalType } = runCode(`fn a b => a == b`);
+		expect(finalType).toBe('a -> a -> Bool');
+	});
+
+	test('== still resolves normally once operands are concrete and Eq-able', () => {
+		expectSuccess(`(fn a b => a == b) 1 1`, true);
 	});
 });
