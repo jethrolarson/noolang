@@ -2,11 +2,7 @@
 # Complements test/ (TS) rather than replacing it — see CLAUDE.md's Tests
 # section for the split. No type-level assertions here.
 
-{@test_case test_case, @group group, @expect_eq expect_eq, @expect expect} = import "std/test";
-# Split import: destructuring a 5th field from the same statement corrupts
-# unrelated type inference elsewhere in this file. See
-# docs-wip/IMPORT_DESTRUCTURE_ARITY_BUG.md.
-{@expect_all expect_all} = import "std/test";
+{@test_case test_case, @group group, @expect_eq expect_eq, @expect expect, @expect_all expect_all} = import "std/test";
 
 applicative_tests = group "Applicative apply" [
   test_case "Option: applies wrapped function" (fn _ =>
