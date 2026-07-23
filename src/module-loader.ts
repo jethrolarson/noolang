@@ -19,7 +19,14 @@ import * as fs from 'node:fs';
 import * as nodePath from 'node:path';
 import type { Expression, Type } from './ast';
 import { flattenStatements } from './typer/type-operations';
-import { createTypeState, loadStdlib, generalize } from './typer/type-operations';
+import {
+	createTypeState,
+	loadStdlib,
+	generalize,
+	freeTypeVars,
+	freshTypeVariable,
+	freshenTypeVariables,
+} from './typer/type-operations';
 import { substitute } from './typer/substitute';
 import { createConstraintStore } from './typer/constraint-store';
 import { initializeBuiltins } from './typer/builtins';
@@ -662,9 +669,17 @@ export function mergeModuleCacheIntoTypeState(
 ): TypeState {
 	// Merge environment diff (ADT constructors, user-defined names, etc.)
 	const newEnv = new Map(importerState.environment);
+	let currentState = importerState;
 	for (const [name, scheme] of cache.envDiff) {
 		if (!newEnv.has(name)) {
-			newEnv.set(name, scheme);
+			// Free vars outside quantifiedVars keep the module's internal
+			// counter names, which the importer's own counter can collide with.
+			const [freshenedScheme, nextState] = freshenSchemeForImporter(
+				scheme,
+				currentState
+			);
+			currentState = nextState;
+			newEnv.set(name, freshenedScheme);
 		}
 	}
 
@@ -729,10 +744,39 @@ export function mergeModuleCacheIntoTypeState(
 	}
 
 	return {
-		...importerState,
+		...currentState,
 		environment: newEnv,
 		adtRegistry: newAdtRegistry,
 		traitRegistry: newTraitRegistry,
 		protectedTypeNames: newProtected,
 	};
+}
+
+// Rename every free type variable in a scheme's type — not just the ones
+// listed in quantifiedVars — to a name fresh in `state`'s counter. See the
+// call site above for why quantifiedVars alone isn't enough.
+function freshenSchemeForImporter(
+	scheme: TypeScheme,
+	state: TypeState
+): [TypeScheme, TypeState] {
+	const mapping = new Map<string, Type>();
+	let currentState = state;
+	for (const varName of freeTypeVars(scheme.type)) {
+		const [freshVar, nextState] = freshTypeVariable(currentState);
+		mapping.set(varName, freshVar);
+		currentState = nextState;
+	}
+	const [freshenedType, finalState] = freshenTypeVariables(
+		scheme.type,
+		mapping,
+		currentState
+	);
+	const freshenedQuantifiedVars = scheme.quantifiedVars.map(v => {
+		const fresh = mapping.get(v);
+		return fresh && fresh.kind === 'variable' ? fresh.name : v;
+	});
+	return [
+		{ ...scheme, type: freshenedType, quantifiedVars: freshenedQuantifiedVars },
+		finalState,
+	];
 }

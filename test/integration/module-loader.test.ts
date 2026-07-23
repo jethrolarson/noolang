@@ -418,3 +418,44 @@ b = import "${p}";
 		expect(result.finalValue).toBe(84);
 	});
 });
+
+// Regression: unfreshened module bindings could collide with the importer's
+// own type-variable counter. Collision was arity-coincidence-dependent, so
+// this sweeps arities rather than hardcoding the one N that failed.
+describe('ISOLATION: imported polymorphic bindings stay independently generalized', () => {
+	beforeEach(() => {
+		writeTmp(
+			'poly.noo',
+			`
+identity = fn x => x;
+same = fn a b => a;
+dummy1 = 1;
+dummy2 = 2;
+dummy3 = 3;
+dummy4 = 4;
+dummy5 = 5;
+dummy6 = 6;
+{@identity identity, @same same, @dummy1 dummy1, @dummy2 dummy2, @dummy3 dummy3, @dummy4 dummy4, @dummy5 dummy5, @dummy6 dummy6}
+`
+		);
+	});
+
+	for (let arity = 1; arity <= 8; arity++) {
+		test(`destructuring ${arity} field(s) from the import doesn't corrupt a later, differently-typed call`, () => {
+			const fields = ['identity', 'same', 'dummy1', 'dummy2', 'dummy3', 'dummy4', 'dummy5', 'dummy6'].slice(
+				0,
+				arity
+			);
+			const destructure = `{${fields.map(f => `@${f} ${f}`).join(', ')}}`;
+			const p = path.join(TMPDIR, 'poly');
+			const code = `
+${destructure} = import "${p}";
+a = identity 1;
+b = identity "x";
+a + 1
+`;
+			const result = runCode(code);
+			expect(result.finalValue).toBe(2);
+		});
+	}
+});
