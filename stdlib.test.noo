@@ -1,7 +1,6 @@
-# Regression suite for stdlib.noo, run by `noo test`.
-# Written against three bugs found by probing (2026-07-16): Applicative apply
-# crashing on Option/Result, join dropping separators before empty elements,
-# and tail throwing on the empty list.
+# Runtime regression suite for stdlib.noo, run by `noo test` (not `bun test`).
+# Complements test/ (TS) rather than replacing it — see CLAUDE.md's Tests
+# section for the split. No type-level assertions here.
 
 {@test_case test_case, @group group, @expect_eq expect_eq, @expect expect} = import "std/test";
 # Split import: destructuring a 5th field from the same statement corrupts
