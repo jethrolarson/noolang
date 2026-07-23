@@ -1,9 +1,8 @@
 import { test, describe, expect } from 'bun:test';
 import { expectSuccess, expectError, runCode } from '../../utils';
 
-// Regression: == and != fell through to a primitives-only native whose
-// default case returned False, so every variant/list comparison was silently
-// wrong. They now dispatch through the Eq trait like + dispatches through Add.
+// Regression: == and != had no trait-resolution fallback, so every
+// variant/list comparison silently returned False.
 describe('==/!= trait dispatch', () => {
 	test('== on Option values uses Eq', () => {
 		expectSuccess(`(Some 3) == (Some 3)`, true);
@@ -43,16 +42,9 @@ describe('==/!= trait dispatch', () => {
 	});
 });
 
-// Regression: == was typed as unconstrained `a -> a -> Bool`, so a type with
-// no Eq instance (records have none) only failed inside the evaluator's
-// trait-resolution fallback — the type system waved it through with no
-// static check at all. == and != now carry the operator-scheme constraint
-// `given a implements Eq`, the same mechanism `<`/`>`/Ord already use: a
-// concrete no-instance type is rejected during typeBinary (before
-// evaluation), while an unresolved polymorphic use defers the constraint
-// rather than erroring. (Note: like Ord, this constraint is enforced at the
-// call site and does not appear in the generalized function type's printed
-// signature the way Add's does — different mechanism, same static coverage.)
+// Regression: == and != were unconstrained, so a no-Eq type only failed at
+// runtime. Now Eq-constrained like Ord's < > — enforced at the call site,
+// not shown in a generalized signature (same as <).
 describe('==/!= Eq constraint', () => {
 	test('comparing a concrete no-Eq-instance type fails during type-checking', () => {
 		expectError(
