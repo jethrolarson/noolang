@@ -283,7 +283,8 @@ describe('STDLIB-CWD: stdlib loads regardless of working directory', () => {
 		const cliPath = path.join(projectRoot, 'src', 'cli.ts');
 
 		// Run from /tmp (a directory that does NOT contain stdlib.noo)
-		const result = spawnSync('bun', [cliPath, nooFile], {
+		// --verbose: plain execution no longer auto-prints the final value.
+		const result = spawnSync('bun', [cliPath, '--verbose', nooFile], {
 			cwd: '/tmp',
 			timeout: 30000,
 			encoding: 'utf8',

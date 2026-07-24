@@ -28,6 +28,9 @@ function printUsage() {
 		`       ${colorize.command('noo --symbol-type <file> <symbol>')}`
 	);
 	console.log(`       ${colorize.command('noo --benchmark <file>')}`);
+	console.log(
+		`       ${colorize.command('noo --verbose <file>')} (or -v; prints the final value and its type, like --eval does)`
+	);
 	console.log('');
 	console.log(colorize.section('Examples:'));
 	console.log(`  ${colorize.identifier('noo my_program.noo')}`);
@@ -440,7 +443,13 @@ async function main() {
 
 	// Check for --benchmark flag
 	const isBenchmark = args.includes('--benchmark');
-	const fileArgs = args.filter(arg => arg !== '--benchmark');
+	// Script execution (`noo file.noo`) prints only what the program itself
+	// prints, like any other CLI tool — the trailing value/type dump is a
+	// REPL/probe affordance, opt in with --verbose when you want it.
+	const isVerbose = args.includes('--verbose') || args.includes('-v');
+	const fileArgs = args.filter(
+		arg => arg !== '--benchmark' && arg !== '--verbose' && arg !== '-v'
+	);
 
 	// If not --eval, treat as file
 	const file = fileArgs[0];
@@ -505,9 +514,11 @@ async function main() {
 		const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
 		const gray = (s: string) => `\x1b[90m${s}\x1b[0m`;
 
-		console.log(valueStr);
-		if (typeStr) {
-			console.log(cyan('Type: ') + cyan(typeStr));
+		if (isVerbose) {
+			console.log(valueStr);
+			if (typeStr) {
+				console.log(cyan('Type: ') + cyan(typeStr));
+			}
 		}
 
 		// Performance measurements
