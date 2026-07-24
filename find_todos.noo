@@ -9,7 +9,7 @@ has_substr = fn needle line =>
 
 scan_line = fn path idx line =>
   if (has_substr "TODO" line) || (has_substr "FIXME" line)
-    then println `${path}:${toString (idx + 1)}: ${trim line}`
+    then println `${path}:${idx + 1}: ${trim line}`
     else {};
 
 scan_lines = fn path idx lines =>
@@ -27,5 +27,5 @@ scan_file = fn path =>
     Err e => println `${path}: ${show e}`
   );
 
-argv | list_map (fn path => (scan_file path; {}));
+argv | list_map scan_file;
 println "Done"
