@@ -38,7 +38,10 @@ export const typeTypeDefinition = (
 
 	// Disallow shadowing built-in types and stdlib ADTs
 	if (isReservedTypeName(name)) {
-		throw new Error(`Shadowing built in type ${name}`);
+		throwTypeError(
+			location => createTypeError(`Shadowing built in type ${name}`, {}, location),
+			getExprLocation(expr)
+		);
 	}
 
 	// If stdlib and builtins are loaded (protected set is non-empty), enforce global no-shadowing
@@ -46,7 +49,10 @@ export const typeTypeDefinition = (
 	if (strictShadowing) {
 		// Disallow shadowing any existing type/constructor in current session
 		if (state.protectedTypeNames.has(name)) {
-			throw new Error(`Type shadowing is not allowed: ${name}`);
+			throwTypeError(
+				location => createTypeError(`Type shadowing is not allowed: ${name}`, {}, location),
+				getExprLocation(expr)
+			);
 		}
 		// Also prevent shadowing of any currently-bound uppercase identifier in environment (constructors/types)
 		for (const existingName of state.environment.keys()) {
@@ -54,14 +60,20 @@ export const typeTypeDefinition = (
 				existingName === name &&
 				existingName[0] === existingName[0].toUpperCase()
 			) {
-				throw new Error(`Type shadowing is not allowed: ${name}`);
+				throwTypeError(
+					location => createTypeError(`Type shadowing is not allowed: ${name}`, {}, location),
+					getExprLocation(expr)
+				);
 			}
 		}
 	}
 
 	// If ADT already exists in registry, always error (duplicate definition)
 	if (state.adtRegistry.has(name)) {
-		throw new Error(`Type already defined: ${name}`);
+		throwTypeError(
+			location => createTypeError(`Type already defined: ${name}`, {}, location),
+			getExprLocation(expr)
+		);
 	}
 
 	// Create stable type variables for the ADT's type parameters
@@ -240,7 +252,10 @@ export const typeMatch = (
 
 	// Type each case and ensure they all return the same type
 	if (expr.cases.length === 0) {
-		throw new Error('Match expression must have at least one case');
+		throwTypeError(
+			location => createTypeError('Match expression must have at least one case', {}, location),
+			getExprLocation(expr)
+		);
 	}
 
 	// Type first case to get result type
@@ -377,7 +392,10 @@ const typePattern = (
 				}
 
 				if (!foundAdt) {
-					throw new Error(`Unknown constructor: ${pattern.name}`);
+					throwTypeError(
+						location => createTypeError(`Unknown constructor: ${pattern.name}`, {}, location),
+						getExprLocation(pattern)
+					);
 				}
 
 				// Create the ADT type with fresh type variables for type parameters
@@ -395,29 +413,50 @@ const typePattern = (
 				// Unify the type variable with the ADT type
 				currentState = unify(expectedType, actualType, currentState, undefined);
 			} else if (!isTypeKind(expectedType, 'variant')) {
-				throw new Error(
-					`Pattern expects constructor but got ${typeToString(
-						expectedType,
-						state.substitution
-					)}`
+				throwTypeError(
+					location =>
+						createTypeError(
+							`Pattern expects constructor but got ${typeToString(
+								expectedType,
+								state.substitution
+							)}`,
+							{},
+							location
+						),
+					getExprLocation(pattern)
 				);
 			}
 
 			// Look up constructor in ADT registry
 			if (!isTypeKind(actualType, 'variant')) {
-				throw new Error(
-					`Internal error: actualType should be variant but got ${actualType.kind}`
+				throwTypeError(
+					location =>
+						createTypeError(
+							`Internal error: actualType should be variant but got ${actualType.kind}`,
+							{},
+							location
+						),
+					getExprLocation(pattern)
 				);
 			}
 			const adtInfo = state.adtRegistry.get(actualType.name);
 			if (!adtInfo) {
-				throw new Error(`Unknown ADT: ${actualType.name}`);
+				throwTypeError(
+					location => createTypeError(`Unknown ADT: ${actualType.name}`, {}, location),
+					getExprLocation(pattern)
+				);
 			}
 
 			const constructorArgs = adtInfo.constructors.get(pattern.name);
 			if (!constructorArgs) {
-				throw new Error(
-					`Unknown constructor: ${pattern.name} for ADT ${actualType.name}`
+				throwTypeError(
+					location =>
+						createTypeError(
+							`Unknown constructor: ${pattern.name} for ADT ${actualType.name}`,
+							{},
+							location
+						),
+					getExprLocation(pattern)
 				);
 			}
 
@@ -434,8 +473,14 @@ const typePattern = (
 
 			// Check argument count
 			if (pattern.args.length !== substitutedArgs.length) {
-				throw new Error(
-					`Constructor ${pattern.name} expects ${substitutedArgs.length} arguments but got ${pattern.args.length}`
+				throwTypeError(
+					location =>
+						createTypeError(
+							`Constructor ${pattern.name} expects ${substitutedArgs.length} arguments but got ${pattern.args.length}`,
+							{},
+							location
+						),
+					getExprLocation(pattern)
 				);
 			}
 
@@ -465,7 +510,10 @@ const typePattern = (
 			} else if (typeof pattern.value === 'string') {
 				literalType = stringType();
 			} else {
-				throw new Error(`Unsupported literal pattern: ${pattern.value}`);
+				throwTypeError(
+					location => createTypeError(`Unsupported literal pattern: ${pattern.value}`, {}, location),
+					getExprLocation(pattern)
+				);
 			}
 
 			const unifiedState = unify(
@@ -480,11 +528,17 @@ const typePattern = (
 		case 'tuple': {
 			// Validate expected type is tuple
 			if (!isTypeKind(expectedType, 'tuple') && !isTypeKind(expectedType, 'variable')) {
-				throw new Error(
-					`Pattern expects tuple but got ${typeToString(
-						expectedType,
-						state.substitution
-					)}`
+				throwTypeError(
+					location =>
+						createTypeError(
+							`Pattern expects tuple but got ${typeToString(
+								expectedType,
+								state.substitution
+							)}`,
+							{},
+							location
+						),
+					getExprLocation(pattern)
 				);
 			}
 
@@ -506,13 +560,22 @@ const typePattern = (
 			}
 
 			if (!isTypeKind(actualType, 'tuple')) {
-				throw new Error('Internal error: actualType should be tuple');
+				throwTypeError(
+					location => createTypeError('Internal error: actualType should be tuple', {}, location),
+					getExprLocation(pattern)
+				);
 			}
 
 			// Check element count
 			if (pattern.elements.length !== actualType.elements.length) {
-				throw new Error(
-					`Tuple pattern expects ${pattern.elements.length} elements but type has ${actualType.elements.length}`
+				throwTypeError(
+					location =>
+						createTypeError(
+							`Tuple pattern expects ${pattern.elements.length} elements but type has ${actualType.elements.length}`,
+							{},
+							location
+						),
+					getExprLocation(pattern)
 				);
 			}
 
@@ -537,11 +600,17 @@ const typePattern = (
 		case 'record': {
 			// Validate expected type is record or type variable
 			if (!isTypeKind(expectedType, 'record') && !isTypeKind(expectedType, 'variable')) {
-				throw new Error(
-					`Pattern expects record but got ${typeToString(
-						expectedType,
-						state.substitution
-					)}`
+				throwTypeError(
+					location =>
+						createTypeError(
+							`Pattern expects record but got ${typeToString(
+								expectedType,
+								state.substitution
+							)}`,
+							{},
+							location
+						),
+					getExprLocation(pattern)
 				);
 			}
 
@@ -563,7 +632,10 @@ const typePattern = (
 			}
 
 			if (!isTypeKind(actualType, 'record')) {
-				throw new Error('Internal error: actualType should be record');
+				throwTypeError(
+					location => createTypeError('Internal error: actualType should be record', {}, location),
+					getExprLocation(pattern)
+				);
 			}
 
 			// Type each field pattern
@@ -605,6 +677,14 @@ const typePattern = (
 		}
 
 		default:
-			throw new Error(`Unsupported pattern kind: ${(pattern as Pattern).kind}`);
+			throwTypeError(
+				location =>
+					createTypeError(
+						`Unsupported pattern kind: ${(pattern as Pattern).kind}`,
+						{},
+						location
+					),
+				getExprLocation(pattern as Pattern)
+			);
 	}
 };
