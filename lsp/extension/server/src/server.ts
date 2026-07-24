@@ -77,8 +77,8 @@ function parseTypesOutput(output: string): string[] {
   return types;
 }
 
-function cleanErrorMessage(line: string): string {
-  let message = line;
+function cleanErrorMessage(text: string): string {
+  let message = text;
   const prefixes = ['Error:', 'TypeError:', 'Parse error:'];
   for (const p of prefixes) {
     const idx = message.indexOf(p);
@@ -87,7 +87,13 @@ function cleanErrorMessage(line: string): string {
       break;
     }
   }
-  message = message.replace(/\s+at line \d+(?:, column \d+)?/g, '');
+  // Drop the "at line X, column Y" line on its own — its info is already
+  // carried by the diagnostic's range, and leaving it in duplicates it in
+  // the hover text.
+  message = message
+    .split(/\r?\n/)
+    .filter((l) => !/^\s*at line \d+(?:, column \d+)?\s*$/.test(l))
+    .join('\n');
   return message.trim();
 }
 
@@ -115,47 +121,44 @@ function extractLineColumn(line: string): { line: number; column: number } | und
 
 function getDiagnostics(filePath: string): Diagnostic[] {
   const result = runNodeCli(['--types-file', filePath]);
+  if (result.status === 0) return []; // clean typecheck — stdout is a Types: dump, not an error
   const stdout = result.stdout || '';
   const stderr = result.stderr || '';
-  const diags: Diagnostic[] = [];
+  const raw = stderr.trim() ? stderr : stdout;
+  if (!raw.trim()) return [];
 
-  const processLine = (line: string) => {
-    if (!line) return;
-    if (/(Error|TypeError|Parse error)/.test(line)) {
-      const loc = extractLineColumn(line);
-      const message = cleanErrorMessage(line);
-      const sev = /warning/i.test(line)
-        ? DiagnosticSeverity.Warning
-        : /info/i.test(line)
-        ? DiagnosticSeverity.Information
-        : DiagnosticSeverity.Error;
-      const l = (loc?.line ?? 1) - 1; // 0-based
-      const c = (loc?.column ?? 1) - 1;
-      diags.push({
-        range: {
-          start: { line: l, character: c },
-          end: { line: l, character: c + 1 },
-        },
-        severity: sev,
-        source: 'noolang',
-        message,
-      });
-    }
-  };
-
-  stderr.split(/\r?\n/).forEach(processLine);
-  if (result.status !== 0 && /Error/.test(stdout)) stdout.split(/\r?\n/).forEach(processLine);
-
-  if (diags.length === 0 && (stderr.trim() || stdout.trim())) {
-    diags.push({
-      range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
-      severity: DiagnosticSeverity.Error,
-      source: 'noolang',
-      message: `Error: ${stderr.trim() || stdout.trim()}`,
-    });
+  // The CLI reports one error per failing run as a single multi-line write
+  // (message, "Expected"/"Got", "at line X, column Y", an optional 💡 tip) —
+  // not one error per output line. Scan the whole block for its one
+  // location and emit one diagnostic, rather than matching line-by-line
+  // (which both loses the location, on its own line, and false-positives
+  // on lines that merely contain the substring "Error", e.g. "ReadError").
+  const lines = raw.split(/\r?\n/);
+  let loc: { line: number; column: number } | undefined;
+  for (const line of lines) {
+    loc = extractLineColumn(line);
+    if (loc) break;
   }
 
-  return diags;
+  const firstMeaningfulLine = lines.find((l) => l.trim()) || raw;
+  const sev = /warning/i.test(firstMeaningfulLine)
+    ? DiagnosticSeverity.Warning
+    : DiagnosticSeverity.Error;
+
+  const l = (loc?.line ?? 1) - 1; // 0-based
+  const c = (loc?.column ?? 1) - 1;
+
+  return [
+    {
+      range: {
+        start: { line: l, character: c },
+        end: { line: l, character: c + 1 },
+      },
+      severity: sev,
+      source: 'noolang',
+      message: cleanErrorMessage(raw),
+    },
+  ];
 }
 
 function getTypeInfo(filePath: string): string[] {
