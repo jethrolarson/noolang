@@ -1023,7 +1023,7 @@ const parseCompose = C.map(
 );
 
 // --- Thrush (|) and Safe Thrush (|?) ---
-const parseThrush: C.Parser<Expression> = C.map(
+const parseThrushBase: C.Parser<Expression> = C.map(
 	C.seq(
 		parseCompose,
 		C.many(C.seq(C.choice2(C.operator('|'), C.operator('|?')), parseCompose))
@@ -1042,6 +1042,35 @@ const parseThrush: C.Parser<Expression> = C.map(
 		return result;
 	}
 );
+
+// --- Dollar ($) ---
+// Lowest-precedence, right-associative function application: `f $ g $ x` is
+// `f $ (g $ x)`, meant to replace an outer pair of parens. Implemented as a
+// thin wrapper around parseThrush's previous body (parseThrushBase) so every
+// existing caller of parseThrush — the de facto "top of the expression
+// hierarchy" throughout this file — gets $ for free, binding looser than
+// everything parseThrush already handles (|, |?, |>, <|, and below).
+const parseThrush: C.Parser<Expression> = tokens => {
+	const leftResult = parseThrushBase(tokens);
+	if (!leftResult.success) return leftResult;
+
+	const opResult = C.operator('$')(leftResult.remaining);
+	if (!opResult.success) return leftResult;
+
+	// Right-associative: recurse into parseThrush (not parseThrushBase) so a
+	// chain of $ nests to the right instead of folding left.
+	const rightResult = parseThrush(opResult.remaining);
+	if (!rightResult.success) return rightResult;
+
+	const result: BinaryExpression = {
+		kind: 'binary',
+		operator: '$',
+		left: leftResult.value,
+		right: rightResult.value,
+		location: leftResult.value.location,
+	};
+	return { success: true, value: result, remaining: rightResult.remaining };
+};
 
 // Helper function to apply postfix operators to an expression
 // Parse type annotation with optional constraint: : Type [given Constraint]

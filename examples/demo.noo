@@ -87,7 +87,7 @@ composed_reverse_result = 10 | composed_reverse;
 complex_without_dollar = map (fn x => x * 2) (filter (fn x => x > 5) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
 # With $ - much cleaner and more readable
-complex_with_dollar = map (fn x => x * 2) $ filter (fn x => x > 5) $ [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+complex_with_dollar = map (fn x => x * 2) $ filter (fn x => x > 5) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 # ========================================
 # 8. MUTATION (LOCAL MUTATION)
@@ -207,9 +207,8 @@ record_count = length record_list;
 # ========================================
 
 # Option type for handling nullable values safely
-safe_divide = fn a b => if b == 0 then None else Some (a / b);
-division_result = safe_divide 10 2;
-zero_division = safe_divide 10 0;
+division_result = 10 / 2;
+zero_division = 10 / 0;
 
 # Pattern matching on Option
 handle_option = fn opt => match opt (
@@ -282,7 +281,8 @@ triangle = Triangle 3 4 5;
 calculate_area = fn shape => match shape (
   Circle radius => radius * radius * 3;
   Rectangle width height => width * height;
-  Triangle a b c => (a * b) / 2
+  # TODO this is awkward
+  Triangle a b c => match ((a * b) / 2) (Some x => x; None => 0)
 );
 
 circle_area = calculate_area circle;
