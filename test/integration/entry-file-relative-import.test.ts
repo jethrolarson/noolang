@@ -26,7 +26,8 @@ function runCli(cliArgs: string[]): string {
 }
 
 test('running a file resolves its relative imports from the file dir, not CWD', () => {
-	expect(runCli([join(dir, 'main.noo')])).toContain('42');
+	// --verbose: plain execution no longer auto-prints the final value.
+	expect(runCli(['--verbose', join(dir, 'main.noo')])).toContain('42');
 });
 
 test('--types-file resolves relative imports from the file dir, not CWD', () => {
