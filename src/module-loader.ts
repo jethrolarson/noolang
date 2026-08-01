@@ -297,7 +297,7 @@ export function resolveModulePath(importPath: string, currentDir?: string): stri
 	// ── 3. std/* — modules shipped with the interpreter ───────────────────────
 	// Routed to the interpreter's own std/ directory. This is resolution sugar
 	// only: the modules themselves are plain userland noolang with no
-	// interpreter privileges (see docs-wip/TESTING_FRAMEWORK_PLAN.md). The
+	// interpreter privileges (see docs/internal/docs-wip/TESTING_FRAMEWORK_PLAN.md). The
 	// monolithic stdlib (global env) is unrelated to this routing.
 	if (importPath === 'std') {
 		throw new Error(

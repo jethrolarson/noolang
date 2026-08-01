@@ -1,6 +1,6 @@
 // std/test — the test framework's types and assertions, shipped with the
 // interpreter but built as plain userland noolang (no interpreter privileges).
-// See docs-wip/TESTING_FRAMEWORK_PLAN.md.
+// See docs/internal/docs-wip/TESTING_FRAMEWORK_PLAN.md.
 import { test, expect } from 'bun:test';
 import { runCode, expectSuccess } from '../utils';
 

@@ -117,11 +117,12 @@ append = fn list1 list2 => match list1 (
 
 # Reverse a list
 reverse = fn lst => 
-    let reverseHelper = fn acc remaining => match remaining (
+    reverseHelper Nil lst where (
+      reverseHelper = fn acc remaining => match remaining (
         Cons head tail => reverseHelper (Cons head acc) tail;
         Nil => acc
-    ) in
-    reverseHelper Nil lst;
+      )
+    );
 
 # Example list operations  
 numbersLength = length numbers;          # => 5

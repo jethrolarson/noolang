@@ -101,7 +101,7 @@ test('should infer constraints in if expressions', () => {
 
 // `x + 1` pins x to Float (numeric literals are all Float now, Int was
 // removed), so `Float -> Bool` is correct here, not a constrained type -
-// see docs-wip/GENERALIZATION_BUG.md.
+// see docs/internal/docs-wip/GENERALIZATION_BUG.md.
 test('where-bound result concretely typed when literals pin the type', () => {
 	const code = `
 			fn x => result where (

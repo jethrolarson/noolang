@@ -253,7 +253,7 @@ jobs:
           echo "**Action required**: Fix the broken examples or update the documentation." >> $GITHUB_STEP_SUMMARY
         fi
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Note**: Design documents in `docs-wip/` are not validated as they contain experimental features." >> $GITHUB_STEP_SUMMARY
+        echo "**Note**: Design documents in `docs/internal/` are not validated as they contain experimental features." >> $GITHUB_STEP_SUMMARY
 
   # Validate example files (currently optional due to known type system issues)
   example-validation:
