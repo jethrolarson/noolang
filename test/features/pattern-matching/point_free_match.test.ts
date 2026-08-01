@@ -53,12 +53,18 @@ test('adversarial: parenthesized single-arg lambda scrutinee still parses as the
 });
 
 test('point-free match is eta-equivalent to the pointful lambda wrapper', () => {
+	// Apply both forms to the same inputs and compare actual results (not
+	// just typeof) and inferred types, so this would fail if the desugaring
+	// diverged in behavior, not just in shape.
 	const pointful = runCode(`
-        fn foo => match (foo) (Some x => x; None => 0)
+        f = fn foo => match (foo) (Some x => x; None => 0);
+        {f (Some 5), f None}
       `);
 	const pointfree = runCode(`
-        match (Some x => x; None => 0)
+        g = match (Some x => x; None => 0);
+        {g (Some 5), g None}
       `);
-	// Both should produce callable functions with the same behavior.
-	expect(typeof pointful.finalValue).toEqual(typeof pointfree.finalValue);
+	expect(pointfree.finalValue).toEqual(pointful.finalValue);
+	expect(pointfree.finalValue).toEqual([5, 0]);
+	expect(pointfree.finalType).toEqual(pointful.finalType);
 });

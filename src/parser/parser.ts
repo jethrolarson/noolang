@@ -1767,6 +1767,16 @@ const parseTupleOrRecordPattern: C.Parser<Pattern> = C.map(
 	}
 );
 
+// INVARIANT (relied on by parseMatchExpression's point-free/scrutinee
+// disambiguation below): no alternative here may start with the `fn`
+// keyword, or otherwise accept a token sequence that a normal expression
+// can also start with immediately followed by `=>`. parseMatchExpression
+// tells `match (arms)` (point-free) apart from `match (scrutinee) (arms)`
+// by trying to parse arms first, which only stays sound because a
+// parenthesized scrutinee can never itself look like `pattern => expr`. If
+// you add a pattern form here (e.g. guards, or-patterns) that could make a
+// scrutinee-shaped token sequence parse as a pattern followed by `=>`,
+// re-check that disambiguation.
 const parsePattern: C.Parser<Pattern> = C.choice(
 	// Wildcard pattern: _
 	C.map(
@@ -1883,7 +1893,6 @@ const parseMatchCase: C.Parser<MatchCase> = C.map(
 // --- Match Arms (the "( pattern => expr ; ... )" block shared by both forms) ---
 const parseMatchArms: C.Parser<{
 	cases: MatchCase[];
-	open: Token;
 	close: Token;
 }> = C.map(
 	C.seq(
@@ -1893,8 +1902,14 @@ const parseMatchArms: C.Parser<{
 		C.many(C.punctuation(';')),
 		C.punctuation(')')
 	),
-	([open, cases, _trailingSemicolons, close]) => ({ cases, open, close })
+	([_open, cases, _trailingSemicolons, close]) => ({ cases, close })
 );
+
+const buildMatch = (
+	expression: Expression,
+	cases: MatchCase[],
+	location: ReturnType<typeof createLocation>
+): MatchExpression => ({ kind: 'match', expression, cases, location });
 
 // --- Match Expression ---
 // Two surface forms, both starting with the `match (` prefix:
@@ -1902,68 +1917,71 @@ const parseMatchArms: C.Parser<{
 //   match (arms)                -- point-free: `fn x => match x (arms)`,
 //                                  letting `fn foo => match (foo) (...)` eta-reduce
 // The parser can't tell which from the leading `(` alone, so it uses
-// ordered-choice backtracking (same technique as C.choice elsewhere in this
-// file): try the arms-only form first, and only if that fails, fall back to
-// parsing a scrutinee followed by the arms block.
+// C.choice2's ordered-choice backtracking: try the arms-only form first,
+// and only if that fails, fall back to parsing a scrutinee followed by the
+// arms block. Routing through choice2 (rather than a hand-rolled if/else)
+// matters beyond consistency: choice2 keeps whichever branch's error made
+// furthest progress through the tokens, so a typo inside a valid arms block
+// (e.g. `match (Some x => x +++ 1; None => 0)`) still reports the real
+// parse error from the point-free attempt instead of the generic failure
+// from the scrutinee-form fallback.
 //
-// This is safe because every match case requires a literal `=>` immediately
-// after a syntactically valid pattern, and no valid Noolang scrutinee
-// expression can produce a bare top-level `=>` — lambdas require the `fn`
-// keyword first, and `fn` is lexed as KEYWORD, not IDENTIFIER, so it can
-// never itself be parsed as a pattern. A parenthesized scrutinee therefore
-// can never be mistaken for an arms block: either the first token inside the
-// parens isn't a valid pattern start at all (e.g. `fn`), or it parses as a
-// pattern but isn't followed by `=>` (e.g. a bare identifier or constructor
-// scrutinee), and either way the arms-only attempt fails and backtracks
-// cleanly. See docs/internal/docs-wip/POINT_FREE_MATCH_PLAN.md for the spike
-// that established this before implementation, including the adversarial
-// cases (bare-identifier scrutinee, parenthesized single-arg lambda
-// scrutinee) exercised in test/features/pattern-matching/point_free_match.test.ts.
+// This disambiguation is safe because every match case requires a literal
+// `=>` immediately after a syntactically valid pattern, and no valid
+// Noolang scrutinee expression can produce a bare top-level `=>` — lambdas
+// require the `fn` keyword first, and `fn` is lexed as KEYWORD, not
+// IDENTIFIER, so it can never itself be parsed as a pattern (see the
+// invariant note on parsePattern/parseMatchCase above). A parenthesized
+// scrutinee therefore can never be mistaken for an arms block: either the
+// first token inside the parens isn't a valid pattern start at all (e.g.
+// `fn`), or it parses as a pattern but isn't followed by `=>` (e.g. a bare
+// identifier or constructor scrutinee), and either way the arms-only
+// attempt fails and backtracks cleanly. See
+// docs/internal/docs-wip/POINT_FREE_MATCH_PLAN.md for the spike that
+// established this before implementation, including the adversarial cases
+// (bare-identifier scrutinee, parenthesized single-arg lambda scrutinee)
+// exercised in test/features/pattern-matching/point_free_match.test.ts.
 const parseMatchExpression: C.Parser<Expression> = tokens => {
 	const matchResult = C.keyword('match')(tokens);
 	if (!matchResult.success) return matchResult;
 	const match = matchResult.value;
 
-	const pointFreeResult = parseMatchArms(matchResult.remaining);
-	if (pointFreeResult.success) {
-		const { cases, close } = pointFreeResult.value;
-		const location = createLocation(match.location.start, close.location.end);
-		const scrutineeVar: Expression = {
-			kind: 'variable',
-			name: '__match_x',
-			location,
-		};
-		const matchExpr: MatchExpression = {
-			kind: 'match',
-			expression: scrutineeVar,
-			cases,
-			location,
-		};
-		const fn: FunctionExpression = {
-			kind: 'function',
-			params: ['__match_x'],
-			body: matchExpr,
-			location,
-		};
-		return {
-			success: true,
-			value: fn,
-			remaining: pointFreeResult.remaining,
-		};
-	}
+	const parsePointFree: C.Parser<Expression> = C.map(
+		parseMatchArms,
+		({ cases, close }): Expression => {
+			const location = createLocation(
+				match.location.start,
+				close.location.end
+			);
+			const scrutineeVar: Expression = {
+				kind: 'variable',
+				name: '__match_x',
+				location,
+			};
+			const fn: FunctionExpression = {
+				kind: 'function',
+				params: ['__match_x'],
+				body: buildMatch(scrutineeVar, cases, location),
+				location,
+			};
+			return fn;
+		}
+	);
 
-	return C.map(
+	const parseWithScrutinee: C.Parser<Expression> = C.map(
 		C.seq(
 			C.lazy(() => parseThrush), // Use a simpler expression parser to avoid circular dependency
 			parseMatchArms
 		),
-		([expression, { cases, close }]): Expression => ({
-			kind: 'match',
-			expression,
-			cases,
-			location: createLocation(match.location.start, close.location.end),
-		})
-	)(matchResult.remaining);
+		([expression, { cases, close }]): Expression =>
+			buildMatch(
+				expression,
+				cases,
+				createLocation(match.location.start, close.location.end)
+			)
+	);
+
+	return C.choice2(parsePointFree, parseWithScrutinee)(matchResult.remaining);
 };
 
 // --- Where Expression ---
