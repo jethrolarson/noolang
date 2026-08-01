@@ -61,4 +61,16 @@ extraction_tests = group "json_field/json_index/json_as_number" [
     ))
 ];
 
-group "std/json regressions" [parse_tests, roundtrip_tests, extraction_tests]
+spec_gap_tests = group "spec edge cases found in code review" [
+  test_case "duplicate keys: last value wins, first position kept" (fn _ =>
+    expect_eq "{\"a\":3,\"b\":2}"
+      (unwrap_or "?" (match (json_parse "{\"a\":1,\"b\":2,\"a\":3}") (Ok v => Ok (json_stringify v); Err e => Err e)))),
+  test_case "rejects a leading zero" (fn _ =>
+    expect "\"01\" is an error" (is_err (json_parse "01"))),
+  test_case "rejects a raw unescaped control character in a string" (fn _ =>
+    expect "a literal tab byte in a string is an error" (is_err (json_parse "\"a\tb\""))),
+  test_case "json_stringify emits null for an overflowed (non-finite) number" (fn _ =>
+    expect_eq "null" (unwrap_or "?" (match (json_parse "1e400") (Ok v => Ok (json_stringify v); Err e => Err e))))
+];
+
+group "std/json regressions" [parse_tests, roundtrip_tests, extraction_tests, spec_gap_tests]

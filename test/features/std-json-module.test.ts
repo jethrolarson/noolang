@@ -193,3 +193,66 @@ test('the module export types are visible to the importer', () => {
 	const { finalType } = runCode(`{@json_parse} = import "std/json"; json_parse`);
 	expect(finalType).toContain('JsonValue');
 });
+
+// Regression: scan_string used to recurse once per input character with a
+// growing accumulator, which overflowed the JS call stack around ~4000
+// chars regardless of accumulator style (no TCO in the evaluator — see
+// std/json.noo's comment on scan_content). A 6000-char string value used
+// to crash outright; this asserts it now round-trips.
+test('a long string value does not overflow the stack', () => {
+	const longValue = 'x'.repeat(6000);
+	const jsonText = JSON.stringify({ text: longValue });
+	expectSuccess(
+		withParsed(
+			JSON.stringify(jsonText),
+			'match (json_field "text" v) (Ok tv => match (json_as_string tv) (Ok s => toString (length (chars s)); Err _ => "wrong-type"); Err _ => "missing")'
+		),
+		'6000'
+	);
+});
+
+test('a long string with interspersed escapes does not overflow the stack', () => {
+	let raw = '';
+	for (let i = 0; i < 5000; i++) raw += i % 37 === 0 ? '\n' : 'x';
+	const jsonText = JSON.stringify({ text: raw });
+	expectSuccess(
+		withParsed(
+			JSON.stringify(jsonText),
+			'match (json_field "text" v) (Ok tv => match (json_as_string tv) (Ok s => toString (length (chars s)); Err _ => "wrong-type"); Err _ => "missing")'
+		),
+		'5000'
+	);
+});
+
+test('duplicate object keys: last value wins, first position kept', () => {
+	expectSuccess(parseOutcome('"{\\"a\\":1,\\"b\\":2,\\"a\\":3}"'), 'OK:{"a":3,"b":2}');
+});
+
+test('rejects a leading zero in the integer part', () => {
+	expectSuccess(parseOutcome('"01"'), expect.stringContaining('ERR:'));
+	expectSuccess(parseOutcome('"-01"'), expect.stringContaining('ERR:'));
+	// "0" alone and "0.5" are still valid — the check is "0 followed by
+	// another digit", not "any leading 0".
+	expectSuccess(parseOutcome('"0"'), 'OK:0');
+	expectSuccess(parseOutcome('"0.5"'), 'OK:0.5');
+});
+
+test('rejects a raw unescaped control character in a string', () => {
+	// A literal tab byte between the quotes, not the two-character escape
+	// `\t`. RFC 8259 §7 requires this to be escaped.
+	expectSuccess(parseOutcome('"\\"a\tb\\""'), expect.stringContaining('ERR:'));
+});
+
+test('json_stringify emits "null" for non-finite numbers instead of invalid syntax', () => {
+	// json_parse "1e400" overflows our own arithmetic to Infinity — this
+	// isn't a hand-constructed pathological JsonValue, it's reachable from
+	// valid-looking JSON text.
+	expectSuccess(
+		withParsed('"1e400"', 'json_stringify v'),
+		'null'
+	);
+	expectSuccess(
+		withParsed('"-1e400"', 'json_stringify v'),
+		'null'
+	);
+});

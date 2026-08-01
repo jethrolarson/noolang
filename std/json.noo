@@ -10,9 +10,18 @@
 #   - \u XXXX escapes in JSON string literals are rejected (ParseError),
 #     not decoded.
 #   - \b and \f escapes are rejected for the same reason.
-#   - Serialization escapes only quote/backslash/newline/cr/tab; other C0
-#     control characters pass through unescaped (round-trips through this
-#     parser fine, may not be valid strict-JSON for input built elsewhere).
+#   - Serialization escapes only quote/backslash/newline/cr/tab. A JsonValue
+#     built by hand (not via json_parse, which now rejects raw control
+#     characters — see scan_content) could still carry other C0 control
+#     characters in a JString; those pass through json_stringify unescaped.
+#   - `-0` loses its sign on parse and can't be recovered on stringify —
+#     see the comment on `signed_mantissa` in parse_number.
+#
+# Explicit spec choices (RFC 8259), not gaps:
+#   - Duplicate object keys: last value wins, first occurrence keeps its
+#     position — matches JS's JSON.parse (see ModeObjectNext).
+#   - Leading zeros in the integer part ("01") are rejected (see
+#     parse_number's has_leading_zero check).
 
 variant JsonValue =
     JNull
@@ -129,32 +138,90 @@ parse_keyword = fn keyword value pos s => (
     else parse_error ("expected '" + keyword + "'") pos
 );
 
-scan_string = fn pos s acc => match (peek_char pos s) (
-  None => parse_error "unterminated string" pos;
-  Some c => match c (
-    "\"" => Ok {@value acc, @pos (pos + 1)};
-    "\\" => match (peek_char (pos + 1) s) (
-      None => parse_error "unterminated escape" (pos + 1);
-      Some e => match e (
-        "\"" => scan_string (pos + 2) s (acc + "\"");
-        "\\" => scan_string (pos + 2) s (acc + "\\");
-        "/" => scan_string (pos + 2) s (acc + "/");
-        "n" => scan_string (pos + 2) s (acc + "\n");
-        "r" => scan_string (pos + 2) s (acc + "\r");
-        "t" => scan_string (pos + 2) s (acc + "\t");
-        "u" => parse_error "\\u escapes are not supported" pos;
-        "b" => parse_error "\\b escapes are not supported" pos;
-        "f" => parse_error "\\f escapes are not supported" pos;
-        _ => parse_error ("invalid escape character '" + e + "'") (pos + 1)
-      )
-    );
-    _ => scan_string (pos + 1) s (acc + c)
+is_some = fn opt => match opt (Some _ => True; None => False);
+
+# Scanning a string char-by-char via noolang-level recursion (`scan_string
+# (pos+1) s ...`) — even with a cheap accumulator, even though it's written
+# in tail position — still grows the JS call stack one frame per input
+# character: this evaluator has no tail-call optimization, so "tail
+# position" doesn't mean anything for stack depth here. Confirmed: even
+# after switching the accumulator to a `List String` joined once (the fix
+# that looked sufficient by analogy with `escape_string` below), a 6000-char
+# string value still overflows ("Maximum call stack size exceeded"). The
+# actual fix has to avoid noolang-level recursion per character entirely.
+#
+# `escape_string` doesn't hit this because `list_map`/`reduce` are native
+# JS loops (`Array.prototype.map`/`reduce` in the evaluator) — each element
+# call returns before the next begins, so stack depth stays O(1) regardless
+# of list length. `scan_content` below is the same idea applied to string
+# scanning: one `reduce` over the remaining characters, carrying an
+# explicit state record, instead of one noolang function call per
+# character. It intentionally does *not* stop at the closing quote —
+# `reduce` has no early-exit, so remaining characters after the string
+# closes are walked but ignored (`is_some (state | @closed_at)` short-
+# circuits to a no-op). That's O(document length) of wasted iteration per
+# string rather than O(this string's length); acceptable for the crash fix
+# this exists for, but a real cost for a document with many short strings —
+# worth revisiting with an `indexOf`-based fast path if that ever shows up
+# in practice.
+scan_content = fn pos s => (
+  doc_len = length (chars s);
+  remaining = chars (substring pos doc_len s);
+  # No `: Option JsonParseError` ascription on the `@error` field: noolang
+  # resolves a same-named type/constructor pair (`variant JsonParseError =
+  # JsonParseError {...}`) to the *constructor's* function type in type
+  # position, not the variant type — confirmed with a minimal repro
+  # (`variant E = E {@f Float}; (None : Option E)` infers `Option ({@f
+  # Float}) -> E`, not `Option E`). Leaving `@error`'s type to be inferred
+  # from the `Some (JsonParseError ...)` branches below sidesteps it.
+  init = {@parts ([] : List String), @escaped False, @closed_at (None : Option Float), @error None, @i pos};
+  step = fn state ch => (
+    already_done = (is_some (state | @closed_at)) || (is_some (state | @error));
+    if already_done then state else (
+      i = state | @i;
+      parts = state | @parts;
+      next_i = i + 1;
+      if state | @escaped
+        then match ch (
+          "\"" => {@parts (append parts ["\""]), @escaped False, @closed_at None, @error None, @i next_i};
+          "\\" => {@parts (append parts ["\\"]), @escaped False, @closed_at None, @error None, @i next_i};
+          "/" => {@parts (append parts ["/"]), @escaped False, @closed_at None, @error None, @i next_i};
+          "n" => {@parts (append parts ["\n"]), @escaped False, @closed_at None, @error None, @i next_i};
+          "r" => {@parts (append parts ["\r"]), @escaped False, @closed_at None, @error None, @i next_i};
+          "t" => {@parts (append parts ["\t"]), @escaped False, @closed_at None, @error None, @i next_i};
+          "u" => {@parts parts, @escaped False, @closed_at None, @error (Some (JsonParseError {@message "\\u escapes are not supported", @position (i - 1)})), @i next_i};
+          "b" => {@parts parts, @escaped False, @closed_at None, @error (Some (JsonParseError {@message "\\b escapes are not supported", @position (i - 1)})), @i next_i};
+          "f" => {@parts parts, @escaped False, @closed_at None, @error (Some (JsonParseError {@message "\\f escapes are not supported", @position (i - 1)})), @i next_i};
+          _ => {@parts parts, @escaped False, @closed_at None, @error (Some (JsonParseError {@message ("invalid escape character '" + ch + "'"), @position i})), @i next_i}
+        )
+        else match ch (
+          "\"" => {@parts parts, @escaped False, @closed_at (Some next_i), @error None, @i next_i};
+          "\\" => {@parts parts, @escaped True, @closed_at None, @error None, @i next_i};
+          # RFC 8259 §7: raw (unescaped) C0 control characters are illegal
+          # inside a JSON string. `ch < " "` is a codepoint comparison in
+          # disguise — noolang has no charCodeAt, but `<` on two 1-char
+          # strings is `primitive_string_less_than`, i.e. a JS `<` on
+          # single UTF-16 code units, so it orders exactly like the
+          # codepoints would.
+          _ => if ch < " "
+            then {@parts parts, @escaped False, @closed_at None, @error (Some (JsonParseError {@message "control character must be escaped", @position i})), @i next_i}
+            else {@parts (append parts [ch]), @escaped False, @closed_at None, @error None, @i next_i}
+        )
+    )
+  );
+  final = reduce step init remaining;
+  match (final | @error) (
+    Some e => Err e;
+    None => match (final | @closed_at) (
+      Some endpos => Ok {@value (join "" (final | @parts)), @pos endpos};
+      None => parse_error "unterminated string" (final | @i)
+    )
   )
 );
 
 # Raw string content (no JString wrapper) starting at the opening quote;
 # returns the position just past the closing quote.
-parse_string_raw = fn pos s => scan_string (pos + 1) s "";
+parse_string_raw = fn pos s => scan_content (pos + 1) s;
 
 parse_json_string = fn pos s =>
   result_map (fn r => {@value (JString (r | @value)), @pos (r | @pos)}) (parse_string_raw pos s);
@@ -168,6 +235,10 @@ parse_number = fn pos s => (
       int_scan = scan_digits pos1 s 0;
       int_val = int_scan | @value;
       pos2 = int_scan | @pos;
+      # RFC 8259 §6: the integer part is `0` alone, or a nonzero digit
+      # followed by more digits — "01", "007" etc. are not valid numbers.
+      has_leading_zero = (fd == "0") && ((pos2 - pos1) > 1);
+      if has_leading_zero then parse_error "leading zeros are not allowed" pos1 else (
       has_frac = (peek_char pos2 s) == Some ".";
       frac_step =
         if has_frac then (
@@ -205,10 +276,22 @@ parse_number = fn pos s => (
           exp = er | @exp;
           pos4 = er | @pos;
           mantissa = int_val + frac;
+          # `-0` loses its sign here (`0 - 0` is `+0`, not `-0`) and stays
+          # lost: `toString` on the resulting Float goes through JS's
+          # `Number.prototype.toString`, where `(-0).toString() === "0"`
+          # regardless of the sign bit. Preserving the sign through parsing
+          # alone (e.g. `mantissa * -1`, which JS does keep as `-0`)
+          # wouldn't be observable in `json_stringify`'s output without
+          # `json_stringify` separately special-casing negative zero — and
+          # noolang has no sign-of-zero test to do that with (no
+          # `Object.is`-equivalent, and `/`'s divide-by-zero guard doesn't
+          # distinguish `-0` from `0`). Left as a known gap rather than a
+          # fix that wouldn't actually round-trip `-0`.
           signed_mantissa = if neg then (0 - mantissa) else mantissa;
           Ok {@value (JNumber (apply_exponent signed_mantissa exp)), @pos pos4}
         ))
       ))
+      )
     )
   )
 );
@@ -248,6 +331,64 @@ variant ParseMode =
 empty_json_array = list_filter (fn _ => False) [JNull];
 empty_json_object = list_filter (fn _ => False) [{"", JNull}];
 
+# --- Leaf helpers for parse_node ---
+#
+# None of these call `parse_node` — they're ordinary, non-recursive
+# top-level functions. Pulling them out of parse_node's body (rather than
+# inlining) isn't just tidiness: a bisection on typecheck time (see PR
+# description) localized a ~30s-per-process cost specifically to
+# parse_node's own body size once every branch's full logic lived inside
+# one match expression. Shrinking that one function's textual/AST bulk by
+# moving anything that *can* live outside it (i.e. doesn't need
+# self-recursion) is the whole point of these three helpers.
+
+# Opening `{` or `[` (pos already past the bracket): either it's
+# immediately empty, or parse_node needs to continue in the corresponding
+# ...Next mode. `continue_mode` is a fully-built ParseMode value (the
+# caller already knows which one), not a function — this stays a leaf.
+variant OpenDecision = OpenEmpty JsonValue Float | OpenContinue ParseMode Float;
+
+open_container = fn close_char pos s empty_value continue_mode => (
+  p1 = skip_ws pos s;
+  if (peek_char p1 s) == Some close_char
+    then OpenEmpty empty_value (p1 + 1)
+    else OpenContinue continue_mode p1
+);
+
+# Object member key: string key through the colon, positioned at the
+# start of the value. Everything up to (not including) parsing the value
+# itself — the one part of "parse an object member" that doesn't recurse.
+parse_object_key_and_colon = fn pos s => (
+  p = skip_ws pos s;
+  match (peek_char p s) (
+    None => parse_error "unterminated object" p;
+    Some c => if not (c == "\"") then parse_error "expected string key" p else
+      result_bind (parse_string_raw p s) (fn keyRes => (
+        p1 = skip_ws (keyRes | @pos) s;
+        result_bind (expect_char ":" p1 s) (fn p2 =>
+          Ok {@key (keyRes | @value), @pos (skip_ws p2 s)}
+        )
+      ))
+  )
+);
+
+# After an array/object element: is there a `,` (more to come), the
+# closing bracket (done), or neither (malformed)? Shared by
+# ModeArrayRest/ModeObjectRest, parameterized by the closing character —
+# their continuation logic was identical but for that one character.
+variant SepDecision = SepComma Float | SepEnd Float | SepError String Float;
+
+decide_separator = fn label close_char pos s => (
+  p = skip_ws pos s;
+  match (peek_char p s) (
+    None => SepError ("unterminated " + label) p;
+    Some c =>
+      if c == "," then SepComma (skip_ws (p + 1) s)
+      else if c == close_char then SepEnd (p + 1)
+      else SepError ("expected ',' or '" + close_char + "'") p
+  )
+);
+
 parse_node = fn mode pos s => match mode (
   ModeValue => (
     p = skip_ws pos s;
@@ -255,17 +396,13 @@ parse_node = fn mode pos s => match mode (
       None => parse_error "unexpected end of input" p;
       Some c => match c (
         "\"" => parse_json_string p s;
-        "{" => (
-          p1 = skip_ws (p + 1) s;
-          if (peek_char p1 s) == Some "}"
-            then Ok {@value (JObject empty_json_object), @pos (p1 + 1)}
-            else parse_node (ModeObjectNext empty_json_object) p1 s
+        "{" => match (open_container "}" (p + 1) s (JObject empty_json_object) (ModeObjectNext empty_json_object)) (
+          OpenEmpty v pos2 => Ok {@value v, @pos pos2};
+          OpenContinue m pos2 => parse_node m pos2 s
         );
-        "[" => (
-          p1 = skip_ws (p + 1) s;
-          if (peek_char p1 s) == Some "]"
-            then Ok {@value (JArray empty_json_array), @pos (p1 + 1)}
-            else parse_node (ModeArrayNext empty_json_array) p1 s
+        "[" => match (open_container "]" (p + 1) s (JArray empty_json_array) (ModeArrayNext empty_json_array)) (
+          OpenEmpty v pos2 => Ok {@value v, @pos pos2};
+          OpenContinue m pos2 => parse_node m pos2 s
         );
         "t" => parse_keyword "true" (JBool True) p s;
         "f" => parse_keyword "false" (JBool False) p s;
@@ -279,42 +416,24 @@ parse_node = fn mode pos s => match mode (
   ModeArrayNext acc => result_bind (parse_node ModeValue pos s) (fn item =>
     parse_node (ModeArrayRest (append acc [item | @value])) (item | @pos) s
   );
-  ModeArrayRest acc => (
-    p = skip_ws pos s;
-    match (peek_char p s) (
-      None => parse_error "unterminated array" p;
-      Some c =>
-        if c == "," then parse_node (ModeArrayNext acc) (skip_ws (p + 1) s) s
-        else if c == "]" then Ok {@value (JArray acc), @pos (p + 1)}
-        else parse_error "expected ',' or ']'" p
+  ModeArrayRest acc => match (decide_separator "array" "]" pos s) (
+    SepComma next => parse_node (ModeArrayNext acc) next s;
+    SepEnd next => Ok {@value (JArray acc), @pos next};
+    SepError msg errPos => parse_error msg errPos
+  );
+  # Duplicate keys: last value wins, first occurrence keeps its position —
+  # matches JS's JSON.parse and RFC 8259's informative guidance.
+  # `assoc_set` already has exactly this behavior (replaces in place if
+  # the key exists, else appends).
+  ModeObjectNext acc => result_bind (parse_object_key_and_colon pos s) (fn kr =>
+    result_bind (parse_node ModeValue (kr | @pos) s) (fn valRes =>
+      parse_node (ModeObjectRest (assoc_set (kr | @key) (valRes | @value) acc)) (valRes | @pos) s
     )
   );
-  ModeObjectNext acc => (
-    p = skip_ws pos s;
-    match (peek_char p s) (
-      None => parse_error "unterminated object" p;
-      Some c => if not (c == "\"") then parse_error "expected string key" p else
-        result_bind (parse_string_raw p s) (fn keyRes => (
-          key = keyRes | @value;
-          p1 = skip_ws (keyRes | @pos) s;
-          result_bind (expect_char ":" p1 s) (fn p2 => (
-            p3 = skip_ws p2 s;
-            result_bind (parse_node ModeValue p3 s) (fn valRes =>
-              parse_node (ModeObjectRest (append acc [{key, valRes | @value}])) (valRes | @pos) s
-            )
-          ))
-        ))
-    )
-  );
-  ModeObjectRest acc => (
-    p = skip_ws pos s;
-    match (peek_char p s) (
-      None => parse_error "unterminated object" p;
-      Some c =>
-        if c == "," then parse_node (ModeObjectNext acc) (skip_ws (p + 1) s) s
-        else if c == "}" then Ok {@value (JObject acc), @pos (p + 1)}
-        else parse_error "expected ',' or '}'" p
-    )
+  ModeObjectRest acc => match (decide_separator "object" "}" pos s) (
+    SepComma next => parse_node (ModeObjectNext acc) next s;
+    SepEnd next => Ok {@value (JObject acc), @pos next};
+    SepError msg errPos => parse_error msg errPos
   )
 );
 
@@ -345,10 +464,24 @@ escape_char = fn c => match c (
 
 escape_string = fn s => join "" (list_map escape_char (chars s));
 
+# JSON has no token for Infinity/NaN, but `JNumber` wraps a plain Float,
+# which can hold either (e.g. `json_parse "1e400"` overflows to Infinity —
+# our own arithmetic, not just a foreign JsonValue someone constructed by
+# hand). `json_stringify`'s signature is `JsonValue -> String`, not a
+# `Result`, so there's no error channel to reject through without a
+# breaking API change; instead, matching JS's own precedent
+# (`JSON.stringify(Infinity) === JSON.stringify(NaN) === "null"`), non-finite
+# values serialize as `"null"` — valid JSON syntax, not the silently-invalid
+# bare `Infinity`/`NaN` token `toString` would otherwise emit.
+non_finite_number_text = fn n => (
+  text = toString n;
+  (text == "Infinity") || (text == "-Infinity") || (text == "NaN")
+);
+
 json_stringify = fn v => match v (
   JNull => "null";
   JBool b => match b (True => "true"; False => "false");
-  JNumber n => toString n;
+  JNumber n => if non_finite_number_text n then "null" else toString n;
   JString s => "\"" + escape_string s + "\"";
   JArray items => "[" + join "," (list_map json_stringify items) + "]";
   JObject members => "{" + join "," (list_map (fn pair => (
