@@ -536,6 +536,35 @@ match (Some 1) (Some x => x)
 A bare variable catch-all also works: `other => ...` matches anything not
 already covered and binds the value.
 
+#### Point-free `match`
+
+Omitting the scrutinee — `match (Pattern => branch; ...)` — desugars at
+parse time to `fn x => match x (Pattern => branch; ...)`. This lets a
+`match` used as a plain lambda body eta-reduce to point-free form, the same
+way operator sectioning (`(+)`) avoids writing out `fn a b => a + b`.
+
+```noolang
+# Point-free: no scrutinee, works directly as a function value
+classify = match (
+    Some x => "got " + show x;
+    None => "nothing"
+);
+classify (Some 42.0)
+```
+
+Because `match (` is ambiguous between a parenthesized scrutinee and the
+point-free form's arms block, the parser tries the arms form first and
+falls back to parsing a scrutinee if that fails. This is safe: every arm
+requires a literal `=>` right after a pattern, and no ordinary scrutinee
+expression can produce a bare `=>` (lambdas require `fn` first), so a real
+scrutinee — even a parenthesized one — never gets misread as arms.
+
+```noolang
+# Parenthesized scrutinee still works normally
+foo = Some 7.0;
+match (foo) (Some x => x; None => 0.0)
+```
+
 ### Destructuring Bindings
 
 Record destructuring binds a **subset** of fields — extra fields in the record
