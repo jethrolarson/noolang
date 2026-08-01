@@ -1,0 +1,442 @@
+# std/json — JSON parse/serialize, hand-written recursive-descent in plain
+# noolang (no native JSON.parse wrapper). Written as a stdlib-gap forcing
+# function: see docs/internal/docs-wip/JSON_PARSER_PLAN.md for why JsonValue
+# is a concrete variant rather than Unknown (records can't take
+# runtime-computed keys, and Unknown has no isTuple/isRecord to recover a
+# record shape from anyway).
+#
+# Known scope limits (not workarounds — genuine gaps in what's expressible
+# without a codepoint<->char builtin, i.e. no fromCharCode/charCodeAt):
+#   - \u XXXX escapes in JSON string literals are rejected (ParseError),
+#     not decoded.
+#   - \b and \f escapes are rejected for the same reason.
+#   - Serialization escapes only quote/backslash/newline/cr/tab; other C0
+#     control characters pass through unescaped (round-trips through this
+#     parser fine, may not be valid strict-JSON for input built elsewhere).
+
+variant JsonValue =
+    JNull
+  | JBool Bool
+  | JNumber Float
+  | JString String
+  | JArray (List JsonValue)
+  | JObject (List {String, JsonValue});
+
+variant JsonParseError = JsonParseError {@message String, @position Float};
+
+# Extraction errors are a separate variant from parse errors: getting a
+# field out of an already-parsed JsonValue is a different failure mode
+# (wrong shape / missing key) than failing to parse text.
+variant JsonError =
+    JsonExpectedString
+  | JsonExpectedNumber
+  | JsonExpectedBool
+  | JsonExpectedArray
+  | JsonExpectedObject
+  | JsonMissingField String
+  | JsonIndexOutOfBounds Float;
+
+# ========================================
+# Result plumbing
+#
+# Deliberately not using the Monad/Applicative `bind`/`map` trait methods
+# here: those dispatch through trait-instance resolution, and two-parameter
+# variants (Result a b) register at arity 1 there, which crashes the typer
+# on `Result`'s own instances (see stdlib.noo's "KNOWN WRONG" note on
+# Applicative Result, and #158). Plain top-level functions that `match`
+# directly don't go through that path and work fine.
+# ========================================
+
+result_bind = fn res f => match res (
+  Ok x => f x;
+  Err e => Err e
+);
+
+result_map = fn f res => match res (
+  Ok x => Ok (f x);
+  Err e => Err e
+);
+
+# ========================================
+# PARSER
+#
+# Threads a Float character position through the input string. Each
+# sub-parser returns Result {@value V, @pos Float} JsonParseError: on
+# success, the parsed value plus the position just past what it consumed.
+# No chars-list/tokenizer stage — `substring`/`indexOf` operate directly on
+# the source string, which is simpler at JSON's grammar size (see plan doc).
+# ========================================
+
+parse_error = fn message pos => Err (JsonParseError {@message message, @position pos});
+
+# One character at `pos`, or None past the end. A 1-char `substring` is
+# exactly one char or "" out of range, so this doubles as the bounds check.
+peek_char = fn pos s => (
+  c = substring pos (pos + 1) s;
+  if c == "" then None else Some c
+);
+
+is_whitespace = fn c => match c (
+  " " => True; "\t" => True; "\n" => True; "\r" => True; _ => False
+);
+
+skip_ws = fn pos s => match (peek_char pos s) (
+  None => pos;
+  Some c => if is_whitespace c then skip_ws (pos + 1) s else pos
+);
+
+is_digit = fn c => match c (
+  "0" => True; "1" => True; "2" => True; "3" => True; "4" => True;
+  "5" => True; "6" => True; "7" => True; "8" => True; "9" => True;
+  _ => False
+);
+
+digit_value = fn c => match c (
+  "0" => 0; "1" => 1; "2" => 2; "3" => 3; "4" => 4;
+  "5" => 5; "6" => 6; "7" => 7; "8" => 8; "9" => 9;
+  _ => 0
+);
+
+# Consumes digits while they last (may consume zero); caller checks whether
+# `pos` advanced when at-least-one-digit is required.
+scan_digits = fn pos s acc => match (peek_char pos s) (
+  None => {@value acc, @pos pos};
+  Some c => if is_digit c
+    then scan_digits (pos + 1) s (acc * 10 + digit_value c)
+    else {@value acc, @pos pos}
+);
+
+pow10 = fn n => if n <= 0 then 1 else 10 * pow10 (n - 1);
+
+divide_or_zero = fn a b => option_get_or 0 (a / b);
+
+apply_exponent = fn value exp =>
+  if exp == 0 then value
+  else if exp > 0 then value * pow10 exp
+  else divide_or_zero value (pow10 (0 - exp));
+
+expect_char = fn expected pos s => match (peek_char pos s) (
+  Some c => if c == expected then Ok (pos + 1)
+    else parse_error ("expected '" + expected + "'") pos;
+  None => parse_error ("expected '" + expected + "' but reached end of input") pos
+);
+
+parse_keyword = fn keyword value pos s => (
+  klen = length (chars keyword);
+  slice = substring pos (pos + klen) s;
+  if slice == keyword
+    then Ok {@value value, @pos (pos + klen)}
+    else parse_error ("expected '" + keyword + "'") pos
+);
+
+scan_string = fn pos s acc => match (peek_char pos s) (
+  None => parse_error "unterminated string" pos;
+  Some c => match c (
+    "\"" => Ok {@value acc, @pos (pos + 1)};
+    "\\" => match (peek_char (pos + 1) s) (
+      None => parse_error "unterminated escape" (pos + 1);
+      Some e => match e (
+        "\"" => scan_string (pos + 2) s (acc + "\"");
+        "\\" => scan_string (pos + 2) s (acc + "\\");
+        "/" => scan_string (pos + 2) s (acc + "/");
+        "n" => scan_string (pos + 2) s (acc + "\n");
+        "r" => scan_string (pos + 2) s (acc + "\r");
+        "t" => scan_string (pos + 2) s (acc + "\t");
+        "u" => parse_error "\\u escapes are not supported" pos;
+        "b" => parse_error "\\b escapes are not supported" pos;
+        "f" => parse_error "\\f escapes are not supported" pos;
+        _ => parse_error ("invalid escape character '" + e + "'") (pos + 1)
+      )
+    );
+    _ => scan_string (pos + 1) s (acc + c)
+  )
+);
+
+# Raw string content (no JString wrapper) starting at the opening quote;
+# returns the position just past the closing quote.
+parse_string_raw = fn pos s => scan_string (pos + 1) s "";
+
+parse_json_string = fn pos s =>
+  result_map (fn r => {@value (JString (r | @value)), @pos (r | @pos)}) (parse_string_raw pos s);
+
+parse_number = fn pos s => (
+  neg = (peek_char pos s) == Some "-";
+  pos1 = if neg then pos + 1 else pos;
+  match (peek_char pos1 s) (
+    None => parse_error "expected digit" pos1;
+    Some fd => if not (is_digit fd) then parse_error "expected digit" pos1 else (
+      int_scan = scan_digits pos1 s 0;
+      int_val = int_scan | @value;
+      pos2 = int_scan | @pos;
+      has_frac = (peek_char pos2 s) == Some ".";
+      frac_step =
+        if has_frac then (
+          fstart = pos2 + 1;
+          fscan = scan_digits fstart s 0;
+          fdigits = (fscan | @pos) - fstart;
+          if fdigits == 0
+            then parse_error "expected digit after '.'" fstart
+            else Ok {@frac (divide_or_zero (fscan | @value) (pow10 fdigits)), @pos (fscan | @pos)}
+        ) else Ok {@frac 0, @pos pos2};
+      result_bind frac_step (fn fr => (
+        frac = fr | @frac;
+        pos3 = fr | @pos;
+        has_exp = match (peek_char pos3 s) (
+          Some c => (c == "e") || (c == "E");
+          None => False
+        );
+        exp_step =
+          if has_exp then (
+            epos1 = pos3 + 1;
+            exp_neg = (peek_char epos1 s) == Some "-";
+            exp_sign = (peek_char epos1 s) == Some "+";
+            epos2 = if exp_neg || exp_sign then epos1 + 1 else epos1;
+            match (peek_char epos2 s) (
+              None => parse_error "expected exponent digits" epos2;
+              Some efd => if not (is_digit efd) then parse_error "expected exponent digits" epos2 else (
+                escan = scan_digits epos2 s 0;
+                raw = escan | @value;
+                signed = if exp_neg then (0 - raw) else raw;
+                Ok {@exp signed, @pos (escan | @pos)}
+              )
+            )
+          ) else Ok {@exp 0, @pos pos3};
+        result_bind exp_step (fn er => (
+          exp = er | @exp;
+          pos4 = er | @pos;
+          mantissa = int_val + frac;
+          signed_mantissa = if neg then (0 - mantissa) else mantissa;
+          Ok {@value (JNumber (apply_exponent signed_mantissa exp)), @pos pos4}
+        ))
+      ))
+    )
+  )
+);
+
+# --- parse_node: the value grammar, self-recursive only ---
+#
+# `parse_value`, "next array element", "more array elements?", "next object
+# member", "more object members?" are naturally mutually recursive (a value
+# can contain an array of values; an array's tail check can start another
+# value). Noolang has no mutual recursion between bindings, top-level or
+# local — only a binding calling *itself* resolves, because forward
+# references are a static ordering error (confirmed by spike: even a local
+# `is_even`/`is_odd` pair inside one `(...)` block fails to typecheck with
+# "Undefined variable", not just at top level).
+#
+# Standard workaround: fold every production into one self-recursive
+# function keyed by a mode tag, with in-progress array/object accumulators
+# carried in the tag itself. Every branch returns the same
+# `Result {@value JsonValue, @pos Float} JsonParseError` shape (array/object
+# accumulators get wrapped as JArray/JObject on completion), which is what
+# makes a single non-polymorphic recursive function typeable at all.
+variant ParseMode =
+    ModeValue
+  | ModeArrayNext (List JsonValue)
+  | ModeArrayRest (List JsonValue)
+  | ModeObjectNext (List {String, JsonValue})
+  | ModeObjectRest (List {String, JsonValue});
+
+# Empty-list constants, not `[]` literals: a real typer bug (filed — see
+# PR description) makes a bare `[]` passed to two different constructors of
+# the same recursive variant (one expecting `List JsonValue`, the other
+# `List {String, JsonValue}`) cross-contaminate each other's element type,
+# even across unrelated top-level bindings. A `List` built from a real
+# (non-empty, then filtered away) element sidesteps it — `[JNull]` and
+# `[{"", JNull}]` both typecheck fine reused across constructors; only the
+# literal `[]` triggers the bug.
+empty_json_array = list_filter (fn _ => False) [JNull];
+empty_json_object = list_filter (fn _ => False) [{"", JNull}];
+
+parse_node = fn mode pos s => match mode (
+  ModeValue => (
+    p = skip_ws pos s;
+    match (peek_char p s) (
+      None => parse_error "unexpected end of input" p;
+      Some c => match c (
+        "\"" => parse_json_string p s;
+        "{" => (
+          p1 = skip_ws (p + 1) s;
+          if (peek_char p1 s) == Some "}"
+            then Ok {@value (JObject empty_json_object), @pos (p1 + 1)}
+            else parse_node (ModeObjectNext empty_json_object) p1 s
+        );
+        "[" => (
+          p1 = skip_ws (p + 1) s;
+          if (peek_char p1 s) == Some "]"
+            then Ok {@value (JArray empty_json_array), @pos (p1 + 1)}
+            else parse_node (ModeArrayNext empty_json_array) p1 s
+        );
+        "t" => parse_keyword "true" (JBool True) p s;
+        "f" => parse_keyword "false" (JBool False) p s;
+        "n" => parse_keyword "null" JNull p s;
+        _ => if (is_digit c) || (c == "-")
+          then parse_number p s
+          else parse_error ("unexpected character '" + c + "'") p
+      )
+    )
+  );
+  ModeArrayNext acc => result_bind (parse_node ModeValue pos s) (fn item =>
+    parse_node (ModeArrayRest (append acc [item | @value])) (item | @pos) s
+  );
+  ModeArrayRest acc => (
+    p = skip_ws pos s;
+    match (peek_char p s) (
+      None => parse_error "unterminated array" p;
+      Some c =>
+        if c == "," then parse_node (ModeArrayNext acc) (skip_ws (p + 1) s) s
+        else if c == "]" then Ok {@value (JArray acc), @pos (p + 1)}
+        else parse_error "expected ',' or ']'" p
+    )
+  );
+  ModeObjectNext acc => (
+    p = skip_ws pos s;
+    match (peek_char p s) (
+      None => parse_error "unterminated object" p;
+      Some c => if not (c == "\"") then parse_error "expected string key" p else
+        result_bind (parse_string_raw p s) (fn keyRes => (
+          key = keyRes | @value;
+          p1 = skip_ws (keyRes | @pos) s;
+          result_bind (expect_char ":" p1 s) (fn p2 => (
+            p3 = skip_ws p2 s;
+            result_bind (parse_node ModeValue p3 s) (fn valRes =>
+              parse_node (ModeObjectRest (append acc [{key, valRes | @value}])) (valRes | @pos) s
+            )
+          ))
+        ))
+    )
+  );
+  ModeObjectRest acc => (
+    p = skip_ws pos s;
+    match (peek_char p s) (
+      None => parse_error "unterminated object" p;
+      Some c =>
+        if c == "," then parse_node (ModeObjectNext acc) (skip_ws (p + 1) s) s
+        else if c == "}" then Ok {@value (JObject acc), @pos (p + 1)}
+        else parse_error "expected ',' or '}'" p
+    )
+  )
+);
+
+parse_value = fn pos s => parse_node ModeValue pos s;
+
+# Entry point: whole-input parse, rejecting trailing non-whitespace content.
+json_parse = fn input =>
+  result_bind (parse_value 0 input) (fn r => (
+    p = skip_ws (r | @pos) input;
+    match (peek_char p input) (
+      None => Ok (r | @value);
+      Some c => parse_error ("unexpected trailing character '" + c + "'") p
+    )
+  ));
+
+# ========================================
+# SERIALIZER
+# ========================================
+
+escape_char = fn c => match c (
+  "\"" => "\\\"";
+  "\\" => "\\\\";
+  "\n" => "\\n";
+  "\r" => "\\r";
+  "\t" => "\\t";
+  _ => c
+);
+
+escape_string = fn s => join "" (list_map escape_char (chars s));
+
+json_stringify = fn v => match v (
+  JNull => "null";
+  JBool b => match b (True => "true"; False => "false");
+  JNumber n => toString n;
+  JString s => "\"" + escape_string s + "\"";
+  JArray items => "[" + join "," (list_map json_stringify items) + "]";
+  JObject members => "{" + join "," (list_map (fn pair => (
+      {k, mv} = pair;
+      "\"" + escape_string k + "\"" + ":" + json_stringify mv
+    )) members) + "}"
+);
+
+# ========================================
+# EXTRACTION API — pull typed values out of a parsed JsonValue.
+# schema.noo-flavored (Result-based, composable via result_bind) but
+# retyped over the concrete JsonValue rather than Unknown; see plan doc for
+# why Unknown doesn't work here.
+# ========================================
+
+json_as_string = fn v => match v (JString s => Ok s; _ => Err JsonExpectedString);
+json_as_number = fn v => match v (JNumber n => Ok n; _ => Err JsonExpectedNumber);
+json_as_bool = fn v => match v (JBool b => Ok b; _ => Err JsonExpectedBool);
+json_as_array = fn v => match v (JArray items => Ok items; _ => Err JsonExpectedArray);
+json_as_object = fn v => match v (JObject members => Ok members; _ => Err JsonExpectedObject);
+
+json_field = fn key v => result_bind (json_as_object v) (fn members =>
+  match (assoc_get key members) (
+    Some found => Ok found;
+    None => Err (JsonMissingField key)
+  )
+);
+
+json_index = fn idx v => result_bind (json_as_array v) (fn items =>
+  match (at idx items) (
+    Some found => Ok found;
+    None => Err (JsonIndexOutOfBounds idx)
+  )
+);
+
+# ========================================
+# EQUALITY — a plain recursive function, not an `implement Eq JsonValue`.
+# JObject's payload is List {String, JsonValue}, and tuples have no Eq
+# instance in this codebase (see stdlib.test.noo's note on tuples being
+# structural, not nominal); a trait instance here would also cross the
+# same two-parameter-variant arity bug noted above for Result. Comparison
+# is order-sensitive for object members (parse order is preserved, so a
+# value that round-trips through json_parse/json_stringify compares equal
+# to itself).
+#
+# Array/object element-wise comparison goes through `primitive_list_all2`
+# (the same builtin `implement Eq (List a)` uses in stdlib.noo) rather than
+# a hand-rolled zip — that sidesteps needing separate
+# json_array_equals/json_object_equals helpers, which would have to call
+# back into json_equals and hit the no-mutual-recursion wall documented
+# above the parser.
+#
+# `(kx : String)` below isn't decoration: dropping it hits a separate typer
+# bug — `equals kx ky && json_equals vx vy` fails to unify ("Expected Bool,
+# Got String") whenever `kx`/`ky` are unannotated lambda parameters, even
+# though the standalone pieces (`equals kx kx`, `json_equals vx vy`) each
+# type fine alone. Ascribing either operand's type at the call site avoids
+# it (filed — see PR description).
+# ========================================
+
+json_equals = fn a b => match a (
+  JNull => match b (JNull => True; _ => False);
+  JBool x => match b (JBool y => equals x y; _ => False);
+  JNumber x => match b (JNumber y => equals x y; _ => False);
+  JString x => match b (JString y => equals x y; _ => False);
+  JArray xs => match b (JArray ys => primitive_list_all2 json_equals xs ys; _ => False);
+  JObject xs => match b (JObject ys => primitive_list_all2 (fn px py => (
+      {kx, vx} = px;
+      {ky, vy} = py;
+      (equals (kx : String) ky) && (json_equals vx vy)
+    )) xs ys; _ => False)
+);
+
+{
+  @JNull JNull,
+  @JBool JBool,
+  @JNumber JNumber,
+  @JString JString,
+  @JArray JArray,
+  @JObject JObject,
+  @json_parse json_parse,
+  @json_stringify json_stringify,
+  @json_equals json_equals,
+  @json_as_string json_as_string,
+  @json_as_number json_as_number,
+  @json_as_bool json_as_bool,
+  @json_as_array json_as_array,
+  @json_as_object json_as_object,
+  @json_field json_field,
+  @json_index json_index
+}
