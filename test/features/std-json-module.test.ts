@@ -2,8 +2,21 @@
 // as plain userland noolang (no native JSON.parse wrapper; see
 // docs/internal/docs-wip/JSON_PARSER_PLAN.md). Tested the same way
 // std/test is: import the module and exercise it as a real consumer would.
-import { test, expect } from 'bun:test';
+import { test, expect, setDefaultTimeout } from 'bun:test';
 import { expectSuccess, runCode } from '../utils';
+
+// Whichever test in this file runs first pays a real, one-time cost:
+// typechecking std/json.noo from scratch currently takes ~15s (module
+// results are cached per-process after that — see the module-loader cache
+// in src/module-loader.ts — so every other test in this file, and every
+// other file that imports std/json in the same `bun test` run, is fast).
+// Bun's default per-test timeout is 5000ms, well under that, so without
+// this the first test intermittently fails as a timeout rather than a
+// real assertion failure. The ~15s figure itself is a known, tracked
+// problem (see the PR #165 discussion and the comment on parse_node in
+// std/json.noo) — this raises the ceiling to stop CI flaking on it, not to
+// paper over it.
+setDefaultTimeout(30000);
 
 const importJson = `{@json_parse json_parse, @json_stringify json_stringify, @json_equals json_equals, @json_field json_field, @json_index json_index, @json_as_string json_as_string, @json_as_number json_as_number, @json_as_bool json_as_bool, @json_as_array json_as_array, @json_as_object json_as_object} = import "std/json";`;
 
