@@ -536,6 +536,40 @@ match (Some 1) (Some x => x)
 A bare variable catch-all also works: `other => ...` matches anything not
 already covered and binds the value.
 
+#### Point-free `match_`
+
+`match_ (Pattern => branch; ...)` — the scrutinee omitted, using the
+dedicated `match_` keyword — desugars at parse time to
+`fn x => match x (Pattern => branch; ...)`. This lets a `match` used as a
+plain lambda body eta-reduce to point-free form, the same way operator
+sectioning (`(+)`) avoids writing out `fn a b => a + b`.
+
+`match_` follows a general naming convention: a trailing underscore names
+the "flipped" form of something — the first argument moves to last
+position, as with the `flip` combinator. `match` is special parser syntax
+rather than a bound value, so it can't be flipped with an ordinary
+function like `flip`; it gets its own keyword instead.
+
+```noolang
+# Point-free: no scrutinee, works directly as a function value
+classify = match_ (
+    Some x => "got " + show x;
+    None => "nothing"
+);
+classify (Some 42.0)
+```
+
+`match_` is a distinct keyword from `match`, tokenized separately by the
+lexer — there's no shared prefix to disambiguate, so a parenthesized
+scrutinee after plain `match` is never at risk of being misread as a
+`match_` arms block:
+
+```noolang
+# match with a parenthesized scrutinee is unaffected by match_
+foo = Some 7.0;
+match (foo) (Some x => x; None => 0.0)
+```
+
 ### Destructuring Bindings
 
 Record destructuring binds a **subset** of fields — extra fields in the record

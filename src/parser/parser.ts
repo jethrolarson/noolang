@@ -450,6 +450,7 @@ const parseLambdaBody: C.Parser<Expression> = tokens => {
 	// Handle complex expressions that start with keywords
 	const complexResult = C.choice(
 		parseMatchExpression,
+		parseMatchUnderscoreExpression,
 		parseTypeDefinition,
 		parseUserDefinedType,
 		parseConstraintDefinition,
@@ -1860,8 +1861,9 @@ const parsePattern: C.Parser<Pattern> = C.choice(
 
 // --- Match Case Expression Parser ---
 // This parser supports expressions in match cases, including nested match expressions
-const parseMatchCaseExpression: C.Parser<Expression> = C.choice3(
+const parseMatchCaseExpression: C.Parser<Expression> = C.choice(
 	C.lazy(() => parseMatchExpression), // Support nested match expressions
+	C.lazy(() => parseMatchUnderscoreExpression), // Support nested point-free match_
 	C.lazy(() => parseIfExpression), // Support if expressions
 	C.lazy(() => parseExprWithType) // Support all other expressions including type annotations
 );
@@ -1880,30 +1882,73 @@ const parseMatchCase: C.Parser<MatchCase> = C.map(
 	})
 );
 
-// --- Match Expression ---
-const parseMatchExpression: C.Parser<MatchExpression> = C.map(
+// --- Match Arms (the "( pattern => expr ; ... )" block shared by both forms) ---
+const parseMatchArms: C.Parser<{
+	cases: MatchCase[];
+	close: Token;
+}> = C.map(
 	C.seq(
-		C.keyword('match'),
-		C.lazy(() => parseThrush), // Use a simpler expression parser to avoid circular dependency
 		C.punctuation('('),
 		C.sepBy(parseMatchCase, C.punctuation(';')),
 		// Allow and ignore trailing semicolons after the last case
 		C.many(C.punctuation(';')),
 		C.punctuation(')')
 	),
-	([
-		match,
-		expression,
-		_openParen,
-		cases,
-		_trailingSemicolons,
-		closeParen,
-	]): MatchExpression => ({
-		kind: 'match',
-		expression,
-		cases,
-		location: createLocation(match.location.start, closeParen.location.end),
-	})
+	([_open, cases, _trailingSemicolons, close]) => ({ cases, close })
+);
+
+const buildMatch = (
+	expression: Expression,
+	cases: MatchCase[],
+	location: ReturnType<typeof createLocation>
+): MatchExpression => ({ kind: 'match', expression, cases, location });
+
+// --- Match Expression ---
+const parseMatchExpression: C.Parser<Expression> = C.map(
+	C.seq(C.keyword('match'), C.lazy(() => parseThrush), parseMatchArms),
+	([match, expression, { cases, close }]): Expression =>
+		buildMatch(
+			expression,
+			cases,
+			createLocation(match.location.start, close.location.end)
+		)
+);
+
+// --- Point-free Match Expression: match_ (arms) ---
+// `match_` (see docs/internal/adrs/0001-trailing-underscore-flip.md) is the
+// "flipped" form of `match`: the scrutinee argument moves to last position,
+// i.e. `match_ (arms)` is sugar for `fn x => match x (arms)`. It lets
+// `fn foo => match (foo) (arms)` eta-reduce to `match_ (arms)`.
+//
+// This used to be spelled `match (arms)` — reusing `match`'s own `(`
+// prefix and disambiguating from `match (scrutinee) (arms)` via
+// parser backtracking. The parser could tell the two apart soundly, but a
+// human reader couldn't without the same lookahead, so that approach was
+// dropped in favor of a lexically distinct keyword (`match_`, tokenized
+// separately from `match` in src/lexer/lexer.ts) — the same fix OCaml
+// (`function` vs `fun`) and Haskell (`\case` / LambdaCase) use for the
+// identical problem. No backtracking needed: `match_` and `match` are
+// simply different tokens from the lexer onward.
+const parseMatchUnderscoreExpression: C.Parser<Expression> = C.map(
+	C.seq(C.keyword('match_'), parseMatchArms),
+	([matchUnderscore, { cases, close }]): Expression => {
+		const location = createLocation(
+			matchUnderscore.location.start,
+			close.location.end
+		);
+		const scrutineeVar: Expression = {
+			kind: 'variable',
+			name: '__match_x',
+			location,
+		};
+		const fn: FunctionExpression = {
+			kind: 'function',
+			params: ['__match_x'],
+			body: buildMatch(scrutineeVar, cases, location),
+			location,
+		};
+		return fn;
+	}
 );
 
 // --- Where Expression ---
@@ -1961,6 +2006,8 @@ const parseSequenceTerm: C.Parser<Expression> = tokens => {
 					return parseUserDefinedType(tokens);
 				case 'match':
 					return parseMatchExpression(tokens);
+				case 'match_':
+					return parseMatchUnderscoreExpression(tokens);
 				case 'import':
 					return parseImportExpression(tokens);
 				case 'if':
@@ -2039,6 +2086,7 @@ const parseIfExpression = C.map(
 const parseWhereMainExpression: C.Parser<Expression> = C.choice(
 	// Parse keyword-based expressions first to avoid identifier conflicts
 	parseMatchExpression, // ADT pattern matching (starts with "match")
+	parseMatchUnderscoreExpression, // point-free match (starts with "match_")
 	parseTypeDefinition, // ADT variant definitions (starts with "variant")
 	parseUserDefinedType, // User-defined types (starts with "type")
 	parseConstraintDefinition, // constraint definitions (starts with "constraint")
