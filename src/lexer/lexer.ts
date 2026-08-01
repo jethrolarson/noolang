@@ -186,6 +186,7 @@ export class Lexer {
 			'variant',
 			'type',
 			'match',
+			'match_',
 			'with',
 			'given',
 			'is',
