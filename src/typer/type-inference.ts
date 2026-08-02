@@ -812,8 +812,15 @@ export const typeDefinition = (
 	// Generalize the type before storing in the environment
 	let scheme: TypeScheme;
 
-	if (expr.value.kind === 'typed') {
-		// For explicit annotations: force quantification of all free variables to prevent sharing
+	if (expr.value.kind === 'typed' || expr.value.kind === 'constrained') {
+		// For explicit annotations (plain `: T` or `: T given ...`): force
+		// quantification of all free variables to prevent sharing. A `given
+		// ... has {@field Concrete}` constraint's field type is pinned to
+		// `Concrete` via a shared, deliberately-unquantified variable (see
+		// generalize's widened free-var walk below for why that variable
+		// would otherwise get quantified and un-pinned) — routing
+		// 'constrained' through this same narrow, non-widened path keeps that
+		// pin intact instead of losing it to generalize's own quantification.
 		const annotationType = expr.value.type;
 		const substitutedAnnotationType = substitute(
 			annotationType,
