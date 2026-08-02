@@ -79,25 +79,29 @@
     ]
   },
   "devDependencies": {
-    "@biomejs/biome": "2.1.1",
-    "@eslint/js": "^9.31.0",
-    "@swc/core": "^1.13.1",
-    "@types/bun": "^1.2.19",
-    "@types/node": "^20.19.9",
-    "@types/vscode": "^1.74.0",
-    "@typescript-eslint/eslint-plugin": "^8.38.0",
-    "@typescript-eslint/parser": "^8.38.0",
-    "@vscode/vsce": "^2.15.0",
-    "c8": "^10.1.3",
-    "eslint": "^9.31.0",
-    "prettier": "^3.6.2",
-    "ts-node": "^10.9.0",
-    "tsx": "^4.20.3",
-    "typescript": "^5.8.3",
+    "@biomejs/biome": "2.5.6",
+    "@eslint/js": "^10.0.1",
+    "@swc/core": "^1.15.47",
+    "@types/bun": "^1.3.14",
+    "@types/node": "^26.1.2",
+    "@types/vscode": "1.74.0",
+    "@typescript-eslint/eslint-plugin": "^8.65.0",
+    "@typescript-eslint/parser": "^8.65.0",
+    "@vscode/vsce": "^3.9.2",
+    "c8": "^12.0.0",
+    "eslint": "^10.8.0",
+    "prettier": "^3.9.6",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.23.1",
+    "typescript": "^6.0.3",
     "uvu": "^0.5.6"
   },
   "dependencies": {
-    "vscode-languageserver": "^8.1.0",
+    "vscode-languageserver": "^10.1.0",
     "vscode-uri": "^3.1.0"
-  }
+  },
+  "trustedDependencies": [
+    "@swc/core",
+    "@vscode/vsce-sign"
+  ]
 }
