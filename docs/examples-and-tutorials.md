@@ -411,7 +411,7 @@ getHead = fn list => head list;
 
 # Test
 result = getHead [3, 1, 4, 1, 5, 9, 2, 6];  # => Some 3 : Option Float
-empty = getHead [];                          # => None : Option String
+empty = getHead [];                          # => None
 result
 ```
 

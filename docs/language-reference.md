@@ -737,7 +737,7 @@ result2 = 10 / 0;  # => None : Option Float
 
 # Option types for nullable values (built-in)
 option1 = head [1, 2, 3];  # => Some 1 : Option Float
-option2 = head [];         # => None : Option String
+option2 = head [];         # => None
 
 # Show the results
 show result1;  # => "Some(5)" : String

@@ -66,7 +66,7 @@ Noolang provides several fundamental types:
 # Lists - homogeneous collections
 numbers = [1, 2, 3, 4];     # => [1, 2, 3, 4] : List Float
 names = ["Alice", "Bob"];   # => ["Alice", "Bob"] : List String
-empty = [];                 # => [] : List a
+empty = [];                 # => []
 
 # Records - structured data with named fields
 person = { @name "Alice", @age 30 };  # => {@name "Alice", @age 30} : { @name String, @age Float }
@@ -334,7 +334,7 @@ Work with polymorphic collections safely:
 ```noolang
 # Generic operations on lists
 first = head [1, 2, 3];     # => Some 1 : Option Float
-empty = head [];            # => None : Option a
+empty = head [];            # => None
 
 # Working with Option results
 result = first;  # => Some 1 : Option Float
