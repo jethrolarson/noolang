@@ -1,5 +1,7 @@
 # Performance Analysis: Sub-50ms Benchmark Challenge
 
+Status: open (numbers are stale — Aug 2025 — re-profile before acting; the parser-specific blowup this once pointed at is now a separate, fixed issue, see PARSER_COMBINATOR_SIZE_COST ADR)
+
 ## Summary
 
 Investigation into achieving sub-50ms benchmark performance has revealed a **shifting bottleneck landscape**. While initial analysis identified parser inefficiencies, recent measurements show the type system has become the primary performance bottleneck.

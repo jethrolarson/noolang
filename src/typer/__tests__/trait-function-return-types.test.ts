@@ -101,7 +101,7 @@ test('should infer constraints in if expressions', () => {
 
 // `x + 1` pins x to Float (numeric literals are all Float now, Int was
 // removed), so `Float -> Bool` is correct here, not a constrained type -
-// see docs/internal/docs-wip/GENERALIZATION_BUG.md.
+// see docs/internal/adrs/0003-generalization-reads-substitution.md.
 test('where-bound result concretely typed when literals pin the type', () => {
 	const code = `
 			fn x => result where (
@@ -118,7 +118,7 @@ test('where-bound result concretely typed when literals pin the type', () => {
 	expect(typeResult.type.return.name).toBe('Bool');
 });
 
-// Regression for the generalize/freeTypeVarsEnv bug (GENERALIZATION_BUG.md):
+// Regression for the generalize/freeTypeVarsEnv bug (ADR 0003):
 // a where-bound (or semicolon-let-bound) result must stay linked to the
 // enclosing function's parameters, not get quantified as an unrelated var
 // with its constraint dropped.

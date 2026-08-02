@@ -1,5 +1,7 @@
 # query tools
 
+Status: raw
+
 ## query
 
 - `noo --query "foo" examples/demo.noo`

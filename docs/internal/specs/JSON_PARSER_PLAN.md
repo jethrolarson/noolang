@@ -1,5 +1,8 @@
 # JSON Parser Plan
 
+Status: draft (implementation landed as a combinator-based rewrite, PR #176,
+still open at time of writing — flip to "implemented" once merged)
+
 A JSON parser/serializer for noolang, as the next stdlib-gap forcing function
 (same pattern as word-count → string primitives, find_todos → &&/||, the test
 runner → exec hardening). Confirmed via spike (2026-07-23): no prerequisite

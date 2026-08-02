@@ -22,8 +22,8 @@ export type Parser<T> = (tokens: Token[]) => ParseResult<T>;
 // enclosing choice point or repetition loop that backtracks past an already-
 // parsed subtree re-derives that subtree from scratch, with zero reuse. Cost
 // multiplies (not adds) with each layer of enclosing backtracking structure —
-// see docs/internal/docs-wip/PARSER_COMBINATOR_SIZE_COST.md for the profiled
-// mechanism. `memoize` caches a parser's result keyed by (this parser
+// see docs/internal/adrs/0006-packrat-memoization-in-combinators.md for the
+// profiled mechanism. `memoize` caches a parser's result keyed by (this parser
 // instance, position).
 //
 // Position is keyed by `tokens[0]` — the actual Token *object* at the front

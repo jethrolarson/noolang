@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { runCode } from '../../../test/utils';
 
-// Regression test for docs/internal/docs-wip/EMPTY_LIST_TYPEVAR_COLLISION_BUG.md
-// (retired once this fix landed).
+// Regression test for the empty-list type-variable collision bug
+// (doc retired once this fix landed).
 //
 // typeList's empty-list case hardcoded typeVariable('a') instead of minting a
 // fresh one via freshTypeVariable(state). Because state.substitution is a
