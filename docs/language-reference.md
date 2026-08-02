@@ -669,7 +669,7 @@ result = myAdd 2 3;         # 5
 |------|-------------|
 | `"./path"` or `"../path"` | File relative to the importing module |
 | `"bare-name"` or `"prefix/name"` | Entry in `noolang.json` import map |
-| `"std/*"` | Reserved for future stdlib modules (not yet importable) |
+| `"std/*"` | Modular standard library, shipped with the interpreter — see [Standard library modules](#standard-library-modules-std) below |
 
 Relative specifiers **must** begin with `./` or `../`. A bare specifier that
 has no matching import-map entry is a compile-time error.
@@ -701,10 +701,55 @@ effectful operations, export an effect-typed function instead.
 **Coherence.** Only one `implement` block per `(Trait, Type)` pair is allowed
 across a program. Conflicting instances from different modules are an error.
 
-### Standard library
+### Auto-loaded standard library
 
 All standard library functions (`map`, `filter`, `equals`, `show`, etc.) are
 loaded automatically at startup — you do not need to import them.
+
+### Standard library modules
+
+Separately, `import "std/<name>"` resolves to a `.noo` module shipped with
+the interpreter (see the specifier table above) — these are opt-in, plain
+userland noolang with no special interpreter privileges, unlike the
+auto-loaded functions above.
+
+- **`std/json`** — JSON parse/serialize over a concrete `JsonValue` variant.
+
+  ```noolang
+  {@json_parse json_parse, @json_stringify json_stringify, @json_field json_field}
+    = import "std/json";
+
+  parsed = json_parse "{\"name\":\"Ada\",\"tags\":[\"math\",\"cs\"]}";
+  name = match parsed (
+    Ok doc => match (json_field "name" doc) (
+      Ok v => json_stringify v;
+      Err _ => "missing field"
+    );
+    Err _ => "parse error"
+  );
+  name  # => "\"Ada\"" : String
+  ```
+
+  `json_parse : String -> Result JsonValue JsonParseError` and
+  `json_stringify : JsonValue -> String` round-trip objects, arrays,
+  strings (with `\" \\ \/ \n \r \t` escapes), and numbers (negative,
+  decimal, exponent). `json_field`/`json_index` extract members by key/index;
+  `json_as_string`/`json_as_number`/`json_as_bool`/`json_as_array`/
+  `json_as_object` narrow a `JsonValue` to a concrete shape — all
+  `Result`-based and composable. Scope limits worth knowing: `\u`, `\b`,
+  `\f` string escapes are rejected rather than decoded (no codepoint↔char
+  builtin exists to decode `\uXXXX` with), and non-finite numbers
+  (`Infinity`/`NaN`, reachable via overflow) serialize to `"null"`. Full
+  design notes: [`docs/internal/specs/std-json.md`](internal/specs/std-json.md).
+
+- **`std/parser`** — the generic parser-combinator library `std/json` is
+  built on (`choice`, `many`, `sep_by`, `between`, `pmap`, `pbind`, and
+  friends), if you're writing your own text-format parser. See
+  [`docs/internal/specs/std-parser.md`](internal/specs/std-parser.md).
+
+- **`std/test`** — the `noo test` testing framework. See
+  [Testing: `noo test`](tools-and-cli.md#testing-noo-test) in the Tools & CLI
+  guide.
 
 ## Operator Precedence
 
