@@ -16,6 +16,52 @@ export type ParseResult<T> = ParseSuccess<T> | ParseError;
 
 export type Parser<T> = (tokens: Token[]) => ParseResult<T>;
 
+// --- Packrat memoization ---
+//
+// `choice`/`many`/`sepBy`/`lazy` are ordinary backtracking combinators: an
+// enclosing choice point or repetition loop that backtracks past an already-
+// parsed subtree re-derives that subtree from scratch, with zero reuse. Cost
+// multiplies (not adds) with each layer of enclosing backtracking structure —
+// see docs/internal/docs-wip/PARSER_COMBINATOR_SIZE_COST.md for the profiled
+// mechanism. `memoize` caches a parser's result keyed by (this parser
+// instance, position).
+//
+// Position is keyed by `tokens[0]` — the actual Token *object* at the front
+// of the remaining slice — not by `tokens.length` or an external position
+// counter. This was tried first with `tokens.length` plus a manual
+// `resetParserMemo()` call at the top of `parse()`, but that broke: several
+// tests (e.g. parser-annotations.test.ts) call productions like
+// `parseTypeExpression` directly, bypassing `parse()`'s reset entirely, so
+// unrelated type strings parsed later in the same test file collided on
+// remaining-length with cached results from earlier ones — a real, caught
+// instance of exactly the silent-wrong-AST failure mode this needed to avoid.
+//
+// Keying on the Token object itself fixes this structurally rather than by
+// remembering every call site: the lexer allocates a fresh Token object per
+// lexical token per `Lexer` run, so two Token objects are only ever
+// reference-equal if they're literally the same token from the same lex —
+// there is no way for two unrelated parses (or two positions within one
+// parse) to collide. This also means no manual reset/invalidation is needed:
+// a `WeakMap<Token, ParseResult<T>>` lets entries for a token stream be
+// garbage-collected once nothing else references it, rather than requiring
+// every possible entry point into the grammar to remember to clear a cache.
+//
+// The empty-remaining-tokens case (no `tokens[0]` to key on) is simply not
+// cached — parsers on empty input are cheap regardless, and end-of-input is
+// not where the profiled backtracking blowup happens.
+const memoize = <T>(parser: Parser<T>): Parser<T> => {
+	const cache = new WeakMap<Token, ParseResult<T>>();
+	return (tokens: Token[]) => {
+		if (tokens.length === 0) return parser(tokens);
+		const key = tokens[0];
+		const cached = cache.get(key);
+		if (cached !== undefined) return cached;
+		const result = parser(tokens);
+		cache.set(key, result);
+		return result;
+	};
+};
+
 // Basic token matching
 export const token = (type: TokenType, value?: string): Parser<Token> => {
 	const expectedMsg = `Expected ${type}${value ? ` '${value}'` : ''}`;
@@ -63,9 +109,8 @@ export const seq =
 	};
 
 // Choice between parsers (try each until one succeeds)
-export const choice =
-	<T>(...parsers: Parser<T>[]): Parser<T> =>
-	(tokens: Token[]) => {
+export const choice = <T>(...parsers: Parser<T>[]): Parser<T> =>
+	memoize((tokens: Token[]) => {
 		let lastError: string = '';
 		let lastPosition: number = 0;
 
@@ -86,12 +131,11 @@ export const choice =
 			error: lastError,
 			position: lastPosition,
 		};
-	};
+	});
 
 // For common 2-parser case
-export const choice2 =
-	<T>(p1: Parser<T>, p2: Parser<T>): Parser<T> =>
-	(tokens: Token[]) => {
+export const choice2 = <T>(p1: Parser<T>, p2: Parser<T>): Parser<T> =>
+	memoize((tokens: Token[]) => {
 		const result1 = p1(tokens);
 		if (result1.success) return result1;
 
@@ -99,12 +143,15 @@ export const choice2 =
 		if (result2.success) return result2;
 
 		return result2.position > result1.position ? result2 : result1;
-	};
+	});
 
 // For common 3-parser case
-export const choice3 =
-	<T>(p1: Parser<T>, p2: Parser<T>, p3: Parser<T>): Parser<T> =>
-	(tokens: Token[]) => {
+export const choice3 = <T>(
+	p1: Parser<T>,
+	p2: Parser<T>,
+	p3: Parser<T>
+): Parser<T> =>
+	memoize((tokens: Token[]) => {
 		const result1 = p1(tokens);
 		if (result1.success) return result1;
 
@@ -122,12 +169,11 @@ export const choice3 =
 			return result3;
 		if (result2.position > result1.position) return result2;
 		return result1;
-	};
+	});
 
 // Zero or more repetitions
-export const many =
-	<T>(parser: Parser<T>): Parser<T[]> =>
-	(tokens: Token[]) => {
+export const many = <T>(parser: Parser<T>): Parser<T[]> =>
+	memoize((tokens: Token[]) => {
 		const results: T[] = [];
 		let remaining = tokens;
 
@@ -145,13 +191,13 @@ export const many =
 			value: results,
 			remaining,
 		};
-	};
+	});
 
 // One or more repetitions
-export const many1 =
-	<T>(parser: Parser<T>): Parser<T[]> =>
-	(tokens: Token[]) => {
-		const manyResult = many(parser)(tokens);
+export const many1 = <T>(parser: Parser<T>): Parser<T[]> => {
+	const manyParser = many(parser); // built once per call site, not per invocation
+	return memoize((tokens: Token[]) => {
+		const manyResult = manyParser(tokens);
 		if (!manyResult.success || manyResult.value.length === 0) {
 			return {
 				success: false,
@@ -160,7 +206,8 @@ export const many1 =
 			};
 		}
 		return manyResult;
-	};
+	});
+};
 
 // Optional parser (zero or one)
 export const optional =
@@ -191,17 +238,15 @@ export const map =
 	};
 
 // Lazy parser for recursive grammars
-export const lazy =
-	<T>(parserFn: () => Parser<T>): Parser<T> =>
-	(tokens: Token[]) =>
-		parserFn()(tokens);
+export const lazy = <T>(parserFn: () => Parser<T>): Parser<T> =>
+	memoize((tokens: Token[]) => parserFn()(tokens));
 
 // Separated by something
 export const sepBy = <T, S>(
 	parser: Parser<T>,
 	separator: Parser<S>
-): Parser<T[]> => {
-	return (tokens: Token[]) => {
+): Parser<T[]> =>
+	memoize((tokens: Token[]) => {
 		// Parse first element
 		const firstResult = parser(tokens);
 		if (!firstResult.success) {
@@ -235,8 +280,7 @@ export const sepBy = <T, S>(
 			value: results,
 			remaining,
 		};
-	};
-};
+	});
 
 // Parse until end of input
 export const parseAll =
