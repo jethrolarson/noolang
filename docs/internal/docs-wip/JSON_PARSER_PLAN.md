@@ -104,3 +104,20 @@ multi-session prerequisite chain, not this task.
 Naming: stdlib is standardizing on `snake_case` (issue #131, decided
 2026-07-23, not yet executed as a rename pass) — new JSON functions should
 follow that from the start rather than adding to the inconsistency.
+
+## Update 2026-08-01: shipped as a combinator-based rewrite, not hand-rolled
+
+The "hand-written recursive-descent" scope decision above was PR #165's
+implementation, and stayed correct advice while it was true: at the time,
+`std/parser.noo` (a generic combinator library) didn't exist, and an early
+attempt at a combinator-based version was ~17x slower to typecheck than the
+hand-rolled one (see `PARSER_COMBINATOR_SIZE_COST.md`), for a reason
+specific to noolang's own (then-unmemoized) parser, not to JSON parsing
+itself. Packrat memoization (#174) fixed that mechanism; re-measured, a
+combinator-style rewrite on top of `std/parser.noo` now typechecks in the
+same ~20-30ms band as the hand-rolled version, so the perf reason to keep
+`std/json.noo` hand-rolled is gone. Shipped combinator-based instead —
+smaller, reuses `std/parser.noo` (making JSON its first real consumer),
+and the public API (`json_parse`/`json_stringify`/`json_field`/etc.,
+including the `JsonParseError` error type) is unchanged from what's
+described above. PR #165 itself was closed unmerged in favor of this.

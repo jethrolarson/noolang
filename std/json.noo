@@ -14,20 +14,15 @@
 # what's being stress-tested (parsing *this file itself* as noolang source,
 # not JSON-parsing runtime behavior), so there's no reason to rewrite them.
 #
-# `std/parser` is deliberately NOT imported via one destructuring binding
-# (`{ @a a, ... } = import "std/parser"`) — that hits the known
-# import-destructure arity bug (see CLAUDE.md, #158, and the
-# `fix-import-destructure-arity` branch, still unmerged as of this file):
-# pulling this many polymorphic bindings out of one module import in a
-# single destructure corrupts later, textually-unrelated type inference in
-# this file (confirmed by bisection — e.g. adding the destructured-but-
-# not-yet-used `@peek_char`/`@lexeme`/`@choice`/`@optional`/`@sep_by`
-# imports, with zero call sites added, was enough on its own to break
-# `json_string_raw_p`'s inferred type several dozen lines later with a
-# `String`-vs-`Float` unification error that has nothing to do with any of
-# them). Binding the module once and projecting each function out with `|
-# @name` avoids the destructure-merge path entirely and was confirmed by
-# the same bisection to sidestep the bug completely.
+# `std/parser` is imported once and projected with `| @name` rather than
+# one destructuring binding (`{ @a a, ... } = import "std/parser"`). That
+# style used to hit the import-destructure arity bug (#158): pulling this
+# many polymorphic bindings out of one module import in a single destructure
+# corrupted later, textually-unrelated type inference in this file. #159
+# fixed the underlying scheme-freshening gap (already on `main` as of this
+# file, confirmed by direct repro with this exact import list) — the
+# destructure form isn't required anymore, but there's no reason to touch a
+# style that already works to prove that, so it's left as projection.
 parser_mod = import "std/parser";
 ParseError = parser_mod | @ParseError;
 parse_error = parser_mod | @parse_error;
@@ -54,6 +49,19 @@ variant JsonValue =
   | JString String
   | JArray (List JsonValue)
   | JObject (List {String, JsonValue});
+
+# Parse errors are re-wrapped from std/parser's `ParseError` into this
+# locally-declared variant at the json_parse boundary (see json_parse
+# below), not re-exported as-is. Noolang's ADT pattern-matching registry
+# doesn't propagate through transitive imports — a consumer that imports
+# only "std/json" (not "std/parser" too) gets "Unknown ADT: ParseError" if
+# asked to match std/parser's own variant, confirmed by direct probe. This
+# also keeps std/parser as an internal implementation detail: a consumer
+# shouldn't need to know this module is combinator-based under the hood.
+# Matches the field shape and constructor name of PR #165's original
+# hand-rolled `JsonParseError`, so callers written against that version are
+# unaffected.
+variant JsonParseError = JsonParseError {@message String, @position Float};
 
 # Extraction errors are a separate variant from parse errors: getting a
 # field out of an already-parsed JsonValue is a different failure mode
@@ -180,8 +188,26 @@ escape_to_char = fn c => match c (
   _ => c
 );
 
-json_escaped_char_p = pbind (fn _ => pmap escape_to_char (satisfy "escape char" (fn _ => True))) (char "\\");
-json_plain_char_p = satisfy "string char" (fn c => (not (c == "\"")) && (not (c < " ")));
+# RFC 8259 §7 lists `\u`/`\b`/`\f` as valid escapes too, but there's no
+# codepoint<->char builtin (fromCharCode/charCodeAt) in noolang to decode
+# `\uXXXX` with — same documented scope limit as PR #165's hand-rolled
+# version. `satisfy`'s predicate below is restricted to the escapes this
+# module actually decodes, so an unsupported escape fails the parse
+# (rejected, matching the old version's behavior) instead of silently
+# passing through as a mis-decoded literal character (which is what a
+# catch-all `satisfy _ => True` here would do: `escape_to_char`'s own `_ =>
+# c` fallback would turn `\u` into a bare `u`, silently dropping the
+# backslash and the rest of the escape sequence — confirmed by direct
+# repro before this restriction was added).
+is_supported_escape = fn c =>
+  (c == "\"") || (c == "\\") || (c == "/") || (c == "n") || (c == "r") || (c == "t");
+
+json_escaped_char_p = pbind (fn _ => pmap escape_to_char (satisfy "recognized escape character" is_supported_escape)) (char "\\");
+# Backslash is excluded from "plain" characters so an unrecognized escape
+# (e.g. `\u`) fails the whole string parse via json_escaped_char_p above,
+# rather than falling back to treating the backslash itself as a literal
+# plain character once the escaped-char branch backtracks.
+json_plain_char_p = satisfy "string char" (fn c => (not (c == "\"")) && (not (c == "\\")) && (not (c < " ")));
 json_string_char_p = choice2 json_escaped_char_p json_plain_char_p;
 
 json_string_raw_p = between (char "\"") (char "\"") (pmap (fn cs => join "" cs) (many json_string_char_p));
@@ -313,14 +339,22 @@ parse_node = fn mode pos s => match mode (
 parse_json_value = fn pos s => parse_node ModeValue pos s;
 
 # Entry point: whole-input parse, rejecting trailing non-whitespace content.
+# Wraps std/parser's ParseError into the locally-declared JsonParseError
+# (see its declaration above) so pattern-matching the error works for a
+# consumer that only imports "std/json".
 json_parse = fn input =>
-  result_bind (parse_json_value 0 input) (fn r => (
-    p = skip_ws (r | @pos) input;
-    match (peek_char p input) (
-      None => Ok (r | @value);
-      Some c => Err (ParseError {@message ("unexpected trailing character '" + c + "'"), @position p})
-    )
-  ));
+  match (
+    result_bind (parse_json_value 0 input) (fn r => (
+      p = skip_ws (r | @pos) input;
+      match (peek_char p input) (
+        None => Ok (r | @value);
+        Some c => Err (ParseError {@message ("unexpected trailing character '" + c + "'"), @position p})
+      )
+    ))
+  ) (
+    Ok v => Ok v;
+    Err (ParseError info) => Err (JsonParseError info)
+  );
 
 # ========================================
 # SERIALIZER — unchanged from the hand-rolled version (PR #165).
