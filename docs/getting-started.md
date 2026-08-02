@@ -1,3 +1,7 @@
+---
+assert: true
+---
+
 # Getting Started with Noolang
 
 > A functional, expression-based, LLM-friendly programming language designed for linear, declarative code with explicit effects and strong type inference.
@@ -58,17 +62,17 @@ bun start -e "x = 10; x * 2"
 
 ```noolang
 # Numbers and arithmetic
-42;
-1 + 2 * 3;
+42;             # => 42 : Float
+1 + 2 * 3;      # => 7 : Float
 
 # Strings
-"Hello, World!";
+"Hello, World!"; # => "Hello, World!" : String
 
 # Function definition
 addTwo = fn x y => x + y;
 
 # Function application
-addTwo 5 3;
+addTwo 5 3;     # => 8 : Float
 ```
 
 ### Pipeline Operations
@@ -77,13 +81,13 @@ Noolang excels at data transformation pipelines:
 
 ```noolang
 # Function application
-doubled = map (fn x => x * 2) [1, 2, 3, 4];
+doubled = map (fn x => x * 2) [1, 2, 3, 4]; # => [2, 4, 6, 8] : List Float
 
 # Function composition
 double = fn x => x * 2;
 addOne = fn x => x + 1;
 composed = addOne |> double;
-result = 5 | composed;              # Apply composed function
+result = 5 | composed;              # => 12 : Float
 ```
 
 ### Type System
@@ -92,9 +96,9 @@ Types are inferred automatically:
 
 ```noolang
 # The type system figures out these types
-identity = fn x => x;              # 'a -> 'a
-numbers = [1, 2, 3];              # List Float
-greeting = "Hello";               # String
+identity = fn x => x;             # => <function> : a -> a
+numbers = [1, 2, 3];              # => [1, 2, 3] : List Float
+greeting = "Hello";                # => "Hello" : String
 ```
 
 ## REPL Commands
@@ -126,14 +130,14 @@ The REPL provides powerful debugging and inspection tools:
 Example REPL session:
 
 ```
-noo> add = fn x y => x + y
-add : Number -> Number -> Number
+noolang> add = fn x y => x + y
+add : Float -> Float -> Float
 
-noo> .tokens (add 5 3)
+noolang> .tokens (add 5 3)
 [IDENTIFIER:add, NUMBER:5, NUMBER:3, EOF]
 
-noo> add 5 3;
-8 : Number
+noolang> add 5 3;
+8 : Float
 ```
 
 ## Examples Directory

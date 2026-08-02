@@ -1,3 +1,8 @@
+---
+shadow: true
+assert: true
+---
+
 # Noolang
 
 An functional, expression-based, LLM-friendly programming language designed for linear, declarative code with explicit effects and strong type inference.
@@ -11,7 +16,8 @@ An functional, expression-based, LLM-friendly programming language designed for 
 - **Pipeline operators** (`|>`, `<|`, `|`, `|?`) for composition
 - **Variants** - algebraic data types with pattern matching (type shadowing is disallowed)
 - **Destructuring patterns** - ergonomic data extraction and import spreading
-- **REPL** - interactive development environment
+- **Literate programming** - `.md` files run as Noolang directly; this README is one
+- **REPL** - interactive development environment with lots of debugging options
 - **VSCode Language Server** - for intellisense and hover types (WIP)
 - **Syntax Highlighting** - for VSCode and other editors
 
@@ -39,61 +45,23 @@ Or run the compiled version:
 npm start
 ```
 
-### CLI Debugging Tools
+### Literate Programming
 
-The CLI provides extensive debugging capabilities for development:
-
-```bash
-# Execute expressions
-npm start -- --eval "1 + 2 * 3"
-npm start -- -e "x = 10; x * 2"
-
-# Debug tokenization
-npm start -- --tokens "fn x => x + 1"
-npm start -- --tokens-file examples/demo.noo
-
-# Debug parsing (AST)
-npm start -- --ast "if x > 0 then x else -x"
-npm start -- --ast-file examples/demo.noo
-
-# Debug type inference
-npm start -- --types "fn x => x + 1"
-npm start -- --types-file examples/demo.noo
-npm start -- --types-detailed "fn x => x + 1"
-npm start -- --types-env "fn x => x + 1"
-npm start -- --type-ast "fn x => x + 1"
-npm start -- --type-ast-file examples/demo.noo
-
-# Run files
-npm start -- examples/demo.noo
-```
-
-#### REPL Debugging Commands
-
-The REPL includes comprehensive debugging tools:
+`.md` files run directly as Noolang: every ```` ```noolang ```` fenced block is
+concatenated and executed. This README is one — run it yourself:
 
 ```bash
-# Basic commands
-.help                    # Show help
-.quit                    # Exit REPL
-
-# Environment inspection
-.env                     # Show current environment
-.env-detail              # Show detailed environment with types
-.env-json                # Show environment as JSON
-.clear-env               # Clear environment
-.types                   # Show type environment
-
-# Debugging commands
-.tokens (expr)           # Show tokens for expression
-.tokens-file file.noo    # Show tokens for file
-.ast (expr)              # Show AST for expression
-.ast-file file.noo       # Show AST for file
-.ast-json (expr)         # Show AST as JSON
+npm start -- README.md
 ```
 
-**Note**: REPL Commands use `.` prefix and parentheses `(expr)` for expressions to avoid conflicts with future type annotations.
+An optional frontmatter block (`shadow`/`assert`, see this file's own top) lets
+a doc redeclare illustrative type names across sections and checks its `# =>`
+comments against real output instead of trusting them. Full details: [Language
+Reference §Literate Programming](docs/language-reference.md#literate-programming).
 
+### Debugging Tools
+
+See [Tools & CLI Guide](docs/tools-and-cli.md) for CLI debugging flags and REPL debugging commands.
 
 ### Examples
 
@@ -106,21 +74,21 @@ The REPL includes comprehensive debugging tools:
 add1 = fn x => x + 1;
 
 # Function application doesn't require parens and `,` is only used for separating items in data structures like `Tuple`, `Record` and `List`
-add1 2;
+add1 2; # => 3
 
 # The + operator works for both numbers and strings
-1 + 2;           # => 3 : Float
-"hello" + " world";  # => "hello world" : String
+1 + 2;               # => 3
+"hello" + " world";  # => "hello world"
 
 # All numeric operators are available as functions as well
-add 1 2; # => 3 : Float
-multiply 2 3; # => 6 : Float
-subtract 10 2; # => 8 : Float
-divide 10 2; # => 5 : Float
+add 1 2; # => 3
+multiply 2 3; # => 6
+subtract 10 2; # => 8
+divide 10 2; # => Some 5
 
 # all functions are curried so if you pass less than their full number of arguments you get back a partially applied function
 increment = add 1;
-increment 2; # => 3 : Float
+increment 2; # => 3
 
 # to nest calls you may need parenthesis
 add 2 (add 3 2);
@@ -145,7 +113,7 @@ x + y where (x = 1; y = 2);  # => 3
 # because nesting can get confusing fast noolang includes a few helpful opperators for reducing the need for parens such as the `|` operator:
 2 | add 3 | add 2;
 
-#[1, 2, 3] | map (add 1); # => [2, 3, 4]
+#[1, 2, 3] | map (add 1); # => [2, 3, 4] : [Float]
 
 ```
 
@@ -179,11 +147,11 @@ user = { @name "Alice", @age 30, @address { @street "123 Main St", @city "Anytow
 # ruth | set @name "Ruth";
 
 # accessors can be chained
-user | @address | @street; # => "123 Main St"
+user | @address | @street; # => "123 Main St" : String
 
 # accessors can also be composed
 user_street = @address |> @street;
-user_street user; # => "123 Main St"
+user_street user; # => "123 Main St" : a
 
 ```
 
@@ -192,9 +160,9 @@ user_street user; # => "123 Main St"
 ```noolang
 # Destructuring for clean data extraction
 {x, y} = {10, 20}; 
-x + y;  # => 30
+x + y;  # => 30 : Float
 {@name, @age} = {@name "Alice", @age 30}; 
-name;  # => "Alice"
+name;  # => "Alice" : String
 ```
 
 #### Recursion and Mutation
@@ -217,8 +185,8 @@ variant Color = Red | Green | Blue;
 favorite = Red;
 
 # Option is a usefull built-in variant type for handling optional values
-Some 1; # => Some 1 : Option 1
-None; # => None : Option None
+Some 1; # => Some 1 : Option Float
+None; # => None : Option a
 
 # Pattern matching is a way to extract the value of a variant
 result = match (Some 42) (Some x => x; None => 0);
@@ -253,14 +221,13 @@ type Point = {Float, Float};
 type Response = User | String | Float;
 
 # Creating and using user-defined types
-user = {@name "Alice", @age 30, @active True};
-point = {10.5, 20.3};
+user = {@name "Alice", @age 30, @active True} : User;
+point = {10.5, 20.3} : Point;
 
 # Accessing user-defined types
-userName = user | @name;  # "Alice"
-userAge = user | @age;    # 30
-x_coord = match point ({x, y} => x);  # 10.5
-
+userName = user | @name;  # => "Alice"
+userAge = user | @age;    # => 30
+x_coord = match point ({x, y} => x);  # => 10.5
 ```
 
 #### Pattern Matching
@@ -478,15 +445,18 @@ Composes functions from left to right (like Unix pipes):
 ```noolang
 # Chain functions: f |> g |> h means h(g(f(x)))
 operate = add 5 |> multiply 2 |> subtract 1;
-operate 10;  # => -29 (1 - (2 * (5 + 10)))
+operate 10;  # => -29 : Float
 ```
+That's `1 - (2 * (5 + 10))`.
+
 #### Compose Operator (`<|`) - Function Composition
 Composes functions from right to left (like B combinator):
 ```noolang
 # Chain functions: f <| g <| h means f(g(h(x)))
 operate = add 5 <| multiply 2 <| subtract 1;
-operate 10;  # => -13 (5 + (2 * (1 - 10))
+operate 10;  # => -13 : Float
 ```
+That's `5 + (2 * (1 - 10))`.
 
 #### Thrush Operator (`|`) - Function Application
 Applies the right function to the left value:
@@ -773,15 +743,15 @@ Noolang features a robust import system with **full static type inference** and 
 ```noolang
 # Import entire module
 math = import "examples/math_module";
-result = (@add math) 2 3;  # => 5
+result = (@add math) 2 3;  # => 5 : Float
 
 # Import with destructuring (recommended)
 {@add, @multiply} = import "examples/math_module";
-result = add 2 3 + multiply 4 5;  # => 25
+result = add 2 3 + multiply 4 5;  # => 25 : Float
 
 # Import with renaming
 {@add addFunc, @multiply mulFunc} = import "examples/math_module";
-result = addFunc 2 3;  # => 5
+result = addFunc 2 3;  # => 5 : Float
 ```
 
 ### Import Type Inference
@@ -890,7 +860,6 @@ Noolang uses commas as separators for all data structures:
 ```noolang
 # Lists - comma separated
 [1, 2, 3];
-[1,2,3,1,2,3];  # Flexible whitespace around commas
 
 # Records - comma separated fields
 { @name "Alice", @age 30 };
@@ -900,11 +869,6 @@ Noolang uses commas as separators for all data structures:
 {1, 2, 3};
 {10, 20};
 ```
-
-**Why commas?** This provides a familiar, consistent syntax across all data structures:
-- `[1, 2, 3]` = list with three elements
-- `{ @name "Alice", @age 30 }` = record with two fields
-- `{1, 2, 3}` = tuple with three elements
 
 ### Built-in Functions
 
@@ -1418,7 +1382,7 @@ type UserData = UserProfile | Coordinates | String;
 # Card game example
 variant Suit = Spade | Heart | Club | Diamond;
 variant CardNum = Ace | King | Queen | Jack;
-type Card = {CardNum, Suit};              # Tuple of variants
+type Card = {CardNum, Suit};                # Tuple of variants
 type Hand = {Card, Card, Card, Card, Card}; # Hand is 5 cards
 type Player = {@name String, @hand Hand};   # Player has name and hand
 
@@ -1505,9 +1469,12 @@ depth = fn t => match t (
     Leaf => 0
 );
 
-getValue tree;  # => 5
-sumTree tree;   # => 15 (5+3+7)
+getValue tree;  # => 5 : Float
+sumTree tree;   # => 15 : Float
+```
+That's `5 + 3 + 7`.
 
+```noolang
 # Linked List Operations:
 
 # Create a linked list
@@ -1531,9 +1498,9 @@ listMap = fn f lst => match lst (
     Nil => Nil
 );
 
-sum myList;           # => 6
-length myList;        # => 3
-listMap (add 1) myList; # => Cons 2 (Cons 3 (Cons 4 Nil))
+sum myList;           # => 6 : Float
+length myList;        # => 3 : Float
+listMap (add 1) myList; # => Cons 2 (Cons 3 (Cons 4 Nil)) : LinkedList Float
 ```
 
 **Complex Recursive Structures:**

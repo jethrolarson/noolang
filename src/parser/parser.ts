@@ -2127,6 +2127,39 @@ const parseSequence: C.Parser<Expression> = C.map(
 const parseExpr: C.Parser<Expression> = parseSequence;
 
 // --- Literate Programming Support ---
+
+export type LiterateFrontmatter = { shadow: boolean; assert: boolean };
+
+// Hand-rolled `key: value` parsing (no YAML dependency) for an optional
+// frontmatter block at the very top of a literate `.md` file. Frontmatter
+// lines are blanked out rather than removed so line numbers in the returned
+// body stay identical to the source, matching preprocessLiterateNoolang's
+// own line-parity guarantee below.
+export function parseLiterateFrontmatter(
+	content: string
+): { flags: LiterateFrontmatter; body: string } {
+	const flags: LiterateFrontmatter = { shadow: false, assert: false };
+	const lines = content.split('\n');
+	if (lines[0] !== '---') return { flags, body: content };
+
+	const closeIdx = lines.indexOf('---', 1);
+	if (closeIdx === -1) return { flags, body: content };
+
+	for (let i = 1; i < closeIdx; i++) {
+		const line = lines[i];
+		const sep = line.indexOf(':');
+		if (sep === -1) continue;
+		const key = line.slice(0, sep).trim();
+		const value = line.slice(sep + 1).trim();
+		if (key === 'shadow') flags.shadow = value === 'true';
+		if (key === 'assert') flags.assert = value === 'true';
+	}
+
+	const bodyLines = lines.slice();
+	for (let i = 0; i <= closeIdx; i++) bodyLines[i] = '';
+	return { flags, body: bodyLines.join('\n') };
+}
+
 // Preprocess markdown files to extract code blocks and create a valid Noolang program
 export function preprocessLiterateNoolang(content: string): string {
 	const lines = content.split('\n');

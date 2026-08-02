@@ -56,6 +56,15 @@ export type TypeState = {
 	traitRegistry: TraitRegistry;
 	protectedTypeNames: Set<string>; // Names of types reserved/protected from shadowing
 	/**
+	 * Per-file opt-out of shadow/duplicate-definition checks driven by
+	 * `protectedTypeNames`/`adtRegistry`/`environment` (literate `.md` files'
+	 * `shadow: true` frontmatter, for docs that legitimately redeclare the
+	 * same type name across independent illustrative sections). Does NOT
+	 * affect `isReservedTypeName` checks — built-in type names stay
+	 * unshadowable regardless.
+	 */
+	allowShadowing?: boolean;
+	/**
 	 * Directory of the file being type-checked (for file-relative import resolution).
 	 * Undefined when checking inline code (REPL / -e); CWD is used as fallback.
 	 */

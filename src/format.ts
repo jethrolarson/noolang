@@ -16,6 +16,14 @@ import {
 	boolValue,
 } from './evaluator/evaluator';
 
+// A constructor argument that is itself a multi-arg constructor application
+// needs parens, or nesting depth is ambiguous: `Cons 2 Cons 3 Cons 4 Nil`
+// reads as one flat application, not `Cons 2 (Cons 3 (Cons 4 Nil))`.
+function formatConstructorArg(value: Value): string {
+	const formatted = formatValue(value);
+	return isConstructor(value) && value.args.length > 0 ? `(${formatted})` : formatted;
+}
+
 export function formatValue(value: Value): string {
 	if (isNumber(value)) {
 		return value.value.toString();
@@ -54,10 +62,25 @@ export function formatValue(value: Value): string {
 		if (value.args.length === 0) {
 			return value.name;
 		} else {
-			return `${value.name} ${value.args.map(formatValue).join(' ')}`;
+			return `${value.name} ${value.args.map(formatConstructorArg).join(' ')}`;
 		}
 	}
 	return '<unknown>';
+}
+
+import type { Type } from './ast';
+
+// Used by literate `assert: true` checking (src/literate-assert.ts) to
+// render the `value : type` shape that `# =>` annotations compare against.
+export function formatValueWithType(
+	value: Value,
+	type: Type | undefined,
+	typeToString: (t: Type, sub: Map<string, Type>) => string,
+	substitution: Map<string, Type>
+): string {
+	const valueStr = formatValue(value);
+	if (!type) return valueStr;
+	return `${valueStr} : ${typeToString(type, substitution)}`;
 }
 
 export default formatValue;

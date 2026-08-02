@@ -1,3 +1,7 @@
+---
+assert: true
+---
+
 # Examples & Tutorials
 
 > Practical examples and walkthroughs for learning Noolang through hands-on coding.
@@ -15,23 +19,23 @@ The simplest introduction to Noolang syntax:
 
 ```noolang
 # Simple arithmetic
-result = 2 + 3 * 4;         # 14
+result = 2 + 3 * 4;         # => 14 : Float
 
 # Function definition and application
 double = fn x => x * 2;
-doubled = double 10;        # 20
+doubled = double 10;        # => 20 : Float
 
 # Recursion (factorial)
 factorial = fn n => if n == 0 then 1 else n * (factorial (n - 1));
-fact_5 = factorial 5;       # 120
+fact_5 = factorial 5;       # => 120 : Float
 
 # Lists and higher-order functions
 numbers = [1, 2, 3, 4, 5];
-squared = map (fn x => x * x) numbers;  # [1, 4, 9, 16, 25]
+squared = map (fn x => x * x) numbers;  # => [1, 4, 9, 16, 25] : List a
 
 # Records
 person = { @name "Alice", @age 30 };
-person
+person  # => {@name "Alice", @age 30} : { @name String, @age Float }
 ```
 
 **Try it**: `bun start examples/basic.noo`
@@ -55,11 +59,11 @@ unit_literal = {}           # Empty record/unit value
 # All functions are automatically curried
 add_func = fn a b => a + b;
 add_ten = add_func 10;       # Partial application
-result = add_ten 5;          # 15
+result = add_ten 5;          # => 15 : Float
 
 # Functions are first-class values
 multiply_func = fn a b => a * b;
-product = multiply_func 6 7  # 42
+product = multiply_func 6 7  # => 42 : Float
 ```
 
 ### 3. Recursion Examples
@@ -83,25 +87,26 @@ number_list = [1, 2, 3, 4, 5];
 
 # Records with named fields
 person = { @name "Alice", @age 30, @city "Wonderland" };
-person
+person  # => {@name "Alice", @age 30, @city "Wonderland"} : { @name String, @age Float, @city String }
 ```
 
 ### 5. Pipeline Operations
 
 ```noolang
-# Function application (pipe with map is broken)
+# Function application
 doubled = map (fn x => x * 2) [1, 2, 3, 4, 5];
-result = head doubled;
+result = head doubled;           # => Some 2 : Option Float
 
 # Function composition (|>)
 double = fn x => x * 2;
 addOne = fn x => x + 1;
 composed = addOne |> double;     # Compose functions
-value = 10 | composed;           # Apply: double (addOne 10) = 22
+# double (addOne 10) = double 11
+value = 10 | composed;           # => 22 : Float
 
 # Reverse composition (<|)
 composed_reverse = double <| addOne;  # Same as addOne |> double
-value
+value  # => 22 : Float
 ```
 
 **Try it**: `bun start examples/demo.noo`
@@ -133,7 +138,7 @@ pair = {42, "answer"} : {Float, String};
 # Typed record
 person = { @name "Alice", @age 30, @active True } 
   : { @name String, @age Float, @active Bool };
-person
+person  # => {@name "Alice", @age 30, @active True} : { @name String, @age Float, @active Bool }
 ```
 
 ### Pipeline Type Inference
@@ -144,13 +149,13 @@ addOne = fn x => x + 1;
 square = fn x => x * x;
 
 # Function composition
-pipeline_result = 3 | (addOne |> square);
+pipeline_result = 3 | (addOne |> square);  # => 16 : Float
 
 # List operations
 numbers = [1, 2, 3];
 composed = addOne |> square;
 mapped_pipeline = map composed numbers;
-mapped_pipeline
+mapped_pipeline  # => [4, 9, 16] : List Float
 ```
 
 **Try it**: `bun start --types-file examples/type_system_demo.noo`
@@ -166,7 +171,7 @@ Constraint-based polymorphism:
 # See stdlib.noo for actual constraint definitions
 # Example of using built-in Show constraint
 result = show 42;  # Uses built-in Show constraint
-result
+result  # => "42" : String
 ```
 
 ### Implementing Constraints
@@ -176,7 +181,7 @@ result
 # Example functions using constraints
 lessThan = fn a b => a < b;
 greaterThan = fn a b => a > b;
-result = lessThan 3 5;  # True
+result = lessThan 3 5;  # => True : Bool
 result
 ```
 
@@ -184,12 +189,12 @@ result
 
 ```noolang
 # Automatically resolves implementations
-intValue = show 42;           # Uses Show Float
-stringValue = show "hello";   # Uses Show String
+intValue = show 42;           # => "42" : String
+stringValue = show "hello";   # => "hello" : String
 
 # Show for different types
-boolValue = show True;        # Uses Show Bool
-listValue = show [1, 2, 3];   # Uses Show List
+boolValue = show True;        # => "True" : String
+listValue = show [1, 2, 3];   # => "[1, 2, 3]" : String
 listValue
 ```
 
@@ -214,7 +219,7 @@ getValue = fn maybe default => match maybe (
 
 # Test it
 result = getValue (checkAge 25) "Minor";
-result
+result  # => "Adult" : String
 ```
 
 **Try it**: `bun start examples/adt_demo.noo`
@@ -289,9 +294,9 @@ Essential built-in functions and traits:
 
 ```noolang
 # Already implemented for basic types
-result1 = show 42;          # "42"
-result2 = show "hello";     # "hello"
-result3 = show [1, 2, 3];   # "[1, 2, 3]"
+result1 = show 42;          # => "42" : String
+result2 = show "hello";     # => "hello" : String
+result3 = show [1, 2, 3];   # => "[1, 2, 3]" : String
 result3
 ```
 
@@ -299,14 +304,16 @@ result3
 
 ```noolang
 # Arithmetic operations  
-result1 = 5 + 3;          # Floats: 8
-result2 = "hello " + "world";  # Strings: "hello world"
+result1 = 5 + 3;          # => 8 : Float
+result2 = "hello " + "world";  # => "hello world" : String
 
 # Built-in arithmetic
-result3 = 10 - 3;    # 7
-result4 = 4 * 5;     # 20
-result5 = 10 / 2;           # Some 5.0 (division returns Option for safety)
-result6 = 10 / 0;           # None (handles division by zero)
+result3 = 10 - 3;    # => 7 : Float
+result4 = 4 * 5;     # => 20 : Float
+# division returns Option for safety
+result5 = 10 / 2;           # => Some 5 : Option Float
+# handles division by zero
+result6 = 10 / 0;           # => None : Option Float
 result6
 ```
 
@@ -314,10 +321,10 @@ result6
 
 ```noolang
 # Built-in list functions
-result1 = head [1, 2, 3];        # Some 1
-result2 = map (fn x => x * 2) [1, 2, 3];  # [2, 4, 6]
-result3 = length [1, 2, 3, 4];   # 4
-result4 = at 1 [10, 20, 30];     # Some 20
+result1 = head [1, 2, 3];        # => Some 1 : Option Float
+result2 = map (fn x => x * 2) [1, 2, 3];  # => [2, 4, 6] : List Float
+result3 = length [1, 2, 3, 4];   # => 4 : Float
+result4 = at 1 [10, 20, 30];     # => Some 20 : Option Float
 result4
 ```
 
@@ -330,13 +337,13 @@ bun start
 ```
 
 ```
-noo> add = fn x y => x + y
-add : Number -> Number -> Number
+noolang> add = fn x y => x + y
+add : Float -> Float -> Float
 
-noo> .types (add)
-add : Number -> Number -> Number
+noolang> .types (add)
+add : Float -> Float -> Float
 
-noo> .ast (add 5)
+noolang> .ast (add 5)
 Application:
   func: Identifier(add)
   args: [Literal(5)]
@@ -345,13 +352,13 @@ Application:
 ### Debugging Code
 
 ```
-noo> broken = fn x => x + "hello"
-Type error: Cannot unify Number with String
+noolang> broken = fn x => x + "hello"
+Type error: Cannot unify Float with String
 
-noo> .tokens (broken 5)
+noolang> .tokens (broken 5)
 [IDENTIFIER:broken, NUMBER:5, EOF]
 
-noo> .error-detail
+noolang> .error-detail
 Detailed error information...
 ```
 
@@ -389,8 +396,8 @@ Create a function that converts Celsius to Fahrenheit:
 celsiusToFahrenheit = fn celsius => celsius * 1.8 + 32;
 
 # Test cases  
-test1 = celsiusToFahrenheit 0;     # Some 32.0
-test2 = celsiusToFahrenheit 100;   # Some 212.0
+test1 = celsiusToFahrenheit 0;     # => 32 : Float
+test2 = celsiusToFahrenheit 100;   # => 212 : Float
 test2
 ```
 
@@ -403,8 +410,8 @@ Implement a function that finds the last element in a list:
 getHead = fn list => head list;
 
 # Test
-result = getHead [3, 1, 4, 1, 5, 9, 2, 6];  # Some 3
-empty = getHead [];                          # None
+result = getHead [3, 1, 4, 1, 5, 9, 2, 6];  # => Some 3 : Option Float
+empty = getHead [];                          # => None
 result
 ```
 
@@ -417,8 +424,8 @@ Create a function that counts elements in a list that satisfy a predicate:
 doubleAll = fn list => map (fn x => x * 2) list;
 
 # Test
-result = doubleAll [1, 2, 3, 4, 5];  # [2, 4, 6, 8, 10]
-empty = doubleAll [];               # []
+result = doubleAll [1, 2, 3, 4, 5];  # => [2, 4, 6, 8, 10] : List Float
+empty = doubleAll [];               # => [] : List Float
 result
 ```
 

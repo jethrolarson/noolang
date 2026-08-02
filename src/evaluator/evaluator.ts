@@ -28,8 +28,14 @@ import type {
 	MutationExpression,
 	DestructuringElement,
 	RecordDestructuringField,
+	Type,
 } from '../ast';
 import type { TraitRegistry } from '../typer/trait-system';
+// Aliased: an existing local `flattenStatements` (below) fully recurses
+// through parens for stdlib loading; this one stops at a parenthesized `;`
+// boundary, matching the typer's own top-level-vs-nested-sequence
+// distinction (type-inference.ts's typeBinary uses the same function).
+import { flattenStatements as flattenTopLevelStatements } from '../typer/type-operations';
 import {
 	Value,
 	Cell,
@@ -95,7 +101,10 @@ import { parse } from '../parser/parser';
 export type ExecutionStep = {
 	expression: string;
 	result: Value;
-	type?: string;
+	// Only populated by evaluateProgramForAssertions (the typer decorates each
+	// flattened `;`-leaf with its own resolved Type before evaluation runs;
+	// evaluateProgram's coarser per-statement trace never sets this).
+	type?: Type;
 	location?: { line: number; column: number };
 };
 
@@ -1480,6 +1489,68 @@ export class Evaluator {
 			});
 
 			finalResult = result;
+		}
+
+		return {
+			finalResult,
+			executionTrace,
+			environment: new Map(
+				Array.from(this.environment.entries()).map(([k, v]) => [
+					k,
+					isCell(v) ? v.value : v,
+				])
+			),
+		};
+	}
+
+	// Literate `.md` files' `assert: true` frontmatter checks trailing `# =>`
+	// comments against real per-line output. evaluateProgram's trace is one
+	// ExecutionStep per program.statements entry, which collapses a whole
+	// `;`-chain (e.g. one fenced code block with several `# =>` lines) into a
+	// single entry holding only the chain's last value — too coarse to check
+	// each annotated line. This method flattens each top-level statement's
+	// un-parenthesized `;`-spine (via the same `flattenStatements` the typer
+	// uses for the identical distinction) and traces one leaf at a time
+	// instead, without changing evaluateProgram's own behavior or its
+	// existing consumers (REPL, --verbose, general `.noo` execution).
+	evaluateProgramForAssertions(program: Program, filePath?: string): ProgramResult {
+		if (filePath) {
+			this.currentFileDir = this.path.dirname(this.path.resolve(filePath));
+		}
+
+		const executionTrace: ExecutionStep[] = [];
+
+		if (program.statements.length === 0) {
+			return {
+				finalResult: createList([]),
+				executionTrace,
+				environment: new Map(
+					Array.from(this.environment.entries()).map(([k, v]) => [
+						k,
+						isCell(v) ? v.value : v,
+					])
+				),
+			};
+		}
+
+		let finalResult: Value = createList([]);
+
+		for (const statement of program.statements) {
+			for (const leaf of flattenTopLevelStatements(statement)) {
+				const result = this.evaluateExpression(leaf);
+
+				executionTrace.push({
+					expression: this.expressionToString(leaf),
+					result: result,
+					type: leaf.type,
+					location: {
+						line: leaf.location.start.line,
+						column: leaf.location.start.column,
+					},
+				});
+
+				finalResult = result;
+			}
 		}
 
 		return {

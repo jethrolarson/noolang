@@ -1,3 +1,7 @@
+---
+assert: true
+---
+
 # Noolang Type System
 
 > Complete guide to Noolang's type system, inference, and constraints
@@ -12,10 +16,10 @@ Noolang automatically infers types for most expressions, eliminating the need fo
 
 ```noolang
 # Types are automatically inferred
-x = 42;              # x: Float
-name = "Alice";      # name: String
-flag = True;         # flag: Bool
-numbers = [1, 2, 3]; # numbers: List Float
+x = 42;              # => 42 : Float
+name = "Alice";      # => "Alice" : String
+flag = True;         # => True : Bool
+numbers = [1, 2, 3]; # => [1, 2, 3] : List Float
 ```
 
 ### Function Type Inference
@@ -24,11 +28,11 @@ Function types are inferred from their definitions and usage:
 
 ```noolang
 # Function types inferred from body
-double = fn x => x * 2;     # double: Float -> Float
-addTwo = fn x y => x + y;   # addTwo: Float -> Float -> Float
+double = fn x => x * 2;     # => <function> : Float -> Float
+addTwo = fn x y => x + y;   # => <function> : a -> a -> a given a implements Add
 
 # Higher-order functions
-applyFn = fn f x => f x;    # applyFn: (a -> b) -> a -> b
+applyFn = fn f x => f x;    # => <function> : (a -> b) -> a -> b
 ```
 
 ### Polymorphic Functions
@@ -37,12 +41,12 @@ The type system supports let-polymorphism, allowing functions to work with multi
 
 ```noolang
 # Polymorphic identity function
-identity = fn x => x;       # identity: a -> a
+identity = fn x => x;       # => <function> : a -> a
 
 # Works with any type
-stringId = identity "hello"; # "hello"
-numberId = identity 42;      # 42
-boolId = identity True;      # True
+stringId = identity "hello"; # => "hello" : String
+numberId = identity 42;      # => 42 : Float
+boolId = identity True;      # => True : Bool
 ```
 
 ## Built-in Types
@@ -60,13 +64,13 @@ Noolang provides several fundamental types:
 
 ```noolang
 # Lists - homogeneous collections
-numbers = [1, 2, 3, 4];     # List Float
-names = ["Alice", "Bob"];   # List String
-empty = [];                 # List a (polymorphic empty list)
+numbers = [1, 2, 3, 4];     # => [1, 2, 3, 4] : List Float
+names = ["Alice", "Bob"];   # => ["Alice", "Bob"] : List String
+empty = [];                 # => []
 
 # Records - structured data with named fields
-person = { @name "Alice", @age 30 };  # { @name String, @age Float }
-point = { @x 10, @y 20 };             # { @x Float, @y Float }
+person = { @name "Alice", @age 30 };  # => {@name "Alice", @age 30} : { @name String, @age Float }
+point = { @x 10, @y 20 };             # => {@x 10, @y 20} : { @x Float, @y Float }
 ```
 
 ### Option Types
@@ -75,13 +79,13 @@ The built-in `Option` type represents values that may or may not exist:
 
 ```noolang
 # Division returns Option Float for safety
-result1 = 10 / 2;        # Some 5.0
-result2 = 10 / 0;        # None
+result1 = 10 / 2;        # => Some 5 : Option Float
+result2 = 10 / 0;        # => None : Option Float
 
 # Working with Option values
-maybeFirst = head [1, 2, 3];  # Some 1
-maybeSecond = at 1 [1, 2, 3]; # Some 2
-maybeEmpty = head [];          # None
+maybeFirst = head [1, 2, 3];  # => Some 1 : Option Float
+maybeSecond = at 1 [1, 2, 3]; # => Some 2 : Option Float
+maybeEmpty = head [];          # => None : Option a
 ```
 
 ## Constraint System
@@ -98,11 +102,11 @@ The `Show` constraint enables converting values to strings:
 
 ```noolang
 # show works for many built-in types
-numberStr = show 42;           # "42"
-stringStr = show "hello";      # "hello"
-boolStr = show True;           # "True"
-listStr = show [1, 2, 3];      # "[1, 2, 3]"
-optionStr = show (Some 42);    # "Some(42)"
+numberStr = show 42;           # => "42" : String
+stringStr = show "hello";      # => "hello" : String
+boolStr = show True;           # => "True" : String
+listStr = show [1, 2, 3];      # => "[1, 2, 3]" : String
+optionStr = show (Some 42);    # => "Some(42)" : String
 ```
 
 #### Functor Constraint
@@ -111,12 +115,12 @@ The `Functor` constraint enables mapping functions over container types:
 
 ```noolang
 # map works with Lists
-doubled = map (fn x => x * 2) [1, 2, 3];    # [2, 4, 6]
-strings = map show [1, 2, 3];               # ["1", "2", "3"]
+doubled = map (fn x => x * 2) [1, 2, 3];    # => [2, 4, 6] : List Float
+strings = map show [1, 2, 3];               # => ["1", "2", "3"] : List String
 
 # map works with Option
-incremented = map (fn x => x + 1) (Some 5); # Some 6
-nothingMapped = map (fn x => x + 1) None;   # None
+incremented = map (fn x => x + 1) (Some 5); # => Some 6 : Option Float
+nothingMapped = map (fn x => x + 1) None;   # => None : Option Float
 ```
 
 ### Constraint Inference
@@ -126,10 +130,10 @@ Constraints are automatically inferred and propagated through function compositi
 ```noolang
 # Constraint inference in action
 double = fn x => x * 2;
-showDoubled = fn x => show (double x);
+showDoubled = fn x => show (double x);  # => <function> : Float -> String
 
-# Type: Float -> String (automatically uses Show constraint)
-result = showDoubled 21;  # "42"
+# automatically uses Show constraint
+result = showDoubled 21;  # => "42" : String
 ```
 
 ### Polymorphic Constraints
@@ -141,8 +145,8 @@ Functions can work polymorphically with any type that satisfies required constra
 showAll = map show;
 
 # Automatically gets constrained type: Show a => List a -> List String
-numberStrings = showAll [1, 2, 3];        # ["1", "2", "3"]
-boolStrings = showAll [True, False];      # ["True", "False"]
+numberStrings = showAll [1, 2, 3];        # => ["1", "2", "3"] : List String
+boolStrings = showAll [True, False];      # => ["True", "False"] : List String
 ```
 
 #### Eq Constraint
@@ -152,18 +156,18 @@ Float, String, Bool, Option, Result, and List:
 
 ```noolang
 # Eq for primitive types
-equals 1.0 1.0;          # True
-equals "hello" "world";  # False
-1.0 == 1.0;              # True
-"a" == "b";              # False
+equals 1.0 1.0;          # => True : Bool
+equals "hello" "world";  # => False : Bool
+1.0 == 1.0;              # => True : Bool
+"a" == "b";              # => False : Bool
 ```
 
 ```noolang
 # Eq for Option, Result, List
-equals (Some 1.0) (Some 1.0);    # True
-equals None (Some 1.0);          # False
-equals (Ok 1.0) (Ok 1.0);        # True
-equals [1.0, 2.0] [1.0, 2.0];   # True
+equals (Some 1.0) (Some 1.0);    # => True : Bool
+equals None (Some 1.0);          # => False : Bool
+equals (Ok 1.0) (Ok 1.0);        # => True : Bool
+equals [1.0, 2.0] [1.0, 2.0];   # => True : Bool
 ```
 
 #### Ord Constraint
@@ -173,17 +177,17 @@ These are polymorphic over Float and String:
 
 ```noolang
 # Ord for Float
-2.0 < 3.0;     # True
-3.0 > 2.0;     # True
-1.0 <= 1.0;    # True
-2.0 >= 1.0;    # True
+2.0 < 3.0;     # => True : Bool
+3.0 > 2.0;     # => True : Bool
+1.0 <= 1.0;    # => True : Bool
+2.0 >= 1.0;    # => True : Bool
 ```
 
 ```noolang
 # Ord for String (lexicographic)
-"a" < "b";     # True
-"b" > "a";     # True
-"abc" <= "abd"; # True
+"a" < "b";     # => True : Bool
+"b" > "a";     # => True : Bool
+"abc" <= "abd"; # => True : Bool
 ```
 
 ### Effect Inference and Enforcement
@@ -194,9 +198,8 @@ adds `!log`, and so on. Effects propagate through function composition.
 
 ```noolang
 # Effect is inferred — no annotation needed
-printTwice = fn x => (print x; print x);
-# Type: a -> a !write
-printTwice "hello"
+printTwice = fn x => (print x; print x);  # => <function> : a -> {} !write
+printTwice "hello"  # => {} : {}
 ```
 
 When you add an explicit type annotation, it is **checked against the inferred
@@ -208,8 +211,8 @@ effects**:
 
 ```noolang
 # Over-declaring is allowed — annotation adds !read even though body only writes
-verbose = fn x => print x : String -> {} !write !read;
-verbose "ok"
+verbose = fn x => print x : String -> {} !write !read;  # => <function> : String -> {} !write !read
+verbose "ok"  # => {} : {}
 ```
 
 The following would be a type error (annotation omits `!write`):
@@ -227,14 +230,14 @@ The type system works seamlessly with Noolang's pipeline operators:
 
 ```noolang
 # Types flow through function application
-doubled = map (fn x => x * 2) [1, 2, 3];      # List Float
-strings = map show doubled;                     # List String
-result = head strings;                          # Option String
+doubled = map (fn x => x * 2) [1, 2, 3];      # => [2, 4, 6] : List Float
+strings = map show doubled;                     # => ["2", "4", "6"] : List String
+result = head strings;                          # => Some "2" : Option String
 
 # Function composition preserves types
 double = fn x => x * 2;
 increment = fn x => x + 1;
-composed = double |> increment;  # Float -> Float
+composed = double |> increment;  # => <function> : Float -> Float
 ```
 
 ### Error Handling with Option
@@ -243,13 +246,13 @@ The type system integrates with Option types for safe error handling:
 
 ```noolang
 # Safe operations return Option types
-safeHead = head [1, 2, 3];  # Some 1
-safeDiv = 10 / 2;           # Some 5.0
-unsafeDiv = 10 / 0;         # None
+safeHead = head [1, 2, 3];  # => Some 1 : Option Float
+safeDiv = 10 / 2;           # => Some 5 : Option Float
+unsafeDiv = 10 / 0;         # => None : Option Float
 
 # Type system supports Option types
-result = safeHead;  # Option Float
-show result;
+result = safeHead;  # => Some 1 : Option Float
+show result;  # => "Some(1)" : String
 ```
 
 ## Type Annotations (Optional)
@@ -258,11 +261,11 @@ While type inference handles most cases, you can provide explicit type annotatio
 
 ```noolang
 # Explicit function types (for documentation)
-addTwo = fn x y => x + y;    # Inferred: Float -> Float -> Float
+addTwo = fn x y => x + y;    # => <function> : a -> a -> a given a implements Add
 
 # Variable type hints (for clarity)
-count = 42;                  # Inferred: Float
-count;                       # count: Float
+count = 42;                  # => 42 : Float
+count;                       # => 42 : Float
 ```
 
 ## Type Definition Rules
@@ -305,8 +308,8 @@ processData = fn items =>
   map show (map (fn x => x * 2) items);
 
 # Safe property access with records
-person = { @name "Alice", @age 30 };
-person;
+person = { @name "Alice", @age 30 };  # => {@name "Alice", @age 30} : { @name String, @age Float }
+person;  # => {@name "Alice", @age 30} : { @name String, @age Float }
 ```
 
 ## Advanced Features
@@ -317,11 +320,11 @@ Constraints automatically propagate through function composition:
 
 ```noolang
 # Functions automatically inherit required constraints
-showAndDouble = fn x => show (x * 2);  # Float -> String
-mapShowAndDouble = map showAndDouble;   # List Float -> List String
+showAndDouble = fn x => show (x * 2);  # => <function> : Float -> String
+mapShowAndDouble = map showAndDouble;
 
 # Constraint requirements are checked at compile time
-validUsage = mapShowAndDouble [1, 2, 3];  # ✅ Works
+validUsage = mapShowAndDouble [1, 2, 3];  # => ["2", "4", "6"] : List String
 ```
 
 ### Polymorphic Data Structures
@@ -330,12 +333,12 @@ Work with polymorphic collections safely:
 
 ```noolang
 # Generic operations on lists
-first = head [1, 2, 3];     # Some 1
-empty = head [];            # None
+first = head [1, 2, 3];     # => Some 1 : Option Float
+empty = head [];            # => None
 
 # Working with Option results
-result = first;
-result;
+result = first;  # => Some 1 : Option Float
+result;  # => Some 1 : Option Float
 ```
 
 ## Type System Limitations
@@ -407,10 +410,10 @@ Use pipelines for clear type flow:
 # Good: Function composition
 process = fn x => x * 2;
 format = show;
-composed = process |> format;  # Float -> String
+composed = process |> format;  # => <function> : Float -> String
 
 # Apply composed function
-result = composed 21;  # "42"
+result = composed 21;  # => "42" : String
 ```
 
 ## Next Steps

@@ -1,13 +1,18 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
 import { Lexer } from './lexer/lexer';
-import { parse, preprocessLiterateNoolang } from './parser/parser';
+import {
+	parse,
+	preprocessLiterateNoolang,
+	parseLiterateFrontmatter,
+} from './parser/parser';
 import { Evaluator } from './evaluator/evaluator';
-import { typeAndDecorate } from './typer/index';
+import { typeAndDecorate, createTypeState } from './typer/index';
 import { typeToString } from './typer/helpers';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { formatValue } from './format';
+import { checkLiterateAssertions } from './literate-assert';
 import { colorize } from './colors';
 
 function printUsage() {
@@ -465,9 +470,14 @@ async function main() {
 		let code = fs.readFileSync(fullPath, 'utf8');
 
 		// Check if this is a literate Noolang file (.md)
+		let literateFlags = { shadow: false, assert: false };
+		let rawMarkdownSource: string | undefined;
 		if (file.endsWith('.md')) {
 			console.log(colorize.info('📖 Processing literate Noolang file...'));
-			code = preprocessLiterateNoolang(code);
+			rawMarkdownSource = code; // original file content, frontmatter still present
+			const { flags, body } = parseLiterateFrontmatter(code);
+			literateFlags = flags;
+			code = preprocessLiterateNoolang(body);
 			console.log(colorize.info('📝 Preprocessed code:'));
 			console.log(code);
 		}
@@ -481,9 +491,13 @@ async function main() {
 		const program = parse(tokens);
 		const parseTime = performance.now();
 
+		const initialTypeState = literateFlags.shadow
+			? { ...createTypeState(), allowShadowing: true }
+			: undefined;
+
 		const { program: decoratedProgram, state } = typeAndDecorate(
 			program,
-			undefined,
+			initialTypeState,
 			path.dirname(fullPath)
 		);
 		const typeTime = performance.now();
@@ -493,8 +507,17 @@ async function main() {
 			programArgs: fileArgs.slice(1),
 		});
 
-		const finalResult = evaluator.evaluateProgram(decoratedProgram, fullPath);
+		// assert: true needs one execution step per `;`-separated source line
+		// (see evaluateProgramForAssertions), not evaluateProgram's coarser
+		// per-statement trace — never both, so nothing evaluates twice.
+		const finalResult = literateFlags.assert
+			? evaluator.evaluateProgramForAssertions(decoratedProgram, fullPath)
+			: evaluator.evaluateProgram(decoratedProgram, fullPath);
 		const evalTime = performance.now();
+
+		if (literateFlags.assert && rawMarkdownSource !== undefined) {
+			checkLiterateAssertions(rawMarkdownSource, finalResult.executionTrace);
+		}
 
 		const valueStr = formatValue(finalResult.finalResult);
 		const formatTime = performance.now();
