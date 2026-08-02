@@ -1450,7 +1450,8 @@ export const typeList = (
 ): TypeResult => {
 	if (expr.elements.length === 0) {
 		// Empty list - we can't infer the element type
-		return createPureTypeResult(listTypeWithElement(typeVariable('a')), state);
+		const [elementType, freshState] = freshTypeVariable(state);
+		return createPureTypeResult(listTypeWithElement(elementType), freshState);
 	}
 
 	// Infer the type from the first element
