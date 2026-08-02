@@ -215,6 +215,13 @@ recognized; unknown keys are ignored. Both are independent booleans, default
   1 + 2;  # => 3
   1 + 2;  # => 3 : Float
   ```
+  Limitations: `# =>` must be on the same source line the checked statement
+  *starts* on — a multi-line statement can only be annotated if its first
+  line already ends the expression (otherwise there's nowhere valid to put
+  the comment, and it's silently never checked). A parenthesized nested
+  sequence (`where (x = 1; y = 2)`) is checked as one opaque unit at the
+  `where` expression's own line — its internal `x = 1`/`y = 2` pieces are
+  not independently checkable.
 
 README.md carries both flags in its own frontmatter, since it redeclares
 illustrative types (`variant Color = ...`) across sections and its `# =>`

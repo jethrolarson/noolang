@@ -70,8 +70,8 @@ export function formatValue(value: Value): string {
 
 import type { Type } from './ast';
 
-// Shared by the CLI's --verbose display and literate `assert: true`
-// checking, so both render the exact same `value : type` shape.
+// Used by literate `assert: true` checking (src/literate-assert.ts) to
+// render the `value : type` shape that `# =>` annotations compare against.
 export function formatValueWithType(
 	value: Value,
 	type: Type | undefined,
