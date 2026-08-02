@@ -1572,6 +1572,28 @@ const resolveTypeAliases = (
 				visited.delete(type.name);
 				return resolved;
 			}
+			if (
+				aliasScheme &&
+				aliasScheme.quantifiedVars.length > 0 &&
+				aliasScheme.quantifiedVars.length === type.args.length
+			) {
+				// Parametric type alias applied to arguments (e.g. `Box Float`).
+				// Beta-reduce: substitute each of the alias's quantified vars in
+				// its stored body with the corresponding (already-resolved)
+				// argument before resolving the result further.
+				visited.add(type.name);
+				const resolvedArgs = type.args.map(arg =>
+					resolveTypeAliases(arg, state, visited)
+				);
+				const substitution = new Map<string, Type>();
+				aliasScheme.quantifiedVars.forEach((param, i) => {
+					substitution.set(param, resolvedArgs[i]);
+				});
+				const beta = substitute(aliasScheme.type, substitution);
+				const resolved = resolveTypeAliases(beta, state, visited);
+				visited.delete(type.name);
+				return resolved;
+			}
 			// If it has arguments, recursively resolve them
 			const resolvedArgs = type.args.map(arg =>
 				resolveTypeAliases(arg, state, visited)
