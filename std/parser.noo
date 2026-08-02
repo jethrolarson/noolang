@@ -1,0 +1,266 @@
+# std/parser — small, generic parser-combinator library in pure noolang.
+#
+# Built as a forcing function one level down from std/json.noo (see PR #165
+# discussion): json.noo's original version was hand-rolled index-threading,
+# not combinator-style, despite superficially looking like it might be. This
+# module is the real thing — composable primitives/combinators — and
+# std/json.noo is rewritten on top of it as the test of whether it's any
+# good.
+#
+# Shape: a "parser of a" is a plain function
+#   String -> Float -> Result {@value a, @pos Float} ParseError
+# i.e. given the full input and a starting character position, either the
+# parsed value plus the position just past what it consumed, or a
+# position-tagged error. There is no `type Parser a = ...` alias here on
+# purpose: parametric `type` aliases parse but don't expand under
+# unification in this codebase (confirmed — see
+# docs/internal/docs-wip/PARAMETRIC_TYPE_ALIAS_BUG.md), so ascribing
+# anything to `Parser a` fails to typecheck even though the alias itself
+# parses fine. Every combinator below is a plain unannotated function;
+# Hindley-Milner inference carries `a` through exactly like it does for
+# `result_bind`/`result_map` in std/json.noo.
+#
+# Backtracking is free: position is an ordinary function argument, not a
+# mutated cursor, so a parser that fails never advances `pos` for its
+# caller — `choice` just tries the next parser at the same starting `pos`
+# with no explicit save/restore state.
+#
+# Repetition combinators (`many`, `sep_by`, ...) use noolang-level recursion
+# (one JS call frame per repetition — this evaluator has no TCO). That's the
+# same risk profile as std/json.noo's existing array/object element
+# recursion, which already ships at realistic document depths. It is NOT
+# safe for scanning long runs of individual characters (confirmed
+# separately: even a 6000-char string via one-call-per-character recursion
+# overflows the JS stack — see std/json.noo's note on scan_content). For
+# that shape of problem, use `take_while`/`take_while1` below, which scan a
+# character run with a single `reduce` (a native JS loop under the hood, so
+# it costs one call frame total regardless of run length) instead of one
+# noolang call per character.
+
+variant ParseError = ParseError {@message String, @position Float};
+
+parse_error = fn message pos => Err (ParseError {@message message, @position pos});
+
+# Deliberately not using the Monad/Applicative `bind`/`map` trait methods —
+# see std/json.noo's note on why: two-parameter variants (Result a b)
+# register at arity 1 in this codebase's trait-instance resolution, which
+# crashes the typer on Result's own instances (#158). Plain top-level
+# functions that `match` directly don't go through that path.
+result_bind = fn res f => match res (
+  Ok x => f x;
+  Err e => Err e
+);
+
+result_map = fn f res => match res (
+  Ok x => Ok (f x);
+  Err e => Err e
+);
+
+# ========================================
+# Character-class predicates — reusable across any grammar built on this
+# library, not JSON-specific.
+# ========================================
+
+is_digit = fn c => match c (
+  "0" => True; "1" => True; "2" => True; "3" => True; "4" => True;
+  "5" => True; "6" => True; "7" => True; "8" => True; "9" => True;
+  _ => False
+);
+
+is_whitespace = fn c => match c (
+  " " => True; "\t" => True; "\n" => True; "\r" => True; _ => False
+);
+
+is_alpha = fn c =>
+  ((c >= "a") && (c <= "z")) || ((c >= "A") && (c <= "Z"));
+
+is_alnum = fn c => (is_alpha c) || (is_digit c);
+
+# ========================================
+# Primitives
+# ========================================
+
+# One character at `pos`, or None past the end. A 1-char `substring` is
+# exactly one char or "" out of range, so this doubles as the bounds check.
+peek_char = fn pos s => (
+  c = substring pos (pos + 1) s;
+  if c == "" then None else Some c
+);
+
+# Single character matching `pred`, described by `label` for error messages.
+satisfy = fn label pred pos s => match (peek_char pos s) (
+  None => parse_error ("expected " + label + " but reached end of input") pos;
+  Some c => if pred c
+    then Ok {@value c, @pos (pos + 1)}
+    else parse_error ("expected " + label) pos
+);
+
+# Exact single character.
+char = fn expected pos s =>
+  satisfy ("'" + expected + "'") (fn c => c == expected) pos s;
+
+# Exact literal string (keyword-style match, e.g. "true"/"null").
+string_lit = fn lit pos s => (
+  len = length (chars lit);
+  slice = substring pos (pos + len) s;
+  if slice == lit
+    then Ok {@value lit, @pos (pos + len)}
+    else parse_error ("expected \"" + lit + "\"") pos
+);
+
+# Longest run of characters satisfying `pred`, possibly empty. Always
+# succeeds (zero-length match is a valid result) — the O(1)-stack-frame
+# alternative to `many (satisfy ...)` for character-level scanning; see the
+# module comment above for why that distinction matters here.
+take_while = fn pred pos s => (
+  doc_len = length (chars s);
+  remaining = chars (substring pos doc_len s);
+  init = {@parts ([] : List String), @i pos, @done False};
+  step = fn state ch =>
+    if state | @done then state
+    else if pred ch
+      then {@parts (append (state | @parts) [ch]), @i ((state | @i) + 1), @done False}
+      else {@parts (state | @parts), @i (state | @i), @done True};
+  final = reduce step init remaining;
+  {@value (join "" (final | @parts)), @pos (final | @i)}
+);
+
+# Same as `take_while`, but fails (rather than succeeding with "") if no
+# character matches.
+take_while1 = fn label pred pos s => (
+  r = take_while pred pos s;
+  if (length (chars (r | @value))) == 0
+    then parse_error ("expected at least one " + label) pos
+    else Ok r
+);
+
+# Skips leading whitespace; returns the position just past it (a plain
+# `Float`, not a `Result` — this is a position-only helper, not itself a
+# `Parser a`, matching std/json.noo's existing `skip_ws`).
+skip_ws = fn pos s => (take_while is_whitespace pos s) | @pos;
+
+# Runs `p` after skipping leading whitespace. Does not skip trailing
+# whitespace — callers that need "surrounded by whitespace" compose this
+# with `skip_ws` again after, same as std/json.noo's existing call sites do.
+lexeme = fn p pos s => p (skip_ws pos s) s;
+
+# ========================================
+# Functor/monad-shaped combinators
+# ========================================
+
+pmap = fn f p => fn pos s =>
+  result_map (fn r => {@value (f (r | @value)), @pos (r | @pos)}) (p pos s);
+
+pbind = fn f p => fn pos s =>
+  result_bind (p pos s) (fn r => (f (r | @value)) (r | @pos) s);
+
+succeed = fn v => fn pos s => Ok {@value v, @pos pos};
+
+fail = fn message => fn pos s => parse_error message pos;
+
+# ========================================
+# Choice / optional
+# ========================================
+
+choice2 = fn p1 p2 => fn pos s => match (p1 pos s) (
+  Ok r => Ok r;
+  Err _ => p2 pos s
+);
+
+# Ordered alternatives, first success wins. Built on `reduce` (not
+# recursion) so it's O(1) stack frames regardless of alternative count;
+# short-circuits on the first success (the `Ok r => Ok r` arm never calls
+# the remaining alternatives — see `reduce`'s accumulator below).
+choice = fn ps pos s => (
+  try_next = fn acc p => match acc (
+    Ok r => Ok r;
+    Err _ => p pos s
+  );
+  reduce try_next (parse_error "no alternative matched" pos) ps
+);
+
+optional = fn p pos s => match (p pos s) (
+  Ok r => Ok {@value (Some (r | @value)), @pos (r | @pos)};
+  Err _ => Ok {@value None, @pos pos}
+);
+
+# ========================================
+# Repetition — see the module comment above on stack-depth risk for
+# character-level use; fine for token/value-level grammars (array
+# elements, object members, ...).
+# ========================================
+
+many_go = fn p acc pos s => match (p pos s) (
+  Err _ => Ok {@value acc, @pos pos};
+  Ok r => many_go p (append acc [r | @value]) (r | @pos) s
+);
+
+many = fn p pos s => many_go p [] pos s;
+
+many1 = fn p pos s => match (p pos s) (
+  Err e => Err e;
+  Ok r => many_go p [r | @value] (r | @pos) s
+);
+
+sep_by_go = fn p sep acc pos s => match (sep pos s) (
+  Err _ => Ok {@value acc, @pos pos};
+  # A separator with no following element is a hard error (matches JSON's
+  # "trailing comma is invalid" semantics) rather than silently stopping.
+  Ok sr => result_bind (p (sr | @pos) s) (fn r =>
+    sep_by_go p sep (append acc [r | @value]) (r | @pos) s
+  )
+);
+
+sep_by = fn p sep pos s => match (p pos s) (
+  Err _ => Ok {@value [], @pos pos};
+  Ok r => sep_by_go p sep [r | @value] (r | @pos) s
+);
+
+sep_by1 = fn p sep pos s => match (p pos s) (
+  Err e => Err e;
+  Ok r => sep_by_go p sep [r | @value] (r | @pos) s
+);
+
+# ========================================
+# Bracketing
+# ========================================
+
+# `p` surrounded by `open`/`close`; the result is `p`'s value, positioned
+# just past `close`.
+between = fn open close p pos s =>
+  result_bind (open pos s) (fn o =>
+    result_bind (p (o | @pos) s) (fn r =>
+      result_bind (close (r | @pos) s) (fn c =>
+        Ok {@value (r | @value), @pos (c | @pos)}
+      )
+    )
+  );
+
+{
+  @ParseError ParseError,
+  @parse_error parse_error,
+  @is_digit is_digit,
+  @is_whitespace is_whitespace,
+  @is_alpha is_alpha,
+  @is_alnum is_alnum,
+  @peek_char peek_char,
+  @satisfy satisfy,
+  @char char,
+  @string_lit string_lit,
+  @take_while take_while,
+  @take_while1 take_while1,
+  @skip_ws skip_ws,
+  @lexeme lexeme,
+  @pmap pmap,
+  @pbind pbind,
+  @succeed succeed,
+  @fail fail,
+  @choice2 choice2,
+  @choice choice,
+  @optional optional,
+  @many many,
+  @many1 many1,
+  @sep_by sep_by,
+  @sep_by1 sep_by1,
+  @between between
+}
