@@ -474,7 +474,9 @@ jobs:
     runs-on: ubuntu-latest
     # Only run for pull requests, not for pushes to branches
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
-    
+    permissions:
+      pull-requests: write  # to post/update the comparison comment on the PR
+
     steps:
     - uses: actions/checkout@v4
       with:
@@ -556,62 +558,93 @@ jobs:
     
     - name: Compare performance
       run: |
-        echo "## Performance Comparison" >> $GITHUB_STEP_SUMMARY
-        echo "Comparing current branch against main..." >> $GITHUB_STEP_SUMMARY
-        
+        # perf-comment.md carries the same content to a PR comment (next step);
+        # $GITHUB_STEP_SUMMARY alone only shows up on the workflow run's own
+        # Summary tab, not on the PR, which is why this existed unseen before.
+        OUT=perf-comment.md
+        : > "$OUT"
+        log() { echo "$1" >> $GITHUB_STEP_SUMMARY; echo "$1" >> "$OUT"; }
+
+        log "## Performance Comparison"
+        log "Comparing current branch against main..."
+
         # Check if benchmark files exist with proper globbing
         CURRENT_RESULTS=""
         MAIN_RESULTS=""
-        
+
         if [ -d "benchmark-results-current" ]; then
           CURRENT_RESULTS=$(find benchmark-results-current -name "*.json" 2>/dev/null | head -1)
         fi
-        
+
         if [ -d "benchmark-results-main" ]; then
           MAIN_RESULTS=$(find benchmark-results-main -name "*.json" 2>/dev/null | head -1)
         fi
-        
+
         if [ -n "$CURRENT_RESULTS" ] && [ -n "$MAIN_RESULTS" ]; then
-          echo "✅ Benchmark files found for both branches" >> $GITHUB_STEP_SUMMARY
-          
+          log "✅ Benchmark files found for both branches"
+
           # Add basic performance validation
-          echo "### Performance Analysis" >> $GITHUB_STEP_SUMMARY
-          
+          log "### Performance Analysis"
+
           # Extract performance metrics and compare
           CURRENT_AVG=$(grep -o '"avg":[0-9.]*' "$CURRENT_RESULTS" | head -1 | cut -d':' -f2)
           MAIN_AVG=$(grep -o '"avg":[0-9.]*' "$MAIN_RESULTS" | head -1 | cut -d':' -f2)
-          
+
           if [ -n "$CURRENT_AVG" ] && [ -n "$MAIN_AVG" ]; then
-            echo "- Current branch average: ${CURRENT_AVG}ms" >> $GITHUB_STEP_SUMMARY
-            echo "- Main branch average: ${MAIN_AVG}ms" >> $GITHUB_STEP_SUMMARY
-            
+            log "- Current branch average: ${CURRENT_AVG}ms"
+            log "- Main branch average: ${MAIN_AVG}ms"
+
             # Calculate percentage difference (using awk for floating point)
             DIFF_PERCENT=$(awk "BEGIN {printf \"%.1f\", (($CURRENT_AVG - $MAIN_AVG) / $MAIN_AVG) * 100}")
-            echo "- Performance difference: ${DIFF_PERCENT}%" >> $GITHUB_STEP_SUMMARY
-            
+            log "- Performance difference: ${DIFF_PERCENT}%"
+
             # Flag significant regressions
             if awk "BEGIN {exit ($DIFF_PERCENT > 20)}"; then
-              echo "⚠️ **WARNING: Performance regression detected (>20% slower)**" >> $GITHUB_STEP_SUMMARY
+              log "⚠️ **WARNING: Performance regression detected (>20% slower)**"
               echo "::warning::Performance regression: ${DIFF_PERCENT}% slower than main"
             elif awk "BEGIN {exit ($DIFF_PERCENT < -10)}"; then
-              echo "🚀 **Performance improvement detected (>10% faster)**" >> $GITHUB_STEP_SUMMARY
+              log "🚀 **Performance improvement detected (>10% faster)**"
             else
-              echo "✅ Performance within acceptable range" >> $GITHUB_STEP_SUMMARY
+              log "✅ Performance within acceptable range"
             fi
           else
-            echo "⚠️ Could not extract performance metrics for comparison" >> $GITHUB_STEP_SUMMARY
+            log "⚠️ Could not extract performance metrics for comparison"
           fi
         elif [ -n "$CURRENT_RESULTS" ]; then
-          echo "⚠️ Only current branch benchmarks available" >> $GITHUB_STEP_SUMMARY
-          echo "Main branch benchmarks failed (possibly due to build issues)" >> $GITHUB_STEP_SUMMARY
+          log "⚠️ Only current branch benchmarks available"
+          log "Main branch benchmarks failed (possibly due to build issues)"
         elif [ -n "$MAIN_RESULTS" ]; then
-          echo "⚠️ Only main branch benchmarks available" >> $GITHUB_STEP_SUMMARY
-          echo "Current branch benchmarks failed" >> $GITHUB_STEP_SUMMARY
+          log "⚠️ Only main branch benchmarks available"
+          log "Current branch benchmarks failed"
         else
-          echo "⚠️ No benchmark results available for comparison" >> $GITHUB_STEP_SUMMARY
-          echo "Both branches had build or benchmark issues" >> $GITHUB_STEP_SUMMARY
+          log "⚠️ No benchmark results available for comparison"
+          log "Both branches had build or benchmark issues"
         fi
-    
+
+    - name: Post performance comparison to PR
+      if: always()
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        if [ ! -s perf-comment.md ]; then
+          echo "No perf-comment.md content, skipping PR comment."
+          exit 0
+        fi
+        MARKER="<!-- perf-comparison-comment -->"
+        BODY_FILE=$(mktemp)
+        { echo "$MARKER"; cat perf-comment.md; } > "$BODY_FILE"
+
+        PR_NUMBER="${{ github.event.pull_request.number }}"
+        EXISTING_ID=$(gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/comments" \
+          --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -1)
+
+        if [ -n "$EXISTING_ID" ]; then
+          gh api "repos/${{ github.repository }}/issues/comments/$EXISTING_ID" \
+            -X PATCH -f body=@"$BODY_FILE"
+        else
+          gh pr comment "$PR_NUMBER" --body-file "$BODY_FILE"
+        fi
+
     - name: Upload comparison results
       uses: actions/upload-artifact@v4
       if: always()
