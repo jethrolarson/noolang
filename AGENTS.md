@@ -62,9 +62,11 @@ more fragile than TS's per-test isolation. Default to TS; add here only for
 
 ## Docs
 
-- `docs/*.md` are validated as whole (concatenated) literate programs; `README.md` is
-  validated **per-block** (each ```noolang block runs standalone). See
-`validate_examples.js`.
+- `docs/*.md` and `README.md` are all validated as whole (concatenated) literate
+  programs (`validate_examples.js`). README.md opts out of the whole-file
+  type-shadow check and opts into checking its `# =>` comments against real
+  output via its own frontmatter — see `docs/language-reference.md` §Literate
+  Programming.
 - Planning docs live in `docs/internal/docs-wip/`; research notes in
   `docs/internal/research/`; ADRs in `docs/internal/adrs/`.
 

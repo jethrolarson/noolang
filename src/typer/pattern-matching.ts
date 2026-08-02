@@ -45,7 +45,8 @@ export const typeTypeDefinition = (
 	}
 
 	// If stdlib and builtins are loaded (protected set is non-empty), enforce global no-shadowing
-	const strictShadowing = state.protectedTypeNames && state.protectedTypeNames.size > 0;
+	const strictShadowing =
+		state.protectedTypeNames && state.protectedTypeNames.size > 0 && !state.allowShadowing;
 	if (strictShadowing) {
 		// Disallow shadowing any existing type/constructor in current session
 		if (state.protectedTypeNames.has(name)) {
@@ -68,8 +69,10 @@ export const typeTypeDefinition = (
 		}
 	}
 
-	// If ADT already exists in registry, always error (duplicate definition)
-	if (state.adtRegistry.has(name)) {
+	// If ADT already exists in registry, error (duplicate definition) — unless
+	// this file has opted into `allowShadowing` (literate docs redeclaring the
+	// same illustrative type across independent sections).
+	if (state.adtRegistry.has(name) && !state.allowShadowing) {
 		throwTypeError(
 			location => createTypeError(`Type already defined: ${name}`, {}, location),
 			getExprLocation(expr)

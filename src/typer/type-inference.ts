@@ -1033,6 +1033,12 @@ export const typeBinary = (
 			currentState = result.state;
 			finalType = result.type;
 			allEffects = unionEffects(allEffects, result.effects);
+			// Decorate each flattened leaf with its own resolved type — mirrors
+			// what typeAndDecorate already does for top-level program
+			// statements — so a literate-mode consumer flattening this same
+			// `;`-spine for per-line `# =>` checking can read each leaf's type
+			// directly instead of re-deriving it.
+			statement.type = substitute(result.type, currentState.substitution);
 
 			// In a nested (parenthesized) sequence a non-final bare expression's
 			// value is silently discarded, so it must be unit — dropping {} drops
@@ -1182,7 +1188,7 @@ export const typeUserDefinedType = (
 
 	// If stdlib and builtins are loaded (protected set is non-empty), enforce global no-shadowing
 	const strictShadowing =
-		state.protectedTypeNames && state.protectedTypeNames.size > 0;
+		state.protectedTypeNames && state.protectedTypeNames.size > 0 && !state.allowShadowing;
 	if (strictShadowing) {
 		if (state.protectedTypeNames.has(name)) {
 			throw new Error(`Type shadowing is not allowed: ${name}`);
@@ -1197,8 +1203,9 @@ export const typeUserDefinedType = (
 		}
 	}
 
-	// If a type with the same name is already in the environment, error (duplicate definition)
-	if (state.environment.has(name)) {
+	// If a type with the same name is already in the environment, error
+	// (duplicate definition) — unless this file has opted into `allowShadowing`.
+	if (state.environment.has(name) && !state.allowShadowing) {
 		throw new Error(`Type already defined: ${name}`);
 	}
 

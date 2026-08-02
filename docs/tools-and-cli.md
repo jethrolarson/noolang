@@ -166,30 +166,30 @@ All commands from [`src/repl.ts:252-305`](../src/repl.ts#L252-L305):
 
 #### Environment Inspection
 ```
-noo> x = 42
-x : Number
+noolang> x = 42
+x : Float
 
-noo> add = fn a b => a + b  
-add : Number -> Number -> Number
+noolang> add = fn a b => a + b  
+add : Float -> Float -> Float
 
-noo> .env
+noolang> .env
 Environment:
-  x: 42 : Number
-  add: <function> : Number -> Number -> Number
+  x: 42 : Float
+  add: <function> : Float -> Float -> Float
 
-noo> .env-json
+noolang> .env-json
 {
-  "x": { "value": "42", "type": "Number" },
-  "add": { "value": "<function>", "type": "Number -> Number -> Number" }
+  "x": { "value": "42", "type": "Float" },
+  "add": { "value": "<function>", "type": "Float -> Float -> Float" }
 }
 ```
 
 #### Debugging Expressions
 ```
-noo> .tokens (result = (@add math) 2 3)
+noolang> .tokens (result = (@add math) 2 3)
 [IDENTIFIER:result, OPERATOR:=, PUNCTUATION:(, ACCESSOR:@add, IDENTIFIER:math, PUNCTUATION:), NUMBER:2, NUMBER:3, EOF]
 
-noo> .ast (a = 1; b = 2)
+noolang> .ast (a = 1; b = 2)
 Program:
   statements: [
     Definition:
@@ -203,41 +203,37 @@ Program:
 
 #### File Analysis
 ```
-noo> .tokens-file examples/basic.noo
+noolang> .tokens-file examples/basic.noo
 # Shows complete token stream for file
 
-noo> .ast-file examples/demo.noo  
+noolang> .ast-file examples/demo.noo  
 # Shows complete AST for file
 ```
 
 ### REPL Session Example
 
 ```
-noo> # Define a function
-noo> factorial = fn n => if n <= 1 then 1 else n * factorial (n - 1)
-factorial : Number -> Number
+noolang> # Define a function
+noolang> factorial = fn n => if n <= 1 then 1 else n * factorial (n - 1)
+factorial : Float -> Float
 
-noo> # Test it
-noo> factorial 5
-120 : Number
+noolang> # Test it
+noolang> factorial 5
+120 : Float
 
-noo> # Inspect the tokens
-noo> .tokens (factorial 3)
+noolang> # Inspect the tokens
+noolang> .tokens (factorial 3)
 [IDENTIFIER:factorial, NUMBER:3, EOF]
 
-noo> # Check environment
-noo> .env
+noolang> # Check environment
+noolang> .env
 Environment:
-  factorial: <function> : Number -> Number
+  factorial: <function> : Float -> Float
 
-noo> # Pipeline example
-noo> [1, 2, 3, 4, 5] | map (fn x => x * x) | filter (fn x => x > 10)
-[16, 25] : List Number
+noolang> # Pipeline example
+noolang> [1, 2, 3, 4, 5] | map (fn x => x * x) | filter (fn x => x > 10)
+[16, 25] : List Float
 ```
-
-## Missing REPL Command
-
-**Note**: The help text mentions `.clear-env` command, but it's not implemented in the handler. This would clear the environment state.
 
 ## Debugging Workflow
 

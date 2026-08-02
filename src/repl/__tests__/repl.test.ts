@@ -153,6 +153,27 @@ test('REPL Core - should handle env command', () => {
 	expect(output.includes('123')).toBeTruthy();
 });
 
+test('REPL Core - should handle clear-env command', () => {
+	const mockOutput = new MockOutput();
+	const repl = new REPLCore(mockOutput, { skipStdlib: true });
+
+	repl.processInput('testVar = 123');
+	mockOutput.clear();
+
+	const clearResult = repl.processInput('.clear-env');
+	expect(clearResult.success).toBe(true);
+
+	mockOutput.clear();
+	const result = repl.processInput('.env');
+	const output = mockOutput.logs.join(' ');
+	expect(output.includes('testVar')).toBeFalsy();
+	expect(result.success).toBe(true);
+
+	// A cleared environment still works for new definitions
+	const afterClear = repl.processInput('testVar');
+	expect(afterClear.success).toBe(false);
+});
+
 test('REPL Core - should handle quit command', () => {
 	const mockOutput = new MockOutput();
 	const repl = new REPLCore(mockOutput, { skipStdlib: true });

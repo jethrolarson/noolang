@@ -40,26 +40,35 @@ export class ConsoleOutput implements REPLOutput {
 
 // Testable REPL core without readline dependency
 export class REPLCore {
-	evaluator: Evaluator;
-	typeState: TypeState;
+	evaluator!: Evaluator;
+	typeState!: TypeState;
 	private output: REPLOutput;
+	private skipStdlib: boolean;
 
 	constructor(
 		output: REPLOutput = new ConsoleOutput(),
 		options: { skipStdlib?: boolean } = {}
 	) {
+		this.output = output;
+		this.skipStdlib = options.skipStdlib ?? false;
+		this.resetEnvironment();
+	}
+
+	// Rebuilds typeState/evaluator from scratch — same initialization the
+	// constructor does, so `.clear-env` and `new REPLCore(...)` can't drift
+	// apart into two subtly different "fresh" states.
+	private resetEnvironment(): void {
 		this.typeState = createTypeState();
 		this.typeState = initializeBuiltins(this.typeState);
 
-		if (!options.skipStdlib) {
+		if (!this.skipStdlib) {
 			this.typeState = loadStdlib(this.typeState); // Ensure stdlib types are loaded
 		}
 
 		this.evaluator = new Evaluator({
 			traitRegistry: this.typeState.traitRegistry,
-			skipStdlib: options.skipStdlib,
+			skipStdlib: this.skipStdlib,
 		});
-		this.output = output;
 	}
 
 	// Main method for processing REPL input - fully testable
@@ -256,6 +265,11 @@ export class REPLCore {
 
 			case '.help':
 				this.showHelp();
+				return { success: true };
+
+			case '.clear-env':
+				this.resetEnvironment();
+				this.output.log('Environment cleared.');
 				return { success: true };
 
 			case '.env':
