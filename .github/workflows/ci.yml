@@ -525,7 +525,11 @@ jobs:
       run: |
         echo "Switching to main branch..."
         git reset --hard HEAD
-        git clean -fd
+        # -e excludes benchmark-results-current/, the untracked dir the
+        # prior step just saved — without it, clean deletes results before
+        # the "Compare performance" step ever reads them (silently, since
+        # this step doesn't fail: it just leaves nothing to compare against).
+        git clean -fd -e benchmark-results-current
         git checkout origin/main
         
         echo "Installing dependencies for main branch..."
