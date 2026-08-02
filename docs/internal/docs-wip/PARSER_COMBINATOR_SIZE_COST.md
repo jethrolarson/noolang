@@ -501,3 +501,104 @@ bundled into a change that was already touching cache correctness.
 **Status: implemented and validated on branch `packrat-parser-memoization`.
 Not committed or opened as a PR — awaiting explicit go-ahead for that
 separately.**
+
+## Update 2026-08-01: merged (#174); worst-case combinator stress test re-run — confirmed fixed
+
+The above landed as PR #174 and is now on `main`. This section re-runs the
+one validation step the PR's own review flagged as outstanding: the
+"combinator-style rewrite makes it worse, not better" section above measured
+the abandoned combinator rewrite of `std/json.noo` at 4m25s+ (killed, not
+finished) *before* memoization; that rewrite was never committed (only
+existed as uncommitted working-tree state in a worktree that was later
+discarded with no stash), so re-running it required reconstructing it from
+scratch against `std/parser.noo`'s actual primitives — same JSON grammar
+(null/bool/number/string/array/object), same target of using
+`choice`/`many`/`sep_by`/`between`/`pmap`/`pbind` idiomatically instead of
+hand-rolled index-threading. Neither `std/parser.noo` (PR #170) nor
+`std/json.noo` (PR #165) is on `main` as of this update — this
+reconstruction, and the `std/parser.noo` it depends on, live on branch
+`explore-combinator-json-perf` for anyone who wants to reproduce these
+numbers directly; not merged here since this doc update is a measurement
+report, not a proposal to land either file.
+
+**Result: the pathology is gone.** Parsing the reconstructed combinator-based
+`std/json.noo` (411 lines, imports `std/parser.noo`), measured the same way
+as every other number in this doc (`NO_COLOR=1 bun src/cli.ts --verbose
+std/json.noo`, phase breakdown):
+
+| | Parse phase |
+|---|---|
+| Old combinator rewrite, pre-memoization (this doc, above) | killed at 4m25s+, never finished |
+| Hand-rolled `std/json.noo` (PR #165), post-memoization (this doc, above) | ~28–67ms |
+| **Reconstructed combinator `std/json.noo`, post-memoization** | **~19–32ms across 5 runs** |
+
+The combinator version's Parse phase is now in the same band as the
+hand-rolled version's — a lower bound on the speedup of roughly **8,000x**
+relative to the old rewrite's last-known state (it never finished, so the
+true old number is unknown and larger than 4m25s). This confirms the
+"pure memoization on pure combinators is monotonic" reasoning the PR's
+review raised but didn't empirically verify: the mechanism this whole doc
+diagnoses (unmemoized re-parsing of expensive subtrees under nested
+`choice`/`many` backtracking) is exactly what packrat memoization caps, and
+capping it helped the *worse* case (combinator-heavy grammar) proportionally
+more than the *already-fine* case (hand-rolled), which is what "removes
+redundant work, never adds any" predicts.
+
+Total wall time for the combinator file (Parse + Type + Eval + everything
+else) is ~150–185ms, dominated by the **Type** phase (~121–145ms, not
+Parse) — a separate, unrelated cost (ordinary Hindley-Milner inference over
+411 lines of polymorphic combinator code) that this doc and PR #174 were
+never about; not investigated further here.
+
+**Correctness.** The reconstruction passes its own copy of
+`json.test.noo`'s full assertion suite (12/12; the copy used here is
+identical to the one written for PR #165, unmodified) — parses, round-trips
+through `json_stringify`, rejects malformed/leading-zero/raw-control-char
+input, and extracts nested fields correctly. No pre-memoization build of
+this exact file exists to AST-diff against (it was never committed, per
+above), so this is a fresh correctness check via the test suite rather than
+an AST-identity check against a prior run — weaker than the AST-diff done
+for the memoization change itself, but the only option available for a file
+that only exists in this reconstruction.
+
+**Two real typer bugs surfaced while reconstructing this, both unrelated to
+memoization or performance — routed around rather than fixed, since fixing
+the typer was out of scope here:**
+
+1. Importing more than a handful of polymorphic bindings from one module via
+   a single destructuring import (`{ @a a, @b b, ... } = import "..."`)
+   corrupts later, textually-unrelated type inference elsewhere in the same
+   file — confirmed by bisection down to "adding an unused destructured
+   import name, with zero new call sites, breaks an unrelated binding's
+   inferred type dozens of lines later." This is very likely the same class
+   as the already-filed import-destructure arity bug (#158; see
+   `fix-import-destructure-arity`, itself still unmerged and confirmed by
+   direct test *not* to fix this particular repro). Workaround used here:
+   bind the imported module once (`parser_mod = import "std/parser"`) and
+   project each function out with `| @name` instead of destructuring.
+2. A self-recursive parser combinator with two `choice` branches that both
+   recurse into itself typechecks fine — *until* one branch pairs the
+   recursive result with a companion value (a tuple, record, or
+   single-constructor variant all reproduce it identically), which is
+   exactly the shape JSON object-member parsing needs (`{key, value}` where
+   `value` comes from recursing into the same value-parser that also
+   handles arrays). Minimal repro reduces to about 10 lines. Workaround used
+   here: array/object *repetition* is threaded through an explicit
+   `ParseMode` tag with manual recursion (the same technique the hand-rolled
+   `std/json.noo` uses to route around the separate no-mutual-recursion
+   restriction), while every leaf production (null/bool/string/number)
+   stays genuinely combinator-built (`choice`/`pmap`/`between`/`many`).
+   Neither bug is filed as its own issue yet — flagging here since both were
+   found in the course of this specific investigation, for whoever picks
+   either up next.
+
+**Practical implication (not acted on here — this is a report, not a
+decision).** The reasoning that kept `std/json.noo` on its hand-rolled
+implementation (PR #165, still open/unmerged) was specifically that the
+combinator rewrite was catastrophically slower to parse; that reasoning no
+longer holds now that memoization has landed on `main`. This doesn't by
+itself mean PR #165 should be revisited — the two typer-bug workarounds
+above mean today's "idiomatic" combinator rewrite is less idiomatic than a
+clean one would be, and there may be other reasons (readability, the
+`std/parser.noo` API's own rough edges) to keep the hand-rolled version.
+Reopening that question is left to whoever owns that call.
