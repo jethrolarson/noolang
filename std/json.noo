@@ -1,28 +1,9 @@
-# std/json — JSON parse/serialize, rewritten in idiomatic parser-combinator
-# style on top of std/parser.noo, as the stress-test reconstruction for the
-# packrat-memoization perf investigation (see
-# docs/internal/docs-wip/PARSER_COMBINATOR_SIZE_COST.md's "combinator-style
-# rewrite makes it worse, not better" section). The original attempt at this
-# rewrite was never committed (uncommitted working-tree state in a since-
-# discarded worktree); this file reconstructs the same idea — express JSON's
-# grammar using std/parser.noo's choice/many/sep_by/between/pmap/pbind
-# instead of hand-rolled index-threading — to re-run that stress test now
-# that src/parser/combinators.ts has packrat memoization.
+# std/json — JSON parse/serialize, built on std/parser's combinators.
+# Design notes and history: docs/internal/specs/std-json.md.
 #
-# json_stringify / json_equals / the extraction API below are carried over
-# unchanged from the hand-rolled version (PR #165) — they aren't part of
-# what's being stress-tested (parsing *this file itself* as noolang source,
-# not JSON-parsing runtime behavior), so there's no reason to rewrite them.
-#
-# `std/parser` is imported once and projected with `| @name` rather than
-# one destructuring binding (`{ @a a, ... } = import "std/parser"`). That
-# style used to hit the import-destructure arity bug (#158): pulling this
-# many polymorphic bindings out of one module import in a single destructure
-# corrupted later, textually-unrelated type inference in this file. #159
-# fixed the underlying scheme-freshening gap (already on `main` as of this
-# file, confirmed by direct repro with this exact import list) — the
-# destructure form isn't required anymore, but there's no reason to touch a
-# style that already works to prove that, so it's left as projection.
+# `std/parser` is imported once and projected with `| @name` rather than a
+# single destructuring bind — see the spec doc for why (import-destructure
+# arity, #158/#159).
 parser_mod = import "std/parser";
 ParseError = parser_mod | @ParseError;
 parse_error = parser_mod | @parse_error;
@@ -32,14 +13,11 @@ satisfy = parser_mod | @satisfy;
 char = parser_mod | @char;
 string_lit = parser_mod | @string_lit;
 skip_ws = parser_mod | @skip_ws;
-lexeme = parser_mod | @lexeme;
 pmap = parser_mod | @pmap;
 pbind = parser_mod | @pbind;
 choice2 = parser_mod | @choice2;
 choice = parser_mod | @choice;
-optional = parser_mod | @optional;
 many = parser_mod | @many;
-sep_by = parser_mod | @sep_by;
 between = parser_mod | @between;
 
 variant JsonValue =
@@ -50,17 +28,10 @@ variant JsonValue =
   | JArray (List JsonValue)
   | JObject (List {String, JsonValue});
 
-# Parse errors are re-wrapped from std/parser's `ParseError` into this
-# locally-declared variant at the json_parse boundary (see json_parse
-# below), not re-exported as-is. Noolang's ADT pattern-matching registry
-# doesn't propagate through transitive imports — a consumer that imports
-# only "std/json" (not "std/parser" too) gets "Unknown ADT: ParseError" if
-# asked to match std/parser's own variant, confirmed by direct probe. This
-# also keeps std/parser as an internal implementation detail: a consumer
-# shouldn't need to know this module is combinator-based under the hood.
-# Matches the field shape and constructor name of PR #165's original
-# hand-rolled `JsonParseError`, so callers written against that version are
-# unaffected.
+# Not std/parser's `ParseError` re-exported as-is: an importer of only
+# "std/json" can't pattern-match a type it never imported (ADT visibility
+# doesn't cross transitive imports), so json_parse re-wraps into this
+# locally-declared variant at the boundary — see json_parse below.
 variant JsonParseError = JsonParseError {@message String, @position Float};
 
 # Extraction errors are a separate variant from parse errors: getting a
@@ -108,32 +79,11 @@ json_bool_p = choice2 json_true_p json_false_p;
 
 # --- numbers ---
 #
-# Not built from `pbind`/`take_while`/`take_while1` chains like the rest of
-# this file, despite being logically the same shape (sequence of optional
-# sub-parses combined into one value) — that composition style hits a real
-# typer bug here: two separate top-level bindings that each apply an
-# imported polymorphic combinator (`pbind`, `take_while`/`take_while1`) to
-# different arguments cross-contaminate each other's instantiated type
-# variables, even though neither references the other (confirmed by
-# bisection — an `int_digits_p` binding built with `pbind`+`take_while`
-# typechecks fine alone; adding an unrelated `frac_digits_p` binding built
-# with `pbind`+`take_while1` right after it breaks *both*, with a
-# unification error pointing at whichever binding comes second). Folding
-# everything into one giant expression didn't help either — the same
-# collision reappears between two uses of `pbind` in one binding. This is
-# very likely the same bug class as `docs/internal/docs-wip` and CLAUDE.md's
-# noted import-destructure arity bug (#158) — a scheme-freshening gap when a
-# polymorphic binding is instantiated more than once — just triggered here
-# by repeated *use* of an imported combinator rather than repeated *import*
-# of one. Not chased further here (out of scope for a perf stress test); the
-# workaround is what the abandoned original attempt at this same rewrite
-# apparently also had to do per this doc's own history ("route around a
-# separate, still-unfiled-precisely typer bug" in the "combinator-style
-# rewrite" section above) — drop to a single self-contained, monomorphic
-# function for just this one production. It still calls the shared `char`/
-# `satisfy`/`peek_char`/`is_digit` primitives from std/parser.noo (so it's
-# not a return to std/json.noo's original hand-rolled character scanning),
-# just not chained through `pbind`/`pmap`/`take_while`.
+# Self-contained (not `pbind`/`take_while1`-chained like the scalars above):
+# a combinator-chain version of this production typechecks fine alone, but
+# corrupts an unrelated inference (std/test's `run_all`) when the two
+# modules are imported into one program together — reproduces only in that
+# combination, not standalone. Same scheme-freshening bug class as #158.
 digit_run = fn pos s => (
   doc_len = length (chars s);
   remaining = chars (substring pos doc_len s);
@@ -151,11 +101,7 @@ json_number_p = fn pos s => (
   neg = (peek_char pos s) == Some "-";
   pos1 = if neg then pos + 1 else pos;
   int_r = digit_run pos1 s;
-  # RFC 8259 §6: the integer part is `0` alone, or a nonzero digit followed
-  # by more digits — "01"/"007" are not valid numbers. `digit_run` itself
-  # doesn't stop at a leading zero (it just scans the whole digit run), so
-  # this has to be checked after the fact, same as the hand-rolled
-  # version's `has_leading_zero` check.
+  # RFC 8259 §6: "0" alone or a nonzero digit run — "01"/"007" rejected.
   has_leading_zero = ((peek_char pos1 s) == Some "0") && ((int_r | @count) > 1);
   if (int_r | @count) == 0 then parse_error "expected digit" pos1 else
   if has_leading_zero then parse_error "leading zeros are not allowed" pos1 else (
@@ -188,25 +134,16 @@ escape_to_char = fn c => match c (
   _ => c
 );
 
-# RFC 8259 §7 lists `\u`/`\b`/`\f` as valid escapes too, but there's no
-# codepoint<->char builtin (fromCharCode/charCodeAt) in noolang to decode
-# `\uXXXX` with — same documented scope limit as PR #165's hand-rolled
-# version. `satisfy`'s predicate below is restricted to the escapes this
-# module actually decodes, so an unsupported escape fails the parse
-# (rejected, matching the old version's behavior) instead of silently
-# passing through as a mis-decoded literal character (which is what a
-# catch-all `satisfy _ => True` here would do: `escape_to_char`'s own `_ =>
-# c` fallback would turn `\u` into a bare `u`, silently dropping the
-# backslash and the rest of the escape sequence — confirmed by direct
-# repro before this restriction was added).
+# \u/\b/\f are valid JSON escapes too (RFC 8259 §7), but noolang has no
+# codepoint<->char builtin to decode `\uXXXX` with, so they're rejected
+# rather than mis-decoded (satisfy's predicate below only accepts escapes
+# this module can actually turn into a char).
 is_supported_escape = fn c =>
   (c == "\"") || (c == "\\") || (c == "/") || (c == "n") || (c == "r") || (c == "t");
 
 json_escaped_char_p = pbind (fn _ => pmap escape_to_char (satisfy "recognized escape character" is_supported_escape)) (char "\\");
-# Backslash is excluded from "plain" characters so an unrecognized escape
-# (e.g. `\u`) fails the whole string parse via json_escaped_char_p above,
-# rather than falling back to treating the backslash itself as a literal
-# plain character once the escaped-char branch backtracks.
+# `\` excluded from "plain" so an unrecognized escape fails the string
+# parse outright, instead of backtracking into treating `\` as a literal.
 json_plain_char_p = satisfy "string char" (fn c => (not (c == "\"")) && (not (c == "\\")) && (not (c < " ")));
 json_string_char_p = choice2 json_escaped_char_p json_plain_char_p;
 
@@ -215,43 +152,13 @@ json_string_p = pmap JString json_string_raw_p;
 
 # --- values, arrays, objects ---
 #
-# Scalars (null/bool/string/number, above) are genuinely combinator-built —
-# `choice`/`pmap`/`between`/`many` all get exercised. Array/object
-# *repetition*, below, is NOT built on `sep_by`/`between` pairing the
-# self-recursive value parser with a companion (a comma separator for
-# arrays; a string key for objects) the way a first-draft idiomatic
-# rewrite would naturally reach for. That shape hits a real, narrow typer
-# bug, confirmed by direct minimal reproduction: a self-recursive parser
-# `f` with two `choice` branches that both call `f` again typechecks fine
-# as long as neither call *pairs* `f`'s result with anything else (e.g.
-# `sep_by f sep` in both branches is fine) — but the moment either branch
-# wraps its self-reference in a tuple, record, *or* single-constructor
-# variant alongside a companion value (`pbind (fn key => pmap (fn v =>
-# {key, v}) f) key_p`, matching object-member parsing's actual shape), the
-# whole function's inferred type breaks with a `String`-vs-recursive-type
-# unification error, regardless of which container shape is used for the
-# pairing. This reproduces with `pbind`+`sep_by` specifically; it is not
-# about self-recursion generally (this file's own leaf productions are
-# self-contained, and `digit_run`/`json_number_p` above show
-# non-`pbind`-chained recursion working fine) — likely the same
-# still-unfiled class of scheme-generalization bug already on file for
-# this codebase (see CLAUDE.md's import-destructure arity note, #158) as
-# reused-scheme corruption, just triggered here by *use* of a self-recursive
-# binding rather than *import* of one. Worth filing separately; out of
-# scope to fix for a perf stress test.
-#
-# Workaround: array/object repetition is threaded through an explicit
-# `ParseMode` tag and manual recursion — the same technique
-# `std/json.noo`'s original hand-rolled version (PR #165) used to route
-# around noolang's separate no-mutual-recursion restriction — instead of
-# `sep_by`. It still calls into the combinator-built scalar parsers above
-# and into `char`/`peek_char`/`skip_ws` from std/parser.noo throughout, so
-# this remains a real (if hybrid) exercise of the combinator library's
-# `choice`-heavy scalar dispatch — the `choice [json_null_p, json_bool_p,
-# json_string_p, json_number_p]` call below is itself invoked once per
-# scalar attempt at every position in the document, which is exactly the
-# `choice`/backtracking shape the packrat-memoization stress test cares
-# about.
+# Array/object repetition doesn't use `sep_by` pairing the self-recursive
+# value parser with a separator/key, unlike the scalar parsers above — a
+# self-recursive parser with 2+ `choice` branches breaks if any branch
+# pairs the recursive result with a companion value (object-member parsing's
+# natural shape). See docs/internal/docs-wip/CHOICE_RECURSIVE_PAIRING_BUG.md.
+# Worked around with an explicit `ParseMode` tag and manual recursion
+# instead; still dispatches through the combinator-built scalar parsers.
 variant ParseMode =
     ModeValue
   | ModeArrayNext (List JsonValue)
@@ -259,8 +166,6 @@ variant ParseMode =
   | ModeObjectNext (List {String, JsonValue})
   | ModeObjectRest (List {String, JsonValue});
 
-# Empty-list constants, not `[]` literals — see std/json.noo's (PR #165)
-# own note on the empty-list type-variable collision bug this avoids.
 empty_json_array = list_filter (fn _ => False) [JNull];
 empty_json_object = list_filter (fn _ => False) [{"", JNull}];
 
@@ -338,10 +243,8 @@ parse_node = fn mode pos s => match mode (
 
 parse_json_value = fn pos s => parse_node ModeValue pos s;
 
-# Entry point: whole-input parse, rejecting trailing non-whitespace content.
-# Wraps std/parser's ParseError into the locally-declared JsonParseError
-# (see its declaration above) so pattern-matching the error works for a
-# consumer that only imports "std/json".
+# Whole-input parse: rejects trailing non-whitespace, wraps ParseError into
+# JsonParseError (see its declaration above).
 json_parse = fn input =>
   match (
     result_bind (parse_json_value 0 input) (fn r => (
@@ -357,7 +260,7 @@ json_parse = fn input =>
   );
 
 # ========================================
-# SERIALIZER — unchanged from the hand-rolled version (PR #165).
+# SERIALIZER
 # ========================================
 
 escape_char = fn c => match c (
@@ -379,6 +282,9 @@ non_finite_number_text = fn n => (
 json_stringify = fn v => match v (
   JNull => "null";
   JBool b => match b (True => "true"; False => "false");
+  # No error channel to reject through (String, not Result) — Infinity/NaN
+  # (reachable via arithmetic overflow) serialize to "null", matching
+  # JSON.stringify's own precedent.
   JNumber n => if non_finite_number_text n then "null" else toString n;
   JString s => "\"" + escape_string s + "\"";
   JArray items => "[" + join "," (list_map json_stringify items) + "]";
@@ -389,7 +295,7 @@ json_stringify = fn v => match v (
 );
 
 # ========================================
-# EXTRACTION API — unchanged from the hand-rolled version.
+# EXTRACTION API
 # ========================================
 
 json_as_string = fn v => match v (JString s => Ok s; _ => Err JsonExpectedString);

@@ -32,12 +32,21 @@ const docsDir = './docs';
 // for a doc that redeclares illustrative type names across sections; a
 // thrown assertion error from `assert: true` fails this the same way any
 // other CLI error does, so no separate assertion-checking step is needed here.
+// docs/internal/specs/*.md are included too: a "spec" for an implemented
+// module claims to describe its real API, so its examples should actually
+// run against that module — an unchecked spec drifts silently the moment
+// the module's signature changes.
+const specsDir = './docs/internal/specs';
 const wholeFileDocs = [
 	'README.md',
 	...fs
 		.readdirSync(docsDir)
 		.filter(f => f.endsWith('.md'))
 		.map(f => path.join(docsDir, f)),
+	...fs
+		.readdirSync(specsDir)
+		.filter(f => f.endsWith('.md'))
+		.map(f => path.join(specsDir, f)),
 ];
 
 console.log(
