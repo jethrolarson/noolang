@@ -590,11 +590,16 @@ jobs:
           # Add basic performance validation
           log "### Performance Analysis"
 
-          # Extract performance metrics and compare
-          CURRENT_AVG=$(grep -o '"avg":[0-9.]*' "$CURRENT_RESULTS" | head -1 | cut -d':' -f2)
-          MAIN_AVG=$(grep -o '"avg":[0-9.]*' "$MAIN_RESULTS" | head -1 | cut -d':' -f2)
+          # Mean of every benchmark's avg (each "avg" is a JSON string, e.g.
+          # "58.8" — grep's `"avg":[0-9.]*` never matched because
+          # JSON.stringify(data, null, 2) puts a space after the colon, so
+          # this always fell through to "Could not extract performance
+          # metrics" regardless of the actual data. jq handles both the
+          # whitespace and the string-to-number conversion.
+          CURRENT_AVG=$(jq -r '[.results[].avg | tonumber] | add / length' "$CURRENT_RESULTS" 2>/dev/null)
+          MAIN_AVG=$(jq -r '[.results[].avg | tonumber] | add / length' "$MAIN_RESULTS" 2>/dev/null)
 
-          if [ -n "$CURRENT_AVG" ] && [ -n "$MAIN_AVG" ]; then
+          if [ -n "$CURRENT_AVG" ] && [ "$CURRENT_AVG" != "null" ] && [ -n "$MAIN_AVG" ] && [ "$MAIN_AVG" != "null" ]; then
             log "- Current branch average: ${CURRENT_AVG}ms"
             log "- Main branch average: ${MAIN_AVG}ms"
 
@@ -602,11 +607,14 @@ jobs:
             DIFF_PERCENT=$(awk "BEGIN {printf \"%.1f\", (($CURRENT_AVG - $MAIN_AVG) / $MAIN_AVG) * 100}")
             log "- Performance difference: ${DIFF_PERCENT}%"
 
-            # Flag significant regressions
-            if awk "BEGIN {exit ($DIFF_PERCENT > 20)}"; then
+            # Flag significant regressions. awk's `exit N` sets the process
+            # exit *code* to N, which bash reads as failure for any nonzero
+            # N — so `exit (cond)` runs the `if` body when cond is FALSE
+            # (awk exit 0), backwards from what's intended. Negate with `!`.
+            if awk "BEGIN {exit !($DIFF_PERCENT > 20)}"; then
               log "⚠️ **WARNING: Performance regression detected (>20% slower)**"
               echo "::warning::Performance regression: ${DIFF_PERCENT}% slower than main"
-            elif awk "BEGIN {exit ($DIFF_PERCENT < -10)}"; then
+            elif awk "BEGIN {exit !($DIFF_PERCENT < -10)}"; then
               log "🚀 **Performance improvement detected (>10% faster)**"
             else
               log "✅ Performance within acceptable range"
