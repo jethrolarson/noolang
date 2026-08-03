@@ -236,4 +236,57 @@ describe('Type Alias Functionality', () => {
         `;
 			expectSuccess(code, '42');
 		});
+
+		test('parametric type alias applied to a concrete type should expand under ascription', () => {
+			// Regression: `Box Float` was treated as an opaque nominal application
+			// instead of being beta-reduced to `{ value: Float }` before unifying
+			// against the inferred record type.
+			const code = `
+            type Box a = {@value a};
+            mkBox = fn v => {@value v};
+            b = (mkBox 42 : Box Float);
+            b | @value
+        `;
+			expectSuccess(code, 42);
+		});
+
+		test('parametric type alias with multiple type params should expand under ascription', () => {
+			const code = `
+            type Pair a b = {@left a, @right b};
+            mkPair = fn l r => {@left l, @right r};
+            p = (mkPair 1 "x" : Pair Float String);
+            p | @right
+        `;
+			expectSuccess(code, 'x');
+		});
+
+		test('nested parametric type aliases should expand under ascription', () => {
+			const code = `
+            type Box a = {@value a};
+            type Wrapper a = {@inner Box a};
+            mkWrapper = fn v => {@inner {@value v}};
+            w = (mkWrapper 42 : Wrapper Float);
+            w | @inner | @value
+        `;
+			expectSuccess(code, 42);
+		});
+
+		test('parametric type alias used without ascription should still infer via ordinary HM', () => {
+			const code = `
+            type Box a = {@value a};
+            mkBox = fn v => {@value v};
+            b = mkBox 42;
+            b | @value
+        `;
+			expectSuccess(code, 42);
+		});
+
+		test('parametric type alias parameter in function position should expand under ascription', () => {
+			const code = `
+            type Transformer a = {(a) -> a};
+            t = ({fn x => x + 1} : Transformer Float);
+            match t ({f} => f 41)
+        `;
+			expectSuccess(code, 42);
+		});
 });
