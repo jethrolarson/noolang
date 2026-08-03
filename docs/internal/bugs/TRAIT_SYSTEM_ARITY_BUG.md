@@ -1,5 +1,7 @@
 # Trait system assumes kind `* -> *`; breaks on arity-2+ variants
 
+Status: open
+
 Filed 2026-07-20, found while fixing `Applicative Result` in PR #156
 (stdlib.noo, KNOWN WRONG comment on the `apply` implementation).
 

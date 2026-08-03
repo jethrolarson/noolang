@@ -1,5 +1,7 @@
 # Operator to Trait Desugaring Implementation Plan
 
+Status: draft
+
 ## Overview
 
 Convert Noolang's hardcoded binary operators (`+`, `-`, `*`, `/`) to proper trait function desugaring while preserving error message quality and maintaining architectural cleanliness.

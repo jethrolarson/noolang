@@ -87,6 +87,99 @@ export const freeTypeVars = (
 	return acc;
 };
 
+// `freeTypeVars` misses variables that only appear inside a `has`/`hasField`
+// constraint payload, so generalize under-quantified them — see
+// choice-recursive-pairing.test.ts. Kept separate from `freeTypeVars` (not
+// merged in) because the explicit-annotation path relies on the old narrow
+// behavior to keep a `given ... has {@field Concrete}` pin unquantified.
+const freeTypeVarsInStructure = (
+	structure: RecordStructure,
+	acc: Set<string>,
+	visited: Set<string>
+): void => {
+	for (const field of Object.values(structure.fields)) {
+		if (typeof field === 'object' && field !== null && 'kind' in field && field.kind === 'nested') {
+			freeTypeVarsInStructure(field.structure, acc, visited);
+		} else {
+			freeTypeVarsWithConstraints(field as Type, acc, visited);
+		}
+	}
+};
+
+const freeTypeVarsInConstraint = (
+	constraint: Constraint,
+	acc: Set<string>,
+	visited: Set<string>
+): void => {
+	acc.add(constraint.typeVar);
+	switch (constraint.kind) {
+		case 'has':
+			freeTypeVarsInStructure(constraint.structure, acc, visited);
+			break;
+		case 'hasField':
+			freeTypeVarsWithConstraints(constraint.fieldType, acc, visited);
+			break;
+		case 'custom':
+			constraint.args.forEach(arg =>
+				freeTypeVarsWithConstraints(arg, acc, visited)
+			);
+			break;
+		case 'is':
+		case 'implements':
+			break;
+	}
+};
+
+// Like `freeTypeVars`, but also walks each variable's `.constraints` payload
+// (see comment above) — used only where generalization needs to know about
+// every variable a scheme's constraints will need to freshen on
+// instantiation, not everywhere `freeTypeVars` is called.
+const freeTypeVarsWithConstraints = (
+	type: Type,
+	acc: Set<string> = new Set(),
+	visited: Set<string> = new Set()
+): Set<string> => {
+	switch (type.kind) {
+		case 'variable': {
+			acc.add(type.name);
+			// Guard against constraint cycles (a constraint's structure can name a
+			// variable whose own constraints point back): only expand each
+			// variable's constraints once per call.
+			if (!visited.has(type.name)) {
+				visited.add(type.name);
+				type.constraints?.forEach(c =>
+					freeTypeVarsInConstraint(c, acc, visited)
+				);
+			}
+			break;
+		}
+		case 'function':
+			for (const param of type.params)
+				freeTypeVarsWithConstraints(param, acc, visited);
+			freeTypeVarsWithConstraints(type.return, acc, visited);
+			break;
+		case 'list':
+			freeTypeVarsWithConstraints(type.element, acc, visited);
+			break;
+		case 'tuple':
+			for (const el of type.elements)
+				freeTypeVarsWithConstraints(el, acc, visited);
+			break;
+		case 'record':
+			Object.values(type.fields).forEach(v =>
+				freeTypeVarsWithConstraints(v, acc, visited)
+			);
+			break;
+		case 'union':
+			type.types.forEach(t => freeTypeVarsWithConstraints(t, acc, visited));
+			break;
+		case 'variant':
+			type.args.forEach(arg => freeTypeVarsWithConstraints(arg, acc, visited));
+			break;
+	}
+	return acc;
+};
+
 // Collect all free type variables in the environment
 export const freeTypeVarsEnv = (
 	env: TypeEnvironment,
@@ -95,7 +188,7 @@ export const freeTypeVarsEnv = (
 	const acc = new Set<string>();
 	for (const scheme of env.values()) {
 		const type = substitution ? substitute(scheme.type, substitution) : scheme.type;
-		for (const varName of freeTypeVars(type)) {
+		for (const varName of freeTypeVarsWithConstraints(type)) {
 			if (!scheme.quantifiedVars.includes(varName)) acc.add(varName);
 		}
 	}
@@ -110,11 +203,11 @@ export const generalize = (
 ): TypeScheme => {
 	// Apply current substitution to the type before generalizing
 	const substitutedType = substitute(type, substitution);
-	const typeVars = freeTypeVars(substitutedType);
+	const typeVars = freeTypeVarsWithConstraints(substitutedType);
 	// Environment variables must be resolved through the same substitution:
 	// a param bound during body inference (α216 := α220) otherwise still reads
 	// as α216 in the env while the value's type says α220, so α220 looks free
-	// and gets wrongly quantified. See docs/internal/docs-wip/GENERALIZATION_BUG.md.
+	// and gets wrongly quantified. See docs/internal/adrs/0003-generalization-reads-substitution.md.
 	const envVars = freeTypeVarsEnv(env, substitution);
 	const quantifiedVars: string[] = [];
 

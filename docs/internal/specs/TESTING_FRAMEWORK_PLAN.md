@@ -1,5 +1,9 @@
 # Testing Framework Plan
 
+Status: implemented — kept as a real file (not deleted) because it's
+referenced by path from src/module-loader.ts and std/test.noo as the living
+design rationale for their behavior.
+
 A test framework for programs written *in* noolang. (The `test/` directory tests the
 interpreter itself, in TypeScript; noolang programs currently have no way to verify
 themselves.)

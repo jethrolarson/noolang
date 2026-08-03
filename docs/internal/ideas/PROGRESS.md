@@ -1,5 +1,10 @@
 # Noolang Progress Tracker
 
+Status: rejected — this was the project's main design document before a
+switch to a more rigorous, per-decision docs process (ADRs + bugs/ideas/specs).
+Superseded wholesale, not per-item; most individual items below are stale or
+already resolved elsewhere. Kept for historical context only.
+
 ## 🔄 FFI System Design (In Planning)
 
 ### **Design Philosophy**
