@@ -1,0 +1,76 @@
+# Runtime regression suite for std/json.noo, run by `noo test` (not `bun
+# test`). Complements test/features/std-json-module.test.ts the way
+# stdlib.test.noo complements the rest of test/ — see CLAUDE.md's Tests
+# section. Exercises the module as an imported consumer would, on real
+# JSON text.
+
+{@test_case test_case, @group group, @expect_eq expect_eq, @expect expect} = import "std/test";
+{@json_parse json_parse, @json_stringify json_stringify, @json_equals json_equals,
+ @json_field json_field, @json_index json_index, @json_as_number json_as_number}
+  = import "std/json";
+
+is_ok = fn r => match r (Ok _ => True; Err _ => False);
+is_err = fn r => match r (Ok _ => False; Err _ => True);
+unwrap_or = fn default r => match r (Ok v => v; Err _ => default);
+
+parse_tests = group "json_parse" [
+  test_case "parses a flat object" (fn _ =>
+    expect_eq "{\"a\":1,\"b\":2}"
+      (unwrap_or "?" (match (json_parse "{\"a\":1,\"b\":2}") (Ok v => Ok (json_stringify v); Err e => Err e)))),
+  test_case "parses a nested structure" (fn _ =>
+    expect_eq "{\"items\":[1,2,3],\"ok\":true}"
+      (unwrap_or "?" (match (json_parse "{\"items\":[1,2,3],\"ok\":true}") (Ok v => Ok (json_stringify v); Err e => Err e)))),
+  test_case "rejects malformed input" (fn _ =>
+    expect "unclosed object is an error" (is_err (json_parse "{\"a\":"))),
+  test_case "rejects trailing garbage" (fn _ =>
+    expect "trailing content is an error" (is_err (json_parse "1 2")))
+];
+
+roundtrip_tests = group "json_stringify . json_parse round-trips" [
+  test_case "round-trips a mixed-shape document" (fn _ => (
+    src = "{\"name\":\"Ada\",\"scores\":[1,2,3],\"meta\":{\"active\":true,\"note\":null}}";
+    match (json_parse src) (
+      Ok v => match (json_parse (json_stringify v)) (
+        Ok v2 => expect "re-parsed value equals the original" (json_equals v v2);
+        Err _ => expect "re-parse failed" False
+      );
+      Err _ => expect "initial parse failed" False
+    )
+  ))
+];
+
+extraction_tests = group "json_field/json_index/json_as_number" [
+  test_case "json_field finds a nested field" (fn _ =>
+    match (json_parse "{\"user\":{\"age\":30}}") (
+      Ok v => match (json_field "user" v) (
+        Ok user => expect_eq (Ok 30)
+          (match (json_field "age" user) (Ok a => json_as_number a; Err e => Err e));
+        Err _ => expect "missing user field" False
+      );
+      Err _ => expect "parse failed" False
+    )),
+  test_case "json_index reaches an array element" (fn _ =>
+    match (json_parse "[10,20,30]") (
+      Ok v => expect_eq (Ok 20) (match (json_index 1 v) (Ok e => json_as_number e; Err e => Err e));
+      Err _ => expect "parse failed" False
+    )),
+  test_case "json_field on a missing key is an error" (fn _ =>
+    match (json_parse "{\"a\":1}") (
+      Ok v => expect "missing key is Err" (is_err (json_field "z" v));
+      Err _ => expect "parse failed" False
+    ))
+];
+
+spec_gap_tests = group "spec edge cases found in code review" [
+  test_case "duplicate keys: last value wins, first position kept" (fn _ =>
+    expect_eq "{\"a\":3,\"b\":2}"
+      (unwrap_or "?" (match (json_parse "{\"a\":1,\"b\":2,\"a\":3}") (Ok v => Ok (json_stringify v); Err e => Err e)))),
+  test_case "rejects a leading zero" (fn _ =>
+    expect "\"01\" is an error" (is_err (json_parse "01"))),
+  test_case "rejects a raw unescaped control character in a string" (fn _ =>
+    expect "a literal tab byte in a string is an error" (is_err (json_parse "\"a\tb\""))),
+  test_case "json_stringify emits null for an overflowed (non-finite) number" (fn _ =>
+    expect_eq "null" (unwrap_or "?" (match (json_parse "1e400") (Ok v => Ok (json_stringify v); Err e => Err e))))
+];
+
+group "std/json regressions" [parse_tests, roundtrip_tests, extraction_tests, spec_gap_tests]
