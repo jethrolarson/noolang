@@ -1,33 +1,10 @@
 import { test, expect } from 'bun:test';
 import { parseAndType, expectSuccess } from '../../../test/utils';
 
-// Regression for the "self-recursive choice/pairing" bug: a self-recursive
-// top-level function with two-or-more `choice` branches, where at least one
-// branch pairs the recursive call's own result with a companion value inside
-// a record/tuple/variant, failed to typecheck with a nonsensical unification
-// error even though every branch was well-typed in isolation (the shape
-// needed for e.g. parsing "a key paired with a recursively-parsed value" —
-// exactly what JSON object-member parsing needs).
-//
-// Root cause: `generalize` decided a definition's quantifiedVars using
-// `freeTypeVars`, which only walked a type's own structural shape (function
-// params/return, list/tuple elements, record fields, ...) and never a type
-// variable's `.constraints` payload (the `has {@field ...}` constraints that
-// e.g. record-accessor typing attaches). A variable reachable only through
-// such a constraint — like the element-type variable buried inside a
-// generic recursive-descent helper's accumulator/result record — was never
-// quantified, so `instantiate`'s freshening map had no entry for it: every
-// call site of that helper shared the exact same variable, and unifying two
-// differently-shaped call sites (as `choice`/`choice2` do, since every
-// alternative must produce the same result type) corrupted one call site's
-// element type with the other's.
-//
-// This is a self-contained rebuild of the filed repro (a recursive-descent
-// JSON-value parser, self-recursive `value_p` with two `choice` branches —
-// array and object — where the object branch pairs the recursive result
-// with a string key) using plain top-level functions instead of importing
-// `std/parser` (not shipped on this branch), so the test doesn't depend on
-// that module's existence or API shape.
+// Self-recursive `value_p` with two `choice` branches (array, object), where
+// the object branch pairs the recursive result with a string key — used to
+// throw a nonsensical unification error even though each branch alone was
+// fine. Inlined instead of importing `std/parser` since it's not shipped here.
 test('self-recursive function with a generic recursive-descent helper called from two choice branches, one pairing the result, typechecks', () => {
 	const code = `
     result_bind = fn res f => match res (
@@ -91,11 +68,8 @@ test('self-recursive function with a generic recursive-descent helper called fro
 	expect(() => parseAndType(code)).not.toThrow();
 });
 
-// Simpler, non-recursive isolation of the same mechanism: a generic
-// self-recursive helper (`sep_by`) whose element type carries a structural
-// (`has`) constraint via a record accessor, called at two different element
-// types and combined through a result-unifying `choice2`. Confirms the fix
-// isn't specific to `value_p`'s own self-recursion.
+// Same mechanism without self-recursion: a shared helper (`sep_by`) called
+// twice and combined through a result-unifying `choice2`.
 test('a generic recursive helper called at two element types through a result-unifying combinator picks the unified type at both call sites', () => {
 	const code = `
     result_bind = fn res f => match res (
@@ -126,13 +100,8 @@ test('a generic recursive helper called at two element types through a result-un
 	expect(() => parseAndType(code)).not.toThrow();
 });
 
-// Regression for the fix's own collateral risk: explicit annotations with a
-// structural `given ... has {@field Concrete}` constraint must still reject
-// arguments whose field has the wrong concrete type. Widening what counts
-// as a "free variable" for quantification purposes (the fix above) must not
-// apply to `constrained`-kind definitions, whose `has` constraint pins a
-// field's type to a concrete literal via a deliberately shared, unquantified
-// variable — quantifying it away silently disables the check.
+// Collateral-risk check: `given ... has {@field Concrete}` must still reject
+// a wrong field type after the fix above.
 test('explicit structural constraint with a concrete field type still rejects a wrong field type', () => {
 	expect(() =>
 		parseAndType(`

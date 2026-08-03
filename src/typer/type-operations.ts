@@ -87,33 +87,11 @@ export const freeTypeVars = (
 	return acc;
 };
 
-// A `has`/`hasField`/`custom` constraint on a type variable names OTHER type
-// variables (in its `structure`/`fieldType`/`args`) that don't appear
-// anywhere in the type's own structural shape — e.g. the `has {@value a}`
-// constraint that typing a record accessor (`r | @value`) attaches to `r`
-// names `a`, but `a` never otherwise occurs in `r`'s own type node.
-// `generalize` used plain `freeTypeVars` (structural-shape-only) to decide
-// quantifiedVars, so a variable reachable only through a constraint payload
-// was never quantified, and `instantiate`'s freshening mapping (built from
-// quantifiedVars) then had no entry for it — every instantiation of the
-// scheme left that constraint pointing at the exact same original variable,
-// silently sharing it across unrelated call sites (confirmed: a self-recursive
-// function with a generic recursive-descent helper like `sep_by`, called at
-// two differently-shaped call sites and combined via a result-unifying
-// combinator, corrupted one call site's element type with the other's) — see
-// src/typer/__tests__/choice-recursive-pairing.test.ts for the reproduction.
-//
-// This widened notion of "free" is deliberately NOT folded into the exported
-// `freeTypeVars` above: `typeDefinition`'s explicit-annotation path also calls
-// that function to force-quantify every variable in the annotation, and an
-// annotation's structural constraint (`given a has {@name String}`) stores
-// its literal field types as a variable unified with the concrete type
-// separately, not embedded directly — quantifying that variable (instead of
-// leaving it a single substitution-pinned name shared for the scheme's
-// lifetime) unpins it, so each instantiation forgets the concrete type the
-// annotation declared. `generalize` (inferred, non-annotated definitions)
-// doesn't have that concrete-literal-via-shared-var mechanism to protect, so
-// it can safely use the widened walk.
+// `freeTypeVars` misses variables that only appear inside a `has`/`hasField`
+// constraint payload, so generalize under-quantified them — see
+// choice-recursive-pairing.test.ts. Kept separate from `freeTypeVars` (not
+// merged in) because the explicit-annotation path relies on the old narrow
+// behavior to keep a `given ... has {@field Concrete}` pin unquantified.
 const freeTypeVarsInStructure = (
 	structure: RecordStructure,
 	acc: Set<string>,
