@@ -151,7 +151,7 @@ const parseTemplate: C.Parser<Expression> = tokens => {
 			operator: '+',
 			left,
 			right,
-			location: left.location,
+			location: createLocation(left.location.start, right.location.end),
 		})
 	);
 	return { success: true, value: combined, remaining };
@@ -439,7 +439,7 @@ const parseLambdaExpression: C.Parser<Expression> = tokens => {
 		kind: 'function',
 		params: paramNames,
 		body: bodyResult.value,
-		location: fnResult.value.location,
+		location: createLocation(fnResult.value.location.start, bodyResult.value.location.end),
 	};
 
 	return { success: true, value: lambda, remaining: bodyResult.remaining };
@@ -482,7 +482,7 @@ const parseLambdaBodyComparison: C.Parser<Expression> = tokens => {
 					operator: op.value as '<' | '>' | '<=' | '>=' | '==' | '!=',
 					left: result,
 					right,
-					location: result.location,
+					location: createLocation(result.location.start, right.location.end),
 				};
 			}
 			return result;
@@ -503,7 +503,7 @@ const parseLambdaBodyLogicalAnd: C.Parser<Expression> = C.map(
 				operator: '&&',
 				left: result,
 				right,
-				location: result.location,
+				location: createLocation(result.location.start, right.location.end),
 			};
 		}
 		return result;
@@ -523,7 +523,7 @@ const parseLambdaBodyLogicalOr: C.Parser<Expression> = C.map(
 				operator: '||',
 				left: result,
 				right,
-				location: result.location,
+				location: createLocation(result.location.start, right.location.end),
 			};
 		}
 		return result;
@@ -553,7 +553,7 @@ const parseLambdaBodyCompose: C.Parser<Expression> = C.map(
 				kind: 'pipeline',
 				steps,
 				operators,
-				location: left.location,
+				location: createLocation(left.location.start, steps[steps.length - 1].location.end),
 			} as PipelineExpression;
 		}
 		return left;
@@ -579,7 +579,7 @@ const parseLambdaBodyThrush: C.Parser<Expression> = C.map(
 				operator: op.value as '|' | '|?',
 				left: result,
 				right,
-				location: result.location,
+				location: createLocation(result.location.start, right.location.end),
 			};
 		}
 		return result;
@@ -605,7 +605,7 @@ const parseLambdaBodyMultiplicative: C.Parser<Expression> = tokens => {
 					operator: op.value as '*' | '/' | '%',
 					left: result,
 					right,
-					location: result.location,
+					location: createLocation(result.location.start, right.location.end),
 				};
 			}
 			return result;
@@ -631,7 +631,7 @@ const parseLambdaBodyAdditive: C.Parser<Expression> = C.map(
 				operator: op.value as '+' | '-',
 				left: result,
 				right,
-				location: result.location,
+				location: createLocation(result.location.start, right.location.end),
 			};
 		}
 		return result;
@@ -682,7 +682,7 @@ const parseLambdaBodyApplication: C.Parser<Expression> = C.map(
 				kind: 'application',
 				func: result,
 				args: [arg],
-				location: result.location,
+				location: createLocation(result.location.start, arg.location.end),
 			};
 		}
 		return result;
@@ -870,7 +870,7 @@ const parseApplication = C.map(
 				kind: 'application',
 				func: result,
 				args: [arg],
-				location: result.location,
+				location: createLocation(result.location.start, arg.location.end),
 			};
 		}
 		return result;
@@ -896,7 +896,7 @@ const parseMultiplicative = C.map(
 				operator: op.value as '*' | '/' | '%',
 				left: result,
 				right,
-				location: result.location,
+				location: createLocation(result.location.start, right.location.end),
 			};
 		}
 		return result;
@@ -919,7 +919,7 @@ const parseAdditive = C.map(
 				operator: op.value as '+' | '-',
 				left: result,
 				right,
-				location: result.location,
+				location: createLocation(result.location.start, right.location.end),
 			};
 		}
 		return result;
@@ -946,7 +946,7 @@ const parseComparison = C.map(
 				operator: op.value as '<' | '>' | '<=' | '>=' | '==' | '!=',
 				left: result,
 				right,
-				location: result.location,
+				location: createLocation(result.location.start, right.location.end),
 			};
 		}
 		return result;
@@ -964,7 +964,7 @@ const parseLogicalAnd = C.map(
 				operator: '&&',
 				left: result,
 				right,
-				location: result.location,
+				location: createLocation(result.location.start, right.location.end),
 			};
 		}
 		return result;
@@ -982,7 +982,7 @@ const parseLogicalOr = C.map(
 				operator: '||',
 				left: result,
 				right,
-				location: result.location,
+				location: createLocation(result.location.start, right.location.end),
 			};
 		}
 		return result;
@@ -1012,7 +1012,7 @@ const parseCompose = C.map(
 				kind: 'pipeline',
 				steps,
 				operators,
-				location: left.location,
+				location: createLocation(left.location.start, steps[steps.length - 1].location.end),
 			};
 			return result;
 		}
@@ -1036,7 +1036,7 @@ const parseThrushBase: C.Parser<Expression> = C.map(
 				operator: op.value as '|' | '|?',
 				left: result,
 				right,
-				location: result.location,
+				location: createLocation(result.location.start, right.location.end),
 			};
 		}
 		return result;
@@ -1067,7 +1067,7 @@ const parseThrush: C.Parser<Expression> = tokens => {
 		operator: '$',
 		left: leftResult.value,
 		right: rightResult.value,
-		location: leftResult.value.location,
+		location: createLocation(leftResult.value.location.start, rightResult.value.location.end),
 	};
 	return { success: true, value: result, remaining: rightResult.remaining };
 };
@@ -1341,6 +1341,9 @@ const parseDefinition: C.Parser<Expression> = tokens => {
 		if (typeResult.success) {
 			// Modify the definition to have a typed value
 			const originalDef = regularResult.value as DefinitionExpression;
+			const annotationEnd =
+				remaining[remaining.length - typeResult.remaining.length - 1].location.end;
+			const typedLocation = createLocation(originalDef.value.location.start, annotationEnd);
 
 			// Create typed value
 			let typedValue: Expression;
@@ -1351,7 +1354,7 @@ const parseDefinition: C.Parser<Expression> = tokens => {
 					expression: originalDef.value,
 					type: typeResult.value.type,
 					constraint: typeResult.value.constraint,
-					location: originalDef.value.location,
+					location: typedLocation,
 				};
 			} else {
 				// Create typed expression
@@ -1359,7 +1362,7 @@ const parseDefinition: C.Parser<Expression> = tokens => {
 					kind: 'typed',
 					expression: originalDef.value,
 					type: typeResult.value.type,
-					location: originalDef.value.location,
+					location: typedLocation,
 				};
 			}
 
@@ -2059,40 +2062,47 @@ const parseWhereMainExpression: C.Parser<Expression> = C.choice(
 );
 
 // --- Expression with type annotation (just above semicolon) ---
-const parseExprWithType: C.Parser<Expression> = C.choice3(
-	// Expression with type and constraints: expr : type given constraintExpr
-	C.map(
-		C.seq(
-			parseThrush, // Use parseThrush to support full expression hierarchy
-			C.punctuation(':'),
-			C.lazy(() => parseTypeExpression),
-			C.keyword('given'),
-			parseConstraintExpr
-		),
-		([expr, _colon, type, _given, constraint]): ConstrainedExpression => ({
+// Written manually (not C.map+C.seq) so the resulting node's location can
+// span through the annotation — Type/ConstraintExpr AST nodes carry no
+// location of their own, so the end position has to come from the last
+// consumed token.
+const parseExprWithType: C.Parser<Expression> = tokens => {
+	const exprResult = parseThrush(tokens);
+	if (!exprResult.success) return parseSequenceTerm(tokens);
+
+	const colonResult = C.punctuation(':')(exprResult.remaining);
+	if (!colonResult.success) return parseSequenceTerm(tokens);
+
+	const typeResult = parseTypeExpression(colonResult.remaining);
+	if (!typeResult.success) return parseSequenceTerm(tokens);
+
+	const givenResult = C.seq(C.keyword('given'), parseConstraintExpr)(typeResult.remaining);
+	if (givenResult.success) {
+		const [, constraint] = givenResult.value;
+		const constrainedEnd =
+			typeResult.remaining[typeResult.remaining.length - givenResult.remaining.length - 1]
+				.location.end;
+		const constrained: ConstrainedExpression = {
 			kind: 'constrained',
-			expression: expr,
-			type,
+			expression: exprResult.value,
+			type: typeResult.value,
 			constraint,
-			location: expr.location,
-		})
-	),
-	// Expression with just type: expr : type
-	C.map(
-		C.seq(
-			parseThrush, // Use parseThrush to support full expression hierarchy
-			C.punctuation(':'),
-			C.lazy(() => parseTypeExpression)
-		),
-		([expr, _colon, type]): TypedExpression => ({
-			kind: 'typed',
-			expression: expr,
-			type,
-			location: expr.location,
-		})
-	),
-	C.lazy(() => parseSequenceTerm) // Fallback to regular expressions
-);
+			location: createLocation(exprResult.value.location.start, constrainedEnd),
+		};
+		return { success: true, value: constrained, remaining: givenResult.remaining };
+	}
+
+	const typedEnd =
+		colonResult.remaining[colonResult.remaining.length - typeResult.remaining.length - 1]
+			.location.end;
+	const typed: TypedExpression = {
+		kind: 'typed',
+		expression: exprResult.value,
+		type: typeResult.value,
+		location: createLocation(exprResult.value.location.start, typedEnd),
+	};
+	return { success: true, value: typed, remaining: typeResult.remaining };
+};
 
 // --- Sequence (semicolon) ---
 // Accepts a sequence of definitions and/or expressions, separated by semicolons
@@ -2116,7 +2126,7 @@ const parseSequence: C.Parser<Expression> = C.map(
 				operator: ';',
 				left: result,
 				right,
-				location: result.location,
+				location: createLocation(result.location.start, right.location.end),
 			};
 		}
 		return result;
