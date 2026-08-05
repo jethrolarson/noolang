@@ -1,11 +1,9 @@
 # std/json — JSON parse/serialize, built on std/parser's combinators.
 # Design notes and history: docs/internal/specs/std-json.md.
 #
-{ @ParseError ParseError, @parse_error parse_error, @is_digit is_digit,
-  @peek_char peek_char, @satisfy satisfy, @char char, @string_lit string_lit,
-  @skip_ws skip_ws, @pmap pmap, @pbind pbind, @choice2 choice2, @choice choice,
-  @many many, @between between, @sep_by sep_by, @lexeme lexeme,
-  @take_while take_while } = import "std/parser";
+{ @ParseError, @parse_error, @is_digit, @peek_char, @satisfy, @char,
+  @string_lit, @skip_ws, @pmap, @pbind, @choice2, @choice, @many, @between,
+  @sep_by, @lexeme, @take_while } = import "std/parser";
 
 variant JsonValue =
     JNull
