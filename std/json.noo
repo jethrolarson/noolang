@@ -19,6 +19,9 @@ choice2 = parser_mod | @choice2;
 choice = parser_mod | @choice;
 many = parser_mod | @many;
 between = parser_mod | @between;
+sep_by = parser_mod | @sep_by;
+lexeme = parser_mod | @lexeme;
+take_while = parser_mod | @take_while;
 
 variant JsonValue =
     JNull
@@ -79,22 +82,19 @@ json_bool_p = choice2 json_true_p json_false_p;
 
 # --- numbers ---
 #
-# Self-contained (not `pbind`/`take_while1`-chained like the scalars above):
-# a combinator-chain version of this production typechecks fine alone, but
-# corrupts an unrelated inference (std/test's `run_all`) when the two
-# modules are imported into one program together — reproduces only in that
-# combination, not standalone. Same scheme-freshening bug class as #158.
+# Digit run built on std/parser's `take_while` (a single `reduce`, not
+# noolang-level recursion) rather than a hand-rolled scan. Sign/fraction/
+# exponent stay explicitly position-threaded rather than a `pbind` chain:
+# each is optional but, once its leading character is seen, requires at
+# least one digit to follow — a hard-fail-after-partial-match shape that
+# `choice`/`optional` can't express without backtracking past a character
+# that was correctly consumed (they retry from the start position on any
+# failure, including one past a already-committed prefix).
 digit_run = fn pos s => (
-  doc_len = length (chars s);
-  remaining = chars (substring pos doc_len s);
-  init = {@n (0 : Float), @count (0 : Float), @i pos, @done False};
-  step = fn state ch =>
-    if state | @done then state
-    else if is_digit ch
-      then {@n ((state | @n) * 10 + digit_value ch), @count ((state | @count) + 1), @i ((state | @i) + 1), @done False}
-      else {@n (state | @n), @count (state | @count), @i (state | @i), @done True};
-  final = reduce step init remaining;
-  {@n (final | @n), @count (final | @count), @i (final | @i)}
+  r = take_while is_digit pos s;
+  digits = chars (r | @value);
+  n = reduce (fn acc c => acc * 10 + digit_value c) 0 digits;
+  {@n n, @count (length digits), @i (r | @pos)}
 );
 
 json_number_p = fn pos s => (
@@ -151,103 +151,49 @@ json_string_raw_p = between (char "\"") (char "\"") (pmap (fn cs => join "" cs) 
 json_string_p = pmap JString json_string_raw_p;
 
 # --- values, arrays, objects ---
-#
-# Array/object repetition doesn't use `sep_by` pairing the self-recursive
-# value parser with a separator/key, unlike the scalar parsers above — a
-# self-recursive parser with 2+ `choice` branches breaks if any branch
-# pairs the recursive result with a companion value (object-member parsing's
-# natural shape). See docs/internal/docs-wip/CHOICE_RECURSIVE_PAIRING_BUG.md.
-# Worked around with an explicit `ParseMode` tag and manual recursion
-# instead; still dispatches through the combinator-built scalar parsers.
-variant ParseMode =
-    ModeValue
-  | ModeArrayNext (List JsonValue)
-  | ModeArrayRest (List JsonValue)
-  | ModeObjectNext (List {String, JsonValue})
-  | ModeObjectRest (List {String, JsonValue});
-
-empty_json_array = list_filter (fn _ => False) [JNull];
-empty_json_object = list_filter (fn _ => False) [{"", JNull}];
 
 json_scalar_p = choice [json_null_p, json_bool_p, json_string_p, json_number_p];
 
-parse_node = fn mode pos s => match mode (
-  ModeValue => (
-    p = skip_ws pos s;
-    match (json_scalar_p p s) (
-      Ok r => Ok r;
-      Err _ => match (peek_char p s) (
-        None => parse_error "unexpected end of input" p;
-        Some c => match c (
-          "[" => (
-            p1 = skip_ws (p + 1) s;
-            if (peek_char p1 s) == Some "]"
-              then Ok {@value (JArray empty_json_array), @pos (p1 + 1)}
-              else parse_node (ModeArrayNext empty_json_array) p1 s
-          );
-          "{" => (
-            p1 = skip_ws (p + 1) s;
-            if (peek_char p1 s) == Some "}"
-              then Ok {@value (JObject empty_json_object), @pos (p1 + 1)}
-              else parse_node (ModeObjectNext empty_json_object) p1 s
-          );
-          _ => parse_error ("unexpected character '" + c + "'") p
-        )
-      )
-    )
-  );
-  ModeArrayNext acc => result_bind (parse_node ModeValue pos s) (fn item =>
-    parse_node (ModeArrayRest (append acc [item | @value])) (item | @pos) s
-  );
-  ModeArrayRest acc => (
-    p = skip_ws pos s;
-    match (peek_char p s) (
-      None => parse_error "unterminated array" p;
-      Some c => match c (
-        "," => parse_node (ModeArrayNext acc) (skip_ws (p + 1) s) s;
-        "]" => Ok {@value (JArray acc), @pos (p + 1)};
-        _ => parse_error "expected ',' or ']'" p
-      )
-    )
-  );
-  # Duplicate keys: last value wins, first occurrence keeps its position —
-  # matches JS's JSON.parse; `assoc_set` already has this behavior.
-  ModeObjectNext acc => (
-    p = skip_ws pos s;
-    match (peek_char p s) (
-      None => parse_error "unterminated object" p;
-      Some c => if not (c == "\"") then parse_error "expected string key" p else
-        result_bind (json_string_raw_p p s) (fn keyRes => (
-          p1 = skip_ws (keyRes | @pos) s;
-          match (peek_char p1 s) (
-            Some ":" => result_bind (parse_node ModeValue (skip_ws (p1 + 1) s) s) (fn valRes =>
-              parse_node (ModeObjectRest (assoc_set (keyRes | @value) (valRes | @value) acc)) (valRes | @pos) s
-            );
-            _ => parse_error "expected ':'" p1
-          )
-        ))
-    )
-  );
-  ModeObjectRest acc => (
-    p = skip_ws pos s;
-    match (peek_char p s) (
-      None => parse_error "unterminated object" p;
-      Some c => match c (
-        "," => parse_node (ModeObjectNext acc) (skip_ws (p + 1) s) s;
-        "}" => Ok {@value (JObject acc), @pos (p + 1)};
-        _ => parse_error "expected ',' or '}'" p
-      )
+# Duplicate keys: last value wins, first occurrence keeps its position —
+# matches JS's JSON.parse; `assoc_set` already has this behavior. Folded
+# over the fully-parsed member list rather than threaded through parsing,
+# since order of application (left to right) gives the same result either
+# way.
+dedupe_members = fn pairs => reduce (fn acc pair => (
+    {k, v} = pair;
+    assoc_set k v acc
+  )) [] pairs;
+
+# Self-recursive: array/object elements recurse back into `json_value_p`
+# itself (a bare self-reference passed to `sep_by`/`pbind`, not a fresh
+# top-level binding — noolang's environment is strictly sequential, so two
+# separately-named functions can't call each other forward, only a
+# binding can call itself). Object members pair the recursive value with a
+# string key via `pbind`, the shape that broke self-recursive `choice`
+# before the generalize fix that made this rewrite possible.
+json_value_p = fn pos s => (
+  p = skip_ws pos s;
+  json_array_p = pmap JArray
+    (between (char "[") (lexeme (char "]")) (sep_by json_value_p (lexeme (char ","))));
+  json_member_p = pbind (fn key =>
+      pbind (fn _ => pmap (fn v => {key, v}) json_value_p) (lexeme (char ":"))
+    ) (lexeme json_string_raw_p);
+  json_object_p = pmap (fn pairs => JObject (dedupe_members pairs))
+    (between (char "{") (lexeme (char "}")) (sep_by json_member_p (lexeme (char ","))));
+  match (choice [json_scalar_p, json_array_p, json_object_p] p s) (
+    Ok r => Ok r;
+    Err _ => match (peek_char p s) (
+      None => parse_error "unexpected end of input" p;
+      Some c => parse_error ("unexpected character '" + c + "'") p
     )
   )
 );
-
-parse_json_value = fn pos s => parse_node ModeValue pos s;
 
 # Whole-input parse: rejects trailing non-whitespace, wraps ParseError into
 # JsonParseError (see its declaration above).
 json_parse = fn input =>
   match (
-    result_bind (parse_json_value 0 input) (fn r => (
+    result_bind (json_value_p 0 input) (fn r => (
       p = skip_ws (r | @pos) input;
       match (peek_char p input) (
         None => Ok (r | @value);

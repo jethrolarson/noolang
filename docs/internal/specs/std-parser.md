@@ -26,12 +26,12 @@ position-tagged `ParseError`. Backtracking is free — position is an
 ordinary argument, not a mutated cursor, so a failed parser never advances
 its caller's position.
 
-There is deliberately no `type Parser a = ...` alias: parametric `type`
-aliases parse but don't expand under unification in this codebase (see
-[`PARAMETRIC_TYPE_ALIAS_BUG.md`](../docs-wip/PARAMETRIC_TYPE_ALIAS_BUG.md)),
-so every combinator is a plain unannotated function and Hindley-Milner
-inference carries the type parameter through, the same way `std/json.noo`
-already relied on for `result_bind`/`result_map`.
+There is no `type Parser a = ...` alias: every combinator is a plain
+unannotated function and Hindley-Milner inference carries the type
+parameter through, the same way `std/json.noo` already relies on for
+`result_bind`/`result_map`. Not a current blocker — the parametric-alias
+bug that once broke ascription against `Parser a` was fixed by #178 — the
+alias is just unadded, not unaddable.
 
 ## Worked example: `std/json`, its real consumer
 
@@ -101,20 +101,19 @@ position = match parsed (Ok r => r | @pos; Err _ => 0 - 1);
 position  # => 1 : Float
 ```
 
-## Known limitation
+## Resolved limitation
 
-A self-recursive parser with 2+ `choice` branches breaks if any branch
-pairs the recursive result with a companion value (record/tuple/variant) —
-see [`CHOICE_RECURSIVE_PAIRING_BUG.md`](../docs-wip/CHOICE_RECURSIVE_PAIRING_BUG.md).
-This is exactly the shape needed for idiomatic object/key-value grammar
-parsing, so `std/json.noo`'s array/object repetition routes around it with
-manual recursion instead of `sep_by`. A second, narrower gap surfaced
-building `std/json.noo`'s number parser — see
-[`CROSS_MODULE_SCHEME_CORRUPTION_BUG.md`](../docs-wip/CROSS_MODULE_SCHEME_CORRUPTION_BUG.md):
-a `pbind`/`take_while1` chain that typechecks fine alone can corrupt
-unrelated inference elsewhere in a program that also imports `std/test`.
-Fixing either would let a future `std/json` revision lean on `std/parser`
-more uniformly.
+Two typer bugs once forced `std/json.noo` to route around this library for
+its trickiest productions: a self-recursive parser with 2+ `choice`
+branches broke if any branch paired the recursive result with a companion
+value (exactly object/key-value grammar's shape), and a `pbind`/`take_while1`
+chain that typechecked fine alone could corrupt unrelated inference
+elsewhere in a program that also imported `std/test`. Both were the same
+root cause — `generalize` wasn't quantifying type variables reachable only
+through a structural constraint — fixed alongside #179. `std/json.noo`'s
+array/object repetition (including the object-member `pbind`-pairing shape)
+is now genuinely combinator-built, self-recursing through `sep_by`/`pbind`
+directly.
 
 ## History
 

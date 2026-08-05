@@ -168,47 +168,34 @@ is a rename, not a translation.
 - **Leading zeros (`"01"`) and raw unescaped control characters in strings
   are rejected**, per RFC 8259 §6 and §7 respectively.
 
-## Implementation notes (combinator-based, mostly)
+## Implementation notes (combinator-based throughout)
 
-`null`/`true`/`false`/string are genuinely combinator-built on
-`std/parser`'s `choice`/`pmap`/`between`/`many`. Two productions fall back
-to hand-rolled scanning, each a workaround for a distinct typer bug:
+`null`/`true`/`false`/string/array/object are all genuinely combinator-built
+on `std/parser`'s `choice`/`pmap`/`between`/`sep_by`/`pbind`. Numbers use
+`take_while` for digit runs, with sign/fraction/exponent explicitly
+position-threaded rather than chained through `pbind` — each is optional
+but, once its leading character is seen, requires at least one digit to
+follow, a hard-fail-after-partial-match shape `choice`/`optional` can't
+express without backtracking past an already-consumed character.
 
-- **Numbers** (`digit_run`/`json_number_p`) use one self-contained,
-  imperative-style function instead of a `pbind`/`take_while1` chain. See
-  [`CROSS_MODULE_SCHEME_CORRUPTION_BUG.md`](../docs-wip/CROSS_MODULE_SCHEME_CORRUPTION_BUG.md):
-  a combinator-chain version typechecks fine standalone but corrupts an
-  unrelated inference (`std/test`'s `run_all`) when the two modules are
-  imported into one program together — reproduces only in that
-  combination, confirmed by direct repro, not caught by typechecking
-  `std/json.noo` in isolation.
-- **Array/object repetition** (`parse_node`, tagged by `ParseMode`) uses
-  manual recursion instead of `sep_by` pairing the self-recursive value
-  parser with a separator/key. See
-  [`CHOICE_RECURSIVE_PAIRING_BUG.md`](../docs-wip/CHOICE_RECURSIVE_PAIRING_BUG.md):
-  a self-recursive parser with 2+ `choice` branches breaks when any branch
-  pairs the recursive result with a companion value — object-member
-  parsing's natural shape.
-
-Both are real, verified typer gaps, not caution left over from an earlier,
-more conservative draft — each was independently reproduced during this
-module's development. `JArray`/`JObject`'s empty-accumulator lists
-(`empty_json_array`/`empty_json_object`) also stay built via `list_filter`
-rather than a bare `[]` literal, for the same reason: a bare `[]` typechecks
-fine in isolation (the empty-list type-variable collision bug it originally
-worked around is fixed on `main`), but given the number-parser finding
-above, "typechecks in isolation" is no longer trusted as sufficient
-evidence on its own for this file — kept as the already-verified form
-rather than re-risked for a cosmetic simplification.
+Two productions were hand-rolled workarounds for typer bugs
+(`CROSS_MODULE_SCHEME_CORRUPTION_BUG`, `CHOICE_RECURSIVE_PAIRING_BUG` —
+both fixed by the `generalize`/constraint-quantification fix landed
+alongside #179) until both were rewritten back to combinator style once the
+bugs were confirmed fixed: array/object repetition self-recurses through
+`json_value_p` directly (a bare self-reference passed to `sep_by`/`pbind`,
+not a second top-level binding — noolang's environment is strictly
+sequential, so two separately-named functions can't call each other
+forward), including the object-member `pbind`-pairing shape that used to
+break it.
 
 ## History: why combinator-based, not hand-rolled
 
 The module shipped once already as PR #165, hand-rolled recursive-descent
 in pure `.noo` with no `std/parser` dependency (that library didn't exist
 yet). That choice was forced, not stylistic: an early attempt at a
-combinator-based rewrite typechecked ~17x slower (see
-[`PARSER_COMBINATOR_SIZE_COST.md`](../docs-wip/PARSER_COMBINATOR_SIZE_COST.md)),
-a cost specific to noolang's own then-unmemoized parser backtracking on
+combinator-based rewrite typechecked ~17x slower, a cost specific to
+noolang's own then-unmemoized parser backtracking on
 combinator-heavy source, not to JSON parsing itself. Packrat memoization
 (#174) fixed that mechanism; re-measured, the combinator-based version now
 typechecks in the same ~20-30ms band as the hand-rolled one, so the
