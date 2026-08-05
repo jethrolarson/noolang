@@ -11,14 +11,12 @@
 #   String -> Float -> Result {@value a, @pos Float} ParseError
 # i.e. given the full input and a starting character position, either the
 # parsed value plus the position just past what it consumed, or a
-# position-tagged error. There is no `type Parser a = ...` alias here on
-# purpose: parametric `type` aliases parse but don't expand under
-# unification in this codebase (confirmed — see
-# docs/internal/docs-wip/PARAMETRIC_TYPE_ALIAS_BUG.md), so ascribing
-# anything to `Parser a` fails to typecheck even though the alias itself
-# parses fine. Every combinator below is a plain unannotated function;
-# Hindley-Milner inference carries `a` through exactly like it does for
-# `result_bind`/`result_map` in std/json.noo.
+# position-tagged error. There is no `type Parser a = ...` alias here;
+# every combinator is a plain unannotated function and Hindley-Milner
+# inference carries `a` through, the same way `result_bind`/`result_map` in
+# std/json.noo do. (Not a current blocker — the parametric-alias bug that
+# once broke ascription against `Parser a` was fixed by #178 — but nothing
+# here needs the alias enough yet to add it back.)
 #
 # Backtracking is free: position is an ordinary function argument, not a
 # mutated cursor, so a parser that fails never advances `pos` for its

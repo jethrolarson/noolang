@@ -1,24 +1,9 @@
 # std/json — JSON parse/serialize, built on std/parser's combinators.
 # Design notes and history: docs/internal/specs/std-json.md.
 #
-# `std/parser` is imported once and projected with `| @name` rather than a
-# single destructuring bind — see the spec doc for why (import-destructure
-# arity, #158/#159).
-parser_mod = import "std/parser";
-ParseError = parser_mod | @ParseError;
-parse_error = parser_mod | @parse_error;
-is_digit = parser_mod | @is_digit;
-peek_char = parser_mod | @peek_char;
-satisfy = parser_mod | @satisfy;
-char = parser_mod | @char;
-string_lit = parser_mod | @string_lit;
-skip_ws = parser_mod | @skip_ws;
-pmap = parser_mod | @pmap;
-pbind = parser_mod | @pbind;
-choice2 = parser_mod | @choice2;
-choice = parser_mod | @choice;
-many = parser_mod | @many;
-between = parser_mod | @between;
+{ @ParseError, @parse_error, @is_digit, @peek_char, @satisfy, @char,
+  @string_lit, @skip_ws, @pmap, @pbind, @choice2, @choice, @many, @between,
+  @sep_by, @lexeme, @take_while } = import "std/parser";
 
 variant JsonValue =
     JNull
@@ -28,10 +13,9 @@ variant JsonValue =
   | JArray (List JsonValue)
   | JObject (List {String, JsonValue});
 
-# Not std/parser's `ParseError` re-exported as-is: an importer of only
-# "std/json" can't pattern-match a type it never imported (ADT visibility
-# doesn't cross transitive imports), so json_parse re-wraps into this
-# locally-declared variant at the boundary — see json_parse below.
+# Wrapped, not re-exported: ADT pattern-matching doesn't cross transitive
+# imports — a std/json-only importer couldn't match std/parser's
+# `ParseError` directly. Boundary wrap in json_parse below.
 variant JsonParseError = JsonParseError {@message String, @position Float};
 
 # Extraction errors are a separate variant from parse errors: getting a
@@ -79,24 +63,20 @@ json_bool_p = choice2 json_true_p json_false_p;
 
 # --- numbers ---
 #
-# Self-contained (not `pbind`/`take_while1`-chained like the scalars above):
-# a combinator-chain version of this production typechecks fine alone, but
-# corrupts an unrelated inference (std/test's `run_all`) when the two
-# modules are imported into one program together — reproduces only in that
-# combination, not standalone. Same scheme-freshening bug class as #158.
-digit_run = fn pos s => (
-  doc_len = length (chars s);
-  remaining = chars (substring pos doc_len s);
-  init = {@n (0 : Float), @count (0 : Float), @i pos, @done False};
-  step = fn state ch =>
-    if state | @done then state
-    else if is_digit ch
-      then {@n ((state | @n) * 10 + digit_value ch), @count ((state | @count) + 1), @i ((state | @i) + 1), @done False}
-      else {@n (state | @n), @count (state | @count), @i (state | @i), @done True};
-  final = reduce step init remaining;
-  {@n (final | @n), @count (final | @count), @i (final | @i)}
-);
+# Digit run: std/parser's `take_while`. Sign/fraction/exponent: position-
+# threaded, not `pbind`-chained — each is optional but commits once its
+# leading character matches, and `choice`/`optional` retry from the start
+# position on failure, which would un-commit that character.
+digit_run = (fn pos s => (
+  r = take_while is_digit pos s;
+  digits = chars (r | @value);
+  n = reduce (fn acc c => acc * 10 + digit_value c) 0 digits;
+  {@n n, @count (length digits), @i (r | @pos)}
+) : Float -> String -> {@n Float, @count Float, @i Float});
 
+# Not ascribed: `Result {...} ParseError` hits the same constructor-name
+# quirk as json_parse's own signature below (ParseError's variant name
+# equals its sole constructor's name).
 json_number_p = fn pos s => (
   neg = (peek_char pos s) == Some "-";
   pos1 = if neg then pos + 1 else pos;
@@ -134,10 +114,9 @@ escape_to_char = fn c => match c (
   _ => c
 );
 
-# \u/\b/\f are valid JSON escapes too (RFC 8259 §7), but noolang has no
-# codepoint<->char builtin to decode `\uXXXX` with, so they're rejected
-# rather than mis-decoded (satisfy's predicate below only accepts escapes
-# this module can actually turn into a char).
+# \u/\b/\f are valid JSON escapes (RFC 8259 §7), unsupported here: no
+# codepoint<->char builtin for `\uXXXX`, no `\b`/`\f` in noolang's own
+# string-literal lexer. Rejected, not mis-decoded.
 is_supported_escape = fn c =>
   (c == "\"") || (c == "\\") || (c == "/") || (c == "n") || (c == "r") || (c == "t");
 
@@ -151,103 +130,46 @@ json_string_raw_p = between (char "\"") (char "\"") (pmap (fn cs => join "" cs) 
 json_string_p = pmap JString json_string_raw_p;
 
 # --- values, arrays, objects ---
-#
-# Array/object repetition doesn't use `sep_by` pairing the self-recursive
-# value parser with a separator/key, unlike the scalar parsers above — a
-# self-recursive parser with 2+ `choice` branches breaks if any branch
-# pairs the recursive result with a companion value (object-member parsing's
-# natural shape). See docs/internal/docs-wip/CHOICE_RECURSIVE_PAIRING_BUG.md.
-# Worked around with an explicit `ParseMode` tag and manual recursion
-# instead; still dispatches through the combinator-built scalar parsers.
-variant ParseMode =
-    ModeValue
-  | ModeArrayNext (List JsonValue)
-  | ModeArrayRest (List JsonValue)
-  | ModeObjectNext (List {String, JsonValue})
-  | ModeObjectRest (List {String, JsonValue});
-
-empty_json_array = list_filter (fn _ => False) [JNull];
-empty_json_object = list_filter (fn _ => False) [{"", JNull}];
 
 json_scalar_p = choice [json_null_p, json_bool_p, json_string_p, json_number_p];
 
-parse_node = fn mode pos s => match mode (
-  ModeValue => (
-    p = skip_ws pos s;
-    match (json_scalar_p p s) (
-      Ok r => Ok r;
-      Err _ => match (peek_char p s) (
-        None => parse_error "unexpected end of input" p;
-        Some c => match c (
-          "[" => (
-            p1 = skip_ws (p + 1) s;
-            if (peek_char p1 s) == Some "]"
-              then Ok {@value (JArray empty_json_array), @pos (p1 + 1)}
-              else parse_node (ModeArrayNext empty_json_array) p1 s
-          );
-          "{" => (
-            p1 = skip_ws (p + 1) s;
-            if (peek_char p1 s) == Some "}"
-              then Ok {@value (JObject empty_json_object), @pos (p1 + 1)}
-              else parse_node (ModeObjectNext empty_json_object) p1 s
-          );
-          _ => parse_error ("unexpected character '" + c + "'") p
-        )
-      )
-    )
-  );
-  ModeArrayNext acc => result_bind (parse_node ModeValue pos s) (fn item =>
-    parse_node (ModeArrayRest (append acc [item | @value])) (item | @pos) s
-  );
-  ModeArrayRest acc => (
-    p = skip_ws pos s;
-    match (peek_char p s) (
-      None => parse_error "unterminated array" p;
-      Some c => match c (
-        "," => parse_node (ModeArrayNext acc) (skip_ws (p + 1) s) s;
-        "]" => Ok {@value (JArray acc), @pos (p + 1)};
-        _ => parse_error "expected ',' or ']'" p
-      )
-    )
-  );
-  # Duplicate keys: last value wins, first occurrence keeps its position —
-  # matches JS's JSON.parse; `assoc_set` already has this behavior.
-  ModeObjectNext acc => (
-    p = skip_ws pos s;
-    match (peek_char p s) (
-      None => parse_error "unterminated object" p;
-      Some c => if not (c == "\"") then parse_error "expected string key" p else
-        result_bind (json_string_raw_p p s) (fn keyRes => (
-          p1 = skip_ws (keyRes | @pos) s;
-          match (peek_char p1 s) (
-            Some ":" => result_bind (parse_node ModeValue (skip_ws (p1 + 1) s) s) (fn valRes =>
-              parse_node (ModeObjectRest (assoc_set (keyRes | @value) (valRes | @value) acc)) (valRes | @pos) s
-            );
-            _ => parse_error "expected ':'" p1
-          )
-        ))
-    )
-  );
-  ModeObjectRest acc => (
-    p = skip_ws pos s;
-    match (peek_char p s) (
-      None => parse_error "unterminated object" p;
-      Some c => match c (
-        "," => parse_node (ModeObjectNext acc) (skip_ws (p + 1) s) s;
-        "}" => Ok {@value (JObject acc), @pos (p + 1)};
-        _ => parse_error "expected ',' or '}'" p
-      )
+# Duplicate keys: last value wins, first position kept — matches
+# JSON.parse, via `assoc_set`. Folded over the parsed list, not threaded
+# through parsing; left-to-right order gives the same result.
+dedupe_members = fn pairs => reduce (fn acc pair => (
+    {k, v} = pair;
+    assoc_set k v acc
+  )) [] pairs : List {String, JsonValue} -> List {String, JsonValue};
+
+# json_value_p passes itself by name into sep_by/pbind, not through
+# separate array_p/object_p bindings — noolang's environment is strictly
+# sequential; only a binding can call itself, two names can't forward-
+# reference each other.
+# Not ascribed: same ParseError constructor-name quirk as json_number_p
+# above.
+json_value_p = fn pos s => (
+  p = skip_ws pos s;
+  json_array_p = pmap JArray
+    (between (char "[") (lexeme (char "]")) (sep_by json_value_p (lexeme (char ","))));
+  json_member_p = pbind (fn key =>
+      pbind (fn _ => pmap (fn v => {key, v}) json_value_p) (lexeme (char ":"))
+    ) (lexeme json_string_raw_p);
+  json_object_p = pmap (fn pairs => JObject (dedupe_members pairs))
+    (between (char "{") (lexeme (char "}")) (sep_by json_member_p (lexeme (char ","))));
+  match (choice [json_scalar_p, json_array_p, json_object_p] p s) (
+    Ok r => Ok r;
+    Err _ => match (peek_char p s) (
+      None => parse_error "unexpected end of input" p;
+      Some c => parse_error ("unexpected character '" + c + "'") p
     )
   )
 );
-
-parse_json_value = fn pos s => parse_node ModeValue pos s;
 
 # Whole-input parse: rejects trailing non-whitespace, wraps ParseError into
 # JsonParseError (see its declaration above).
 json_parse = fn input =>
   match (
-    result_bind (parse_json_value 0 input) (fn r => (
+    result_bind (json_value_p 0 input) (fn r => (
       p = skip_ws (r | @pos) input;
       match (peek_char p input) (
         None => Ok (r | @value);
@@ -279,6 +201,10 @@ non_finite_number_text = fn n => (
   (text == "Infinity") || (text == "-Infinity") || (text == "NaN")
 );
 
+# Not ascribed: wrapping a self-recursive binding in a type ascription
+# breaks its own recursive reference at runtime ("Undefined variable"),
+# even though it typechecks — an evaluator gap independent of this module.
+# See docs/internal/bugs/SELF_RECURSIVE_ASCRIPTION_BUG.md.
 json_stringify = fn v => match v (
   JNull => "null";
   JBool b => match b (True => "true"; False => "false");
@@ -298,26 +224,28 @@ json_stringify = fn v => match v (
 # EXTRACTION API
 # ========================================
 
-json_as_string = fn v => match v (JString s => Ok s; _ => Err JsonExpectedString);
-json_as_number = fn v => match v (JNumber n => Ok n; _ => Err JsonExpectedNumber);
-json_as_bool = fn v => match v (JBool b => Ok b; _ => Err JsonExpectedBool);
-json_as_array = fn v => match v (JArray items => Ok items; _ => Err JsonExpectedArray);
-json_as_object = fn v => match v (JObject members => Ok members; _ => Err JsonExpectedObject);
+json_as_string = fn v => match v (JString s => Ok s; _ => Err JsonExpectedString) : JsonValue -> Result String JsonError;
+json_as_number = fn v => match v (JNumber n => Ok n; _ => Err JsonExpectedNumber) : JsonValue -> Result Float JsonError;
+json_as_bool = fn v => match v (JBool b => Ok b; _ => Err JsonExpectedBool) : JsonValue -> Result Bool JsonError;
+json_as_array = fn v => match v (JArray items => Ok items; _ => Err JsonExpectedArray) : JsonValue -> Result (List JsonValue) JsonError;
+json_as_object = fn v => match v (JObject members => Ok members; _ => Err JsonExpectedObject) : JsonValue -> Result (List {String, JsonValue}) JsonError;
 
 json_field = fn key v => result_bind (json_as_object v) (fn members =>
   match (assoc_get key members) (
     Some found => Ok found;
     None => Err (JsonMissingField key)
   )
-);
+) : String -> JsonValue -> Result JsonValue JsonError;
 
 json_index = fn idx v => result_bind (json_as_array v) (fn items =>
   match (at idx items) (
     Some found => Ok found;
     None => Err (JsonIndexOutOfBounds idx)
   )
-);
+) : Float -> JsonValue -> Result JsonValue JsonError;
 
+# Not ascribed: same self-recursive-ascription runtime gap as json_stringify
+# above.
 json_equals = fn a b => match a (
   JNull => match b (JNull => True; _ => False);
   JBool x => match b (JBool y => equals x y; _ => False);

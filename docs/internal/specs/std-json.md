@@ -1,3 +1,7 @@
+---
+assert: true
+---
+
 # `std/json` — JSON parse/serialize
 
 **Status: Implemented** (PR #176). User-facing usage docs live in
@@ -7,8 +11,8 @@ read the language reference first if you just want to use it.
 
 This file is literate noolang (see `docs/language-reference.md` §Literate
 Programming): every ```` ```noolang ```` block below actually runs, in file
-order, as one program. If the module's real API ever drifts from what this
-doc claims, this file stops typechecking or its assertions fail — see
+order, as one program. `assert: true` makes every `# =>` comment checked
+against the real evaluated value, not just documentation — see
 `validate_examples.js`.
 
 ## Scope
@@ -48,8 +52,11 @@ doc = json_parse "{\"name\":\"Ada\",\"scores\":[1,2,3]}";
 summary = match doc (
   Ok v => (
     name = match (json_field "name" v) (Ok n => json_stringify n; Err _ => "?");
-    first_score = match (json_index 0 v) (
-      Ok s => match (json_as_number s) (Ok n => toString n; Err _ => "?");
+    first_score = match (json_field "scores" v) (
+      Ok scores => match (json_index 0 scores) (
+        Ok s => match (json_as_number s) (Ok n => toString n; Err _ => "?");
+        Err _ => "?"
+      );
       Err _ => "?"
     );
     name + " " + first_score
@@ -131,11 +138,14 @@ is a rename, not a translation.
 
 ## Documented scope limits
 
-- **`\u`, `\b`, `\f` string escapes are rejected, not decoded.** There is
-  no codepoint↔character builtin (`fromCharCode`/`charCodeAt`-equivalent)
-  in noolang to decode a `\uXXXX` escape with — rejected rather than
-  silently mis-decoded (e.g. passing the literal letter through and
-  dropping the backslash).
+- **`\u`, `\b`, `\f` string escapes are rejected, not decoded.** `\u` needs
+  a codepoint↔character builtin (`fromCharCode`/`charCodeAt`-equivalent)
+  noolang doesn't have. `\b`/`\f` need no such builtin — they're fixed
+  characters, same as the already-supported `\n`/`\r`/`\t` — but noolang's
+  own string-literal lexer has no `\b`/`\f` escape either, so this module
+  has no way to construct the character to emit. All three are rejected
+  rather than silently mis-decoded (e.g. passing the literal letter through
+  and dropping the backslash).
 
   ```noolang
   {@json_parse json_parse} = import "std/json";
@@ -165,50 +175,82 @@ is a rename, not a translation.
   deduped = match (json_parse "{\"a\":1,\"b\":2,\"a\":3}") (Ok v => json_stringify v; Err _ => "parse failed");
   deduped  # => "{\"a\":3,\"b\":2}" : String
   ```
-- **Leading zeros (`"01"`) and raw unescaped control characters in strings
-  are rejected**, per RFC 8259 §6 and §7 respectively.
 
-## Implementation notes (combinator-based, mostly)
+## RFC 8259 compliance
 
-`null`/`true`/`false`/string are genuinely combinator-built on
-`std/parser`'s `choice`/`pmap`/`between`/`many`. Two productions fall back
-to hand-rolled scanning, each a workaround for a distinct typer bug:
+Grammar-shape checks the sections above don't already exercise, each cited
+to the clause it verifies:
 
-- **Numbers** (`digit_run`/`json_number_p`) use one self-contained,
-  imperative-style function instead of a `pbind`/`take_while1` chain. See
-  [`CROSS_MODULE_SCHEME_CORRUPTION_BUG.md`](../docs-wip/CROSS_MODULE_SCHEME_CORRUPTION_BUG.md):
-  a combinator-chain version typechecks fine standalone but corrupts an
-  unrelated inference (`std/test`'s `run_all`) when the two modules are
-  imported into one program together — reproduces only in that
-  combination, confirmed by direct repro, not caught by typechecking
-  `std/json.noo` in isolation.
-- **Array/object repetition** (`parse_node`, tagged by `ParseMode`) uses
-  manual recursion instead of `sep_by` pairing the self-recursive value
-  parser with a separator/key. See
-  [`CHOICE_RECURSIVE_PAIRING_BUG.md`](../docs-wip/CHOICE_RECURSIVE_PAIRING_BUG.md):
-  a self-recursive parser with 2+ `choice` branches breaks when any branch
-  pairs the recursive result with a companion value — object-member
-  parsing's natural shape.
+```noolang
+{@json_parse json_parse, @json_stringify json_stringify} = import "std/json";
+is_err = fn r => match r (Ok _ => False; Err _ => True);
 
-Both are real, verified typer gaps, not caution left over from an earlier,
-more conservative draft — each was independently reproduced during this
-module's development. `JArray`/`JObject`'s empty-accumulator lists
-(`empty_json_array`/`empty_json_object`) also stay built via `list_filter`
-rather than a bare `[]` literal, for the same reason: a bare `[]` typechecks
-fine in isolation (the empty-list type-variable collision bug it originally
-worked around is fixed on `main`), but given the number-parser finding
-above, "typechecks in isolation" is no longer trusted as sufficient
-evidence on its own for this file — kept as the already-verified form
-rather than re-risked for a cosmetic simplification.
+# §2 Insignificant whitespace: space, tab, LF, CR only, allowed around any
+# token.
+ws_tolerant = match (json_parse "  { \"a\" : 1 }  ") (Ok v => json_stringify v; Err _ => "parse failed");
+ws_tolerant;  # => "{\"a\":1}" : String
+
+# §4 object = %x7B ws [ member *( ws %x2C ws member ) ] ws %x7D — empty
+# object is valid.
+empty_object = match (json_parse "{}") (Ok v => json_stringify v; Err _ => "parse failed");
+empty_object;  # => "{}" : String
+
+# §5 array = %x5B ws [ value *( ws %x2C ws value ) ] ws %x5D — empty array
+# is valid, and a trailing comma is not part of the grammar.
+empty_array = match (json_parse "[]") (Ok v => json_stringify v; Err _ => "parse failed");
+empty_array;  # => "[]" : String
+trailing_comma = is_err (json_parse "[1,2,]");
+trailing_comma;  # => True
+
+# §6 number = [ minus ] int [ frac ] [ exp ] — int alone (no digits) is not
+# a value.
+bare_minus = is_err (json_parse "-");
+bare_minus;  # => True
+
+# §6 int = zero / ( digit1-9 *DIGIT ) — a leading zero followed by more
+# digits isn't in the grammar.
+leading_zero = is_err (json_parse "01");
+leading_zero;  # => True
+
+# §7 char = unescaped / escape ...; unescaped excludes %x00-1F (control
+# characters) — must be escaped, not written raw.
+raw_control_char = is_err (json_parse "\"a\tb\"");
+raw_control_char;  # => True
+```
+
+§8 (encoding, byte-order mark) doesn't apply: `json_parse` takes an
+already-decoded noolang `String`, not raw bytes, so there's no encoding
+layer for this module to get right or wrong. `\u`/`\b`/`\f` escapes (§7)
+are rejected rather than decoded — see "Documented scope limits" above.
+
+## Implementation notes (combinator-based throughout)
+
+`null`/`true`/`false`/string/array/object are all genuinely combinator-built
+on `std/parser`'s `choice`/`pmap`/`between`/`sep_by`/`pbind`. Numbers use
+`take_while` for digit runs, with sign/fraction/exponent explicitly
+position-threaded rather than chained through `pbind` — each is optional
+but, once its leading character is seen, requires at least one digit to
+follow, a hard-fail-after-partial-match shape `choice`/`optional` can't
+express without backtracking past an already-consumed character.
+
+Two productions were hand-rolled workarounds for typer bugs
+(`CROSS_MODULE_SCHEME_CORRUPTION_BUG`, `CHOICE_RECURSIVE_PAIRING_BUG` —
+both fixed by the `generalize`/constraint-quantification fix landed
+alongside #179) until both were rewritten back to combinator style once the
+bugs were confirmed fixed: array/object repetition self-recurses through
+`json_value_p` directly (a bare self-reference passed to `sep_by`/`pbind`,
+not a second top-level binding — noolang's environment is strictly
+sequential, so two separately-named functions can't call each other
+forward), including the object-member `pbind`-pairing shape that used to
+break it.
 
 ## History: why combinator-based, not hand-rolled
 
 The module shipped once already as PR #165, hand-rolled recursive-descent
 in pure `.noo` with no `std/parser` dependency (that library didn't exist
 yet). That choice was forced, not stylistic: an early attempt at a
-combinator-based rewrite typechecked ~17x slower (see
-[`PARSER_COMBINATOR_SIZE_COST.md`](../docs-wip/PARSER_COMBINATOR_SIZE_COST.md)),
-a cost specific to noolang's own then-unmemoized parser backtracking on
+combinator-based rewrite typechecked ~17x slower, a cost specific to
+noolang's own then-unmemoized parser backtracking on
 combinator-heavy source, not to JSON parsing itself. Packrat memoization
 (#174) fixed that mechanism; re-measured, the combinator-based version now
 typechecks in the same ~20-30ms band as the hand-rolled one, so the

@@ -207,7 +207,7 @@ export const generalize = (
 	// Environment variables must be resolved through the same substitution:
 	// a param bound during body inference (α216 := α220) otherwise still reads
 	// as α216 in the env while the value's type says α220, so α220 looks free
-	// and gets wrongly quantified. See docs/internal/adrs/0003-generalization-reads-substitution.md.
+	// and gets wrongly quantified. See docs/internal/adrs/adr_0003.md.
 	const envVars = freeTypeVarsEnv(env, substitution);
 	const quantifiedVars: string[] = [];
 
