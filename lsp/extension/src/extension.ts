@@ -47,11 +47,25 @@ export function activate(context: ExtensionContext) {
 	];
 	const bunPath = bunCandidates.find(c => fs.existsSync(c)) ?? 'bun';
 
+	// GUI-launched VS Code often lacks the shell PATH; resolve node directly too
+	const nvmVersionsDir = path.join(process.env.HOME ?? '', '.nvm', 'versions', 'node');
+	const nvmNodeCandidate = fs.existsSync(nvmVersionsDir)
+		? fs.readdirSync(nvmVersionsDir).sort().reverse()
+			.map(v => path.join(nvmVersionsDir, v, 'bin', 'node'))
+			.find(c => fs.existsSync(c))
+		: undefined;
+	const nodeCandidates = [
+		nvmNodeCandidate,
+		'/opt/homebrew/bin/node',
+		'/usr/local/bin/node',
+	].filter((c): c is string => !!c);
+	const nodePath = nodeCandidates.find(c => fs.existsSync(c)) ?? 'node';
+
 	const env = {
 		...process.env,
 		NOOLANG_WORKSPACE: workspaceFolder ?? '',
 		NOOLANG_CLI_PATH: cliPath,
-		NOOLANG_CLI_RUNTIME: cliPath.endsWith('.ts') ? bunPath : 'node',
+		NOOLANG_CLI_RUNTIME: cliPath.endsWith('.ts') ? bunPath : nodePath,
 	};
 
 	// The debug options for the server
@@ -59,9 +73,9 @@ export function activate(context: ExtensionContext) {
 
 	// Server options for node script
 	const serverOptions: { run: Executable; debug: Executable } = {
-		run: { command: 'node', args: [serverJs], transport: TransportKind.stdio, options: { env } },
+		run: { command: nodePath, args: [serverJs], transport: TransportKind.stdio, options: { env } },
 		debug: {
-			command: 'node',
+			command: nodePath,
 			args: ['--inspect=6009', serverJs],
 			transport: TransportKind.stdio,
 			options: debugOptions,
