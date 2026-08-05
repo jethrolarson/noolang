@@ -1,3 +1,7 @@
+---
+assert: true
+---
+
 # `std/json` — JSON parse/serialize
 
 **Status: Implemented** (PR #176). User-facing usage docs live in
@@ -7,8 +11,8 @@ read the language reference first if you just want to use it.
 
 This file is literate noolang (see `docs/language-reference.md` §Literate
 Programming): every ```` ```noolang ```` block below actually runs, in file
-order, as one program. If the module's real API ever drifts from what this
-doc claims, this file stops typechecking or its assertions fail — see
+order, as one program. `assert: true` makes every `# =>` comment checked
+against the real evaluated value, not just documentation — see
 `validate_examples.js`.
 
 ## Scope
@@ -48,8 +52,11 @@ doc = json_parse "{\"name\":\"Ada\",\"scores\":[1,2,3]}";
 summary = match doc (
   Ok v => (
     name = match (json_field "name" v) (Ok n => json_stringify n; Err _ => "?");
-    first_score = match (json_index 0 v) (
-      Ok s => match (json_as_number s) (Ok n => toString n; Err _ => "?");
+    first_score = match (json_field "scores" v) (
+      Ok scores => match (json_index 0 scores) (
+        Ok s => match (json_as_number s) (Ok n => toString n; Err _ => "?");
+        Err _ => "?"
+      );
       Err _ => "?"
     );
     name + " " + first_score
@@ -131,11 +138,14 @@ is a rename, not a translation.
 
 ## Documented scope limits
 
-- **`\u`, `\b`, `\f` string escapes are rejected, not decoded.** There is
-  no codepoint↔character builtin (`fromCharCode`/`charCodeAt`-equivalent)
-  in noolang to decode a `\uXXXX` escape with — rejected rather than
-  silently mis-decoded (e.g. passing the literal letter through and
-  dropping the backslash).
+- **`\u`, `\b`, `\f` string escapes are rejected, not decoded.** `\u` needs
+  a codepoint↔character builtin (`fromCharCode`/`charCodeAt`-equivalent)
+  noolang doesn't have. `\b`/`\f` need no such builtin — they're fixed
+  characters, same as the already-supported `\n`/`\r`/`\t` — but noolang's
+  own string-literal lexer has no `\b`/`\f` escape either, so this module
+  has no way to construct the character to emit. All three are rejected
+  rather than silently mis-decoded (e.g. passing the literal letter through
+  and dropping the backslash).
 
   ```noolang
   {@json_parse json_parse} = import "std/json";
@@ -165,8 +175,53 @@ is a rename, not a translation.
   deduped = match (json_parse "{\"a\":1,\"b\":2,\"a\":3}") (Ok v => json_stringify v; Err _ => "parse failed");
   deduped  # => "{\"a\":3,\"b\":2}" : String
   ```
-- **Leading zeros (`"01"`) and raw unescaped control characters in strings
-  are rejected**, per RFC 8259 §6 and §7 respectively.
+
+## RFC 8259 compliance
+
+Grammar-shape checks the sections above don't already exercise, each cited
+to the clause it verifies:
+
+```noolang
+{@json_parse json_parse, @json_stringify json_stringify} = import "std/json";
+is_err = fn r => match r (Ok _ => False; Err _ => True);
+
+# §2 Insignificant whitespace: space, tab, LF, CR only, allowed around any
+# token.
+ws_tolerant = match (json_parse "  { \"a\" : 1 }  ") (Ok v => json_stringify v; Err _ => "parse failed");
+ws_tolerant;  # => "{\"a\":1}" : String
+
+# §4 object = %x7B ws [ member *( ws %x2C ws member ) ] ws %x7D — empty
+# object is valid.
+empty_object = match (json_parse "{}") (Ok v => json_stringify v; Err _ => "parse failed");
+empty_object;  # => "{}" : String
+
+# §5 array = %x5B ws [ value *( ws %x2C ws value ) ] ws %x5D — empty array
+# is valid, and a trailing comma is not part of the grammar.
+empty_array = match (json_parse "[]") (Ok v => json_stringify v; Err _ => "parse failed");
+empty_array;  # => "[]" : String
+trailing_comma = is_err (json_parse "[1,2,]");
+trailing_comma;  # => True
+
+# §6 number = [ minus ] int [ frac ] [ exp ] — int alone (no digits) is not
+# a value.
+bare_minus = is_err (json_parse "-");
+bare_minus;  # => True
+
+# §6 int = zero / ( digit1-9 *DIGIT ) — a leading zero followed by more
+# digits isn't in the grammar.
+leading_zero = is_err (json_parse "01");
+leading_zero;  # => True
+
+# §7 char = unescaped / escape ...; unescaped excludes %x00-1F (control
+# characters) — must be escaped, not written raw.
+raw_control_char = is_err (json_parse "\"a\tb\"");
+raw_control_char;  # => True
+```
+
+§8 (encoding, byte-order mark) doesn't apply: `json_parse` takes an
+already-decoded noolang `String`, not raw bytes, so there's no encoding
+layer for this module to get right or wrong. `\u`/`\b`/`\f` escapes (§7)
+are rejected rather than decoded — see "Documented scope limits" above.
 
 ## Implementation notes (combinator-based throughout)
 
