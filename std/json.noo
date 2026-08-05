@@ -204,6 +204,7 @@ non_finite_number_text = fn n => (
 # Not ascribed: wrapping a self-recursive binding in a type ascription
 # breaks its own recursive reference at runtime ("Undefined variable"),
 # even though it typechecks — an evaluator gap independent of this module.
+# See docs/internal/bugs/SELF_RECURSIVE_ASCRIPTION_BUG.md.
 json_stringify = fn v => match v (
   JNull => "null";
   JBool b => match b (True => "true"; False => "false");
