@@ -82,14 +82,10 @@ json_bool_p = choice2 json_true_p json_false_p;
 
 # --- numbers ---
 #
-# Digit run built on std/parser's `take_while` (a single `reduce`, not
-# noolang-level recursion) rather than a hand-rolled scan. Sign/fraction/
-# exponent stay explicitly position-threaded rather than a `pbind` chain:
-# each is optional but, once its leading character is seen, requires at
-# least one digit to follow — a hard-fail-after-partial-match shape that
-# `choice`/`optional` can't express without backtracking past a character
-# that was correctly consumed (they retry from the start position on any
-# failure, including one past a already-committed prefix).
+# Digit run: std/parser's `take_while`. Sign/fraction/exponent: position-
+# threaded, not `pbind`-chained — each is optional but commits once its
+# leading character matches, and `choice`/`optional` retry from the start
+# position on failure, which would un-commit that character.
 digit_run = fn pos s => (
   r = take_while is_digit pos s;
   digits = chars (r | @value);
@@ -164,13 +160,10 @@ dedupe_members = fn pairs => reduce (fn acc pair => (
     assoc_set k v acc
   )) [] pairs;
 
-# Self-recursive: array/object elements recurse back into `json_value_p`
-# itself (a bare self-reference passed to `sep_by`/`pbind`, not a fresh
-# top-level binding — noolang's environment is strictly sequential, so two
-# separately-named functions can't call each other forward, only a
-# binding can call itself). Object members pair the recursive value with a
-# string key via `pbind`, the shape that broke self-recursive `choice`
-# before the generalize fix that made this rewrite possible.
+# json_value_p passes itself by name into sep_by/pbind rather than through
+# separate top-level array_p/object_p bindings — noolang's environment is
+# strictly sequential, so two separately-named functions can't forward-
+# reference each other; only a binding can call itself.
 json_value_p = fn pos s => (
   p = skip_ws pos s;
   json_array_p = pmap JArray
