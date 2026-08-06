@@ -24,12 +24,22 @@ import {
   DidChangeTextDocumentParams,
   DidSaveTextDocumentParams,
   Connection,
+  CodeActionParams,
+  CodeAction,
+  CodeActionKind,
+  TextEdit,
 } from 'vscode-languageserver/node';
 import { URI } from 'vscode-uri';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { spawnSync } from 'child_process';
+import {
+  findEnclosingDefinition,
+  planInferAnnotationEdit,
+  spliceText,
+  type AstNode,
+} from './infer-annotation';
 
 export interface ServerOptions {
   workspacePath?: string;
@@ -423,6 +433,84 @@ function getPositionType(filePath: string, line1: number, col1: number): string 
   return undefined;
 }
 
+// Infers a definition's type independent of any existing annotation: writes
+// a scratch copy of the file with that one annotation stripped (so a stale
+// declared type can't just echo itself back through --symbol-type) into the
+// same directory, so relative imports still resolve, then deletes it.
+function inferTypeIgnoringAnnotation(
+  filePath: string,
+  text: string,
+  name: string,
+  strip?: { start: { line: number; column: number }; end: { line: number; column: number } },
+): string | undefined {
+  const strippedText = strip ? spliceText(text, strip.start, strip.end, '') : text;
+  const tmpPath = path.join(
+    path.dirname(filePath),
+    `.${path.basename(filePath)}.infer-tmp${path.extname(filePath) || '.noo'}`,
+  );
+  try {
+    fs.writeFileSync(tmpPath, strippedText, 'utf8');
+    const res = runNodeCli(['--symbol-type', tmpPath, name]);
+    if (res.status !== 0) return undefined;
+    const out = res.stdout || '';
+    const i = out.indexOf('has type: ');
+    return i >= 0 ? out.slice(i + 10).trim() : undefined;
+  } finally {
+    try {
+      fs.unlinkSync(tmpPath);
+    } catch {}
+  }
+}
+
+function buildInferAnnotationAction(
+  uri: string,
+  filePath: string,
+  position: { line: number; character: number },
+): CodeAction[] {
+  const ast: AstNode | undefined = getAstFile(filePath);
+  if (!ast) return [];
+  const text = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : '';
+  if (!text) return [];
+
+  const match = findEnclosingDefinition(ast, position.line + 1, position.character + 1);
+  if (!match) return [];
+  const plan = planInferAnnotationEdit(match.value, text);
+  if (!plan) return [];
+
+  const inferredType = inferTypeIgnoringAnnotation(
+    filePath,
+    text,
+    match.name,
+    plan.kind === 'replace' ? { start: plan.start, end: plan.end } : undefined,
+  );
+  if (!inferredType) return [];
+
+  const edit: TextEdit =
+    plan.kind === 'insert'
+      ? {
+          range: Range.create(
+            Position.create(plan.at.line - 1, plan.at.column - 1),
+            Position.create(plan.at.line - 1, plan.at.column - 1),
+          ),
+          newText: ` : ${inferredType}`,
+        }
+      : {
+          range: Range.create(
+            Position.create(plan.start.line - 1, plan.start.column - 1),
+            Position.create(plan.end.line - 1, plan.end.column - 1),
+          ),
+          newText: ` : ${inferredType}`,
+        };
+
+  return [
+    {
+      title: plan.kind === 'insert' ? 'Infer type annotation' : 'Update type annotation to inferred type',
+      kind: CodeActionKind.RefactorRewrite,
+      edit: { changes: { [uri]: [edit] } },
+    },
+  ];
+}
+
 // --- LSP Handlers ---
 connection.onInitialize((_params: InitializeParams): InitializeResult => {
   return {
@@ -437,6 +525,7 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
       referencesProvider: true,
       documentSymbolProvider: true,
       workspaceSymbolProvider: true,
+      codeActionProvider: true,
     },
     serverInfo: { name: 'Noolang Language Server', version: '0.1.0' },
   };
@@ -550,6 +639,13 @@ connection.onReferences((params: ReferenceParams) => {
   // References in this file
   const refs = findReferences(ast, name, uri);
   return refs;
+});
+
+connection.onCodeAction((params: CodeActionParams): CodeAction[] => {
+  const uri = params.textDocument.uri;
+  const filePath = uriToFilePath(uri);
+  if (!filePath) return [];
+  return buildInferAnnotationAction(uri, analysisPath(uri, filePath), params.range.start);
 });
 
 connection.onDocumentSymbol((params: DocumentSymbolParams) => {
