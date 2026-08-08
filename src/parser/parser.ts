@@ -284,13 +284,13 @@ const parseRecordFields: C.Parser<
 // --- Record/Tuple Parsing ---
 const parseRecord = C.map(
 	C.seq(C.punctuation('{'), C.optional(parseRecordFields), C.punctuation('}')),
-	([open, fields, _close]): Expression => {
+	([open, fields, close]): Expression => {
 		const fieldsList = fields || [];
 		if (fieldsList.length === 0) {
 			// Empty braces: unit
 			return {
 				kind: 'unit',
-				location: open.location,
+				location: createLocation(open.location.start, close.location.end),
 			} as UnitExpression;
 		}
 		const allNamed = fieldsList.every(f => f.name[0] !== '@');
@@ -300,14 +300,14 @@ const parseRecord = C.map(
 			return {
 				kind: 'record',
 				fields: fieldsList,
-				location: open.location,
+				location: createLocation(open.location.start, close.location.end),
 			} as RecordExpression;
 		} else if (allPositional) {
 			// All positional fields: tuple
 			return {
 				kind: 'tuple',
 				elements: fieldsList.map(f => f.value),
-				location: open.location,
+				location: createLocation(open.location.start, close.location.end),
 			} as TupleExpression;
 		} else {
 			// Mixed fields: error
@@ -664,7 +664,7 @@ const parseLambdaBodyUnary: C.Parser<Expression> = tokens => {
 						location: minusToken.location,
 					},
 					right: operandResult.value,
-					location: minusToken.location,
+					location: createLocation(minusToken.location.start, operandResult.value.location.end),
 				},
 				remaining: operandResult.remaining,
 			};
@@ -746,12 +746,12 @@ const parseListElements: C.Parser<Expression[]> = tokens => {
 
 const parseList: C.Parser<ListExpression> = C.map(
 	C.seq(C.punctuation('['), C.optional(parseListElements), C.punctuation(']')),
-	([open, elements, _close]) => {
+	([open, elements, close]) => {
 		const elementsList: Expression[] = elements || [];
 		return {
 			kind: 'list',
 			elements: elementsList,
-			location: open.location,
+			location: createLocation(open.location.start, close.location.end),
 		};
 	}
 );
@@ -851,7 +851,7 @@ const parseUnary: C.Parser<Expression> = tokens => {
 						location: minusToken.location,
 					},
 					right: operandResult.value,
-					location: minusToken.location,
+					location: createLocation(minusToken.location.start, operandResult.value.location.end),
 				},
 				remaining: operandResult.remaining,
 			} as const;
@@ -1926,12 +1926,12 @@ const parseWhereExpression: C.Parser<WhereExpression> = C.map(
 		_openParen,
 		definitions,
 		_trailingSemicolons,
-		_closeParen,
+		closeParen,
 	]): WhereExpression => ({
 		kind: 'where',
 		main,
 		definitions,
-		location: main.location,
+		location: createLocation(main.location.start, closeParen.location.end),
 	})
 );
 
@@ -2032,7 +2032,7 @@ const parseIfExpression = C.map(
 			condition,
 			then: thenExpr,
 			else: elseExpr,
-			location: ifKw.location,
+			location: createLocation(ifKw.location.start, elseExpr.location.end),
 		};
 	}
 );

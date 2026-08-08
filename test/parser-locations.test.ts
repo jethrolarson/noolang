@@ -120,4 +120,41 @@ describe('composite expression locations span through the right operand', () => 
 		expect(fn.kind).toBe('function');
 		expect(endCol(fn)).toBe(18);
 	});
+
+	// Found via real corruption: the LSP "infer type annotation" action
+	// spliced text at an `if` expression's reported end, which pointed at
+	// just the `if` keyword — inserting the annotation mid-condition instead
+	// of after the whole if/then/else. Same bug class as the binary/pipeline
+	// sites above, different node kinds that weren't covered by that sweep.
+	test('if/then/else spans through the else branch', () => {
+		expect(endCol(parseExpr('if True then 1 else 22222'))).toBe(26);
+	});
+
+	test('unary minus spans through the operand', () => {
+		expect(endCol(parseExpr('-22222'))).toBe(7);
+	});
+
+	test('unary minus in a lambda body spans through the operand', () => {
+		expect(endCol(parseExpr('fn x => -22222'))).toBe(15);
+	});
+
+	test('record literal spans through the closing brace', () => {
+		expect(endCol(parseExpr('{@a 22222}'))).toBe(11);
+	});
+
+	test('tuple literal spans through the closing brace', () => {
+		expect(endCol(parseExpr('{1, 22222}'))).toBe(11);
+	});
+
+	test('unit literal spans through the closing brace', () => {
+		expect(endCol(parseExpr('{}'))).toBe(3);
+	});
+
+	test('list literal spans through the closing bracket', () => {
+		expect(endCol(parseExpr('[1, 22222]'))).toBe(11);
+	});
+
+	test('where expression spans through its definitions clause', () => {
+		expect(endCol(parseExpr('main where (x = 22222)'))).toBe(23);
+	});
 });
