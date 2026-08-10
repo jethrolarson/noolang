@@ -55,7 +55,22 @@ function analysisPath(uri: string, originalPath: string): string {
   if (content === undefined) return originalPath;
   let filePath = materializedPaths.get(uri);
   if (!filePath) {
-    filePath = path.join(tempDirectory, `${materializedPaths.size}.noo`);
+    // Keep the scratch file beside the document whenever its directory exists.
+    // The CLI resolves relative imports from the entry file, so putting every
+    // open document in one unrelated temp directory silently breaks imports.
+    const directory = path.dirname(originalPath);
+    let canWriteBesideDocument = false;
+    try {
+      canWriteBesideDocument = fs.existsSync(directory) && (fs.accessSync(directory, fs.constants.W_OK), true);
+    } catch {
+      canWriteBesideDocument = false;
+    }
+    if (canWriteBesideDocument) {
+      const base = path.basename(originalPath, path.extname(originalPath));
+      filePath = path.join(directory, `.${base}.live-buffer-${process.pid}-${materializedPaths.size}.noo`);
+    } else {
+      filePath = path.join(tempDirectory, `${materializedPaths.size}.noo`);
+    }
     materializedPaths.set(uri, filePath);
   }
   fs.writeFileSync(filePath, content, 'utf8');
