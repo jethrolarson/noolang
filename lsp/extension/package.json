@@ -65,8 +65,10 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./ && tsc -p ./server",
-    "watch": "tsc -watch -p ./ & tsc -watch -p ./server"
+    "compile": "tsc -p ./ && tsc -p ./server && tsc -p ./test",
+    "watch": "tsc -watch -p ./ & tsc -watch -p ./server",
+    "test": "bun test test",
+    "test:watch": "bun test --watch test"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
