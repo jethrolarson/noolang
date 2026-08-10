@@ -24,59 +24,32 @@ describe('LSP Completion', () => {
 		await harness.close();
 	});
 
-	test('returns completion items for keywords', async () => {
+	test('completion catalogs contain every expected item with its category', async () => {
 		const uri = 'file:///test.noo';
-		const content = FIXTURE;
+		await harness.openDocument(uri, 'noolang', FIXTURE);
 
-		await harness.openDocument(uri, 'noolang', content);
-
-		const completions = await harness.requestCompletion(uri, 0, 1);
-
+		const completions = await harness.requestCompletion(uri, 0, 0);
 		expect(completions).toBeDefined();
 		expect(Array.isArray(completions)).toBe(true);
 		expect(completions.length).toBeGreaterThan(0);
 
-		// Check that we have keywords
-		const keywordItems = completions.filter((item: any) =>
-			item.kind === 14 && EXPECTED_KEYWORDS.includes(item.label)
-		);
-		expect(keywordItems.length).toBeGreaterThan(0);
-	});
+		const labelsByKind = new Map<number, Set<string>>();
+		for (const item of completions) {
+			const labels = labelsByKind.get(item.kind) ?? new Set<string>();
+			labels.add(item.label);
+			labelsByKind.set(item.kind, labels);
+		}
 
-	test('returns completion items for builtins', async () => {
-		const uri = 'file:///test.noo';
-		const content = '';
-
-		await harness.openDocument(uri, 'noolang', content);
-
-		const completions = await harness.requestCompletion(uri, 0, 0);
-
-		expect(completions).toBeDefined();
-		expect(Array.isArray(completions)).toBe(true);
-
-		// Check that we have builtin functions (kind 3 = Function)
-		const builtinItems = completions.filter((item: any) =>
-			item.kind === 3 && EXPECTED_BUILTINS.includes(item.label)
-		);
-		expect(builtinItems.length).toBeGreaterThan(0);
-	});
-
-	test('returns completion items for constructors', async () => {
-		const uri = 'file:///test.noo';
-		const content = '';
-
-		await harness.openDocument(uri, 'noolang', content);
-
-		const completions = await harness.requestCompletion(uri, 0, 0);
-
-		expect(completions).toBeDefined();
-		expect(Array.isArray(completions)).toBe(true);
-
-		// Check that we have constructors (kind 4 = Constructor)
-		const ctorItems = completions.filter((item: any) =>
-			item.kind === 4 && EXPECTED_CONSTRUCTORS.includes(item.label)
-		);
-		expect(ctorItems.length).toBeGreaterThan(0);
+		for (const [kind, expected] of [
+			[14, EXPECTED_KEYWORDS],
+			[4, EXPECTED_CONSTRUCTORS],
+			[3, EXPECTED_BUILTINS],
+		] as const) {
+			const labels = labelsByKind.get(kind) ?? new Set<string>();
+			for (const label of expected) {
+				expect(labels).toContain(label);
+			}
+		}
 	});
 
 	test('completion items have proper structure', async () => {
@@ -95,37 +68,6 @@ describe('LSP Completion', () => {
 		expect(item).toHaveProperty('insertText');
 	});
 
-	test('completion includes all expected keywords', async () => {
-		const uri = 'file:///test.noo';
-		const content = '';
-
-		await harness.openDocument(uri, 'noolang', content);
-
-		const completions = await harness.requestCompletion(uri, 0, 0);
-
-		const labels = completions.map((item: any) => item.label);
-		const expectedKeywords = EXPECTED_KEYWORDS;
-
-		for (const keyword of expectedKeywords) {
-			expect(labels).toContain(keyword);
-		}
-	});
-
-	test('completion includes all expected constructors', async () => {
-		const uri = 'file:///test.noo';
-		const content = '';
-
-		await harness.openDocument(uri, 'noolang', content);
-
-		const completions = await harness.requestCompletion(uri, 0, 0);
-
-		const labels = completions.map((item: any) => item.label);
-		const expectedCtors = EXPECTED_CONSTRUCTORS;
-
-		for (const ctor of expectedCtors) {
-			expect(labels).toContain(ctor);
-		}
-	});
 
 	test('analysis uses the latest in-memory document content', async () => {
 		const uri = 'file:///not-on-disk.noo';
@@ -138,21 +80,6 @@ describe('LSP Completion', () => {
 		expect(JSON.stringify(stringHover)).toContain('String');
 	});
 
-	test('completion includes all expected builtins', async () => {
-		const uri = 'file:///test.noo';
-		const content = '';
-
-		await harness.openDocument(uri, 'noolang', content);
-
-		const completions = await harness.requestCompletion(uri, 0, 0);
-
-		const labels = completions.map((item: any) => item.label);
-		const expectedBuiltins = EXPECTED_BUILTINS;
-
-		for (const builtin of expectedBuiltins) {
-			expect(labels).toContain(builtin);
-		}
-	});
 
 	test('preserves relative imports for opened workspace documents', async () => {
 		const directory = mkdtempSync(join(tmpdir(), 'noolang-lsp-import-'));
