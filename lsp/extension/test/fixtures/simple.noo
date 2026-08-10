@@ -1,0 +1,5 @@
+fn greet(name: String) -> String {
+  "Hello, " ++ name
+}
+
+let result = greet("world")

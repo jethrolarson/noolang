@@ -23,22 +23,59 @@ import {
   DidOpenTextDocumentParams,
   DidChangeTextDocumentParams,
   DidSaveTextDocumentParams,
+  Connection,
 } from 'vscode-languageserver/node';
 import { URI } from 'vscode-uri';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import { spawnSync } from 'child_process';
 
-const connection = createConnection(ProposedFeatures.all);
+export interface ServerOptions {
+  workspacePath?: string;
+  cliPath?: string;
+  cliRuntime?: string;
+}
+
+export function createServer(connection: Connection, options: ServerOptions = {}): void {
 
 // Very simple in-memory document store (FULL sync)
 const documents = new Map<string, string>(); // key: uri
 
 // Env from client
-const WORKSPACE = process.env.NOOLANG_WORKSPACE || '';
-const CLI_PATH = process.env.NOOLANG_CLI_PATH || path.join(WORKSPACE || '.', 'dist', 'cli.js');
+const WORKSPACE = options.workspacePath || process.env.NOOLANG_WORKSPACE || process.cwd();
+const CLI_PATH = options.cliPath || process.env.NOOLANG_CLI_PATH || path.join(WORKSPACE, 'dist', 'cli.js');
 // bun for live .ts source, node for a built dist bundle (see extension.ts)
-const CLI_RUNTIME = process.env.NOOLANG_CLI_RUNTIME || 'node';
+const CLI_RUNTIME = options.cliRuntime || process.env.NOOLANG_CLI_RUNTIME || 'node';
+const materializedPaths = new Map<string, string>();
+const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'noolang-lsp-'));
+
+function analysisPath(uri: string, originalPath: string): string {
+  const content = documents.get(uri);
+  if (content === undefined) return originalPath;
+  let filePath = materializedPaths.get(uri);
+  if (!filePath) {
+    // Keep the scratch file beside the document whenever its directory exists.
+    // The CLI resolves relative imports from the entry file, so putting every
+    // open document in one unrelated temp directory silently breaks imports.
+    const directory = path.dirname(originalPath);
+    let canWriteBesideDocument = false;
+    try {
+      canWriteBesideDocument = fs.existsSync(directory) && (fs.accessSync(directory, fs.constants.W_OK), true);
+    } catch {
+      canWriteBesideDocument = false;
+    }
+    if (canWriteBesideDocument) {
+      const base = path.basename(originalPath, path.extname(originalPath));
+      filePath = path.join(directory, `.${base}.live-buffer-${process.pid}-${materializedPaths.size}.noo`);
+    } else {
+      filePath = path.join(tempDirectory, `${materializedPaths.size}.noo`);
+    }
+    materializedPaths.set(uri, filePath);
+  }
+  fs.writeFileSync(filePath, content, 'utf8');
+  return filePath;
+}
 
 function uriToFilePath(uri: string): string | undefined {
   try {
@@ -419,7 +456,7 @@ connection.onDidOpenTextDocument((params: DidOpenTextDocumentParams) => {
   documents.set(uri, content);
   const filePath = uriToFilePath(uri);
   if (filePath) {
-    const diagnostics = getDiagnostics(filePath);
+    const diagnostics = getDiagnostics(analysisPath(uri, filePath));
     connection.sendDiagnostics({ uri, diagnostics });
   }
 });
@@ -434,7 +471,7 @@ connection.onDidChangeTextDocument((params: DidChangeTextDocumentParams) => {
   }
   const filePath = uriToFilePath(uri);
   if (filePath) {
-    const diagnostics = getDiagnostics(filePath);
+    const diagnostics = getDiagnostics(analysisPath(uri, filePath));
     connection.sendDiagnostics({ uri, diagnostics });
   }
 });
@@ -443,7 +480,7 @@ connection.onDidSaveTextDocument((params: DidSaveTextDocumentParams) => {
   const uri = params.textDocument.uri;
   const filePath = uriToFilePath(uri);
   if (filePath) {
-    const diagnostics = getDiagnostics(filePath);
+    const diagnostics = getDiagnostics(analysisPath(uri, filePath));
     connection.sendDiagnostics({ uri, diagnostics });
   }
 });
@@ -470,14 +507,14 @@ connection.onHover((params: HoverParams): Hover | null => {
   const filePath = uriToFilePath(uri);
   if (!filePath) return null;
   const pos = params.position;
-  const type = getPositionType(filePath, pos.line + 1, pos.character + 1);
+  const type = getPositionType(analysisPath(uri, filePath), pos.line + 1, pos.character + 1);
   if (type) {
     return {
       contents: { kind: MarkupKind.Markdown, value: 'Type: ' + type },
       range: Range.create(pos, Position.create(pos.line, pos.character + 1)),
     };
   }
-  const types = getTypeInfo(filePath);
+  const types = getTypeInfo(analysisPath(uri, filePath));
   if (types[0]) {
     return {
       contents: { kind: MarkupKind.Markdown, value: 'Type: ' + simplifyTypeString(types[0]) },
@@ -492,7 +529,7 @@ connection.onDefinition((params: DefinitionParams) => {
   const filePath = uriToFilePath(uri);
   if (!filePath) return null;
   const pos = params.position;
-  const ast = getAstFile(filePath);
+  const ast = getAstFile(analysisPath(uri, filePath));
   if (!ast) return null;
   const name = extractSymbolAtPosition(ast, pos.line + 1, pos.character + 1);
   if (!name) return null;
@@ -506,7 +543,7 @@ connection.onReferences((params: ReferenceParams) => {
   const filePath = uriToFilePath(uri);
   if (!filePath) return [];
   const pos = params.position;
-  const ast = getAstFile(filePath);
+  const ast = getAstFile(analysisPath(uri, filePath));
   if (!ast) return [];
   const name = extractSymbolAtPosition(ast, pos.line + 1, pos.character + 1);
   if (!name) return [];
@@ -519,9 +556,15 @@ connection.onDocumentSymbol((params: DocumentSymbolParams) => {
   const uri = params.textDocument.uri;
   const filePath = uriToFilePath(uri);
   if (!filePath) return [];
-  const ast = getAstFile(filePath);
+  const ast = getAstFile(analysisPath(uri, filePath));
   if (!ast) return [];
   return extractAllSymbols(ast, uri);
 });
 
-connection.listen();
+}
+
+if (require.main === module) {
+  const connection = createConnection(ProposedFeatures.all);
+  createServer(connection);
+  connection.listen();
+}

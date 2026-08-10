@@ -65,12 +65,16 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./ && tsc -p ./server",
-    "watch": "tsc -watch -p ./ & tsc -watch -p ./server"
+    "compile": "tsc -p ./ && tsc -p ./server && tsc -p ./test",
+    "watch": "tsc -watch -p ./ & tsc -watch -p ./server",
+    "test": "bun test test/*.test.ts",
+    "test:watch": "bun test --watch test/*.test.ts"
   },
   "devDependencies": {
+    "@types/bun": "^1.3.14",
     "@types/node": "^26.1.2",
     "@types/vscode": "1.74.0",
+    "bun-types": "^1.3.14",
     "typescript": "^7.0.2"
   },
   "dependencies": {
