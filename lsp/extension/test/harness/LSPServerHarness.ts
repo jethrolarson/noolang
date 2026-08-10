@@ -4,12 +4,14 @@
  */
 
 import { createConnection, InitializeParams, Connection } from 'vscode-languageserver/node';
+import * as path from 'path';
+import * as fs from 'fs';
 import {
 	createInMemoryTransportPair,
 	InMemoryMessageReader,
 	InMemoryMessageWriter,
 } from './InMemoryTransport';
-import { createTestServer } from './TestServer';
+import { createServer } from '../../server/src/server';
 
 export interface HarnessOptions {
 	workspacePath?: string;
@@ -23,6 +25,8 @@ export class LSPServerHarness {
 	private readonly clientConnection: Connection;
 	private readonly serverConnection: Connection;
 	private isInitialized = false;
+	private readonly workspacePath: string;
+	private readonly rootUri?: string;
 
 	constructor(options: HarnessOptions = {}) {
 		// Create bidirectional transport pairs
@@ -33,8 +37,18 @@ export class LSPServerHarness {
 		// Create client connection (sends requests)
 		this.clientConnection = createConnection(clientReader, clientWriter);
 
-		// Setup LSP handlers on the server connection
-		createTestServer(this.serverConnection);
+		const workspacePath = options.workspacePath || process.env.NOOLANG_WORKSPACE || path.resolve(process.cwd(), '../..');
+		this.workspacePath = workspacePath;
+		this.rootUri = options.rootUri;
+		const builtCli = path.join(workspacePath, 'dist', 'cli.js');
+		const sourceCli = path.join(workspacePath, 'src', 'cli.ts');
+		const cliPath = process.env.NOOLANG_CLI_PATH || (fs.existsSync(builtCli) ? builtCli : sourceCli);
+		if (!fs.existsSync(cliPath)) {
+			throw new Error(`Noolang CLI not found at ${cliPath}; build the workspace or set NOOLANG_CLI_PATH`);
+		}
+		const cliRuntime = process.env.NOOLANG_CLI_RUNTIME || (cliPath.endsWith('.ts') ? process.execPath : 'node');
+		// Use the production handlers with the in-memory connection.
+		createServer(this.serverConnection, { workspacePath, cliPath, cliRuntime });
 	}
 
 	/**
@@ -47,7 +61,7 @@ export class LSPServerHarness {
 
 		const defaultParams: InitializeParams = {
 			processId: process.pid,
-			rootUri: `file://${process.cwd()}`,
+			rootUri: this.rootUri || `file://${this.workspacePath}`,
 			capabilities: {
 				textDocument: {
 					completion: {

@@ -59,8 +59,8 @@ describe('LSP Feature Tests', () => {
 
 ```bash
 cd lsp/extension
-npm test              # Run all tests
-npm run test:watch    # Run tests in watch mode
+bun test              # Run all tests (the npm scripts are Bun wrappers)
+bun test --watch      # Run tests in watch mode
 ```
 
 ## Extending to Other Features

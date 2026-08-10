@@ -119,6 +119,17 @@ describe('LSP Completion', () => {
 		}
 	});
 
+	test('analysis uses the latest in-memory document content', async () => {
+		const uri = 'file:///not-on-disk.noo';
+		await harness.openDocument(uri, 'noolang', 'fn value => 1.0');
+		const floatHover = await harness.requestHover(uri, 0, 3);
+		expect(JSON.stringify(floatHover)).toContain('Float');
+
+		await harness.changeDocument(uri, 'fn value => "changed"', 2);
+		const stringHover = await harness.requestHover(uri, 0, 3);
+		expect(JSON.stringify(stringHover)).toContain('String');
+	});
+
 	test('completion includes all expected builtins', async () => {
 		const uri = 'file:///test.noo';
 		const content = '';
