@@ -375,10 +375,12 @@ const parseParenExpr: C.Parser<Expression> = tokens => {
 			C.lazy(() => parseSequence), // Use parseSequence to allow full semicolon-separated sequences
 			C.punctuation(')')
 		),
-		([_open, expr, _close]) =>
-			expr.kind === 'binary' && expr.operator === ';'
-				? { ...expr, parenthesized: true }
-				: expr
+		([_open, expr, _close]) => {
+			const extendedLocation = createLocation(_open.location.start, _close.location.end);
+			return expr.kind === 'binary' && expr.operator === ';'
+				? { ...expr, parenthesized: true, location: extendedLocation }
+				: { ...expr, location: extendedLocation };
+		}
 	)(tokens);
 };
 

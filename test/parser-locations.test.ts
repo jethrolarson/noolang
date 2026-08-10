@@ -157,4 +157,36 @@ describe('composite expression locations span through the right operand', () => 
 	test('where expression spans through its definitions clause', () => {
 		expect(endCol(parseExpr('main where (x = 22222)'))).toBe(23);
 	});
+
+	describe('parenthesized expressions span through closing )', () => {
+		test('simple parenthesized number', () => {
+			expect(endCol(parseExpr('(1)'))).toBe(4);
+		});
+
+		test('parenthesized binary expression', () => {
+			expect(endCol(parseExpr('(1 + 22222)'))).toBe(12);
+		});
+
+		test('parenthesized function call', () => {
+			expect(endCol(parseExpr('(f 22222)'))).toBe(10);
+		});
+
+		test('nested parentheses', () => {
+			expect(endCol(parseExpr('((1 + 2))'))).toBe(10);
+		});
+
+		test('parenthesized application in function body', () => {
+			const fn = parseExpr('fn x => (f x 22222)');
+			expect(endCol(fn)).toBe(20);
+		});
+
+		test('semicolon sequence inside parens has parenthesized flag but also extended location', () => {
+			const seq = parseExpr('(1; 22222)');
+			expect(seq.kind).toBe('binary');
+			if (seq.kind === 'binary') {
+				expect(seq.parenthesized).toBe(true);
+				expect(endCol(seq)).toBe(11);
+			}
+		});
+	});
 });
