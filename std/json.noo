@@ -43,7 +43,7 @@ digit_value = fn c => match c (
   "0" => 0; "1" => 1; "2" => 2; "3" => 3; "4" => 4;
   "5" => 5; "6" => 6; "7" => 7; "8" => 8; "9" => 9;
   _ => 0
-);
+) : String -> Float;
 
 pow10 = fn n => if n <= 0 then 1 else 10 * pow10 (n - 1);
 
@@ -112,7 +112,7 @@ escape_to_char = fn c => match c (
   "\"" => "\""; "\\" => "\\"; "/" => "/";
   "n" => "\n"; "r" => "\r"; "t" => "\t";
   _ => c
-);
+) : String -> String;
 
 # \u/\b/\f are valid JSON escapes (RFC 8259 §7), unsupported here: no
 # codepoint<->char builtin for `\uXXXX`, no `\b`/`\f` in noolang's own

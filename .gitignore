@@ -106,4 +106,10 @@ lsp/extension/*.vsix
 # Legacy Rust LSP build artifacts (unused)
 lsp/target/
 
+# LSP server scratch files — written next to the real source file so
+# relative imports still resolve while typechecking live (unsaved) buffer
+# content, deleted synchronously right after each query
+.*.live-buffer-*.noo
+.*.infer-tmp.noo
+
  

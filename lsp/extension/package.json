@@ -47,7 +47,21 @@
         "scopeName": "source.noolang",
         "path": "./syntaxes/noolang.tmLanguage.json"
       }
-    ]
+    ],
+    "configurationDefaults": {
+      "files.watcherExclude": {
+        "**/.*.live-buffer-*.noo": true,
+        "**/.*.infer-tmp.noo": true
+      },
+      "files.exclude": {
+        "**/.*.live-buffer-*.noo": true,
+        "**/.*.infer-tmp.noo": true
+      },
+      "search.exclude": {
+        "**/.*.live-buffer-*.noo": true,
+        "**/.*.infer-tmp.noo": true
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
