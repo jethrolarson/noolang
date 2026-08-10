@@ -4,6 +4,14 @@
 
 import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
 import { LSPServerHarness } from './harness/LSPServerHarness';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+const EXPECTED_KEYWORDS = ['fn', 'if', 'then', 'else', 'match', 'with', 'variant', 'mut', 'constraint', 'implement'];
+const EXPECTED_CONSTRUCTORS = ['True', 'False', 'Some', 'None', 'Ok', 'Err'];
+const EXPECTED_BUILTINS = ['head', 'tail', 'map', 'filter', 'reduce', 'length', 'print', 'toString', 'read', 'write', 'log', 'random'];
+const FIXTURE = readFileSync(join(__dirname, 'fixtures', 'simple.noo'), 'utf8');
 
 describe('LSP Completion', () => {
 	let harness: LSPServerHarness;
@@ -16,59 +24,32 @@ describe('LSP Completion', () => {
 		await harness.close();
 	});
 
-	test('returns completion items for keywords', async () => {
+	test('completion catalogs contain every expected item with its category', async () => {
 		const uri = 'file:///test.noo';
-		const content = 'f';
+		await harness.openDocument(uri, 'noolang', FIXTURE);
 
-		await harness.openDocument(uri, 'noolang', content);
-
-		const completions = await harness.requestCompletion(uri, 0, 1);
-
+		const completions = await harness.requestCompletion(uri, 0, 0);
 		expect(completions).toBeDefined();
 		expect(Array.isArray(completions)).toBe(true);
 		expect(completions.length).toBeGreaterThan(0);
 
-		// Check that we have keywords
-		const keywordItems = completions.filter((item: any) =>
-			item.kind === 14 && ['fn', 'if', 'then', 'else', 'match', 'with', 'variant', 'mut', 'constraint', 'implement'].includes(item.label)
-		);
-		expect(keywordItems.length).toBeGreaterThan(0);
-	});
+		const labelsByKind = new Map<number, Set<string>>();
+		for (const item of completions) {
+			const labels = labelsByKind.get(item.kind) ?? new Set<string>();
+			labels.add(item.label);
+			labelsByKind.set(item.kind, labels);
+		}
 
-	test('returns completion items for builtins', async () => {
-		const uri = 'file:///test.noo';
-		const content = '';
-
-		await harness.openDocument(uri, 'noolang', content);
-
-		const completions = await harness.requestCompletion(uri, 0, 0);
-
-		expect(completions).toBeDefined();
-		expect(Array.isArray(completions)).toBe(true);
-
-		// Check that we have builtin functions (kind 3 = Function)
-		const builtinItems = completions.filter((item: any) =>
-			item.kind === 3 && ['head', 'tail', 'map', 'filter', 'reduce', 'length', 'print', 'toString', 'read', 'write', 'log', 'random'].includes(item.label)
-		);
-		expect(builtinItems.length).toBeGreaterThan(0);
-	});
-
-	test('returns completion items for constructors', async () => {
-		const uri = 'file:///test.noo';
-		const content = '';
-
-		await harness.openDocument(uri, 'noolang', content);
-
-		const completions = await harness.requestCompletion(uri, 0, 0);
-
-		expect(completions).toBeDefined();
-		expect(Array.isArray(completions)).toBe(true);
-
-		// Check that we have constructors (kind 4 = Constructor)
-		const ctorItems = completions.filter((item: any) =>
-			item.kind === 4 && ['True', 'False', 'Some', 'None', 'Ok', 'Err'].includes(item.label)
-		);
-		expect(ctorItems.length).toBeGreaterThan(0);
+		for (const [kind, expected] of [
+			[14, EXPECTED_KEYWORDS],
+			[4, EXPECTED_CONSTRUCTORS],
+			[3, EXPECTED_BUILTINS],
+		] as const) {
+			const labels = labelsByKind.get(kind) ?? new Set<string>();
+			for (const label of expected) {
+				expect(labels).toContain(label);
+			}
+		}
 	});
 
 	test('completion items have proper structure', async () => {
@@ -87,37 +68,6 @@ describe('LSP Completion', () => {
 		expect(item).toHaveProperty('insertText');
 	});
 
-	test('completion includes all expected keywords', async () => {
-		const uri = 'file:///test.noo';
-		const content = '';
-
-		await harness.openDocument(uri, 'noolang', content);
-
-		const completions = await harness.requestCompletion(uri, 0, 0);
-
-		const labels = completions.map((item: any) => item.label);
-		const expectedKeywords = ['fn', 'if', 'then', 'else', 'match', 'with', 'variant', 'mut', 'constraint', 'implement'];
-
-		for (const keyword of expectedKeywords) {
-			expect(labels).toContain(keyword);
-		}
-	});
-
-	test('completion includes all expected constructors', async () => {
-		const uri = 'file:///test.noo';
-		const content = '';
-
-		await harness.openDocument(uri, 'noolang', content);
-
-		const completions = await harness.requestCompletion(uri, 0, 0);
-
-		const labels = completions.map((item: any) => item.label);
-		const expectedCtors = ['True', 'False', 'Some', 'None', 'Ok', 'Err'];
-
-		for (const ctor of expectedCtors) {
-			expect(labels).toContain(ctor);
-		}
-	});
 
 	test('analysis uses the latest in-memory document content', async () => {
 		const uri = 'file:///not-on-disk.noo';
@@ -130,19 +80,23 @@ describe('LSP Completion', () => {
 		expect(JSON.stringify(stringHover)).toContain('String');
 	});
 
-	test('completion includes all expected builtins', async () => {
-		const uri = 'file:///test.noo';
-		const content = '';
 
-		await harness.openDocument(uri, 'noolang', content);
-
-		const completions = await harness.requestCompletion(uri, 0, 0);
-
-		const labels = completions.map((item: any) => item.label);
-		const expectedBuiltins = ['head', 'tail', 'map', 'filter', 'reduce', 'length', 'print', 'toString', 'read', 'write', 'log', 'random'];
-
-		for (const builtin of expectedBuiltins) {
-			expect(labels).toContain(builtin);
+	test('preserves relative imports for opened workspace documents', async () => {
+		const directory = mkdtempSync(join(tmpdir(), 'noolang-lsp-import-'));
+		const mainPath = join(directory, 'main.noo');
+		writeFileSync(join(directory, 'dep.noo'), '{@answer 42}');
+		const importSource = '{@answer} = import "./dep";\nanswer';
+		writeFileSync(mainPath, importSource);
+		const repoRoot = join(__dirname, '../../..');
+		const importHarness = await LSPServerHarness.create({ workspacePath: repoRoot });
+		try {
+			const hoverUri = `file://${mainPath}`;
+			await importHarness.openDocument(hoverUri, 'noolang', importSource);
+			const hover = await importHarness.requestHover(hoverUri, 1, 1);
+			expect(JSON.stringify(hover)).toContain('Float');
+		} finally {
+			await importHarness.close();
+			rmSync(directory, { recursive: true, force: true });
 		}
 	});
 });

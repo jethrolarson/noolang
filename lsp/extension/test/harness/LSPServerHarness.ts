@@ -37,7 +37,7 @@ export class LSPServerHarness {
 		// Create client connection (sends requests)
 		this.clientConnection = createConnection(clientReader, clientWriter);
 
-		const workspacePath = options.workspacePath || process.env.NOOLANG_WORKSPACE || path.resolve(process.cwd(), '../..');
+		const workspacePath = options.workspacePath || process.env.NOOLANG_WORKSPACE || path.resolve(__dirname, '../../../..');
 		this.workspacePath = workspacePath;
 		this.rootUri = options.rootUri;
 		const builtCli = path.join(workspacePath, 'dist', 'cli.js');

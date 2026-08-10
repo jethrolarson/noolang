@@ -9,9 +9,9 @@ test/
 ├── harness/
 │   ├── InMemoryTransport.ts    # In-memory MessageReader/MessageWriter
 │   ├── LSPServerHarness.ts     # Test harness main class
-│   └── TestServer.ts           # LSP server logic (mirrors server.ts)
+│   └── TestServer.ts           # Deprecated compatibility re-export of production setup
 ├── fixtures/
-│   └── simple.noo              # Sample .noo file for testing
+│   └── simple.noo              # Sample .noo source used by completion tests
 └── completion.test.ts          # Completion feature tests
 ```
 
@@ -53,14 +53,14 @@ describe('LSP Feature Tests', () => {
    - Server connection: Registers LSP handlers (completion, hover, etc.)
    - Client connection: Sends requests and receives responses
 
-4. **Test Server**: `TestServer.ts` contains the same LSP handler logic as the main `server.ts`, but accepts a custom connection for testing.
+4. **Production server**: `LSPServerHarness.ts` injects its in-memory server connection into `createServer` from `server/src/server.ts`. Tests therefore exercise the shipped handlers; `TestServer.ts` remains only as a compatibility import for older tests.
 
 ## Running Tests
 
 ```bash
 cd lsp/extension
-bun test              # Run all tests (the npm scripts are Bun wrappers)
-bun test --watch      # Run tests in watch mode
+bun test test/*.test.ts        # Run TypeScript tests (the npm scripts are Bun wrappers)
+bun test --watch test/*.test.ts # Run tests in watch mode
 ```
 
 ## Extending to Other Features
@@ -94,6 +94,7 @@ test('reports type errors', async () => {
 
 ## Implementation Notes
 
+- Open documents are synchronized into scratch files beside the original document when possible. This keeps the CLI's relative-import resolution anchored to the document's original directory.
 - The harness uses a small delay (50ms) after starting listeners to ensure both sides are ready
 - Each test should create its own document URIs to avoid conflicts
 - The harness automatically handles initialization (initialize/initialized handshake)
