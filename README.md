@@ -5,7 +5,7 @@ assert: true
 
 # Noolang
 
-An functional, expression-based, LLM-friendly programming language designed for linear, declarative code with explicit effects and strong type inference.
+A functional, expression-based, LLM-friendly programming language designed for linear, declarative code with explicit effects and strong type inference.
 
 ## Features
 - **Expression-based** - everything is an expression
