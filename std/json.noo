@@ -120,13 +120,40 @@ escape_to_char = fn c => match c (
 is_supported_escape = fn c =>
   (c == "\"") || (c == "\\") || (c == "/") || (c == "n") || (c == "r") || (c == "t");
 
-json_escaped_char_p = pbind (fn _ => pmap escape_to_char (satisfy "recognized escape character" is_supported_escape)) (char "\\");
-# `\` excluded from "plain" so an unrecognized escape fails the string
-# parse outright, instead of backtracking into treating `\` as a literal.
-json_plain_char_p = satisfy "string char" (fn c => (not (c == "\"")) && (not (c == "\\")) && (not (c < " ")));
-json_string_char_p = choice2 json_escaped_char_p json_plain_char_p;
+# Body of a JSON string (everything after the opening `"`), through and
+# including the closing `"`. A `reduce` scan (one native loop, O(1) noolang
+# call frames) rather than `many json_string_char_p` (one noolang call frame
+# per character) — see std/parser.noo's module comment on why per-character
+# `many` overflows the stack around ~4000 characters, and `take_while`'s note
+# just above it on the fix shape. `take_while` itself doesn't fit here: it
+# takes a single character predicate with no state, and escapes need to
+# consume the char after `\` as part of the same step.
+# Not ascribed: same ParseError constructor-name quirk as json_number_p
+# above.
+json_string_body_p = fn pos s => (
+  doc_len = length (chars s);
+  remaining = chars (substring pos doc_len s);
+  init = {@parts ([] : List String), @i pos, @escaping False, @status "scanning", @error "", @error_pos pos};
+  step = fn state ch =>
+    if not ((state | @status) == "scanning") then state
+    else if state | @escaping then (
+      if is_supported_escape ch
+        then {@parts (append (state | @parts) [escape_to_char ch]), @i ((state | @i) + 1), @escaping False, @status "scanning", @error (state | @error), @error_pos (state | @error_pos)}
+        else {@parts (state | @parts), @i (state | @i), @escaping False, @status "error", @error "recognized escape character", @error_pos (state | @i)}
+    )
+    else if ch == "\\" then {@parts (state | @parts), @i ((state | @i) + 1), @escaping True, @status "scanning", @error (state | @error), @error_pos (state | @error_pos)}
+    else if ch == "\"" then {@parts (state | @parts), @i ((state | @i) + 1), @escaping False, @status "done", @error (state | @error), @error_pos (state | @error_pos)}
+    else if ch < " " then {@parts (state | @parts), @i (state | @i), @escaping False, @status "error", @error "string char", @error_pos (state | @i)}
+    else {@parts (append (state | @parts) [ch]), @i ((state | @i) + 1), @escaping False, @status "scanning", @error (state | @error), @error_pos (state | @error_pos)};
+  final = reduce step init remaining;
+  match (final | @status) (
+    "done" => Ok {@value (join "" (final | @parts)), @pos (final | @i)};
+    "error" => parse_error ("expected " + (final | @error)) (final | @error_pos);
+    _ => parse_error "unterminated string" (final | @i)
+  )
+);
 
-json_string_raw_p = between (char "\"") (char "\"") (pmap (fn cs => join "" cs) (many json_string_char_p));
+json_string_raw_p = pbind (fn _ => json_string_body_p) (char "\"");
 json_string_p = pmap JString json_string_raw_p;
 
 # --- values, arrays, objects ---
