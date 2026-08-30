@@ -36,6 +36,13 @@ direct/mutual recursion in noolang is safe at unbounded depth. Entry points to l
 
 ## Status
 
-Not started. Leave the reduce-based workaround in std/json.noo/std/parser.noo as the
-weakness this is meant to fix — once TCO lands, `many`-based recursive parsing should
-round-trip back to the plain combinator form.
+Done — see ADR 8 (`docs/internal/adrs/adr_0008.md`) for the design (syntactic
+tail-position trampolining, not CPS or a bytecode VM) and its scope boundaries.
+Self-tail-recursive direct application is now stack-safe at unbounded depth.
+
+Not done as part of this: reverting `std/json.noo`'s `reduce`-based
+`json_string_body_p` back to the plain `many`-based combinator form, to prove
+the fix actually closes the loop that motivated it. `many`/`many_go` in
+std/parser.noo recurse through ordinary function application, which the fix
+covers — this should now round-trip cleanly. Worth doing as a follow-up PR,
+not bundled into the evaluator change.
