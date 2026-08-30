@@ -38,7 +38,6 @@ import type { TraitRegistry } from '../typer/trait-system';
 import { flattenStatements as flattenTopLevelStatements } from '../typer/type-operations';
 import {
 	Value,
-	Cell,
 	isFunction,
 	isNativeFunction,
 	isTraitFunctionValue,
@@ -71,11 +70,13 @@ import {
 	valueToString,
 	type TupleValue,
 	RecordValue,
+	type Environment,
 } from './evaluator-utils';
 
 // Re-export commonly used utilities for backward compatibility
 export {
 	type Value,
+	type Environment,
 	isFunction,
 	isNativeFunction,
 	isTraitFunctionValue,
@@ -114,8 +115,6 @@ export type ProgramResult = {
 	environment: Map<string, Value>;
 };
 
-export type Environment = Map<string, Value | Cell>;
-
 // Helper to flatten semicolon-separated binary expressions into individual statements
 const flattenStatements = (expr: Expression): Expression[] => {
 	if (expr.kind === 'binary' && expr.operator === ';') {
@@ -123,6 +122,23 @@ const flattenStatements = (expr: Expression): Expression[] => {
 	}
 	return [expr];
 };
+
+// A saturated tail call into a same-owner terminal closure (see
+// FunctionValue.tailInfo in evaluator-utils.ts) produces this instead of
+// invoking `.fn` — see docs/internal/docs-wip/TCO_TRAMPOLINE_PLAN.md. Never
+// leaks past evaluateTailPosition/runTrampolined; every other call site
+// keeps getting real Values.
+type TailCall = {
+	tailcall: true;
+	param: string;
+	body: Expression;
+	env: Environment;
+	arg: Value;
+};
+
+function isTailCall(value: Value | TailCall): value is TailCall {
+	return (value as TailCall)?.tailcall === true;
+}
 
 // Helper function to apply any kind of function (regular, native, or trait functions)
 function applyValueFunction(func: Value, arg: Value): Value {
@@ -1935,12 +1951,156 @@ export class Evaluator {
 		return value;
 	}
 
+	// Runs a function body to completion, bouncing through same-owner tail
+	// calls in a loop instead of recursing in JS. One JS frame for the
+	// entire run regardless of how many noolang tail calls it bounces
+	// through — see docs/internal/docs-wip/TCO_TRAMPOLINE_PLAN.md. Called
+	// once per entered terminal closure (from inside a single
+	// withNewEnvironment), not once per bounce.
+	private runTrampolined(initialBody: Expression, initialEnv: Environment): Value {
+		let currentBody = initialBody;
+		let currentEnv = initialEnv;
+		for (;;) {
+			this.environment = currentEnv;
+			const r = this.evaluateTailPosition(currentBody);
+			if (!isTailCall(r)) return r;
+			const nextEnv = new Map(r.env);
+			nextEnv.set(r.param, r.arg);
+			currentBody = r.body;
+			currentEnv = nextEnv;
+		}
+	}
+
+	// Tail-position counterpart to evaluateExpression. Recursion here is
+	// bounded by a function body's *static* nesting depth, not by how many
+	// times the trampoline loops, so plain JS recursion through if/match/
+	// where/`;`/single-step-pipeline/typed/constrained is safe. `application`
+	// is the bounce point: a saturated call into a same-owner terminal
+	// closure returns a TailCall marker instead of invoking `.fn` — see
+	// runTrampolined. Everything else defers to evaluateExpression.
+	//
+	// Each non-passthrough case duplicates its non-tail counterpart's logic
+	// rather than sharing a call with it (noted per case) — a shared helper
+	// costs one extra JS frame per call, which is enough on its own to
+	// overflow borderline-deep code (see "Shared-logic refactor — retracted"
+	// in the plan doc). Duplication means these can drift if the non-tail
+	// method changes; nothing enforces staying in sync.
+	private evaluateTailPosition(expr: Expression): Value | TailCall {
+		switch (expr.kind) {
+			case 'if': {
+				// Mirrors evaluateIf.
+				const condition = this.evaluateExpression(expr.condition);
+				let isTruthy = false;
+				if (isBool(condition)) {
+					isTruthy = boolValue(condition);
+				} else if (isNumber(condition)) {
+					isTruthy = condition.value !== 0;
+				} else if (isString(condition)) {
+					isTruthy = condition.value !== '';
+				} else if (isUnit(condition)) {
+					isTruthy = true;
+				} else {
+					isTruthy = true;
+				}
+				return this.evaluateTailPosition(isTruthy ? expr.then : expr.else);
+			}
+			case 'match': {
+				// Mirrors evaluateMatch.
+				const value = this.evaluateExpression(expr.expression);
+				for (const matchCase of expr.cases) {
+					const matchResult = this.tryMatchPattern(matchCase.pattern, value);
+					if (matchResult.matched) {
+						return this.withNewEnvironment(() => {
+							for (const [name, boundValue] of matchResult.bindings) {
+								this.environment.set(name, boundValue);
+							}
+							return this.evaluateTailPosition(matchCase.expression);
+						});
+					}
+				}
+				throw new Error('No pattern matched in match expression');
+			}
+			case 'where': {
+				// Mirrors evaluateWhere.
+				return this.withNewEnvironment(() => {
+					for (const def of expr.definitions) {
+						if (def.kind === 'definition') {
+							const value = this.evaluateExpression(def.value);
+							this.environment.set(def.name, value);
+						} else if (def.kind === 'mutable-definition') {
+							const value = this.evaluateExpression(def.value);
+							this.environment.set(def.name, createCell(value));
+						} else if (def.kind === 'tuple-destructuring') {
+							this.evaluateTupleDestructuring(def);
+						} else if (def.kind === 'record-destructuring') {
+							this.evaluateRecordDestructuring(def);
+						}
+					}
+					return this.evaluateTailPosition(expr.main);
+				});
+			}
+			case 'binary':
+				if (expr.operator === ';') {
+					this.evaluateExpression(expr.left);
+					return this.evaluateTailPosition(expr.right);
+				}
+				// Every other operator (+, ==, |, $, &&, ||, ...) is out of
+				// scope — see the plan doc's Non-goals.
+				return this.evaluateExpression(expr);
+			case 'pipeline':
+				if (expr.steps.length === 1) {
+					return this.evaluateTailPosition(expr.steps[0]);
+				}
+				return this.evaluateExpression(expr);
+			case 'typed':
+			case 'constrained':
+				return this.evaluateTailPosition(expr.expression);
+			case 'application': {
+				// Only the parser's actual single-arg shape takes the bounce
+				// path — evaluateApplication's multi-arg loop tracks the
+				// intermediate result as a raw callable, which breaks past
+				// the first argument, so a hypothetical multi-arg node must
+				// defer there entirely to keep tail/non-tail semantics
+				// identical for the same AST.
+				if (expr.args.length !== 1) {
+					return this.evaluateExpression(expr);
+				}
+				// Mirrors evaluateApplication, except: a saturated call into
+				// a same-owner terminal closure bounces instead of `.fn`.
+				const func = this.evaluateExpression(expr.func);
+				if (func.tag === 'trait-function') {
+					return this.evaluateTraitFunctionApplication(func, expr.args);
+				}
+				if (!isFunction(func) && !isNativeFunction(func)) {
+					throw new Error(
+						`Cannot apply non-function: ${typeof func} (${(func as Value)?.tag || 'unknown'})`
+					);
+				}
+				let arg = this.evaluateExpression(expr.args[0]);
+				if (isCell(arg)) arg = arg.value;
+				if (isFunction(func) && func.tailInfo && func.tailInfo.owner === this) {
+					return {
+						tailcall: true,
+						param: func.tailInfo.param,
+						body: func.tailInfo.body,
+						env: func.tailInfo.env,
+						arg,
+					};
+				}
+				return func.fn(arg);
+			}
+			default:
+				return this.evaluateExpression(expr);
+		}
+	}
+
 	private evaluateFunction(expr: FunctionExpression): Value {
 		const self = this;
 		// Create a closure that captures the current environment
 		const closureEnv = new Map(this.environment);
 
 		function createCurriedFunction(params: string[], body: Expression): Value {
+			const isTerminal = params.length === 1;
 			return createFunction((arg: Value) => {
 				// Create a new environment for this function call
 				const callEnv = new Map(closureEnv);
@@ -1951,48 +2111,59 @@ export class Evaluator {
 
 				let result: Value;
 				if (params.length === 1) {
-					// Use environment stacking for efficient scoping
+					// Use environment stacking for efficient scoping. The whole
+					// trampoline loop runs inside one withNewEnvironment call —
+					// one logical call frame, not one per bounce.
 					result = self.withNewEnvironment(() => {
 						self.environment = callEnv;
-						return self.evaluateExpression(body);
+						return self.runTrampolined(body, callEnv);
 					});
 				} else {
 					// Create a function that captures the current parameter
 					const remainingParams = params.slice(1);
+					const nextIsTerminal = remainingParams.length === 1;
 
-					const nextFunction = createFunction((nextArg: Value) => {
-						const nextCallEnv = new Map(callEnv);
-						nextCallEnv.set(remainingParams[0], nextArg);
+					const nextFunction = createFunction(
+						(nextArg: Value) => {
+							const nextCallEnv = new Map(callEnv);
+							nextCallEnv.set(remainingParams[0], nextArg);
 
-						if (remainingParams.length === 1) {
-							return self.withNewEnvironment(() => {
-								self.environment = nextCallEnv;
-								return self.evaluateExpression(body);
-							});
-						} else {
-							// Continue currying for remaining parameters
-							const remainingFunction = self.withNewEnvironment(() => {
-								self.environment = nextCallEnv;
-								return self.evaluateFunction({
-									...expr,
-									params: remainingParams,
+							if (remainingParams.length === 1) {
+								return self.withNewEnvironment(() => {
+									self.environment = nextCallEnv;
+									return self.runTrampolined(body, nextCallEnv);
 								});
-							});
-							if (isFunction(remainingFunction)) {
-								return remainingFunction.fn(nextArg);
 							} else {
-								throw new Error(
-									`Expected function but got: ${typeof remainingFunction}`
-								);
+								// Continue currying for remaining parameters
+								const remainingFunction = self.withNewEnvironment(() => {
+									self.environment = nextCallEnv;
+									return self.evaluateFunction({
+										...expr,
+										params: remainingParams,
+									});
+								});
+								if (isFunction(remainingFunction)) {
+									return remainingFunction.fn(nextArg);
+								} else {
+									throw new Error(
+										`Expected function but got: ${typeof remainingFunction}`
+									);
+								}
 							}
-						}
-					});
+						},
+						// The terminal closure for this arity — the one whose `.fn`
+						// actually evaluates `body`. tailInfo lets a caller in tail
+						// position bounce into it instead of recursing in JS.
+						nextIsTerminal
+							? { param: remainingParams[0], body, env: callEnv, owner: self }
+							: undefined
+					);
 
 					result = nextFunction;
 				}
 
 				return result;
-			});
+			}, isTerminal ? { param: params[0], body, env: closureEnv, owner: self } : undefined);
 		}
 
 		return createCurriedFunction(expr.params, expr.body);
@@ -2769,11 +2940,18 @@ export class Evaluator {
 						this.containsVariable(matchCase.expression, varName)
 					)
 				);
+			case 'where':
+				return (
+					expr.definitions.some(def => this.containsVariable(def, varName)) ||
+					this.containsVariable(expr.main, varName)
+				);
+			case 'typed':
+			case 'constrained':
+				return this.containsVariable(expr.expression, varName);
 			case 'import':
 			case 'accessor':
 			case 'literal':
 			case 'unit':
-			case 'typed':
 				return false;
 			default:
 				return false;
@@ -3065,23 +3243,17 @@ export class Evaluator {
 	private evaluateMatch(expr: MatchExpression): Value {
 		// Evaluate the expression being matched
 		const value = this.evaluateExpression(expr.expression);
-
-		// Try each case until one matches
 		for (const matchCase of expr.cases) {
 			const matchResult = this.tryMatchPattern(matchCase.pattern, value);
 			if (matchResult.matched) {
-				// Use environment stacking for pattern bindings
 				return this.withNewEnvironment(() => {
-					// Add bindings to environment
 					for (const [name, boundValue] of matchResult.bindings) {
 						this.environment.set(name, boundValue);
 					}
-					// Evaluate the case expression
 					return this.evaluateExpression(matchCase.expression);
 				});
 			}
 		}
-
 		throw new Error('No pattern matched in match expression');
 	}
 
