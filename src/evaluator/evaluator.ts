@@ -123,11 +123,9 @@ const flattenStatements = (expr: Expression): Expression[] => {
 	return [expr];
 };
 
-// A saturated tail call into a same-owner terminal closure (see
-// FunctionValue.tailInfo in evaluator-utils.ts) produces this instead of
-// invoking `.fn` — see docs/internal/docs-wip/TCO_TRAMPOLINE_PLAN.md. Never
-// leaks past evaluateTailPosition/runTrampolined; every other call site
-// keeps getting real Values.
+// A saturated tail call into a same-owner terminal closure (FunctionValue
+// .tailInfo) produces this instead of invoking `.fn` — see ADR 8. Never
+// leaks past evaluateTailPosition/runTrampolined.
 type TailCall = {
 	tailcall: true;
 	param: string;
@@ -1951,12 +1949,8 @@ export class Evaluator {
 		return value;
 	}
 
-	// Runs a function body to completion, bouncing through same-owner tail
-	// calls in a loop instead of recursing in JS. One JS frame for the
-	// entire run regardless of how many noolang tail calls it bounces
-	// through — see docs/internal/docs-wip/TCO_TRAMPOLINE_PLAN.md. Called
-	// once per entered terminal closure (from inside a single
-	// withNewEnvironment), not once per bounce.
+	// Bounces through same-owner tail calls in a loop instead of recursing in
+	// JS — one JS frame for the whole run, not one per bounce (ADR 8).
 	private runTrampolined(initialBody: Expression, initialEnv: Environment): Value {
 		let currentBody = initialBody;
 		let currentEnv = initialEnv;
@@ -1971,20 +1965,12 @@ export class Evaluator {
 		}
 	}
 
-	// Tail-position counterpart to evaluateExpression. Recursion here is
-	// bounded by a function body's *static* nesting depth, not by how many
-	// times the trampoline loops, so plain JS recursion through if/match/
-	// where/`;`/single-step-pipeline/typed/constrained is safe. `application`
-	// is the bounce point: a saturated call into a same-owner terminal
-	// closure returns a TailCall marker instead of invoking `.fn` — see
-	// runTrampolined. Everything else defers to evaluateExpression.
-	//
-	// Each non-passthrough case duplicates its non-tail counterpart's logic
-	// rather than sharing a call with it (noted per case) — a shared helper
-	// costs one extra JS frame per call, which is enough on its own to
-	// overflow borderline-deep code (see "Shared-logic refactor — retracted"
-	// in the plan doc). Duplication means these can drift if the non-tail
-	// method changes; nothing enforces staying in sync.
+	// Tail-position counterpart to evaluateExpression: recurses through
+	// tail-preserving node kinds (bounded by static nesting, not call count),
+	// bounces at `application` (see runTrampolined), defers everything else.
+	// Duplicates rather than shares logic with its non-tail counterparts —
+	// a shared helper's extra JS frame overflowed a borderline test; see
+	// ADR 8. Can drift if those methods change; nothing enforces sync.
 	private evaluateTailPosition(expr: Expression): Value | TailCall {
 		switch (expr.kind) {
 			case 'if': {
@@ -2044,8 +2030,7 @@ export class Evaluator {
 					this.evaluateExpression(expr.left);
 					return this.evaluateTailPosition(expr.right);
 				}
-				// Every other operator (+, ==, |, $, &&, ||, ...) is out of
-				// scope — see the plan doc's Non-goals.
+				// Other operators (+, ==, |, $, &&, ||, ...) out of scope — ADR 8.
 				return this.evaluateExpression(expr);
 			case 'pipeline':
 				if (expr.steps.length === 1) {
@@ -2056,12 +2041,8 @@ export class Evaluator {
 			case 'constrained':
 				return this.evaluateTailPosition(expr.expression);
 			case 'application': {
-				// Only the parser's actual single-arg shape takes the bounce
-				// path — evaluateApplication's multi-arg loop tracks the
-				// intermediate result as a raw callable, which breaks past
-				// the first argument, so a hypothetical multi-arg node must
-				// defer there entirely to keep tail/non-tail semantics
-				// identical for the same AST.
+				// Only the single-arg shape bounces — evaluateApplication's
+				// multi-arg loop breaks past the first arg if mirrored naively.
 				if (expr.args.length !== 1) {
 					return this.evaluateExpression(expr);
 				}
@@ -2111,9 +2092,7 @@ export class Evaluator {
 
 				let result: Value;
 				if (params.length === 1) {
-					// Use environment stacking for efficient scoping. The whole
-					// trampoline loop runs inside one withNewEnvironment call —
-					// one logical call frame, not one per bounce.
+					// The whole trampoline loop runs inside one withNewEnvironment.
 					result = self.withNewEnvironment(() => {
 						self.environment = callEnv;
 						return self.runTrampolined(body, callEnv);
@@ -2151,9 +2130,7 @@ export class Evaluator {
 								}
 							}
 						},
-						// The terminal closure for this arity — the one whose `.fn`
-						// actually evaluates `body`. tailInfo lets a caller in tail
-						// position bounce into it instead of recursing in JS.
+						// tailInfo only on the terminal closure for this arity.
 						nextIsTerminal
 							? { param: remainingParams[0], body, env: callEnv, owner: self }
 							: undefined

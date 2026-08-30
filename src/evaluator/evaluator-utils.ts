@@ -22,11 +22,9 @@ export type RecordValue = { tag: 'record'; fields: { [key: string]: Value } };
 export type FunctionValue = {
 	tag: 'function';
 	fn: (...args: Value[]) => Value;
-	// Set only on a terminal closure (one that evaluates a noolang function
-	// body directly) — lets evaluator.ts's evaluateTailPosition bounce a
-	// same-owner tail call through runTrampolined instead of recursing in
-	// JS. `owner` (the creating Evaluator, compared by reference) is typed
-	// `unknown` to avoid an import cycle with evaluator.ts.
+	// Set only on a terminal closure (evaluates a function body directly) —
+	// lets evaluateTailPosition bounce a same-owner tail call instead of
+	// recursing. `owner` typed `unknown` to avoid an evaluator.ts import cycle.
 	tailInfo?: {
 		param: string;
 		body: Expression;

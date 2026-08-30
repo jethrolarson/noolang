@@ -1,26 +1,16 @@
-// Tail-position trampolining for the evaluator — see
-// docs/internal/docs-wip/TCO_TRAMPOLINE_PLAN.md for design.
+// Tail-position trampolining for the evaluator — see ADR 8.
 //
-// `[fixed]` blocks assert the correct result at a depth that overflows the
-// JS stack without the trampoline (measured threshold, bun test v1.3.14
-// in-process: 10000 OK, 11000+ overflows). `[characterization]` blocks
-// assert behavior that must hold regardless of the trampoline. STRESS_DEPTH
-// is one expensive deep case; SHALLOW_OVERFLOW_DEPTH is the cheap depth
-// reused across every structural variant instead of repeating the stress
-// depth per shape.
+// `[fixed]` blocks assert correctness at a depth that overflows without the
+// trampoline (measured threshold: 10000 OK, 11000+ overflows).
+// `[characterization]` blocks must hold regardless of the trampoline.
 import { test, expect, describe } from 'bun:test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { expectSuccess } from '../utils';
 
 const STRESS_DEPTH = 100000;
-// 12000 (a thin margin above the measured 11000 threshold) turned out
-// run-to-run flaky — different tail-position shapes carry slightly
-// different per-call frame overhead, and 1000 calls of headroom wasn't
-// enough. 25000 leaves real margin while still being fast to fail (<1s).
-// Kept as the depth for these tests even now that they're fixed (labeled
-// `[fixed]` below, not `[red]`) — same rationale: enough that a future
-// regression back to non-tail recursion would fail loudly, not flakily.
+// 12000 (thin margin above the measured 11000 threshold) was flaky
+// run-to-run across shapes; 25000 is stable and still fast (<1s).
 const SHALLOW_OVERFLOW_DEPTH = 25000;
 const SANITY_DEPTH = 10; // confirms a shape is correct before trusting its deep result as "real"
 
