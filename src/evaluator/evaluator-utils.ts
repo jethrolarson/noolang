@@ -1,4 +1,5 @@
 import { TraitRegistry } from '../typer/trait-system';
+import type { Expression } from '../ast';
 
 // Value types (Phase 6: functions and native functions as tagged union)
 export type Value =
@@ -21,6 +22,15 @@ export type RecordValue = { tag: 'record'; fields: { [key: string]: Value } };
 export type FunctionValue = {
 	tag: 'function';
 	fn: (...args: Value[]) => Value;
+	// Set only on a terminal closure (evaluates a function body directly) —
+	// lets evaluateTailPosition bounce a same-owner tail call instead of
+	// recursing. `owner` typed `unknown` to avoid an evaluator.ts import cycle.
+	tailInfo?: {
+		param: string;
+		body: Expression;
+		env: Environment;
+		owner: unknown;
+	};
 };
 export type NativeValue = { tag: 'native'; name: string; fn: unknown };
 export type ConstructorValue = {
@@ -48,6 +58,10 @@ export const isCell = (val: any): val is Cell =>
 	val && typeof val === 'object' && val.cell === true && 'value' in val;
 
 export const createCell = (value: Value): Cell => ({ cell: true, value });
+
+// Moved from evaluator.ts so FunctionValue below can reference it without a
+// circular import.
+export type Environment = Map<string, Value | Cell>;
 
 export const isNumber = (
 	value: Value
@@ -117,11 +131,10 @@ export const isAnyFunction = (
 	isFunction(value) || isNativeFunction(value) || isTraitFunctionValue(value);
 
 export const createFunction = (
-	fn: (...args: Value[]) => Value
-): FunctionValue => ({
-	tag: 'function',
-	fn,
-});
+	fn: (...args: Value[]) => Value,
+	tailInfo?: FunctionValue['tailInfo']
+): FunctionValue =>
+	tailInfo === undefined ? { tag: 'function', fn } : { tag: 'function', fn, tailInfo };
 
 export const isNativeFunction = (value: Value): value is NativeFunctionValue =>
 	value.tag === 'native';

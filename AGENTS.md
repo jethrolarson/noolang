@@ -86,6 +86,8 @@ where practical.
 Minor duplication beats a premature abstraction, and YAGNI wins ties. Don't
 pre-optimize into something that's harder to maintain.
 
+Comments: Express meaning through decomposition and names--not narrative comments. Document only unobvious "why" and public API where appropriate.
+
 ## Prompting
 
 1. Prompt is _for_ an agent. Write for and understand intended agent's knowledge and capability and _trust_ them appropriately.
