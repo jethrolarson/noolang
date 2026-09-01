@@ -30,6 +30,11 @@ variant JsonError =
   | JsonMissingField String
   | JsonIndexOutOfBounds Float;
 
+# Local, not stdlib's `bind`: swapping in the Monad-trait `bind` here trips
+# a typer bug — "Result has 1 vs 2 type arguments" — even on the plain
+# multi-constructor JsonError case (json_field), not just the ParseError
+# single-constructor quirk. Root cause is in the typer, not this file;
+# tracked as a follow-up rather than worked around further here.
 result_bind = fn res f => match res (
   Ok x => f x;
   Err e => Err e
@@ -199,7 +204,7 @@ escape_string = fn s => join "" (list_map escape_char (chars s));
 non_finite_number_text = fn n => (
   text = toString n;
   (text == "Infinity") || (text == "-Infinity") || (text == "NaN")
-);
+) : a -> Bool;
 
 # Not ascribed: wrapping a self-recursive binding in a type ascription
 # breaks its own recursive reference at runtime ("Undefined variable"),
@@ -218,17 +223,17 @@ json_stringify = fn v => match v (
       {k, mv} = pair;
       "\"" + escape_string k + "\"" + ":" + json_stringify mv
     )) members) + "}"
-);
+) : JsonValue -> String;
 
 # ========================================
 # EXTRACTION API
 # ========================================
 
-json_as_string = fn v => match v (JString s => Ok s; _ => Err JsonExpectedString) : JsonValue -> Result String JsonError;
-json_as_number = fn v => match v (JNumber n => Ok n; _ => Err JsonExpectedNumber) : JsonValue -> Result Float JsonError;
-json_as_bool = fn v => match v (JBool b => Ok b; _ => Err JsonExpectedBool) : JsonValue -> Result Bool JsonError;
-json_as_array = fn v => match v (JArray items => Ok items; _ => Err JsonExpectedArray) : JsonValue -> Result (List JsonValue) JsonError;
-json_as_object = fn v => match v (JObject members => Ok members; _ => Err JsonExpectedObject) : JsonValue -> Result (List {String, JsonValue}) JsonError;
+json_as_string = fn v => match v (JString s => Ok s; _ => Err JsonExpectedString)
+json_as_number = fn v => match v (JNumber n => Ok n; _ => Err JsonExpectedNumber)
+json_as_bool = fn v => match v (JBool b => Ok b; _ => Err JsonExpectedBool)
+json_as_array = fn v => match v (JArray items => Ok items; _ => Err JsonExpectedArray)
+json_as_object = fn v => match v (JObject members => Ok members; _ => Err JsonExpectedObject)
 
 json_field = fn key v => result_bind (json_as_object v) (fn members =>
   match (assoc_get key members) (
@@ -244,20 +249,29 @@ json_index = fn idx v => result_bind (json_as_array v) (fn items =>
   )
 ) : Float -> JsonValue -> Result JsonValue JsonError;
 
-# Not ascribed: same self-recursive-ascription runtime gap as json_stringify
-# above.
-json_equals = fn a b => match a (
-  JNull => match b (JNull => True; _ => False);
-  JBool x => match b (JBool y => equals x y; _ => False);
-  JNumber x => match b (JNumber y => equals x y; _ => False);
-  JString x => match b (JString y => equals x y; _ => False);
-  JArray xs => match b (JArray ys => primitive_list_all2 json_equals xs ys; _ => False);
-  JObject xs => match b (JObject ys => primitive_list_all2 (fn px py => (
-      {kx, vx} = px;
-      {ky, vy} = py;
-      (equals (kx : String) ky) && (json_equals vx vy)
-    )) xs ys; _ => False)
+# implement Eq (not a bare function) so Eq (List a)/Eq (Option a)'s existing
+# generic instances (stdlib.noo) pick up JsonValue for free, and `==` works
+# directly. Every internal `equals` call is ascribed: inside this instance
+# body, unqualified `equals` resolves to JsonValue -> JsonValue -> Bool (the
+# instance being defined) rather than dispatching per argument type, so
+# scalar/recursive calls need the type spelled out to reach the right
+# instance.
+implement Eq JsonValue (
+  equals = fn a b => match a (
+    JNull => match b (JNull => True; _ => False);
+    JBool x => match b (JBool y => (equals : Bool -> Bool -> Bool) x y; _ => False);
+    JNumber x => match b (JNumber y => (equals : Float -> Float -> Bool) x y; _ => False);
+    JString x => match b (JString y => (equals : String -> String -> Bool) x y; _ => False);
+    JArray xs => match b (JArray ys => primitive_list_all2 (equals : JsonValue -> JsonValue -> Bool) xs ys; _ => False);
+    JObject xs => match b (JObject ys => primitive_list_all2 (fn px py => (
+        {kx, vx} = px;
+        {ky, vy} = py;
+        ((equals : String -> String -> Bool) kx ky) && ((equals : JsonValue -> JsonValue -> Bool) vx vy)
+      )) xs ys; _ => False)
+  )
 );
+
+json_equals = equals : JsonValue -> JsonValue -> Bool;
 
 {
   @JNull JNull,
