@@ -271,8 +271,6 @@ implement Eq JsonValue (
   )
 );
 
-json_equals = equals : JsonValue -> JsonValue -> Bool;
-
 {
   @JNull JNull,
   @JBool JBool,
@@ -282,7 +280,6 @@ json_equals = equals : JsonValue -> JsonValue -> Bool;
   @JObject JObject,
   @json_parse json_parse,
   @json_stringify json_stringify,
-  @json_equals json_equals,
   @json_as_string json_as_string,
   @json_as_number json_as_number,
   @json_as_bool json_as_bool,

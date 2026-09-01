@@ -5,7 +5,7 @@
 # JSON text.
 
 {@test_case test_case, @group group, @expect_eq expect_eq, @expect expect} = import "std/test";
-{@json_parse json_parse, @json_stringify json_stringify, @json_equals json_equals,
+{@json_parse json_parse, @json_stringify json_stringify,
  @json_field json_field, @json_index json_index, @json_as_number json_as_number}
   = import "std/json";
 
@@ -31,7 +31,7 @@ roundtrip_tests = group "json_stringify . json_parse round-trips" [
     src = "{\"name\":\"Ada\",\"scores\":[1,2,3],\"meta\":{\"active\":true,\"note\":null}}";
     match (json_parse src) (
       Ok v => match (json_parse (json_stringify v)) (
-        Ok v2 => expect "re-parsed value equals the original" (json_equals v v2);
+        Ok v2 => expect "re-parsed value equals the original" (equals v v2);
         Err _ => expect "re-parse failed" False
       );
       Err _ => expect "initial parse failed" False
