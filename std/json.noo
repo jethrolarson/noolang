@@ -119,13 +119,83 @@ escape_to_char = fn c => match c (
   _ => c
 ) : String -> String;
 
-# \u/\b/\f are valid JSON escapes (RFC 8259 §7), unsupported here: no
-# codepoint<->char builtin for `\uXXXX`, no `\b`/`\f` in noolang's own
-# string-literal lexer. Rejected, not mis-decoded.
+# \b/\f are valid JSON escapes (RFC 8259 §7) still unsupported here: noolang's
+# own string-literal lexer has no way to write those two control characters.
+# Rejected, not mis-decoded. \u is handled separately below, via
+# json_unicode_escape_p — it decodes to a codepoint (not a fixed character),
+# so it doesn't fit this single-char whitelist.
 is_supported_escape = fn c =>
   (c == "\"") || (c == "\\") || (c == "/") || (c == "n") || (c == "r") || (c == "t");
 
-json_escaped_char_p = pbind (fn _ => pmap escape_to_char (satisfy "recognized escape character" is_supported_escape)) (char "\\");
+is_hex_digit = fn c =>
+  (is_digit c) || ((c >= "a") && (c <= "f")) || ((c >= "A") && (c <= "F"));
+
+hex_digit_value = fn c => match c (
+  "0" => 0; "1" => 1; "2" => 2; "3" => 3; "4" => 4;
+  "5" => 5; "6" => 6; "7" => 7; "8" => 8; "9" => 9;
+  "a" => 10; "b" => 11; "c" => 12; "d" => 13; "e" => 14; "f" => 15;
+  "A" => 10; "B" => 11; "C" => 12; "D" => 13; "E" => 14; "F" => 15;
+  _ => 0
+) : String -> Float;
+
+# Exactly 4 hex digits (RFC 8259 §7's `\uXXXX`), not `take_while`'s "as many
+# as match" — a short run (e.g. "\u12" at end of input) must fail, not
+# silently succeed on fewer digits.
+read_hex4 = fn pos s => (
+  cs = [peek_char pos s, peek_char (pos + 1) s, peek_char (pos + 2) s, peek_char (pos + 3) s];
+  all_hex = reduce (fn acc c => acc && (match c (Some d => is_hex_digit d; None => False))) True cs;
+  if not all_hex then parse_error "expected 4 hex digits" pos else (
+    values = list_map (fn c => match c (Some d => hex_digit_value d; None => 0)) cs;
+    n = reduce (fn acc v => acc * 16 + v) 0 values;
+    Ok {@value n, @pos (pos + 4)}
+  )
+);
+
+# High/low surrogate ranges, UTF-16 (RFC 8259 §7's astral-codepoint escape).
+is_high_surrogate = fn n => (n >= 55296) && (n <= 56319);
+is_low_surrogate = fn n => (n >= 56320) && (n <= 57343);
+combine_surrogates = fn hi lo => 65536 + ((hi - 55296) * 1024) + (lo - 56320);
+
+# Called positioned just after "\u" (the literal backslash-u already
+# consumed). A lone/unpaired surrogate is rejected outright rather than
+# handed to from_char_code — this module's stated stance (see
+# is_supported_escape above) is reject, not mis-decode.
+json_unicode_escape_p = fn pos s =>
+  result_bind (read_hex4 pos s) (fn r1 => (
+    code1 = r1 | @value;
+    pos1 = r1 | @pos;
+    if is_low_surrogate code1 then parse_error "unpaired low surrogate in \\u escape" pos else
+    if not (is_high_surrogate code1) then Ok {@value (from_char_code code1), @pos pos1} else
+    match (peek_char pos1 s) (
+      Some "\\" => match (peek_char (pos1 + 1) s) (
+        Some "u" => result_bind (read_hex4 (pos1 + 2) s) (fn r2 => (
+          code2 = r2 | @value;
+          if is_low_surrogate code2
+            then Ok {@value (from_char_code (combine_surrogates code1 code2)), @pos (r2 | @pos)}
+            else parse_error "unpaired high surrogate in \\u escape" pos
+        ));
+        _ => parse_error "unpaired high surrogate in \\u escape" pos
+      );
+      _ => parse_error "unpaired high surrogate in \\u escape" pos
+    )
+  ));
+
+# `\` then either a fixed-mapping escape (satisfy+map, single char) or `u`
+# (position-threaded 4-hex-digit decode, see json_unicode_escape_p) — the two
+# don't fit one combinator chain since only one of them consumes a variable
+# number of characters.
+json_escaped_char_p = fn pos s => (
+  match (char "\\" pos s) (
+    Err e => Err e;
+    Ok r => (
+      pos1 = r | @pos;
+      match (peek_char pos1 s) (
+        Some "u" => json_unicode_escape_p (pos1 + 1) s;
+        _ => pmap escape_to_char (satisfy "recognized escape character" is_supported_escape) pos1 s
+      )
+    )
+  )
+);
 # `\` excluded from "plain" so an unrecognized escape fails the string
 # parse outright, instead of backtracking into treating `\` as a literal.
 json_plain_char_p = satisfy "string char" (fn c => (not (c == "\"")) && (not (c == "\\")) && (not (c < " ")));

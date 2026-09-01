@@ -784,6 +784,33 @@ export class Evaluator {
 		);
 
 		this.environment.set(
+			'char_code',
+			createNativeFunction('char_code', (str: Value) => {
+				if (!isString(str)) throw new Error('char_code requires a string');
+				if (str.value.length === 0)
+					throw new Error('char_code requires a non-empty string');
+				return createNumber(str.value.codePointAt(0) as number);
+			})
+		);
+
+		this.environment.set(
+			'from_char_code',
+			createNativeFunction('from_char_code', (code: Value) => {
+				if (!isNumber(code))
+					throw new Error('from_char_code requires a number');
+				try {
+					return createString(String.fromCodePoint(code.value));
+				} catch (e) {
+					throw new Error(
+						`from_char_code requires a valid Unicode codepoint: ${
+							e instanceof Error ? e.message : String(e)
+						}`
+					);
+				}
+			})
+		);
+
+		this.environment.set(
 			'trim',
 			createNativeFunction('trim', (str: Value) => {
 				if (!isString(str)) throw new Error('trim requires a string');

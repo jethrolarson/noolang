@@ -18,7 +18,7 @@ import { expectSuccess, runCode } from '../utils';
 // paper over it.
 setDefaultTimeout(30000);
 
-const importJson = `{@json_parse json_parse, @json_stringify json_stringify, @json_equals json_equals, @json_field json_field, @json_index json_index, @json_as_string json_as_string, @json_as_number json_as_number, @json_as_bool json_as_bool, @json_as_array json_as_array, @json_as_object json_as_object} = import "std/json";`;
+const importJson = `{@json_parse json_parse, @json_stringify json_stringify, @json_field json_field, @json_index json_index, @json_as_string json_as_string, @json_as_number json_as_number, @json_as_bool json_as_bool, @json_as_array json_as_array, @json_as_object json_as_object} = import "std/json";`;
 
 // Renders a Result JsonValue JsonParseError down to a plain string so
 // assertions don't need to know the constructor shapes.
@@ -102,12 +102,19 @@ test('rejects trailing content after a valid value', () => {
 	expectSuccess(parseOutcome('"1 2"'), expect.stringContaining('ERR:'));
 });
 
-test('rejects unsupported \\u and \\b/\\f escapes rather than mis-decoding them', () => {
-	// Documented scope limit: no codepoint<->char builtin (fromCharCode /
-	// charCodeAt) exists in noolang, so \u escapes can't be decoded and
-	// aren't silently passed through either.
-	expectSuccess(parseOutcome('"\\"\\\\u0041\\""'), expect.stringContaining('ERR:'));
+test('decodes \\uXXXX escapes, including surrogate pairs, and rejects lone surrogates', () => {
+	expectSuccess(parseOutcome('"\\"\\\\u0041\\""'), 'OK:"A"');
+	expectSuccess(parseOutcome('"\\"\\\\u00e9\\""'), 'OK:"é"');
+	expectSuccess(parseOutcome('"\\"\\\\ud83d\\\\ude00\\""'), 'OK:"😀"');
+	expectSuccess(parseOutcome('"\\"\\\\ud83d\\""'), expect.stringContaining('ERR:'));
+	expectSuccess(parseOutcome('"\\"\\\\udc00\\""'), expect.stringContaining('ERR:'));
+});
+
+test('rejects unsupported \\b/\\f escapes rather than mis-decoding them', () => {
+	// Documented scope limit: noolang's own string-literal lexer has no way
+	// to write these two control characters.
 	expectSuccess(parseOutcome('"\\"\\\\b\\""'), expect.stringContaining('ERR:'));
+	expectSuccess(parseOutcome('"\\"\\\\f\\""'), expect.stringContaining('ERR:'));
 });
 
 test('json_stringify round-trips through json_parse', () => {
@@ -117,7 +124,7 @@ test('json_stringify round-trips through json_parse', () => {
 			`
     stringified = json_stringify v;
     match (json_parse stringified) (
-      Ok v2 => if json_equals v v2 then "roundtrip-ok" else "roundtrip-mismatch";
+      Ok v2 => if v == v2 then "roundtrip-ok" else "roundtrip-mismatch";
       Err _ => "reparse-failed"
     )`
 		),
@@ -125,7 +132,7 @@ test('json_stringify round-trips through json_parse', () => {
 	);
 });
 
-test('json_equals distinguishes different values and ignores nothing', () => {
+test('Eq JsonValue (==) distinguishes different values and ignores nothing', () => {
 	expectSuccess(
 		`
 ${importJson}
@@ -134,7 +141,7 @@ b = json_parse "{\\"x\\":1,\\"y\\":[1,2]}";
 c = json_parse "{\\"x\\":1,\\"y\\":[1,3]}";
 match {a, b, c} (
   {Ok va, Ok vb, Ok vc} =>
-    if (json_equals va vb) && (not (json_equals va vc))
+    if (va == vb) && (not (va == vc))
       then "as-expected"
       else "mismatch";
   _ => "parse-failed"

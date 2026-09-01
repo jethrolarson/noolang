@@ -439,6 +439,14 @@ export const initializeBuiltins = (state: TypeState): TypeState => {
 		),
 		quantifiedVars: [],
 	});
+	newEnv.set('char_code', {
+		type: createUnaryFunctionType(stringType(), floatType()),
+		quantifiedVars: [],
+	});
+	newEnv.set('from_char_code', {
+		type: createUnaryFunctionType(floatType(), stringType()),
+		quantifiedVars: [],
+	});
 	newEnv.set('trim', {
 		type: createUnaryFunctionType(stringType(), stringType()),
 		quantifiedVars: [],

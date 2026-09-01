@@ -6,7 +6,8 @@
 
 {@test_case test_case, @group group, @expect_eq expect_eq, @expect expect} = import "std/test";
 {@json_parse json_parse, @json_stringify json_stringify,
- @json_field json_field, @json_index json_index, @json_as_number json_as_number}
+ @json_field json_field, @json_index json_index, @json_as_number json_as_number,
+ @json_as_string json_as_string}
   = import "std/json";
 
 is_ok = fn r => match r (Ok _ => True; Err _ => False);
@@ -73,4 +74,20 @@ spec_gap_tests = group "spec edge cases found in code review" [
     expect_eq "null" (unwrap_or "?" (match (json_parse "1e400") (Ok v => Ok (json_stringify v); Err e => Err e))))
 ];
 
-group "std/json regressions" [parse_tests, roundtrip_tests, extraction_tests, spec_gap_tests]
+json_parse_string = fn src => match (json_parse src) (
+  Ok v => match (json_as_string v) (Ok s => s; Err _ => "?");
+  Err _ => "?"
+);
+
+unicode_escape_tests = group "\\u escape decoding" [
+  test_case "decodes a plain BMP \\u escape" (fn _ =>
+    expect_eq "é" (json_parse_string "\"\\u00e9\"")),
+  test_case "decodes a surrogate pair into an astral codepoint" (fn _ =>
+    expect_eq "😀" (json_parse_string "\"\\ud83d\\ude00\"")),
+  test_case "rejects a lone high surrogate" (fn _ =>
+    expect "unpaired high surrogate is an error" (is_err (json_parse "\"\\ud83d\""))),
+  test_case "rejects a lone low surrogate" (fn _ =>
+    expect "unpaired low surrogate is an error" (is_err (json_parse "\"\\udc00\"")))
+];
+
+group "std/json regressions" [parse_tests, roundtrip_tests, extraction_tests, spec_gap_tests, unicode_escape_tests]
