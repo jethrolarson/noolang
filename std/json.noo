@@ -251,22 +251,22 @@ json_index = fn idx v => result_bind (json_as_array v) (fn items =>
 
 # implement Eq (not a bare function) so Eq (List a)/Eq (Option a)'s existing
 # generic instances (stdlib.noo) pick up JsonValue for free, and `==` works
-# directly. Every internal `equals` call is ascribed: inside this instance
-# body, unqualified `equals` resolves to JsonValue -> JsonValue -> Bool (the
-# instance being defined) rather than dispatching per argument type, so
-# scalar/recursive calls need the type spelled out to reach the right
-# instance.
+# directly. Infix `==`, not prefix `equals`: inside this instance body,
+# unqualified `equals` monomorphizes to JsonValue -> JsonValue -> Bool (the
+# instance being defined) instead of dispatching per argument type — `==`
+# doesn't have that problem, including in the self-recursive Array/Object
+# cases, so no ascriptions are needed.
 implement Eq JsonValue (
   equals = fn a b => match a (
     JNull => match b (JNull => True; _ => False);
-    JBool x => match b (JBool y => (equals : Bool -> Bool -> Bool) x y; _ => False);
-    JNumber x => match b (JNumber y => (equals : Float -> Float -> Bool) x y; _ => False);
-    JString x => match b (JString y => (equals : String -> String -> Bool) x y; _ => False);
-    JArray xs => match b (JArray ys => primitive_list_all2 (equals : JsonValue -> JsonValue -> Bool) xs ys; _ => False);
+    JBool x => match b (JBool y => x == y; _ => False);
+    JNumber x => match b (JNumber y => x == y; _ => False);
+    JString x => match b (JString y => x == y; _ => False);
+    JArray xs => match b (JArray ys => primitive_list_all2 (fn x y => x == y) xs ys; _ => False);
     JObject xs => match b (JObject ys => primitive_list_all2 (fn px py => (
         {kx, vx} = px;
         {ky, vy} = py;
-        ((equals : String -> String -> Bool) kx ky) && ((equals : JsonValue -> JsonValue -> Bool) vx vy)
+        (kx == ky) && (vx == vy)
       )) xs ys; _ => False)
   )
 );

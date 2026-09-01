@@ -31,7 +31,7 @@ roundtrip_tests = group "json_stringify . json_parse round-trips" [
     src = "{\"name\":\"Ada\",\"scores\":[1,2,3],\"meta\":{\"active\":true,\"note\":null}}";
     match (json_parse src) (
       Ok v => match (json_parse (json_stringify v)) (
-        Ok v2 => expect "re-parsed value equals the original" (equals v v2);
+        Ok v2 => expect "re-parsed value equals the original" (v == v2);
         Err _ => expect "re-parse failed" False
       );
       Err _ => expect "initial parse failed" False
