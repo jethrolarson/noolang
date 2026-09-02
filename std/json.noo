@@ -144,10 +144,6 @@ is_high_surrogate = fn n => (n >= 55296) && (n <= 56319);
 is_low_surrogate = fn n => (n >= 56320) && (n <= 57343);
 combine_surrogates = fn hi lo => 65536 + ((hi - 55296) * 1024) + (lo - 56320);
 
-# Called positioned just after "\u" (the literal backslash-u already
-# consumed). A lone/unpaired surrogate is rejected outright rather than
-# handed to from_char_code — this module's stated stance (see
-# is_supported_escape above) is reject, not mis-decode.
 # from_char_code returns Option String (it's a general builtin, not every
 # caller passes a valid codepoint) but every codepoint reaching it here is
 # already range-checked (a plain BMP value from exactly 4 hex digits, or a
@@ -159,6 +155,10 @@ codepoint_to_char = fn code pos => match (from_char_code code) (
   None => parse_error "invalid codepoint in \\u escape" pos
 );
 
+# Called positioned just after "\u" (the literal backslash-u already
+# consumed). A lone/unpaired surrogate is rejected outright rather than
+# handed to from_char_code — this module's stated stance (see
+# is_supported_escape above) is reject, not mis-decode.
 json_unicode_escape_p = fn pos s => (
   unpaired_high = parse_error "unpaired high surrogate in \\u escape" pos;
   bind (read_hex4 pos s) (fn r1 => (
@@ -243,8 +243,7 @@ json_value_p = fn pos s => (
   )
 );
 
-# Whole-input parse: rejects trailing non-whitespace, wraps ParseError into
-# JsonParseError (see its declaration above).
+# Wraps std/parser's ParseError into JsonParseError (see its declaration above).
 json_parse = fn input =>
   match (
     bind (json_value_p 0 input) (fn r => (
