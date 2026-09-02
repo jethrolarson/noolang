@@ -787,9 +787,10 @@ export class Evaluator {
 			'char_code',
 			createNativeFunction('char_code', (str: Value) => {
 				if (!isString(str)) throw new Error('char_code requires a string');
-				if (str.value.length === 0)
-					throw new Error('char_code requires a non-empty string');
-				return createNumber(str.value.codePointAt(0) as number);
+				if (str.value.length === 0) return createConstructor('None', []);
+				return createConstructor('Some', [
+					createNumber(str.value.codePointAt(0) as number),
+				]);
 			})
 		);
 
@@ -799,13 +800,11 @@ export class Evaluator {
 				if (!isNumber(code))
 					throw new Error('from_char_code requires a number');
 				try {
-					return createString(String.fromCodePoint(code.value));
-				} catch (e) {
-					throw new Error(
-						`from_char_code requires a valid Unicode codepoint: ${
-							e instanceof Error ? e.message : String(e)
-						}`
-					);
+					return createConstructor('Some', [
+						createString(String.fromCodePoint(code.value)),
+					]);
+				} catch {
+					return createConstructor('None', []);
 				}
 			})
 		);

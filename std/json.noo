@@ -158,19 +158,32 @@ combine_surrogates = fn hi lo => 65536 + ((hi - 55296) * 1024) + (lo - 56320);
 # consumed). A lone/unpaired surrogate is rejected outright rather than
 # handed to from_char_code — this module's stated stance (see
 # is_supported_escape above) is reject, not mis-decode.
+# from_char_code returns Option String (it's a general builtin, not every
+# caller passes a valid codepoint) but every codepoint reaching it here is
+# already range-checked (a plain BMP value from exactly 4 hex digits, or a
+# combined high/low surrogate pair) — None is unreachable. Still handled,
+# not assumed away: a distinct parse_error rather than option_get_or with a
+# silent placeholder, so it stays diagnosable if that invariant is ever wrong.
+codepoint_to_char = fn code pos => match (from_char_code code) (
+  Some c => Ok c;
+  None => parse_error "invalid codepoint in \\u escape" pos
+);
+
 json_unicode_escape_p = fn pos s => (
   unpaired_high = parse_error "unpaired high surrogate in \\u escape" pos;
   result_bind (read_hex4 pos s) (fn r1 => (
     code1 = r1 | @value;
     pos1 = r1 | @pos;
     if is_low_surrogate code1 then parse_error "unpaired low surrogate in \\u escape" pos else
-    if not (is_high_surrogate code1) then Ok {@value (from_char_code code1), @pos pos1} else
+    if not (is_high_surrogate code1)
+      then result_bind (codepoint_to_char code1 pos) (fn c => Ok {@value c, @pos pos1})
+    else
     match (peek_char pos1 s) (
       Some "\\" => match (peek_char (pos1 + 1) s) (
         Some "u" => result_bind (read_hex4 (pos1 + 2) s) (fn r2 => (
           code2 = r2 | @value;
           if is_low_surrogate code2
-            then Ok {@value (from_char_code (combine_surrogates code1 code2)), @pos (r2 | @pos)}
+            then result_bind (codepoint_to_char (combine_surrogates code1 code2) pos) (fn c => Ok {@value c, @pos (r2 | @pos)})
             else unpaired_high
         ));
         _ => unpaired_high
