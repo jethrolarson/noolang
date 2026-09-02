@@ -363,11 +363,13 @@ json_index = fn idx v => bind (json_as_array v) (fn items =>
 
 # implement Eq (not a bare function) so Eq (List a)/Eq (Option a)'s existing
 # generic instances (stdlib.noo) pick up JsonValue for free, and `==` works
-# directly. Infix `==`, not prefix `equals`: inside this instance body,
-# unqualified `equals` monomorphizes to JsonValue -> JsonValue -> Bool (the
-# instance being defined) instead of dispatching per argument type — `==`
-# doesn't have that problem, including in the self-recursive Array/Object
-# cases, so no ascriptions are needed.
+# directly. Infix `==`, not prefix `equals`: the JObject case needs `equals`
+# resolved at two different types in one lambda (String for keys, JsonValue
+# for values, in the callback passed to primitive_list_all2) — a
+# trait-constrained identifier used at 2+ types within a single lambda body
+# doesn't get each call site independently resolved (confirmed unrelated to
+# self-recursion or to JsonValue specifically: docs/internal/bugs/
+# TRAIT_CONSTRAINT_SINGLE_LAMBDA_BUG.md). `==` doesn't go through that path.
 implement Eq JsonValue (
   equals = fn a b => match a (
     JNull => match b (JNull => True; _ => False);
