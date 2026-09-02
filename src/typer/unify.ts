@@ -1103,12 +1103,42 @@ function tryUnifyConstrainedVariant(
 }
 
 // PHASE 3: Constraint resolution during unification
+function hasTypeVariable(type: Type): boolean {
+	switch (type.kind) {
+		case 'variable':
+			return true;
+		case 'function':
+			return type.params.some(hasTypeVariable) || hasTypeVariable(type.return);
+		case 'list':
+			return hasTypeVariable(type.element);
+		case 'tuple':
+			return type.elements.some(hasTypeVariable);
+		case 'record':
+			return Object.values(type.fields).some(hasTypeVariable);
+		case 'union':
+			return type.types.some(hasTypeVariable);
+		case 'variant':
+			return type.args.some(hasTypeVariable);
+		case 'constrained':
+			return hasTypeVariable(type.baseType);
+		default:
+			return false;
+	}
+}
+
 function unifyConstrainedWithConcrete(
 	constrainedType: Type & { kind: 'constrained' },
 	concreteType: Type,
 	state: TypeState,
 	location?: { line: number; column: number }
 ): TypeState {
+	if (!hasTypeVariable(constrainedType.baseType)) {
+		// A constraint may describe an input even when the result is concrete,
+		// as in `equals x y : Bool given a implements Eq`. Unifying that result
+		// with Bool must not resolve the unrelated `a` substitution to Bool.
+		return unify(constrainedType.baseType, concreteType, state, location);
+	}
+
 	// Get the concrete type name for trait lookup
 	const concreteTypeName = getTypeName(concreteType);
 
