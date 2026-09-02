@@ -1,30 +1,101 @@
-# Runtime regression suite for std/json.noo, run by `noo test` (not `bun
-# test`). Complements test/features/std-json-module.test.ts the way
-# stdlib.test.noo complements the rest of test/ — see CLAUDE.md's Tests
-# section. Exercises the module as an imported consumer would, on real
-# JSON text.
+# Primary regression suite for std/json.noo, run by `noo test` (not `bun
+# test`). std/json is an ordinary unprivileged userland module (unlike
+# stdlib.noo, which every program gets for free) — an idiomatic noolang
+# library gets tested the way its own users would test it: std/test, not
+# a TS harness. test/features/std-json-module.test.ts exists only for
+# what this file structurally cannot express (inferred-type assertions,
+# stack-depth stress tests needing a trivially-built huge string).
 
 {@test_case test_case, @group group, @expect_eq expect_eq, @expect expect} = import "std/test";
 {@json_parse json_parse, @json_stringify json_stringify,
  @json_field json_field, @json_index json_index, @json_as_number json_as_number,
- @json_as_string json_as_string}
+ @json_as_string json_as_string, @json_as_bool json_as_bool}
   = import "std/json";
 
 is_ok = fn r => match r (Ok _ => True; Err _ => False);
 is_err = fn r => match r (Ok _ => False; Err _ => True);
 unwrap_or = fn default r => match r (Ok v => v; Err _ => default);
 
-parse_tests = group "json_parse" [
+parse_and_restringify = fn src =>
+  unwrap_or "?" (match (json_parse src) (Ok v => Ok (json_stringify v); Err e => Err e));
+
+json_parse_string = fn src => match (json_parse src) (
+  Ok v => match (json_as_string v) (Ok s => s; Err _ => "?");
+  Err _ => "?"
+);
+
+primitive_tests = group "parses primitives" [
+  test_case "parses null" (fn _ => expect_eq "null" (parse_and_restringify "null")),
+  test_case "parses true" (fn _ => expect_eq "true" (parse_and_restringify "true")),
+  test_case "parses false" (fn _ => expect_eq "false" (parse_and_restringify "false")),
+  test_case "parses a quoted string" (fn _ => expect_eq "\"hello\"" (parse_and_restringify "\"hello\""))
+];
+
+number_tests = group "parses numbers: integers, negatives, decimals, exponents" [
+  test_case "parses zero" (fn _ => expect_eq "0" (parse_and_restringify "0")),
+  test_case "parses a positive integer" (fn _ => expect_eq "42" (parse_and_restringify "42")),
+  test_case "parses a negative integer" (fn _ => expect_eq "-42" (parse_and_restringify "-42")),
+  test_case "parses a decimal" (fn _ => expect_eq "3.14" (parse_and_restringify "3.14")),
+  test_case "parses a negative decimal" (fn _ => expect_eq "-3.14" (parse_and_restringify "-3.14")),
+  test_case "parses a positive exponent" (fn _ => expect_eq "100" (parse_and_restringify "1e2")),
+  test_case "parses a decimal with an exponent" (fn _ => expect_eq "150" (parse_and_restringify "1.5e2")),
+  test_case "parses an explicit-plus exponent" (fn _ => expect_eq "100" (parse_and_restringify "1E+2")),
+  test_case "parses a negative exponent" (fn _ => expect_eq "0.25" (parse_and_restringify "2.5e-1"))
+];
+
+structural_tests = group "parses arrays and objects, including nested and empty" [
+  test_case "parses an empty array" (fn _ => expect_eq "[]" (parse_and_restringify "[]")),
+  test_case "parses an empty object" (fn _ => expect_eq "{}" (parse_and_restringify "{}")),
+  test_case "parses nested arrays" (fn _ => expect_eq "[[1,2],[3,4]]" (parse_and_restringify "[[1,2],[3,4]]")),
+  test_case "parses a mixed-type array" (fn _ =>
+    expect_eq "[1,true,null,\"x\"]" (parse_and_restringify "[1, true, null, \"x\"]")),
   test_case "parses a flat object" (fn _ =>
-    expect_eq "{\"a\":1,\"b\":2}"
-      (unwrap_or "?" (match (json_parse "{\"a\":1,\"b\":2}") (Ok v => Ok (json_stringify v); Err e => Err e)))),
+    expect_eq "{\"a\":1,\"b\":2}" (parse_and_restringify "{\"a\":1,\"b\":2}")),
   test_case "parses a nested structure" (fn _ =>
-    expect_eq "{\"items\":[1,2,3],\"ok\":true}"
-      (unwrap_or "?" (match (json_parse "{\"items\":[1,2,3],\"ok\":true}") (Ok v => Ok (json_stringify v); Err e => Err e)))),
-  test_case "rejects malformed input" (fn _ =>
+    expect_eq "{\"items\":[1,2,3],\"ok\":true}" (parse_and_restringify "{\"items\":[1,2,3],\"ok\":true}")),
+  test_case "tolerates whitespace around tokens" (fn _ =>
+    expect_eq "{\"a\":1,\"b\":[1,2]}" (parse_and_restringify "  { \"a\" : 1 , \"b\" : [ 1 , 2 ] }  "))
+];
+
+escape_tests = group "decodes string escapes" [
+  test_case "decodes \\\" escape" (fn _ => expect_eq "a\"b" (json_parse_string "\"a\\\"b\"")),
+  test_case "decodes \\\\ escape" (fn _ => expect_eq "a\\b" (json_parse_string "\"a\\\\b\"")),
+  test_case "decodes \\/ escape" (fn _ => expect_eq "a/b" (json_parse_string "\"a\\/b\"")),
+  test_case "decodes \\n escape" (fn _ => expect_eq "a\nb" (json_parse_string "\"a\\nb\"")),
+  test_case "decodes \\t escape" (fn _ => expect_eq "a\tb" (json_parse_string "\"a\\tb\"")),
+  test_case "decodes \\r escape" (fn _ => expect_eq "a\rb" (json_parse_string "\"a\\rb\""))
+];
+
+unicode_escape_tests = group "\\u escape decoding" [
+  test_case "decodes an ASCII \\u escape" (fn _ =>
+    expect_eq "A" (json_parse_string "\"\\u0041\"")),
+  test_case "decodes a plain BMP \\u escape" (fn _ =>
+    expect_eq "é" (json_parse_string "\"\\u00e9\"")),
+  test_case "decodes a surrogate pair into an astral codepoint" (fn _ =>
+    expect_eq "😀" (json_parse_string "\"\\ud83d\\ude00\"")),
+  test_case "rejects a lone high surrogate" (fn _ =>
+    expect "unpaired high surrogate is an error" (is_err (json_parse "\"\\ud83d\""))),
+  test_case "rejects a lone low surrogate" (fn _ =>
+    expect "unpaired low surrogate is an error" (is_err (json_parse "\"\\udc00\""))),
+  test_case "rejects \\b (unsupported escape)" (fn _ =>
+    expect "\\b is an error" (is_err (json_parse "\"\\b\""))),
+  test_case "rejects \\f (unsupported escape)" (fn _ =>
+    expect "\\f is an error" (is_err (json_parse "\"\\f\"")))
+];
+
+malformed_tests = group "rejects malformed input" [
+  test_case "unclosed object is an error" (fn _ =>
     expect "unclosed object is an error" (is_err (json_parse "{\"a\":"))),
-  test_case "rejects trailing garbage" (fn _ =>
-    expect "trailing content is an error" (is_err (json_parse "1 2")))
+  test_case "trailing garbage is an error" (fn _ =>
+    expect "trailing content is an error" (is_err (json_parse "1 2"))),
+  test_case "unterminated string is an error" (fn _ =>
+    expect "unterminated string is an error" (is_err (json_parse "\"unterminated"))),
+  test_case "empty input is an error" (fn _ =>
+    expect "empty input is an error" (is_err (json_parse ""))),
+  test_case "trailing comma in an array is an error" (fn _ =>
+    expect "trailing comma is an error" (is_err (json_parse "[1,2,]"))),
+  test_case "bare minus is an error" (fn _ =>
+    expect "bare minus is an error" (is_err (json_parse "-")))
 ];
 
 roundtrip_tests = group "json_stringify . json_parse round-trips" [
@@ -40,7 +111,20 @@ roundtrip_tests = group "json_stringify . json_parse round-trips" [
   ))
 ];
 
-extraction_tests = group "json_field/json_index/json_as_number" [
+equality_tests = group "Eq JsonValue (==)" [
+  test_case "equal documents compare equal" (fn _ =>
+    match {json_parse "{\"x\":1,\"y\":[1,2]}", json_parse "{\"x\":1,\"y\":[1,2]}"} (
+      {Ok a, Ok b} => expect "equal documents are ==" (a == b);
+      _ => expect "parse failed" False
+    )),
+  test_case "differing documents compare unequal" (fn _ =>
+    match {json_parse "{\"x\":1,\"y\":[1,2]}", json_parse "{\"x\":1,\"y\":[1,3]}"} (
+      {Ok a, Ok b} => expect "differing documents are not ==" (not (a == b));
+      _ => expect "parse failed" False
+    ))
+];
+
+extraction_tests = group "json_field/json_index/json_as_*" [
   test_case "json_field finds a nested field" (fn _ =>
     match (json_parse "{\"user\":{\"age\":30}}") (
       Ok v => match (json_field "user" v) (
@@ -50,44 +134,51 @@ extraction_tests = group "json_field/json_index/json_as_number" [
       );
       Err _ => expect "parse failed" False
     )),
+  test_case "json_field on a missing key is an error" (fn _ =>
+    match (json_parse "{\"a\":1}") (
+      Ok v => expect "missing key is Err" (is_err (json_field "z" v));
+      Err _ => expect "parse failed" False
+    )),
+  test_case "json_field on a non-object is an error" (fn _ =>
+    match (json_parse "[1,2]") (
+      Ok v => expect "non-object is Err" (is_err (json_field "a" v));
+      Err _ => expect "parse failed" False
+    )),
   test_case "json_index reaches an array element" (fn _ =>
     match (json_parse "[10,20,30]") (
       Ok v => expect_eq (Ok 20) (match (json_index 1 v) (Ok e => json_as_number e; Err e => Err e));
       Err _ => expect "parse failed" False
     )),
-  test_case "json_field on a missing key is an error" (fn _ =>
-    match (json_parse "{\"a\":1}") (
-      Ok v => expect "missing key is Err" (is_err (json_field "z" v));
+  test_case "json_index out of bounds is an error" (fn _ =>
+    match (json_parse "[10,20,30]") (
+      Ok v => expect "out-of-bounds index is Err" (is_err (json_index 9 v));
       Err _ => expect "parse failed" False
+    )),
+  test_case "json_as_bool accepts a bool and rejects other shapes" (fn _ =>
+    match {json_parse "true", json_parse "42"} (
+      {Ok boolVal, Ok numVal} =>
+        expect "bool decodes, number doesn't"
+          ((is_ok (json_as_bool boolVal)) && (is_err (json_as_bool numVal)));
+      _ => expect "parse failed" False
     ))
 ];
 
 spec_gap_tests = group "spec edge cases found in code review" [
   test_case "duplicate keys: last value wins, first position kept" (fn _ =>
-    expect_eq "{\"a\":3,\"b\":2}"
-      (unwrap_or "?" (match (json_parse "{\"a\":1,\"b\":2,\"a\":3}") (Ok v => Ok (json_stringify v); Err e => Err e)))),
+    expect_eq "{\"a\":3,\"b\":2}" (parse_and_restringify "{\"a\":1,\"b\":2,\"a\":3}")),
   test_case "rejects a leading zero" (fn _ =>
     expect "\"01\" is an error" (is_err (json_parse "01"))),
+  test_case "leading zero check doesn't reject a bare 0" (fn _ =>
+    expect_eq "0" (parse_and_restringify "0")),
   test_case "rejects a raw unescaped control character in a string" (fn _ =>
     expect "a literal tab byte in a string is an error" (is_err (json_parse "\"a\tb\""))),
   test_case "json_stringify emits null for an overflowed (non-finite) number" (fn _ =>
-    expect_eq "null" (unwrap_or "?" (match (json_parse "1e400") (Ok v => Ok (json_stringify v); Err e => Err e))))
+    expect_eq "null" (parse_and_restringify "1e400")),
+  test_case "json_stringify emits null for a negative overflow" (fn _ =>
+    expect_eq "null" (parse_and_restringify "-1e400"))
 ];
 
-json_parse_string = fn src => match (json_parse src) (
-  Ok v => match (json_as_string v) (Ok s => s; Err _ => "?");
-  Err _ => "?"
-);
-
-unicode_escape_tests = group "\\u escape decoding" [
-  test_case "decodes a plain BMP \\u escape" (fn _ =>
-    expect_eq "é" (json_parse_string "\"\\u00e9\"")),
-  test_case "decodes a surrogate pair into an astral codepoint" (fn _ =>
-    expect_eq "😀" (json_parse_string "\"\\ud83d\\ude00\"")),
-  test_case "rejects a lone high surrogate" (fn _ =>
-    expect "unpaired high surrogate is an error" (is_err (json_parse "\"\\ud83d\""))),
-  test_case "rejects a lone low surrogate" (fn _ =>
-    expect "unpaired low surrogate is an error" (is_err (json_parse "\"\\udc00\"")))
-];
-
-group "std/json regressions" [parse_tests, roundtrip_tests, extraction_tests, spec_gap_tests, unicode_escape_tests]
+group "std/json regressions" [
+  primitive_tests, number_tests, structural_tests, escape_tests, unicode_escape_tests,
+  malformed_tests, roundtrip_tests, equality_tests, extraction_tests, spec_gap_tests
+]
