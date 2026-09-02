@@ -162,6 +162,19 @@ is a rename, not a translation.
   is_err = fn r => match r (Ok _ => False; Err _ => True);
   is_err (json_parse "\"\\ud83d\"")  # => True
   ```
+- **`json_stringify` escapes every control character, not just the
+  RFC-named ones.** `"`/`\`/`\n`/`\r`/`\t` get their named two-character
+  escape; anything else below U+0020 (reachable via `\uXXXX` decoding, or
+  from a `JString` built directly with the `JString` constructor rather
+  than parsed) gets a `\u00XX` escape instead of passing through raw —
+  RFC 8259 §7 forbids literal control characters in JSON text regardless
+  of how the string was constructed.
+
+  ```noolang
+  {@json_parse json_parse, @json_stringify json_stringify} = import "std/json";
+  escaped = match (json_parse "\"\\u0000\"") (Ok v => json_stringify v; Err _ => "parse failed");
+  escaped  # => "\"\\u0000\"" : String
+  ```
 - **`\b`/`\f` string escapes are still rejected, not decoded.** They're
   fixed characters, same as the already-supported `\n`/`\r`/`\t`, but
   noolang's own string-literal lexer has no `\b`/`\f` escape either, so
