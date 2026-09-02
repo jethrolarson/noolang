@@ -10,10 +10,13 @@ applicative_tests = group "Applicative apply" [
   test_case "Option: None function short-circuits" (fn _ =>
     expect_eq None (apply None (Some 2))),
   test_case "Option: None argument short-circuits" (fn _ =>
-    expect_eq None (apply (Some (fn x => x + 1)) None))
-  # Result apply/map tests blocked on a typer kind bug: two-parameter variants
-  # register at arity 1 in trait instances (`map f (Ok 2)` infers `Result Float`,
-  # `apply` at Result won't type at all). Needs a typer fix, not a stdlib one.
+    expect_eq None (apply (Some (fn x => x + 1)) None)),
+  test_case "Result: applies wrapped function" (fn _ =>
+    expect_eq (Ok 3) (apply (Ok (fn x => x + 1)) (Ok 2))),
+  test_case "Result: Err function short-circuits" (fn _ =>
+    expect "Err in function position propagates" (is_err (apply (Err "bad") (Ok 2)))),
+  test_case "Result: Err argument short-circuits" (fn _ =>
+    expect "Err in argument position propagates" (is_err (apply (Ok (fn x => x + 1)) (Err "bad"))))
 ];
 
 join_tests = group "join" [

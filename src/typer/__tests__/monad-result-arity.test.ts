@@ -51,6 +51,53 @@ describe('Monad Result trait dispatch preserves Result arity', () => {
 		);
 	});
 
+	test('Applicative Result apply preserves both Result type args', () => {
+		// The Monad-Result arity fix made this instance's type checkable for
+		// the first time (previously blocked by a different typer crash,
+		// "Unknown ADT: Result", on `main`). Its old body (`match res (Ok x
+		// => f x; ...)`, applying the wrapped *function* value as if it were
+		// already unwrapped) was accepted the same way and crashed at
+		// runtime — fixed in stdlib.noo alongside this test.
+		const decorated = parseAndType(
+			`apply (Ok (fn x => x + 1)) ((Err "bad") : Result Float String)`
+		);
+		const inferred = typeToString(
+			decorated.type!,
+			decorated.state.substitution
+		);
+		expect(inferred).toBe('Result Float String');
+	});
+
+	test('Applicative Result apply runs Ok through both wrapped values', () => {
+		expectSuccess('apply (Ok (fn x => x + 1)) (Ok 2)', {
+			tag: 'constructor',
+			name: 'Ok',
+			args: [{ tag: 'number', value: 3 }],
+		});
+	});
+
+	test('Applicative Result apply short-circuits on Err in function position', () => {
+		expectSuccess(
+			'apply ((Err "bad") : Result (Float -> Float) String) (Ok 2)',
+			{
+				tag: 'constructor',
+				name: 'Err',
+				args: [{ tag: 'string', value: 'bad' }],
+			}
+		);
+	});
+
+	test('Applicative Result apply short-circuits on Err in argument position', () => {
+		expectSuccess(
+			'apply (Ok (fn x => x + 1)) ((Err "bad") : Result Float String)',
+			{
+				tag: 'constructor',
+				name: 'Err',
+				args: [{ tag: 'string', value: 'bad' }],
+			}
+		);
+	});
+
 	test('bind inside an explicitly-ascribed function keeps Result at two args', () => {
 		// Shape mirrors the std/json.noo `json_field` bug: an ascribed function
 		// whose body calls the trait's `bind` on a `Result` value must not
