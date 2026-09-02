@@ -30,16 +30,6 @@ variant JsonError =
   | JsonMissingField String
   | JsonIndexOutOfBounds Float;
 
-# Local, not stdlib's `bind`: swapping in the Monad-trait `bind` here trips
-# a typer bug — "Result has 1 vs 2 type arguments" — even on the plain
-# multi-constructor JsonError case (json_field), not just the ParseError
-# single-constructor quirk. Root cause is in the typer, not this file;
-# tracked as a follow-up rather than worked around further here.
-result_bind = fn res f => match res (
-  Ok x => f x;
-  Err e => Err e
-);
-
 # ========================================
 # PARSER — combinator-style, built entirely from std/parser.noo primitives.
 # ========================================
@@ -171,19 +161,19 @@ codepoint_to_char = fn code pos => match (from_char_code code) (
 
 json_unicode_escape_p = fn pos s => (
   unpaired_high = parse_error "unpaired high surrogate in \\u escape" pos;
-  result_bind (read_hex4 pos s) (fn r1 => (
+  bind (read_hex4 pos s) (fn r1 => (
     code1 = r1 | @value;
     pos1 = r1 | @pos;
     if is_low_surrogate code1 then parse_error "unpaired low surrogate in \\u escape" pos else
     if not (is_high_surrogate code1)
-      then result_bind (codepoint_to_char code1 pos) (fn c => Ok {@value c, @pos pos1})
+      then bind (codepoint_to_char code1 pos) (fn c => Ok {@value c, @pos pos1})
     else
     match (peek_char pos1 s) (
       Some "\\" => match (peek_char (pos1 + 1) s) (
-        Some "u" => result_bind (read_hex4 (pos1 + 2) s) (fn r2 => (
+        Some "u" => bind (read_hex4 (pos1 + 2) s) (fn r2 => (
           code2 = r2 | @value;
           if is_low_surrogate code2
-            then result_bind (codepoint_to_char (combine_surrogates code1 code2) pos) (fn c => Ok {@value c, @pos (r2 | @pos)})
+            then bind (codepoint_to_char (combine_surrogates code1 code2) pos) (fn c => Ok {@value c, @pos (r2 | @pos)})
             else unpaired_high
         ));
         _ => unpaired_high
@@ -257,7 +247,7 @@ json_value_p = fn pos s => (
 # JsonParseError (see its declaration above).
 json_parse = fn input =>
   match (
-    result_bind (json_value_p 0 input) (fn r => (
+    bind (json_value_p 0 input) (fn r => (
       p = skip_ws (r | @pos) input;
       match (peek_char p input) (
         None => Ok (r | @value);
@@ -318,14 +308,14 @@ json_as_bool = fn v => match v (JBool b => Ok b; _ => Err JsonExpectedBool)
 json_as_array = fn v => match v (JArray items => Ok items; _ => Err JsonExpectedArray)
 json_as_object = fn v => match v (JObject members => Ok members; _ => Err JsonExpectedObject)
 
-json_field = fn key v => result_bind (json_as_object v) (fn members =>
+json_field = fn key v => bind (json_as_object v) (fn members =>
   match (assoc_get key members) (
     Some found => Ok found;
     None => Err (JsonMissingField key)
   )
 ) : String -> JsonValue -> Result JsonValue JsonError;
 
-json_index = fn idx v => result_bind (json_as_array v) (fn items =>
+json_index = fn idx v => bind (json_as_array v) (fn items =>
   match (at idx items) (
     Some found => Ok found;
     None => Err (JsonIndexOutOfBounds idx)
