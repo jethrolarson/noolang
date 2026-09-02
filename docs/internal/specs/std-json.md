@@ -43,7 +43,7 @@ noolang record for the same reason.
 ## Public API, exercised end to end
 
 ```noolang
-{@json_parse json_parse, @json_stringify json_stringify, @json_equals json_equals,
+{@json_parse json_parse, @json_stringify json_stringify,
  @json_field json_field, @json_index json_index, @json_as_number json_as_number}
   = import "std/json";
 
@@ -72,7 +72,7 @@ Signatures, ascribed against the real imports so a drift breaks this file
 ```noolang
 {@json_stringify json_stringify, @json_field json_field, @json_index json_index,
  @json_as_string json_as_string, @json_as_number json_as_number, @json_as_bool json_as_bool,
- @json_as_array json_as_array, @json_as_object json_as_object, @json_equals json_equals}
+ @json_as_array json_as_array, @json_as_object json_as_object}
   = import "std/json";
 
 _stringify  = (json_stringify : JsonValue -> String);
@@ -83,8 +83,19 @@ _as_number  = (json_as_number : JsonValue -> Result Float JsonError);
 _as_bool    = (json_as_bool : JsonValue -> Result Bool JsonError);
 _as_array   = (json_as_array : JsonValue -> Result (List JsonValue) JsonError);
 _as_object  = (json_as_object : JsonValue -> Result (List {String, JsonValue}) JsonError);
-_equals     = (json_equals : JsonValue -> JsonValue -> Bool);
 "signatures check out"  # => "signatures check out" : String
+```
+
+Equality is an `implement Eq JsonValue` instance, not a standalone function —
+`==`/`equals` work on any `JsonValue` (and, via stdlib's generic `Eq (List
+a)`/`Eq (Option a)` instances, on `List JsonValue`/`Option JsonValue` too)
+once `std/json` is imported for anything at all; no separate import needed:
+
+```noolang
+{@json_parse json_parse, @JNull JNull} = import "std/json";
+a = match (json_parse "{\"x\":1}") (Ok v => v; Err _ => JNull);
+b = match (json_parse "{\"x\":1}") (Ok v => v; Err _ => JNull);
+a == b  # => True
 ```
 
 `json_parse`'s own signature isn't ascribed the same way: `JsonParseError`
@@ -138,19 +149,30 @@ is a rename, not a translation.
 
 ## Documented scope limits
 
-- **`\u`, `\b`, `\f` string escapes are rejected, not decoded.** `\u` needs
-  a codepoint↔character builtin (`fromCharCode`/`charCodeAt`-equivalent)
-  noolang doesn't have. `\b`/`\f` need no such builtin — they're fixed
-  characters, same as the already-supported `\n`/`\r`/`\t` — but noolang's
-  own string-literal lexer has no `\b`/`\f` escape either, so this module
-  has no way to construct the character to emit. All three are rejected
+- **`\u` string escapes decode via `char_code`/`from_char_code`**, two
+  builtins (`String -> Option Float` / `Float -> Option String`) added
+  specifically to fill this gap. Surrogate pairs combine into one astral
+  codepoint; a lone/unpaired surrogate is a parse error, not a guess.
+
+  ```noolang
+  {@json_parse json_parse, @json_as_string json_as_string} = import "std/json";
+  decoded = match (json_parse "\"caf\\u00e9\"") (Ok v => match (json_as_string v) (Ok s => s; Err _ => "?"); Err _ => "parse failed");
+  decoded;  # => "café" : String
+
+  is_err = fn r => match r (Ok _ => False; Err _ => True);
+  is_err (json_parse "\"\\ud83d\"")  # => True
+  ```
+- **`\b`/`\f` string escapes are still rejected, not decoded.** They're
+  fixed characters, same as the already-supported `\n`/`\r`/`\t`, but
+  noolang's own string-literal lexer has no `\b`/`\f` escape either, so
+  this module has no way to construct the character to emit — rejected
   rather than silently mis-decoded (e.g. passing the literal letter through
   and dropping the backslash).
 
   ```noolang
   {@json_parse json_parse} = import "std/json";
   is_err = fn r => match r (Ok _ => False; Err _ => True);
-  is_err (json_parse "\"\\u0041\"")  # => True
+  is_err (json_parse "\"\\bx\"")  # => True
   ```
 - **`-0` does not round-trip its sign.** `toString` normalizes `-0` to
   `"0"` regardless of the underlying float's sign bit, so `json_stringify`
@@ -220,8 +242,8 @@ raw_control_char;  # => True
 
 §8 (encoding, byte-order mark) doesn't apply: `json_parse` takes an
 already-decoded noolang `String`, not raw bytes, so there's no encoding
-layer for this module to get right or wrong. `\u`/`\b`/`\f` escapes (§7)
-are rejected rather than decoded — see "Documented scope limits" above.
+layer for this module to get right or wrong. `\b`/`\f` escapes (§7) are
+still rejected rather than decoded — see "Documented scope limits" above.
 
 ## Implementation notes (combinator-based throughout)
 
@@ -243,6 +265,17 @@ not a second top-level binding — noolang's environment is strictly
 sequential, so two separately-named functions can't call each other
 forward), including the object-member `pbind`-pairing shape that used to
 break it.
+
+A third case of the same pattern: `Result`-returning code here (`json_parse`,
+`json_field`, `json_index`, `json_unicode_escape_p`) used a local hand-rolled
+`result_bind` instead of stdlib's `Monad Result` `bind`, because the trait
+method corrupted `Result`'s arity when unified against an ascribed
+signature — `unify`'s constrained-variant binding stored a higher-kinded
+placeholder's *whole* concrete type under one substitution key, and a later
+occurrence of that placeholder rebuilt the variant from its own (shorter)
+textual arg list, silently dropping the error type argument. Fixed in
+`src/typer/unify.ts`/`src/typer/substitute.ts`; `bind` used directly
+throughout since.
 
 ## History: why combinator-based, not hand-rolled
 
