@@ -69,37 +69,66 @@ digit_run = (fn pos s => (
   {@n n, @count (length digits), @i (r | @pos)}
 ) : Float -> String -> {@n Float, @count Float, @i Float});
 
+# RFC 8259 §6: number = [minus] int [frac] [exp]. Each grammar piece is its
+# own Result-returning function so json_number_p below reads as that same
+# three-step sequence instead of one nested if-pyramid; digit_run itself
+# never fails (it just reports how many digits it found), so each piece's
+# job is turning "zero digits where at least one was required" into an
+# error at the right position.
+
+# int: required. "0" alone or a nonzero digit run — "01"/"007" rejected.
+# Not ascribed: same ParseError constructor-name quirk as json_number_p
+# below.
+json_int_part_p = fn pos s => (
+  r = digit_run pos s;
+  has_leading_zero = ((peek_char pos s) == Some "0") && ((r | @count) > 1);
+  if (r | @count) == 0 then parse_error "expected digit" pos else
+  if has_leading_zero then parse_error "leading zeros are not allowed" pos else
+  Ok r
+);
+
+# frac: optional. Present only if '.' is next; if present, at least one
+# digit must follow.
+json_frac_part_p = fn pos s =>
+  if not ((peek_char pos s) == Some ".") then Ok {@n 0, @count 0, @i pos} else (
+    start = pos + 1;
+    r = digit_run start s;
+    if (r | @count) == 0 then parse_error "expected digit after '.'" start else Ok r
+  );
+
+# exp: optional. Present only if 'e'/'E' is next; if present, an optional
+# sign then at least one digit must follow. @n carries the already-signed
+# exponent value, so callers don't need to track the sign separately.
+json_exp_part_p = fn pos s => match (peek_char pos s) (
+  None => Ok {@n 0, @count 0, @i pos};
+  Some c => if not ((c == "e") || (c == "E")) then Ok {@n 0, @count 0, @i pos} else (
+    sign_pos = pos + 1;
+    neg = (peek_char sign_pos s) == Some "-";
+    plus = (peek_char sign_pos s) == Some "+";
+    digits_start = if neg || plus then sign_pos + 1 else sign_pos;
+    r = digit_run digits_start s;
+    if (r | @count) == 0 then parse_error "expected exponent digits" digits_start else
+    Ok {@n (if neg then (0 - (r | @n)) else (r | @n)), @count (r | @count), @i (r | @i)}
+  )
+);
+
 # Not ascribed: `Result {...} ParseError` hits the same constructor-name
 # quirk as json_parse's own signature below (ParseError's variant name
 # equals its sole constructor's name).
 json_number_p = fn pos s => (
   neg = (peek_char pos s) == Some "-";
   pos1 = if neg then pos + 1 else pos;
-  int_r = digit_run pos1 s;
-  # RFC 8259 §6: "0" alone or a nonzero digit run — "01"/"007" rejected.
-  has_leading_zero = ((peek_char pos1 s) == Some "0") && ((int_r | @count) > 1);
-  if (int_r | @count) == 0 then parse_error "expected digit" pos1 else
-  if has_leading_zero then parse_error "leading zeros are not allowed" pos1 else (
-  pos2 = int_r | @i;
-  has_frac = (peek_char pos2 s) == Some ".";
-  frac_start = pos2 + 1;
-  frac_r = if has_frac then digit_run frac_start s else {@n 0, @count 0, @i pos2};
-  if has_frac && ((frac_r | @count) == 0) then parse_error "expected digit after '.'" frac_start else (
-  pos3 = if has_frac then (frac_r | @i) else pos2;
-  frac = if (frac_r | @count) == 0 then 0 else divide_or_zero (frac_r | @n) (pow10 (frac_r | @count));
-  has_exp = match (peek_char pos3 s) (Some c => (c == "e") || (c == "E"); None => False);
-  epos1 = pos3 + 1;
-  exp_neg = has_exp && ((peek_char epos1 s) == Some "-");
-  exp_plus = has_exp && ((peek_char epos1 s) == Some "+");
-  epos2 = if exp_neg || exp_plus then epos1 + 1 else epos1;
-  exp_r = if has_exp then digit_run epos2 s else {@n 0, @count 0, @i pos3};
-  if has_exp && ((exp_r | @count) == 0) then parse_error "expected exponent digits" epos2 else (
-  pos4 = if has_exp then (exp_r | @i) else pos3;
-  exp_signed = if exp_neg then (0 - (exp_r | @n)) else (exp_r | @n);
-  mantissa = (int_r | @n) + frac;
-  signed = if neg then (0 - mantissa) else mantissa;
-  Ok {@value (JNumber (apply_exponent signed exp_signed)), @pos pos4}
-  ))));
+  bind (json_int_part_p pos1 s) (fn int_r => (
+    bind (json_frac_part_p (int_r | @i) s) (fn frac_r => (
+      bind (json_exp_part_p (frac_r | @i) s) (fn exp_r => (
+        frac = if (frac_r | @count) == 0 then 0 else divide_or_zero (frac_r | @n) (pow10 (frac_r | @count));
+        mantissa = (int_r | @n) + frac;
+        signed = if neg then (0 - mantissa) else mantissa;
+        Ok {@value (JNumber (apply_exponent signed (exp_r | @n))), @pos (exp_r | @i)}
+      ))
+    ))
+  ))
+);
 
 # --- strings ---
 
@@ -187,18 +216,14 @@ json_unicode_escape_p = fn pos s => (
 # (position-threaded 4-hex-digit decode, see json_unicode_escape_p) — the two
 # don't fit one combinator chain since only one of them consumes a variable
 # number of characters.
-json_escaped_char_p = fn pos s => (
-  match (char "\\" pos s) (
-    Err e => Err e;
-    Ok r => (
-      pos1 = r | @pos;
-      match (peek_char pos1 s) (
-        Some "u" => json_unicode_escape_p (pos1 + 1) s;
-        _ => pmap escape_to_char (satisfy "recognized escape character" is_supported_escape) pos1 s
-      )
+json_escaped_char_p = fn pos s =>
+  bind (char "\\" pos s) (fn r => (
+    pos1 = r | @pos;
+    match (peek_char pos1 s) (
+      Some "u" => json_unicode_escape_p (pos1 + 1) s;
+      _ => pmap escape_to_char (satisfy "recognized escape character" is_supported_escape) pos1 s
     )
-  )
-);
+  ));
 # `\` excluded from "plain" so an unrecognized escape fails the string
 # parse outright, instead of backtracking into treating `\` as a literal.
 json_plain_char_p = satisfy "string char" (fn c => (not (c == "\"")) && (not (c == "\\")) && (not (c < " ")));
@@ -245,7 +270,7 @@ json_value_p = fn pos s => (
 
 # Wraps std/parser's ParseError into JsonParseError (see its declaration above).
 json_parse = fn input =>
-  match (
+  map_err (fn e => match e (ParseError info => JsonParseError info)) (
     bind (json_value_p 0 input) (fn r => (
       p = skip_ws (r | @pos) input;
       match (peek_char p input) (
@@ -253,9 +278,6 @@ json_parse = fn input =>
         Some c => Err (ParseError {@message ("unexpected trailing character '" + c + "'"), @position p})
       )
     ))
-  ) (
-    Ok v => Ok v;
-    Err (ParseError info) => Err (JsonParseError info)
   );
 
 # ========================================
