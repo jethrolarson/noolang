@@ -131,11 +131,9 @@ is_hex_digit = fn c =>
   (is_digit c) || ((c >= "a") && (c <= "f")) || ((c >= "A") && (c <= "F"));
 
 hex_digit_value = fn c => match c (
-  "0" => 0; "1" => 1; "2" => 2; "3" => 3; "4" => 4;
-  "5" => 5; "6" => 6; "7" => 7; "8" => 8; "9" => 9;
   "a" => 10; "b" => 11; "c" => 12; "d" => 13; "e" => 14; "f" => 15;
   "A" => 10; "B" => 11; "C" => 12; "D" => 13; "E" => 14; "F" => 15;
-  _ => 0
+  _ => digit_value c
 ) : String -> Float;
 
 # Exactly 4 hex digits (RFC 8259 §7's `\uXXXX`), not `take_while`'s "as many
@@ -160,7 +158,8 @@ combine_surrogates = fn hi lo => 65536 + ((hi - 55296) * 1024) + (lo - 56320);
 # consumed). A lone/unpaired surrogate is rejected outright rather than
 # handed to from_char_code — this module's stated stance (see
 # is_supported_escape above) is reject, not mis-decode.
-json_unicode_escape_p = fn pos s =>
+json_unicode_escape_p = fn pos s => (
+  unpaired_high = parse_error "unpaired high surrogate in \\u escape" pos;
   result_bind (read_hex4 pos s) (fn r1 => (
     code1 = r1 | @value;
     pos1 = r1 | @pos;
@@ -172,13 +171,14 @@ json_unicode_escape_p = fn pos s =>
           code2 = r2 | @value;
           if is_low_surrogate code2
             then Ok {@value (from_char_code (combine_surrogates code1 code2)), @pos (r2 | @pos)}
-            else parse_error "unpaired high surrogate in \\u escape" pos
+            else unpaired_high
         ));
-        _ => parse_error "unpaired high surrogate in \\u escape" pos
+        _ => unpaired_high
       );
-      _ => parse_error "unpaired high surrogate in \\u escape" pos
+      _ => unpaired_high
     )
-  ));
+  ))
+);
 
 # `\` then either a fixed-mapping escape (satisfy+map, single char) or `u`
 # (position-threaded 4-hex-digit decode, see json_unicode_escape_p) — the two
