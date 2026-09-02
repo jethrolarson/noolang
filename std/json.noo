@@ -284,13 +284,31 @@ json_parse = fn input =>
 # SERIALIZER
 # ========================================
 
+hex_nibble = fn n => match n (
+  0 => "0"; 1 => "1"; 2 => "2"; 3 => "3"; 4 => "4";
+  5 => "5"; 6 => "6"; 7 => "7"; 8 => "8"; 9 => "9";
+  10 => "a"; 11 => "b"; 12 => "c"; 13 => "d"; 14 => "e"; 15 => "f";
+  _ => "0"
+) : Float -> String;
+
+# Every remaining control character reaching here is U+0000-U+001F (RFC
+# 8259 §7's own unescaped-char boundary: json_plain_char_p already rejects
+# anything < " " unescaped during parsing, and \uXXXX decoding can produce
+# any codepoint in this range). Always fits in two hex digits, so this
+# doesn't need general hex-width formatting, just the fixed "00XY" shape.
+escape_control_char = fn n => (
+  hi = if n >= 16 then 1 else 0;
+  lo = if n >= 16 then n - 16 else n;
+  "\\u00" + hex_nibble hi + hex_nibble lo
+);
+
 escape_char = fn c => match c (
   "\"" => "\\\"";
   "\\" => "\\\\";
   "\n" => "\\n";
   "\r" => "\\r";
   "\t" => "\\t";
-  _ => c
+  _ => if c < " " then escape_control_char (option_get_or 0 (char_code c)) else c
 );
 
 escape_string = fn s => join "" (list_map escape_char (chars s));

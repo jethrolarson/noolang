@@ -66,6 +66,19 @@ escape_tests = group "decodes string escapes" [
   test_case "decodes \\r escape" (fn _ => expect_eq "a\rb" (json_parse_string "\"a\\rb\""))
 ];
 
+control_char_stringify_tests = group "escapes control characters on serialization" [
+  test_case "escapes \\u0000 (NUL)" (fn _ =>
+    expect_eq "\"\\u0000\"" (parse_and_restringify "\"\\u0000\"")),
+  test_case "escapes \\u0008 (backspace)" (fn _ =>
+    expect_eq "\"\\u0008\"" (parse_and_restringify "\"\\u0008\"")),
+  test_case "escapes \\u000c (form feed)" (fn _ =>
+    expect_eq "\"\\u000c\"" (parse_and_restringify "\"\\u000c\"")),
+  test_case "escapes \\u001f (top of the control range)" (fn _ =>
+    expect_eq "\"\\u001f\"" (parse_and_restringify "\"\\u001f\"")),
+  test_case "round-trips a control character embedded in other text" (fn _ =>
+    expect_eq "\"a\\u0000b\"" (parse_and_restringify "\"a\\u0000b\""))
+];
+
 unicode_escape_tests = group "\\u escape decoding" [
   test_case "decodes an ASCII \\u escape" (fn _ =>
     expect_eq "A" (json_parse_string "\"\\u0041\"")),
@@ -179,6 +192,7 @@ spec_gap_tests = group "spec edge cases found in code review" [
 ];
 
 group "std/json regressions" [
-  primitive_tests, number_tests, structural_tests, escape_tests, unicode_escape_tests,
+  primitive_tests, number_tests, structural_tests, escape_tests,
+  control_char_stringify_tests, unicode_escape_tests,
   malformed_tests, roundtrip_tests, equality_tests, extraction_tests, spec_gap_tests
 ]
