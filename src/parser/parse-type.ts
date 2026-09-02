@@ -195,10 +195,6 @@ const parseParenthesizedType: C.Parser<Type> = C.map(
 	([_open, type, _close]) => type
 );
 
-const parseTypeHole: C.Parser<Type> = C.map(C.punctuation('_'), () =>
-	typeVariable('_')
-);
-
 // Parse simple type variable or nullary constructor (no type applications)
 const parseSimpleTypeVariable = (tokens: Token[]): C.ParseResult<Type> => {
 	if (tokens.length > 0 && tokens[0].type === 'IDENTIFIER') {
@@ -308,7 +304,6 @@ const parseTupleConstructor = (tokens: Token[]): C.ParseResult<Type> => {
 
 // Parse simple type arguments (no type applications to avoid Result a b becoming Result (a b))
 const parseSimpleTypeArgument = C.choice(
-	parseTypeHole,
 	parsePrimitiveType,
 	parseListType,
 	parseRecordType,
@@ -320,7 +315,6 @@ const parseSimpleTypeArgument = C.choice(
 
 // Main type atom parser - now clean and focused
 const parseTypeAtom = C.choice(
-	parseTypeHole,
 	parsePrimitiveType,
 	parseListType,
 	parseRecordType,

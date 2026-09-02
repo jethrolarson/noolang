@@ -18,6 +18,10 @@ variant RightMap context value = RightMap context value;
 `;
 
 describe('explicit higher-kinded trait slots', () => {
+	test('type holes remain scoped to implementation heads', () => {
+		expect(() => parseAndType('1 : _')).toThrow(/parse/i);
+	});
+
 	test('the apply-wrapper repro preserves Result argument order', () => {
 		expect(
 			inferredType(`

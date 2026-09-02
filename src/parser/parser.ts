@@ -34,6 +34,7 @@ import {
 	type MutationExpression,
 	type IfExpression,
 	type BinaryExpression,
+	type Type,
 } from '../ast';
 import {
 	parseTypeDefinition,
@@ -1543,12 +1544,61 @@ const parseImplementationFunction: C.Parser<ImplementationFunction> = C.map(
 	})
 );
 
+const implementationHoleName = 'implementationTypeHoleInternal';
+
+const restoreImplementationHoles = (type: Type): Type => {
+	if (type.kind === 'variable' && type.name === implementationHoleName) {
+		return { ...type, name: '_' };
+	}
+	if (type.kind === 'variant')
+		return { ...type, args: type.args.map(restoreImplementationHoles) };
+	if (type.kind === 'function')
+		return {
+			...type,
+			params: type.params.map(restoreImplementationHoles),
+			return: restoreImplementationHoles(type.return),
+		};
+	if (type.kind === 'list')
+		return { ...type, element: restoreImplementationHoles(type.element) };
+	if (type.kind === 'tuple')
+		return { ...type, elements: type.elements.map(restoreImplementationHoles) };
+	if (type.kind === 'union')
+		return { ...type, types: type.types.map(restoreImplementationHoles) };
+	if (type.kind === 'record')
+		return {
+			...type,
+			fields: Object.fromEntries(
+				Object.entries(type.fields).map(([name, field]) => [
+					name,
+					restoreImplementationHoles(field),
+				])
+			),
+		};
+	return type;
+};
+
+const parseImplementationType: C.Parser<Type> = tokens => {
+	const withHolesAsIdentifiers: Token[] = tokens.map(token =>
+		token.type === 'PUNCTUATION' && token.value === '_'
+			? { ...token, type: 'IDENTIFIER', value: implementationHoleName }
+			: token
+	);
+	const result = parseTypeExpression(withHolesAsIdentifiers);
+	if (!result.success) return result;
+	const consumed = tokens.length - result.remaining.length;
+	return {
+		success: true,
+		value: restoreImplementationHoles(result.value),
+		remaining: tokens.slice(consumed),
+	};
+};
+
 // --- Implement Definition ---
 const parseImplementDefinition: C.Parser<ImplementDefinitionExpression> = C.map(
 	C.seq(
 		C.keyword('implement'),
 		C.identifier(), // constraint name like "Monad"
-		C.lazy(() => parseTypeExpression), // type expression like "Option" or "(Result e)"
+		C.lazy(() => parseImplementationType), // supports `_` only in implementation heads
 		// Optional given constraints
 		C.optional(
 			C.seq(
