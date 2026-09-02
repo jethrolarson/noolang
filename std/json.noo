@@ -30,11 +30,6 @@ variant JsonError =
   | JsonMissingField String
   | JsonIndexOutOfBounds Float;
 
-result_bind = fn res f => match res (
-  Ok x => f x;
-  Err e => Err e
-);
-
 # ========================================
 # PARSER — combinator-style, built entirely from std/parser.noo primitives.
 # ========================================
@@ -74,37 +69,66 @@ digit_run = (fn pos s => (
   {@n n, @count (length digits), @i (r | @pos)}
 ) : Float -> String -> {@n Float, @count Float, @i Float});
 
+# RFC 8259 §6: number = [minus] int [frac] [exp]. Each grammar piece is its
+# own Result-returning function so json_number_p below reads as that same
+# three-step sequence instead of one nested if-pyramid; digit_run itself
+# never fails (it just reports how many digits it found), so each piece's
+# job is turning "zero digits where at least one was required" into an
+# error at the right position.
+
+# int: required. "0" alone or a nonzero digit run — "01"/"007" rejected.
+# Not ascribed: same ParseError constructor-name quirk as json_number_p
+# below.
+json_int_part_p = fn pos s => (
+  r = digit_run pos s;
+  has_leading_zero = ((peek_char pos s) == Some "0") && ((r | @count) > 1);
+  if (r | @count) == 0 then parse_error "expected digit" pos else
+  if has_leading_zero then parse_error "leading zeros are not allowed" pos else
+  Ok r
+);
+
+# frac: optional. Present only if '.' is next; if present, at least one
+# digit must follow.
+json_frac_part_p = fn pos s =>
+  if not ((peek_char pos s) == Some ".") then Ok {@n 0, @count 0, @i pos} else (
+    start = pos + 1;
+    r = digit_run start s;
+    if (r | @count) == 0 then parse_error "expected digit after '.'" start else Ok r
+  );
+
+# exp: optional. Present only if 'e'/'E' is next; if present, an optional
+# sign then at least one digit must follow. @n carries the already-signed
+# exponent value, so callers don't need to track the sign separately.
+json_exp_part_p = fn pos s => match (peek_char pos s) (
+  None => Ok {@n 0, @count 0, @i pos};
+  Some c => if not ((c == "e") || (c == "E")) then Ok {@n 0, @count 0, @i pos} else (
+    sign_pos = pos + 1;
+    neg = (peek_char sign_pos s) == Some "-";
+    plus = (peek_char sign_pos s) == Some "+";
+    digits_start = if neg || plus then sign_pos + 1 else sign_pos;
+    r = digit_run digits_start s;
+    if (r | @count) == 0 then parse_error "expected exponent digits" digits_start else
+    Ok {@n (if neg then (0 - (r | @n)) else (r | @n)), @count (r | @count), @i (r | @i)}
+  )
+);
+
 # Not ascribed: `Result {...} ParseError` hits the same constructor-name
 # quirk as json_parse's own signature below (ParseError's variant name
 # equals its sole constructor's name).
 json_number_p = fn pos s => (
   neg = (peek_char pos s) == Some "-";
   pos1 = if neg then pos + 1 else pos;
-  int_r = digit_run pos1 s;
-  # RFC 8259 §6: "0" alone or a nonzero digit run — "01"/"007" rejected.
-  has_leading_zero = ((peek_char pos1 s) == Some "0") && ((int_r | @count) > 1);
-  if (int_r | @count) == 0 then parse_error "expected digit" pos1 else
-  if has_leading_zero then parse_error "leading zeros are not allowed" pos1 else (
-  pos2 = int_r | @i;
-  has_frac = (peek_char pos2 s) == Some ".";
-  frac_start = pos2 + 1;
-  frac_r = if has_frac then digit_run frac_start s else {@n 0, @count 0, @i pos2};
-  if has_frac && ((frac_r | @count) == 0) then parse_error "expected digit after '.'" frac_start else (
-  pos3 = if has_frac then (frac_r | @i) else pos2;
-  frac = if (frac_r | @count) == 0 then 0 else divide_or_zero (frac_r | @n) (pow10 (frac_r | @count));
-  has_exp = match (peek_char pos3 s) (Some c => (c == "e") || (c == "E"); None => False);
-  epos1 = pos3 + 1;
-  exp_neg = has_exp && ((peek_char epos1 s) == Some "-");
-  exp_plus = has_exp && ((peek_char epos1 s) == Some "+");
-  epos2 = if exp_neg || exp_plus then epos1 + 1 else epos1;
-  exp_r = if has_exp then digit_run epos2 s else {@n 0, @count 0, @i pos3};
-  if has_exp && ((exp_r | @count) == 0) then parse_error "expected exponent digits" epos2 else (
-  pos4 = if has_exp then (exp_r | @i) else pos3;
-  exp_signed = if exp_neg then (0 - (exp_r | @n)) else (exp_r | @n);
-  mantissa = (int_r | @n) + frac;
-  signed = if neg then (0 - mantissa) else mantissa;
-  Ok {@value (JNumber (apply_exponent signed exp_signed)), @pos pos4}
-  ))));
+  bind (json_int_part_p pos1 s) (fn int_r => (
+    bind (json_frac_part_p (int_r | @i) s) (fn frac_r => (
+      bind (json_exp_part_p (frac_r | @i) s) (fn exp_r => (
+        frac = if (frac_r | @count) == 0 then 0 else divide_or_zero (frac_r | @n) (pow10 (frac_r | @count));
+        mantissa = (int_r | @n) + frac;
+        signed = if neg then (0 - mantissa) else mantissa;
+        Ok {@value (JNumber (apply_exponent signed (exp_r | @n))), @pos (exp_r | @i)}
+      ))
+    ))
+  ))
+);
 
 # --- strings ---
 
@@ -114,13 +138,92 @@ escape_to_char = fn c => match c (
   _ => c
 ) : String -> String;
 
-# \u/\b/\f are valid JSON escapes (RFC 8259 §7), unsupported here: no
-# codepoint<->char builtin for `\uXXXX`, no `\b`/`\f` in noolang's own
-# string-literal lexer. Rejected, not mis-decoded.
+# \b/\f are valid JSON escapes (RFC 8259 §7) still unsupported here: noolang's
+# own string-literal lexer has no way to write those two control characters.
+# Rejected, not mis-decoded. \u is handled separately below, via
+# json_unicode_escape_p — it decodes to a codepoint (not a fixed character),
+# so it doesn't fit this single-char whitelist.
 is_supported_escape = fn c =>
   (c == "\"") || (c == "\\") || (c == "/") || (c == "n") || (c == "r") || (c == "t");
 
-json_escaped_char_p = pbind (fn _ => pmap escape_to_char (satisfy "recognized escape character" is_supported_escape)) (char "\\");
+is_hex_digit = fn c =>
+  (is_digit c) || ((c >= "a") && (c <= "f")) || ((c >= "A") && (c <= "F"));
+
+hex_digit_value = fn c => match c (
+  "a" => 10; "b" => 11; "c" => 12; "d" => 13; "e" => 14; "f" => 15;
+  "A" => 10; "B" => 11; "C" => 12; "D" => 13; "E" => 14; "F" => 15;
+  _ => digit_value c
+) : String -> Float;
+
+# Exactly 4 hex digits (RFC 8259 §7's `\uXXXX`), not `take_while`'s "as many
+# as match" — a short run (e.g. "\u12" at end of input) must fail, not
+# silently succeed on fewer digits.
+read_hex4 = fn pos s => (
+  cs = [peek_char pos s, peek_char (pos + 1) s, peek_char (pos + 2) s, peek_char (pos + 3) s];
+  all_hex = reduce (fn acc c => acc && (match c (Some d => is_hex_digit d; None => False))) True cs;
+  if not all_hex then parse_error "expected 4 hex digits" pos else (
+    values = list_map (fn c => match c (Some d => hex_digit_value d; None => 0)) cs;
+    n = reduce (fn acc v => acc * 16 + v) 0 values;
+    Ok {@value n, @pos (pos + 4)}
+  )
+);
+
+# High/low surrogate ranges, UTF-16 (RFC 8259 §7's astral-codepoint escape).
+is_high_surrogate = fn n => (n >= 55296) && (n <= 56319);
+is_low_surrogate = fn n => (n >= 56320) && (n <= 57343);
+combine_surrogates = fn hi lo => 65536 + ((hi - 55296) * 1024) + (lo - 56320);
+
+# from_char_code returns Option String (it's a general builtin, not every
+# caller passes a valid codepoint) but every codepoint reaching it here is
+# already range-checked (a plain BMP value from exactly 4 hex digits, or a
+# combined high/low surrogate pair) — None is unreachable. Still handled,
+# not assumed away: a distinct parse_error rather than option_get_or with a
+# silent placeholder, so it stays diagnosable if that invariant is ever wrong.
+codepoint_to_char = fn code pos => match (from_char_code code) (
+  Some c => Ok c;
+  None => parse_error "invalid codepoint in \\u escape" pos
+);
+
+# Called positioned just after "\u" (the literal backslash-u already
+# consumed). A lone/unpaired surrogate is rejected outright rather than
+# handed to from_char_code — this module's stated stance (see
+# is_supported_escape above) is reject, not mis-decode.
+json_unicode_escape_p = fn pos s => (
+  unpaired_high = parse_error "unpaired high surrogate in \\u escape" pos;
+  bind (read_hex4 pos s) (fn r1 => (
+    code1 = r1 | @value;
+    pos1 = r1 | @pos;
+    if is_low_surrogate code1 then parse_error "unpaired low surrogate in \\u escape" pos else
+    if not (is_high_surrogate code1)
+      then bind (codepoint_to_char code1 pos) (fn c => Ok {@value c, @pos pos1})
+    else
+    match (peek_char pos1 s) (
+      Some "\\" => match (peek_char (pos1 + 1) s) (
+        Some "u" => bind (read_hex4 (pos1 + 2) s) (fn r2 => (
+          code2 = r2 | @value;
+          if is_low_surrogate code2
+            then bind (codepoint_to_char (combine_surrogates code1 code2) pos) (fn c => Ok {@value c, @pos (r2 | @pos)})
+            else unpaired_high
+        ));
+        _ => unpaired_high
+      );
+      _ => unpaired_high
+    )
+  ))
+);
+
+# `\` then either a fixed-mapping escape (satisfy+map, single char) or `u`
+# (position-threaded 4-hex-digit decode, see json_unicode_escape_p) — the two
+# don't fit one combinator chain since only one of them consumes a variable
+# number of characters.
+json_escaped_char_p = fn pos s =>
+  bind (char "\\" pos s) (fn r => (
+    pos1 = r | @pos;
+    match (peek_char pos1 s) (
+      Some "u" => json_unicode_escape_p (pos1 + 1) s;
+      _ => pmap escape_to_char (satisfy "recognized escape character" is_supported_escape) pos1 s
+    )
+  ));
 # `\` excluded from "plain" so an unrecognized escape fails the string
 # parse outright, instead of backtracking into treating `\` as a literal.
 json_plain_char_p = satisfy "string char" (fn c => (not (c == "\"")) && (not (c == "\\")) && (not (c < " ")));
@@ -165,25 +268,39 @@ json_value_p = fn pos s => (
   )
 );
 
-# Whole-input parse: rejects trailing non-whitespace, wraps ParseError into
-# JsonParseError (see its declaration above).
+# Wraps std/parser's ParseError into JsonParseError (see its declaration above).
 json_parse = fn input =>
-  match (
-    result_bind (json_value_p 0 input) (fn r => (
+  map_err (fn e => match e (ParseError info => JsonParseError info)) (
+    bind (json_value_p 0 input) (fn r => (
       p = skip_ws (r | @pos) input;
       match (peek_char p input) (
         None => Ok (r | @value);
         Some c => Err (ParseError {@message ("unexpected trailing character '" + c + "'"), @position p})
       )
     ))
-  ) (
-    Ok v => Ok v;
-    Err (ParseError info) => Err (JsonParseError info)
   );
 
 # ========================================
 # SERIALIZER
 # ========================================
+
+hex_nibble = fn n => match n (
+  0 => "0"; 1 => "1"; 2 => "2"; 3 => "3"; 4 => "4";
+  5 => "5"; 6 => "6"; 7 => "7"; 8 => "8"; 9 => "9";
+  10 => "a"; 11 => "b"; 12 => "c"; 13 => "d"; 14 => "e"; 15 => "f";
+  _ => "0"
+) : Float -> String;
+
+# Every remaining control character reaching here is U+0000-U+001F (RFC
+# 8259 §7's own unescaped-char boundary: json_plain_char_p already rejects
+# anything < " " unescaped during parsing, and \uXXXX decoding can produce
+# any codepoint in this range). Always fits in two hex digits, so this
+# doesn't need general hex-width formatting, just the fixed "00XY" shape.
+escape_control_char = fn n => (
+  hi = if n >= 16 then 1 else 0;
+  lo = if n >= 16 then n - 16 else n;
+  "\\u00" + hex_nibble hi + hex_nibble lo
+);
 
 escape_char = fn c => match c (
   "\"" => "\\\"";
@@ -191,7 +308,7 @@ escape_char = fn c => match c (
   "\n" => "\\n";
   "\r" => "\\r";
   "\t" => "\\t";
-  _ => c
+  _ => if c < " " then escape_control_char (option_get_or 0 (char_code c)) else c
 );
 
 escape_string = fn s => join "" (list_map escape_char (chars s));
@@ -199,7 +316,7 @@ escape_string = fn s => join "" (list_map escape_char (chars s));
 non_finite_number_text = fn n => (
   text = toString n;
   (text == "Infinity") || (text == "-Infinity") || (text == "NaN")
-);
+) : a -> Bool;
 
 # Not ascribed: wrapping a self-recursive binding in a type ascription
 # breaks its own recursive reference at runtime ("Undefined variable"),
@@ -218,45 +335,54 @@ json_stringify = fn v => match v (
       {k, mv} = pair;
       "\"" + escape_string k + "\"" + ":" + json_stringify mv
     )) members) + "}"
-);
+) : JsonValue -> String;
 
 # ========================================
 # EXTRACTION API
 # ========================================
 
-json_as_string = fn v => match v (JString s => Ok s; _ => Err JsonExpectedString) : JsonValue -> Result String JsonError;
-json_as_number = fn v => match v (JNumber n => Ok n; _ => Err JsonExpectedNumber) : JsonValue -> Result Float JsonError;
-json_as_bool = fn v => match v (JBool b => Ok b; _ => Err JsonExpectedBool) : JsonValue -> Result Bool JsonError;
-json_as_array = fn v => match v (JArray items => Ok items; _ => Err JsonExpectedArray) : JsonValue -> Result (List JsonValue) JsonError;
-json_as_object = fn v => match v (JObject members => Ok members; _ => Err JsonExpectedObject) : JsonValue -> Result (List {String, JsonValue}) JsonError;
+json_as_string = fn v => match v (JString s => Ok s; _ => Err JsonExpectedString)
+json_as_number = fn v => match v (JNumber n => Ok n; _ => Err JsonExpectedNumber)
+json_as_bool = fn v => match v (JBool b => Ok b; _ => Err JsonExpectedBool)
+json_as_array = fn v => match v (JArray items => Ok items; _ => Err JsonExpectedArray)
+json_as_object = fn v => match v (JObject members => Ok members; _ => Err JsonExpectedObject)
 
-json_field = fn key v => result_bind (json_as_object v) (fn members =>
+json_field = fn key v => bind (json_as_object v) (fn members =>
   match (assoc_get key members) (
     Some found => Ok found;
     None => Err (JsonMissingField key)
   )
 ) : String -> JsonValue -> Result JsonValue JsonError;
 
-json_index = fn idx v => result_bind (json_as_array v) (fn items =>
+json_index = fn idx v => bind (json_as_array v) (fn items =>
   match (at idx items) (
     Some found => Ok found;
     None => Err (JsonIndexOutOfBounds idx)
   )
 ) : Float -> JsonValue -> Result JsonValue JsonError;
 
-# Not ascribed: same self-recursive-ascription runtime gap as json_stringify
-# above.
-json_equals = fn a b => match a (
-  JNull => match b (JNull => True; _ => False);
-  JBool x => match b (JBool y => equals x y; _ => False);
-  JNumber x => match b (JNumber y => equals x y; _ => False);
-  JString x => match b (JString y => equals x y; _ => False);
-  JArray xs => match b (JArray ys => primitive_list_all2 json_equals xs ys; _ => False);
-  JObject xs => match b (JObject ys => primitive_list_all2 (fn px py => (
-      {kx, vx} = px;
-      {ky, vy} = py;
-      (equals (kx : String) ky) && (json_equals vx vy)
-    )) xs ys; _ => False)
+# implement Eq (not a bare function) so Eq (List a)/Eq (Option a)'s existing
+# generic instances (stdlib.noo) pick up JsonValue for free, and `==` works
+# directly. Infix `==`, not prefix `equals`: the JObject case needs `equals`
+# resolved at two different types in one lambda (String for keys, JsonValue
+# for values, in the callback passed to primitive_list_all2) — a
+# trait-constrained identifier used at 2+ types within a single lambda body
+# doesn't get each call site independently resolved (confirmed unrelated to
+# self-recursion or to JsonValue specifically: docs/internal/bugs/
+# TRAIT_CONSTRAINT_SINGLE_LAMBDA_BUG.md). `==` doesn't go through that path.
+implement Eq JsonValue (
+  equals = fn a b => match a (
+    JNull => match b (JNull => True; _ => False);
+    JBool x => match b (JBool y => x == y; _ => False);
+    JNumber x => match b (JNumber y => x == y; _ => False);
+    JString x => match b (JString y => x == y; _ => False);
+    JArray xs => match b (JArray ys => primitive_list_all2 (fn x y => x == y) xs ys; _ => False);
+    JObject xs => match b (JObject ys => primitive_list_all2 (fn px py => (
+        {kx, vx} = px;
+        {ky, vy} = py;
+        (kx == ky) && (vx == vy)
+      )) xs ys; _ => False)
+  )
 );
 
 {
@@ -268,7 +394,6 @@ json_equals = fn a b => match a (
   @JObject JObject,
   @json_parse json_parse,
   @json_stringify json_stringify,
-  @json_equals json_equals,
   @json_as_string json_as_string,
   @json_as_number json_as_number,
   @json_as_bool json_as_bool,

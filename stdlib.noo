@@ -290,15 +290,13 @@ implement Eq (Result a b) given (a implements Eq) and (b implements Eq) (
   )
 );
 
-# KNOWN WRONG: matches the argument and applies the wrapped value as a
-# function. The correct body (match f; Ok g => map g res) crashes the typer —
-# two-parameter variants register at arity 1 in trait instances, and matching
-# the `f (a -> b)` parameter hits "Unknown ADT: Result" during stdlib load.
-# Unusable either way until the typer kind bug is fixed; deferred tests in
-# stdlib.test.noo.
+# Nested match, not `match f (Ok g => map g res; ...)`: the shorter form
+# still hits a typer arity mismatch in isolation (a remaining instance of
+# the higher-kinded-trait-slot gap in ADR 9), even after the Monad-Result
+# arity fix. This form typechecks and evaluates correctly.
 implement Applicative Result (
-  apply = fn f res => match res (
-    Ok x => f x;
+  apply = fn f res => match f (
+    Ok g => match res (Ok x => Ok (g x); Err e => Err e);
     Err e => Err e
   )
 );

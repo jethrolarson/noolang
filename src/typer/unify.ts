@@ -1034,8 +1034,23 @@ function tryUnifyConstrainedVariant(
 							name: concreteVariant.name, // TypeScript now knows this is ValidPrimitiveName
 						});
 					} else {
-						// For non-primitive variants (Option, Result, etc.), substitute with the variant type itself
-						newSubstitution.set(variantType.name, concreteVariant);
+						// For non-primitive variants (Option, Result, etc.), bind the
+						// constructor placeholder to the concrete constructor's name plus
+						// any "extra" trailing type args the concrete type carries beyond
+						// what the trait's (unary) signature models — e.g. `Monad m`
+						// declares only `m a`, but `Result a b` has a second (error) type
+						// param the trait never sees. substitute.ts re-appends these
+						// extras to each occurrence's own args, so storing the full
+						// concreteVariant here (old behavior) would double up/overwrite
+						// the wrong slot once args differ in length.
+						const extraArgs = concreteVariant.args.slice(
+							variantType.args.length
+						);
+						newSubstitution.set(variantType.name, {
+							kind: 'variant',
+							name: concreteVariant.name,
+							args: extraArgs,
+						});
 					}
 
 					// Transform α130 Float -> Option Float (variant)

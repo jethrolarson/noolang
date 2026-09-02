@@ -79,11 +79,22 @@ const substituteImpl =
 							};
 						}
 					} else if (substitutedName.kind === 'variant') {
-						// Substituting with another variant constructor
+						// Substituting with another variant constructor. `type.args` are
+						// this occurrence's own generic args (e.g. the `a` in `m a`);
+						// `substitutedName.args` are "extra" args the concrete constructor
+						// carries beyond what the trait models (e.g. Result's error type,
+						// which the unary `Monad m` signature never mentions) — see
+						// tryUnifyConstrainedVariant in unify.ts, which stores exactly
+						// those extras rather than the full concrete arg list. Appending
+						// them preserves arity instead of silently truncating to
+						// `type.args.length`.
 						return {
 							...type,
 							name: substitutedName.name,
-							args: type.args.map(substituteImpl(substitution, seen)),
+							args: [
+								...type.args.map(substituteImpl(substitution, seen)),
+								...substitutedName.args.map(substituteImpl(substitution, seen)),
+							],
 						};
 					}
 					// For other substitution types, fall through to normal arg substitution

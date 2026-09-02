@@ -1,9 +1,55 @@
 # Trait system assumes kind `* -> *`; breaks on arity-2+ variants
 
-Status: open
+Status: open, partially fixed
 
 Filed 2026-07-20, found while fixing `Applicative Result` in PR #156
 (stdlib.noo, KNOWN WRONG comment on the `apply` implementation).
+
+## Update 2026-09-01 (PR #191)
+
+Fixed the symptom described below under "Symptom" bullet 1 and the
+`Unknown ADT: Result` crash under bullet 2 — `unify.ts`
+(`tryUnifyConstrainedVariant`) was storing a higher-kinded trait
+placeholder's *entire* concrete arg list under one substitution key
+instead of just the args beyond what the trait's own signature models;
+`substitute.ts` then rebuilt each occurrence from its own (shorter)
+textual arg count, silently truncating. Fixed by storing only the
+concrete constructor's extra trailing args in `unify.ts` and re-appending
+them in `substitute.ts`. Design writeup: `docs/internal/adrs/adr_0009.md`
+(proposed follow-up: name the modeled slot explicitly at each `implement`
+site instead of assuming it's always the leading argument — this fix
+still makes that assumption, just no longer silently).
+
+Concretely, now working: `map (fn x => x + 1) (Ok 2)` infers `Result
+Float a` (previously `Result Float`, second param vanished). `bind` on
+`Result` works and preserves arity (`src/typer/__tests__/monad-result-
+arity.test.ts`). `Applicative Result`'s `apply` now has a correct,
+non-crashing direct implementation (`stdlib.noo`, nested match on `f`
+then `res` — no longer `KNOWN WRONG`).
+
+**Still open** — two confirmed repros past this fix:
+
+1. The `map g res` form inside a hand-written `apply`-shaped function
+   still trips `Variant arity mismatch: Result has 1 vs 2 type arguments`
+   (not the old `Unknown ADT: Result` crash, but still wrong):
+   ```
+   apply = fn f res => match f (Ok g => map g res; Err e => Err e);
+   apply (Ok (fn x => x + 1)) (Ok 2)
+   ```
+   This is why `stdlib.noo`'s `Applicative Result::apply` uses the longer
+   nested-match form instead.
+2. Wrapping *any* trait-generic function — not just `apply`-shaped code —
+   in a plain new lambda loses the wrapped function's polymorphism, with
+   the same error message:
+   ```
+   my_bind = fn res f => bind res f;
+   my_bind (Ok 1) (fn x => Ok (x + 1))
+   ```
+   fails with the same `Variant arity mismatch`; a bare rebind with no
+   wrapper (`b2 = bind; b2 (Ok 1) (fn x => Ok (x + 1))`) works. Blocks a
+   `bind_ = flip bind` pipe-friendly form (ADR 1's flip convention) that
+   would otherwise be a real readability win in combinator-heavy code like
+   `std/json.noo`.
 
 ## Symptom
 
@@ -75,6 +121,10 @@ patch, or the next arity-2+ user variant hits the same wall.
 
 ## Trigger for picking this up
 
-A second arity-2+ variant with trait instances is dogfooded, or `apply`/full
-`Applicative Result` is actually needed by a program (currently unused —
-deferred tests only).
+Partially overtaken by events: `Applicative Result::apply` is used and
+tested now (`stdlib.test.noo`, `src/typer/__tests__/monad-result-
+arity.test.ts`), not deferred-only. Remaining trigger for the two "still
+open" repros above: a second arity-2+ variant with trait instances is
+dogfooded (raises the odds of hitting the `map`-inside-a-wrapper or
+wrap-any-trait-method-in-a-lambda shape by accident), or someone attempts
+the `bind_`/flip-based pipe-chaining style blocked by repro 2.
