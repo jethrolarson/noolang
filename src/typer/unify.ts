@@ -1102,13 +1102,45 @@ function tryUnifyConstrainedVariant(
 	return null; // No constraint resolution possible
 }
 
-// PHASE 3: Constraint resolution during unification
+function containsTypeVariable(type: Type): boolean {
+	switch (type.kind) {
+		case 'variable':
+			return true;
+		case 'function':
+			return (
+				type.params.some(containsTypeVariable) ||
+				containsTypeVariable(type.return)
+			);
+		case 'list':
+			return containsTypeVariable(type.element);
+		case 'tuple':
+			return type.elements.some(containsTypeVariable);
+		case 'record':
+			return Object.values(type.fields).some(containsTypeVariable);
+		case 'union':
+			return type.types.some(containsTypeVariable);
+		case 'variant':
+			return type.args.some(containsTypeVariable);
+		case 'constrained':
+			return containsTypeVariable(type.baseType);
+		default:
+			return false;
+	}
+}
+
 function unifyConstrainedWithConcrete(
 	constrainedType: Type & { kind: 'constrained' },
 	concreteType: Type,
 	state: TypeState,
 	location?: { line: number; column: number }
 ): TypeState {
+	const constraintDescribesOnlyInputs = !containsTypeVariable(
+		constrainedType.baseType
+	);
+	if (constraintDescribesOnlyInputs) {
+		return unify(constrainedType.baseType, concreteType, state, location);
+	}
+
 	// Get the concrete type name for trait lookup
 	const concreteTypeName = getTypeName(concreteType);
 
