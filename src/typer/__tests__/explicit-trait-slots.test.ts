@@ -55,6 +55,21 @@ right_map (fn x => x + 1) (RightMap "kept" 2)
 		).toBe('RightMap String Float');
 	});
 
+	test('grouped fixed applications share direct named free variables', () => {
+		expect(
+			inferredType(`
+constraint F f (fm : (a -> b) -> f a -> f b);
+variant Outer error value nested = Outer error value nested;
+implement F (Outer error _ (Option error)) (
+  fm = fn f outer => match outer (
+    Outer error value nested => Outer error (f value) nested
+  )
+);
+fm (fn x => x + 1) (Outer "kept" 2 (Some "kept"))
+`)
+		).toBe('Outer String Float Option String');
+	});
+
 	test('fixed constructor arguments must match during dispatch', () => {
 		expect(() =>
 			parseAndType(`${rightFunctor}
@@ -130,6 +145,40 @@ implement RightFunctor (RightMap _ _) (
 });
 
 describe('explicit trait slot module transport', () => {
+	test('an imported descriptor preserves sharing inside grouped fixed applications', () => {
+		const dir = path.join(
+			process.cwd(),
+			'.test-tmp-explicit-trait-slots-nested'
+		);
+		const modulePath = path.join(dir, 'outer.noo');
+		fs.mkdirSync(dir, { recursive: true });
+		fs.writeFileSync(
+			modulePath,
+			`
+constraint F f (fm : (a -> b) -> f a -> f b);
+variant Outer error value nested = Outer error value nested;
+implement F (Outer error _ (Option error)) (
+  fm = fn f outer => match outer (
+    Outer error value nested => Outer error (f value) nested
+  )
+);
+{@make fn error value => Outer error value (Some error)}
+`
+		);
+		clearModuleCache();
+		try {
+			expect(
+				inferredType(`
+{@make} = import "${modulePath.replace(/\.noo$/, '')}";
+fm (fn x => x + 1) (make "kept" 2)
+`)
+			).toBe('Outer String Float Option String');
+		} finally {
+			clearModuleCache();
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
 	test('an imported slot descriptor preserves non-leading argument order', () => {
 		const dir = path.join(process.cwd(), '.test-tmp-explicit-trait-slots');
 		const modulePath = path.join(dir, 'right-map.noo');

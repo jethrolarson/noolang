@@ -133,16 +133,85 @@ export const concreteArguments = (
 		: null;
 };
 
+const bindFreeSlots = (
+	descriptor: TraitSlotDescriptor,
+	args: Type[]
+): Map<string, Type> | null => {
+	const bindings = new Map<string, Type>();
+	for (let index = 0; index < descriptor.slots.length; index++) {
+		const role = descriptor.slots[index];
+		if (role.kind !== 'free' || role.type.kind !== 'variable') continue;
+		const existing = bindings.get(role.type.name);
+		if (existing && !typesEqual(existing, args[index])) return null;
+		bindings.set(role.type.name, args[index]);
+	}
+	return bindings;
+};
+
+const instantiateFreeVariables = (
+	type: Type,
+	bindings: Map<string, Type>
+): Type => {
+	if (type.kind === 'variable') return bindings.get(type.name) ?? type;
+	if (type.kind === 'variant')
+		return {
+			...type,
+			args: type.args.map(arg => instantiateFreeVariables(arg, bindings)),
+		};
+	if (type.kind === 'function')
+		return {
+			...type,
+			params: type.params.map(arg => instantiateFreeVariables(arg, bindings)),
+			return: instantiateFreeVariables(type.return, bindings),
+		};
+	if (type.kind === 'list')
+		return {
+			...type,
+			element: instantiateFreeVariables(type.element, bindings),
+		};
+	if (type.kind === 'tuple')
+		return {
+			...type,
+			elements: type.elements.map(arg =>
+				instantiateFreeVariables(arg, bindings)
+			),
+		};
+	if (type.kind === 'record')
+		return {
+			...type,
+			fields: Object.fromEntries(
+				Object.entries(type.fields).map(([name, field]) => [
+					name,
+					instantiateFreeVariables(field, bindings),
+				])
+			),
+		};
+	if (type.kind === 'union')
+		return {
+			...type,
+			types: type.types.map(arg => instantiateFreeVariables(arg, bindings)),
+		};
+	if (type.kind === 'constrained')
+		return {
+			...type,
+			baseType: instantiateFreeVariables(type.baseType, bindings),
+		};
+	return type;
+};
+
 export const descriptorAccepts = (
 	descriptor: TraitSlotDescriptor,
 	type: Type
 ): boolean => {
 	const args = concreteArguments(type, descriptor);
+	if (!args) return false;
+	const bindings = bindFreeSlots(descriptor, args);
 	return (
-		!!args &&
+		!!bindings &&
 		descriptor.slots.every(
 			(role, index) =>
-				role.kind !== 'fixed' || typesEqual(role.type, args[index])
+				role.kind !== 'fixed' ||
+				typesEqual(instantiateFreeVariables(role.type, bindings), args[index])
 		)
 	);
 };
@@ -165,16 +234,23 @@ export const reassembleTraitType = (
 	// A constructor placeholder can already have been rebuilt by an earlier
 	// substitution while retaining its dispatch metadata.
 	if (modeledArguments.length === descriptor.slots.length) {
+		const bindings = bindFreeSlots(descriptor, modeledArguments) ?? new Map();
 		return construct(
 			descriptor.slots.map((role, index) =>
-				role.kind === 'fixed' ? role.type : modeledArguments[index]
+				role.kind === 'fixed'
+					? instantiateFreeVariables(role.type, bindings)
+					: modeledArguments[index]
 			)
 		);
 	}
+	const bindings = preservedArguments
+		? (bindFreeSlots(descriptor, preservedArguments) ?? new Map())
+		: new Map<string, Type>();
 	let modeledIndex = 0;
 	const args = descriptor.slots.map((role, index) => {
 		if (role.kind === 'modeled') return modeledArguments[modeledIndex++];
-		if (role.kind === 'fixed') return role.type;
+		if (role.kind === 'fixed')
+			return instantiateFreeVariables(role.type, bindings);
 		return preservedArguments?.[index] ?? role.type;
 	});
 	if (modeledIndex !== modeledArguments.length || args.some(arg => !arg)) {
