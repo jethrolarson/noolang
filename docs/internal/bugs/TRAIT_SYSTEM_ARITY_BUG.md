@@ -1,6 +1,6 @@
 # Trait system assumes kind `* -> *`; breaks on arity-2+ variants
 
-Status: open, partially fixed
+Status: fixed
 
 Filed 2026-07-20, found while fixing `Applicative Result` in PR #156
 (stdlib.noo, KNOWN WRONG comment on the `apply` implementation).
@@ -27,7 +27,7 @@ arity.test.ts`). `Applicative Result`'s `apply` now has a correct,
 non-crashing direct implementation (`stdlib.noo`, nested match on `f`
 then `res` — no longer `KNOWN WRONG`).
 
-**Still open** — two confirmed repros past this fix:
+**Fixed by ADR 9** — the two remaining repros were:
 
 1. The `map g res` form inside a hand-written `apply`-shaped function
    still trips `Variant arity mismatch: Result has 1 vs 2 type arguments`

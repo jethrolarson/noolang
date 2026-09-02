@@ -98,7 +98,12 @@ const freeTypeVarsInStructure = (
 	visited: Set<string>
 ): void => {
 	for (const field of Object.values(structure.fields)) {
-		if (typeof field === 'object' && field !== null && 'kind' in field && field.kind === 'nested') {
+		if (
+			typeof field === 'object' &&
+			field !== null &&
+			'kind' in field &&
+			field.kind === 'nested'
+		) {
 			freeTypeVarsInStructure(field.structure, acc, visited);
 		} else {
 			freeTypeVarsWithConstraints(field as Type, acc, visited);
@@ -187,7 +192,9 @@ export const freeTypeVarsEnv = (
 ): Set<string> => {
 	const acc = new Set<string>();
 	for (const scheme of env.values()) {
-		const type = substitution ? substitute(scheme.type, substitution) : scheme.type;
+		const type = substitution
+			? substitute(scheme.type, substitution)
+			: scheme.type;
 		for (const varName of freeTypeVarsWithConstraints(type)) {
 			if (!scheme.quantifiedVars.includes(varName)) acc.add(varName);
 		}
@@ -226,7 +233,7 @@ export const instantiate = (
 ): [Type, TypeState] => {
 	const mapping = new Map<string, Type>();
 	let currentState = state;
-	
+
 	for (const varName of scheme.quantifiedVars) {
 		const [freshVar, newState] = freshTypeVariable(currentState);
 		mapping.set(varName, freshVar);
@@ -241,7 +248,6 @@ export const instantiate = (
 
 	return [instantiatedType, finalState];
 };
-
 
 // Replace type variables with fresh ones, threading state
 export const freshenTypeVariables = (
@@ -301,7 +307,7 @@ export const freshenTypeVariables = (
 				mapping,
 				currentState
 			);
-			
+
 			// Handle function-level constraints
 			currentState = finalState;
 			let newConstraints: Constraint[] | undefined = undefined;
@@ -317,7 +323,11 @@ export const freshenTypeVariables = (
 				});
 			}
 
-			const freshenedFunction = { ...type, params: newParams, return: newReturn };
+			const freshenedFunction = {
+				...type,
+				params: newParams,
+				return: newReturn,
+			};
 			if (newConstraints) {
 				freshenedFunction.constraints = newConstraints;
 			}
@@ -391,7 +401,7 @@ export const freshenTypeVariables = (
 				}
 				return [
 					{
-						kind: 'variant',
+						...type,
 						name: mappedVar.name,
 						args: newArgs,
 					},
@@ -559,10 +569,11 @@ export const cleanSubstitutions = (state: TypeState): TypeState => ({
 
 // Centralized reserved type names (cannot be shadowed by user-defined types or variants)
 export const RESERVED_TYPE_NAMES: ReadonlySet<string> = new Set([
-  'Float',
-  'String',
-  'Unit',
-  'List',
+	'Float',
+	'String',
+	'Unit',
+	'List',
 ]);
 
-export const isReservedTypeName = (name: string): boolean => RESERVED_TYPE_NAMES.has(name);
+export const isReservedTypeName = (name: string): boolean =>
+	RESERVED_TYPE_NAMES.has(name);

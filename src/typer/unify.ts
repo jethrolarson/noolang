@@ -13,6 +13,7 @@ import { addConstraints, getConstraints } from './constraint-store';
 // Legacy constraint imports removed
 import { functionApplicationError } from './type-errors';
 import { getTypeName } from './trait-system';
+import { concreteArguments } from './trait-slots';
 
 // Valid primitive type names (must match PrimitiveType['name'] union)
 const VALID_PRIMITIVES = new Set(['Float', 'String'] as const);
@@ -98,6 +99,48 @@ const unifyInternal = (
 		if (constraintResult) {
 			return constraintResult;
 		}
+	}
+
+	const resolveAnnotatedConstructor = (
+		placeholder: Type & { kind: 'variant' },
+		concrete: Type
+	): TypeState | null => {
+		if (!placeholder.traitConstraint) return null;
+		const typeName = getTypeName(concrete);
+		const implementation = state.traitRegistry.implementations
+			.get(placeholder.traitConstraint)
+			?.get(typeName);
+		const descriptor = implementation?.slotDescriptor;
+		if (!descriptor) return null;
+		const args = concreteArguments(concrete, descriptor);
+		if (!args) return null;
+		if (
+			placeholder.name === descriptor.typeName &&
+			placeholder.args.length === descriptor.slots.length
+		)
+			return null;
+		const substitution = new Map(state.substitution);
+		substitution.set(placeholder.name, {
+			kind: 'variant',
+			name: typeName,
+			args,
+			traitSlots: descriptor,
+		});
+		return unify(
+			substitute(placeholder, substitution),
+			concrete,
+			{ ...state, substitution },
+			location,
+			context
+		);
+	};
+	if (s1.kind === 'variant') {
+		const resolved = resolveAnnotatedConstructor(s1, s2);
+		if (resolved) return resolved;
+	}
+	if (s2.kind === 'variant') {
+		const resolved = resolveAnnotatedConstructor(s2, s1);
+		if (resolved) return resolved;
 	}
 
 	// Handle variables (either order)
@@ -562,9 +605,11 @@ function unifyVariable(
 		if (seenVars.has(currentVar.name)) break;
 		seenVars.add(currentVar.name);
 		currentVar.constraints?.forEach(pushUnique);
-		getConstraints(state.constraints, currentVar.name, state.substitution).forEach(
-			pushUnique
-		);
+		getConstraints(
+			state.constraints,
+			currentVar.name,
+			state.substitution
+		).forEach(pushUnique);
 		const next = state.substitution.get(currentVar.name);
 		if (!next) break;
 		currentVar = next;
@@ -964,13 +1009,18 @@ function tryUnifyConstrainedVariant(
 	}
 
 	// Special case: if concreteType is also a type variable, check for constraint compatibility
+	if (concreteType.kind === 'variable') {
+		// The ordinary variable stands for the whole applied value, not for its
+		// constructor. Preserve `f a` so a lambda wrapper around a trait method
+		// retains the relationship between its argument and result.
+		const newSubstitution = new Map(state.substitution);
+		newSubstitution.set(concreteType.name, variantType);
+		return { ...state, substitution: newSubstitution };
+	}
 	if (
-		concreteType.kind === 'variable' ||
 		(concreteType.kind === 'variant' && concreteTypeName.startsWith('α')) ||
 		(concreteType.kind === 'constrained' && concreteTypeName.startsWith('α'))
 	) {
-		// Both are type variables - we can unify them by propagating constraints
-		// For now, substitute the variant type with the concrete type
 		const newSubstitution = new Map(state.substitution);
 		newSubstitution.set(variantType.name, concreteType);
 		return { ...state, substitution: newSubstitution };
@@ -985,6 +1035,25 @@ function tryUnifyConstrainedVariant(
 			if (traitImpls && traitImpls.has(concreteTypeName)) {
 				// Constraint is satisfied! Perform the substitution
 				const newSubstitution = new Map(state.substitution);
+				const descriptor = traitImpls.get(concreteTypeName)?.slotDescriptor;
+				const concreteArgs = descriptor
+					? concreteArguments(concreteType, descriptor)
+					: null;
+				if (descriptor && concreteArgs) {
+					newSubstitution.set(variantType.name, {
+						kind: 'variant',
+						name: concreteTypeName,
+						args: concreteArgs,
+						traitSlots: descriptor,
+					});
+					const reconstructed = substitute(variantType, newSubstitution);
+					return unify(
+						reconstructed,
+						concreteType,
+						{ ...state, substitution: newSubstitution },
+						location
+					);
+				}
 
 				if (concreteType.kind === 'list') {
 					// For List types, substitute the type constructor

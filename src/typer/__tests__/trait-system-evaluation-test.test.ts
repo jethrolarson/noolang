@@ -34,7 +34,7 @@ describe('Trait System Evaluation', () => {
 		// Test a custom trait function to see if it evaluates correctly
 		const code = `
 		constraint TestMapper f ( testMap: (a -> b) -> f a -> f b );
-		implement TestMapper List ( testMap = fn f list => list_map f list );
+		implement TestMapper (List _) ( testMap = fn f list => list_map f list );
 		testMap (fn x => x * 2) [1, 2, 3]
 	`;
 

@@ -7,19 +7,23 @@ import {
 	FunctionExpression,
 	ConstraintExpr,
 	FunctionType,
+	TraitSlotDescriptor,
 } from '../ast';
 import { TypeState } from './types';
+import { descriptorAccepts } from './trait-slots';
 
 // Simple trait definition - just a name and function signatures
 export type TraitDefinition = {
 	name: string;
 	typeParam: string; // Usually 'a' or 'f'
+	constructorArity?: number; // Arity at which the parameter is used (0 for value traits)
 	functions: Map<string, FunctionType>; // function name -> function type
 };
 
 // Simple trait implementation - concrete functions for a specific type
 export type TraitImplementation = {
 	typeName: string; // e.g., "Option", "List", "Float"
+	slotDescriptor?: TraitSlotDescriptor;
 	functions: Map<string, Expression>; // function name -> implementation expression (AST)
 	givenConstraints?: ConstraintExpr; // Optional given constraints for conditional implementations
 	/**
@@ -175,6 +179,9 @@ export function resolveTraitFunction(
 	traitName?: string;
 	typeName?: string;
 	impl?: Expression;
+	implementation?: TraitImplementation;
+	matchedType?: Type;
+	headMismatch?: boolean;
 	needsConstraint?: boolean;
 } {
 	if (argTypes.length === 0) {
@@ -202,10 +209,13 @@ export function resolveTraitFunction(
 
 	// Try to find a concrete implementation by examining all argument types
 	// Look for any argument that has a concrete type we can dispatch on
+	let headMismatch = false;
 	const candidateImplementations: Array<{
 		traitName: string;
 		typeName: string;
 		impl: Expression;
+		implementation: TraitImplementation;
+		matchedType: Type;
 	}> = [];
 
 	// Check each argument type to see if we can find a concrete implementation
@@ -218,10 +228,19 @@ export function resolveTraitFunction(
 				if (traitImpls) {
 					const impl = traitImpls.get(typeName);
 					if (impl && impl.functions.has(functionName)) {
+						if (
+							impl.slotDescriptor &&
+							!descriptorAccepts(impl.slotDescriptor, argType)
+						) {
+							headMismatch = true;
+							continue;
+						}
 						candidateImplementations.push({
 							traitName: candidateTraitName,
 							typeName,
 							impl: impl.functions.get(functionName)!,
+							implementation: impl,
+							matchedType: argType,
 						});
 					}
 				}
@@ -255,35 +274,49 @@ export function resolveTraitFunction(
 			traitName: candidate.traitName,
 			typeName: candidate.typeName,
 			impl: candidate.impl,
+			implementation: candidate.implementation,
+			matchedType: candidate.matchedType,
 		};
 	}
+
+	if (headMismatch) return { found: false, headMismatch: true, traitName };
 
 	// No concrete implementation found - check if we should error or create constraint
 	// For functions where the trait type parameter is in the return type (like pure: a -> m a),
 	// we can't dispatch on arguments, so always create constrained type
 	const traitTypeParam = traitDef.typeParam;
-	
+
 	// Helper to check if a type contains the trait type parameter
 	const containsTypeParameter = (type: Type, paramName: string): boolean => {
 		switch (type.kind) {
 			case 'variable':
 				return type.name === paramName;
 			case 'variant':
-				return type.name === paramName || type.args.some(arg => containsTypeParameter(arg, paramName));
+				return (
+					type.name === paramName ||
+					type.args.some(arg => containsTypeParameter(arg, paramName))
+				);
 			case 'function':
-				return type.params.some(param => containsTypeParameter(param, paramName)) ||
-					   containsTypeParameter(type.return, paramName);
+				return (
+					type.params.some(param => containsTypeParameter(param, paramName)) ||
+					containsTypeParameter(type.return, paramName)
+				);
 			case 'list':
 				return containsTypeParameter(type.element, paramName);
 			default:
 				return false;
 		}
 	};
-	
+
 	// Check if trait type parameter is only in return type
-	const paramHasTraitType = functionType.params.some(param => containsTypeParameter(param, traitTypeParam));
-	const returnHasTraitType = containsTypeParameter(functionType.return, traitTypeParam);
-	
+	const paramHasTraitType = functionType.params.some(param =>
+		containsTypeParameter(param, traitTypeParam)
+	);
+	const returnHasTraitType = containsTypeParameter(
+		functionType.return,
+		traitTypeParam
+	);
+
 	if (!paramHasTraitType && returnHasTraitType) {
 		// Trait type parameter only in return type (like pure) - always create constraint
 		return {
@@ -292,18 +325,18 @@ export function resolveTraitFunction(
 			traitName: definingTraits[0],
 		};
 	}
-	
+
 	// For functions where trait type parameter is in arguments, check for concrete types
 	const hasConcreteArgs = argTypes.some(argType => {
 		const typeName = getTypeName(argType);
 		return typeName && typeName !== 'variable' && argType.kind !== 'variable';
 	});
-	
+
 	if (hasConcreteArgs) {
 		// Concrete types with no implementation should error
 		return { found: false };
 	}
-	
+
 	// Type variables/polymorphic cases should create constrained type
 	return {
 		found: false,
@@ -337,15 +370,39 @@ export function getTraitFunctionInfo(
 	const traitName = definingTraits[0];
 	const traitDef = registry.definitions.get(traitName)!;
 	const rawFunctionType = traitDef.functions.get(functionName)!;
+	const markTraitConstructor = (type: Type): Type => {
+		if (type.kind === 'variant') {
+			return {
+				...type,
+				traitConstraint:
+					type.name === traitDef.typeParam ? traitName : type.traitConstraint,
+				args: type.args.map(markTraitConstructor),
+			};
+		}
+		if (type.kind === 'function')
+			return {
+				...type,
+				params: type.params.map(markTraitConstructor),
+				return: markTraitConstructor(type.return),
+			};
+		if (type.kind === 'list')
+			return { ...type, element: markTraitConstructor(type.element) };
+		if (type.kind === 'tuple')
+			return { ...type, elements: type.elements.map(markTraitConstructor) };
+		return type;
+	};
+	const markedFunctionType = markTraitConstructor(
+		rawFunctionType
+	) as FunctionType;
 
 	// Find the actual variable name that corresponds to the trait parameter
 	// The trait parameter (e.g., 'f' for Functor) appears as a variant type in the function
 	let actualTypeVar = traitDef.typeParam; // fallback
 	if (
-		rawFunctionType.kind === 'function' &&
-		rawFunctionType.params.length > 0
+		markedFunctionType.kind === 'function' &&
+		markedFunctionType.params.length > 0
 	) {
-		const firstParam = rawFunctionType.params[0];
+		const firstParam = markedFunctionType.params[0];
 		if (
 			firstParam.kind === 'variant' &&
 			firstParam.name === traitDef.typeParam
@@ -357,7 +414,7 @@ export function getTraitFunctionInfo(
 
 	// Attach the trait constraint to the function type
 	const functionTypeWithConstraints = {
-		...(rawFunctionType as FunctionType),
+		...markedFunctionType,
 		constraints: [
 			{
 				kind: 'implements' as const,

@@ -1,5 +1,6 @@
 import { type Type, type Constraint, type StructureFieldType } from '../ast';
 import { mapObject } from './helpers';
+import { reassembleTraitType } from './trait-slots';
 
 // Apply substitution to a type
 export const substitute = (
@@ -10,7 +11,7 @@ export const substitute = (
 	if (!type) {
 		throw new Error('Cannot substitute undefined type');
 	}
-	
+
 	// No cache - just do the substitution directly
 	return substituteImpl(substitution, new Set())(type);
 };
@@ -55,10 +56,7 @@ const substituteImpl =
 			case 'record':
 				return {
 					...type,
-					fields: mapObject(
-						type.fields,
-						substituteImpl(substitution, seen)
-					),
+					fields: mapObject(type.fields, substituteImpl(substitution, seen)),
 				};
 			case 'union':
 				return {
@@ -70,14 +68,26 @@ const substituteImpl =
 				const substitutedName = substitution.get(type.name);
 				if (substitutedName) {
 					// The variant name is being substituted
-					if (substitutedName.kind === 'variant' && substitutedName.name === 'List') {
+					if (
+						substitutedName.kind === 'variant' &&
+						substitutedName.name === 'List'
+					) {
 						// Special case: substituting with List constructor -> create list type
 						if (type.args.length === 1) {
 							return {
 								kind: 'list',
-								element: substituteImpl(substitution, seen)(type.args[0])
+								element: substituteImpl(substitution, seen)(type.args[0]),
 							};
 						}
+					} else if (
+						substitutedName.kind === 'variant' &&
+						substitutedName.traitSlots
+					) {
+						return reassembleTraitType(
+							substitutedName.traitSlots,
+							type.args.map(substituteImpl(substitution, seen)),
+							substitutedName.args.map(substituteImpl(substitution, seen))
+						);
 					} else if (substitutedName.kind === 'variant') {
 						// Substituting with another variant constructor. `type.args` are
 						// this occurrence's own generic args (e.g. the `a` in `m a`);
@@ -99,7 +109,7 @@ const substituteImpl =
 					}
 					// For other substitution types, fall through to normal arg substitution
 				}
-				
+
 				// Normal case: just substitute the arguments
 				return {
 					...type,
@@ -142,10 +152,15 @@ export const substituteConstraint = (
 				...constraint,
 				structure: {
 					fields: Object.fromEntries(
-						Object.entries(constraint.structure.fields).map(([fieldName, fieldType]) => [
-							fieldName,
-							substitute(fieldType as Type, substitution) as StructureFieldType,
-						])
+						Object.entries(constraint.structure.fields).map(
+							([fieldName, fieldType]) => [
+								fieldName,
+								substitute(
+									fieldType as Type,
+									substitution
+								) as StructureFieldType,
+							]
+						)
 					),
 				},
 			};

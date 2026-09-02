@@ -2,7 +2,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Lexer } from '../lexer/lexer';
 import { parse } from '../parser/parser';
-import { loadModule, resolveModulePath, mergeModuleCacheIntoTypeState } from '../module-loader';
+import {
+	loadModule,
+	resolveModulePath,
+	mergeModuleCacheIntoTypeState,
+} from '../module-loader';
 import { emptyManifest, mergeManifests } from './module-manifest';
 import {
 	type Expression,
@@ -107,6 +111,11 @@ import {
 	getTypeName,
 	addTraitImplementation,
 } from './trait-system';
+import {
+	createTraitSlotDescriptor,
+	expandTraitParameter,
+	traitConstructorArity,
+} from './trait-slots';
 
 export const typeLiteral = (
 	expr: LiteralExpression,
@@ -131,7 +140,7 @@ export const typeVariableExpr = (
 	const scheme = state.environment.get(expr.name);
 	if (!scheme) {
 		if (isTraitFunction(state.traitRegistry, expr.name)) {
-				const traitInfo = getTraitFunctionInfo(state.traitRegistry, expr.name);
+			const traitInfo = getTraitFunctionInfo(state.traitRegistry, expr.name);
 			if (traitInfo) {
 				const typeVars = new Set<string>();
 				collectTypeVariables(traitInfo.functionType, typeVars);
@@ -585,7 +594,9 @@ function buildNormalFunctionType(
 	// Combine implicit constraints with body and lifted parameter constraints
 	const allConstraints = [...implicitConstraints, ...bodyConstraints];
 	for (const constraint of paramConstraints) {
-		if (!allConstraints.some(existing => constraintsEqual(existing, constraint))) {
+		if (
+			!allConstraints.some(existing => constraintsEqual(existing, constraint))
+		) {
 			allConstraints.push(constraint);
 		}
 	}
@@ -751,7 +762,6 @@ function usesOperator(expr: Expression, targetOperator: string): boolean {
 
 const usesAddOperator = (expr: Expression): boolean => usesOperator(expr, '+');
 
-
 function collectTypeVariables(type: Type, vars: Set<string>): void {
 	switch (type.kind) {
 		case 'variable':
@@ -906,7 +916,6 @@ export const typeIf = (expr: IfExpression, state: TypeState): TypeResult => {
 	);
 };
 
-
 // Thrush `a | f` is equivalent to the application `f a`. Delegating to
 // typeApplication (rather than a bespoke unify) reuses the full constraint
 // resolution machinery, so trait-constrained functions like `map` resolve
@@ -925,7 +934,15 @@ const handleThrush = (expr: BinaryExpression, state: TypeState): TypeResult =>
 	);
 
 const handleDollar = (expr: BinaryExpression, state: TypeState): TypeResult =>
-	typeApplication({ kind: 'application', func: expr.left, args: [expr.right], location: expr.location }, state);
+	typeApplication(
+		{
+			kind: 'application',
+			func: expr.left,
+			args: [expr.right],
+			location: expr.location,
+		},
+		state
+	);
 
 const handleSafeThrush = (
 	expr: BinaryExpression,
@@ -1191,7 +1208,9 @@ export const typeUserDefinedType = (
 
 	// If stdlib and builtins are loaded (protected set is non-empty), enforce global no-shadowing
 	const strictShadowing =
-		state.protectedTypeNames && state.protectedTypeNames.size > 0 && !state.allowShadowing;
+		state.protectedTypeNames &&
+		state.protectedTypeNames.size > 0 &&
+		!state.allowShadowing;
 	if (strictShadowing) {
 		if (state.protectedTypeNames.has(name)) {
 			throw new Error(`Type shadowing is not allowed: ${name}`);
@@ -1325,7 +1344,10 @@ export const typeImport = (
 		// with the importer's accumulated manifest. mergeManifests throws on any
 		// (trait, type) or ADT conflict, naming both conflicting paths.
 		const currentImporterManifest = state.importerManifest ?? emptyManifest();
-		const mergedImporterManifest = mergeManifests(currentImporterManifest, cached.manifest);
+		const mergedImporterManifest = mergeManifests(
+			currentImporterManifest,
+			cached.manifest
+		);
 
 		// Merge the module's declarations into the importer's TypeState.
 		let newState = mergeModuleCacheIntoTypeState(cached, state);
@@ -1335,7 +1357,10 @@ export const typeImport = (
 
 		// Instantiate the export type scheme with fresh type variables so each
 		// import site gets independent polymorphism.
-		const [instantiatedType, finalState] = instantiate(cached.exportType, newState);
+		const [instantiatedType, finalState] = instantiate(
+			cached.exportType,
+			newState
+		);
 
 		return createPureTypeResult(instantiatedType, finalState);
 	} catch (error) {
@@ -1344,7 +1369,11 @@ export const typeImport = (
 		const reason = error instanceof Error ? error.message : String(error);
 		throwTypeError(
 			location =>
-				createTypeError(`Failed to import '${expr.path}': ${reason}`, {}, location),
+				createTypeError(
+					`Failed to import '${expr.path}': ${reason}`,
+					{},
+					location
+				),
 			getExprLocation(expr)
 		);
 	}
@@ -1640,7 +1669,6 @@ const resolveTypeAliases = (
 	}
 };
 
-
 export const typeTyped = (
 	expr: TypedExpression,
 	state: TypeState
@@ -1664,7 +1692,10 @@ export const typeTyped = (
 
 	// Effect enforcement: a function annotation may over-declare effects (a
 	// conservative claim) but must not omit an effect the body performs.
-	const inferredType = substitute(inferredResult.type, currentState.substitution);
+	const inferredType = substitute(
+		inferredResult.type,
+		currentState.substitution
+	);
 	if (inferredType.kind === 'function' && resolvedType.kind === 'function') {
 		const performed = collectSpineEffects(inferredType);
 		const declared = collectSpineEffects(resolvedType);
@@ -1738,9 +1769,15 @@ export const typeConstraintDefinition = (
 		}
 	}
 
+	const typeParam = typeParams.length > 0 ? typeParams[0] : 'a';
 	const traitDef = {
 		name,
-		typeParam: typeParams.length > 0 ? typeParams[0] : 'a', // Use first type param or default to 'a'
+		typeParam,
+		constructorArity: traitConstructorArity(
+			functionMap.values(),
+			typeParam,
+			name
+		),
 		functions: functionMap,
 	};
 
@@ -1767,6 +1804,18 @@ export const typeImplementDefinition = (
 		throw new Error(`Trait '${constraintName}' not defined`);
 	}
 
+	const slotDescriptor = createTraitSlotDescriptor(
+		typeExpr,
+		traitDef.constructorArity ??
+			traitConstructorArity(
+				traitDef.functions.values(),
+				traitDef.typeParam,
+				traitDef.name
+			),
+		state.adtRegistry,
+		constraintName
+	);
+
 	// Type each implementation and store as expressions
 	const implementationMap = new Map<string, Expression>();
 	let currentState = state;
@@ -1786,8 +1835,61 @@ export const typeImplementDefinition = (
 		currentState = implResult.state;
 		allEffects = unionEffects(allEffects, implResult.effects);
 
-		// TODO: Check that implementation type matches required type
-		// For now, we'll trust the implementation
+		const expected = expandTraitParameter(
+			requiredType,
+			traitDef.typeParam,
+			slotDescriptor
+		);
+		const rigid = new Map<string, Type>();
+		for (const variable of freeTypeVars(expected)) {
+			rigid.set(variable, {
+				kind: 'variant',
+				name: `__trait_rigid_${constraintName}_${impl.name}_${variable}`,
+				args: [],
+			});
+		}
+		const flattenFunction = (type: Type): Type => {
+			if (type.kind !== 'function') return type;
+			const params = [...type.params];
+			let result = type.return;
+			const effects = new Set(type.effects);
+			while (result.kind === 'function') {
+				params.push(...result.params);
+				for (const effect of result.effects) effects.add(effect);
+				result = result.return;
+			}
+			return { ...type, params, return: result, effects };
+		};
+		const rigidExpected = flattenFunction(substitute(expected, rigid));
+		const actual = flattenFunction(implResult.type);
+		try {
+			// Compatibility checking is proof-only. Its rigid skolems must never
+			// escape into the program's inference substitution.
+			unify(
+				rigidExpected,
+				actual,
+				{ ...currentState, substitution: new Map(currentState.substitution) },
+				{
+					line: impl.location.start.line,
+					column: impl.location.start.column,
+				}
+			);
+		} catch (error) {
+			throw new Error(
+				`Trait implementation signature mismatch for '${impl.name}' in '${constraintName}': ${(error as Error).message}`
+			);
+		}
+		if (
+			rigidExpected.kind === 'function' &&
+			actual.kind === 'function' &&
+			Array.from(actual.effects).some(
+				effect => !rigidExpected.effects.has(effect)
+			)
+		) {
+			throw new Error(
+				`Trait implementation signature mismatch for '${impl.name}': implementation performs an undeclared effect`
+			);
+		}
 
 		// Store the expression (not the type scheme)
 		implementationMap.set(impl.name, impl.value);
@@ -1805,6 +1907,7 @@ export const typeImplementDefinition = (
 	// Create trait implementation
 	const traitImpl = {
 		typeName,
+		slotDescriptor,
 		functions: implementationMap,
 		givenConstraints, // Include given constraints if present
 	};

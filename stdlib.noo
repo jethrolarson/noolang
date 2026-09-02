@@ -150,7 +150,7 @@ option_get_or = fn default opt => match opt (
 );
 
 # Map over Option (using Monad constraint)
-implement Monad Option (
+implement Monad (Option _) (
   bind = fn opt f => match opt (
     Some x => f x;
     None => None
@@ -158,7 +158,7 @@ implement Monad Option (
   pure = fn x => Some x
 );
 
-implement Functor Option (
+implement Functor (Option _) (
   map = fn f opt => match opt (
     Some x => Some (f x);
     None => None
@@ -181,7 +181,7 @@ implement Eq (Option a) given a implements Eq (
   )
 );
 
-implement Applicative Option (
+implement Applicative (Option _) (
   apply = fn f opt => match f (
     Some g => map g opt;
     None => None
@@ -243,7 +243,7 @@ result_get_or = fn default res => match res (
 );
 
 # Map over Result value (using Monad constraint) 
-implement Monad Result (
+implement Monad (Result _ error) (
   bind = fn res f => match res (
     Ok x => f x;
     Err e => Err e
@@ -251,7 +251,7 @@ implement Monad Result (
   pure = fn x => Ok x
 );
 
-implement Functor Result (
+implement Functor (Result _ error) (
   map = fn f res => match res (
     Ok x => Ok (f x);
     Err e => Err e
@@ -290,13 +290,9 @@ implement Eq (Result a b) given (a implements Eq) and (b implements Eq) (
   )
 );
 
-# Nested match, not `match f (Ok g => map g res; ...)`: the shorter form
-# still hits a typer arity mismatch in isolation (a remaining instance of
-# the higher-kinded-trait-slot gap in ADR 9), even after the Monad-Result
-# arity fix. This form typechecks and evaluates correctly.
-implement Applicative Result (
+implement Applicative (Result _ error) (
   apply = fn f res => match f (
-    Ok g => match res (Ok x => Ok (g x); Err e => Err e);
+    Ok g => map g res;
     Err e => Err e
   )
 );
@@ -377,11 +373,11 @@ assoc_update = fn key f default list => match (assoc_get key list) (
   None => assoc_set key default list
 );
 
-implement Functor List (
+implement Functor (List _) (
   map = fn f list => list_map f list
 );
 
-implement Monad List (
+implement Monad (List _) (
   bind = fn list f => reduce (fn acc x => append acc (f x)) [] list;
   pure = fn x => [x]
 );

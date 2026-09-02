@@ -115,7 +115,7 @@ test('| operator with non-function gives clear error', () => {
 
 // New coverage: wrong typed partial application through map
 test('type error when partially applying add with wrong type', () => {
-	expectError(`[1, 2, 3] | map (add "x")`, 'requires two strings');
+	expectError(`[1, 2, 3] | map (add "x")`, 'requires two strings|Expected: String');
 });
 
 // =============================================================================

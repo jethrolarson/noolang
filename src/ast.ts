@@ -100,10 +100,25 @@ export type UnionType = {
 	types: Type[];
 };
 
+export type TraitSlotRole =
+	| { kind: 'modeled' }
+	| { kind: 'free'; type: Type }
+	| { kind: 'fixed'; type: Type };
+
+export type TraitSlotDescriptor = {
+	constructorKind: 'variant' | 'list' | 'primitive';
+	typeName: string;
+	slots: TraitSlotRole[];
+};
+
 export type VariantType = {
 	kind: 'variant';
 	name: string;
 	args: Type[];
+	/** Trait carried by an unresolved higher-kinded constructor placeholder. */
+	traitConstraint?: string;
+	/** Present only on constructor substitutions created for trait dispatch. */
+	traitSlots?: TraitSlotDescriptor;
 };
 
 export type ADTType = {

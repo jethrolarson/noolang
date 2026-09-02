@@ -7,6 +7,7 @@ import {
 import { type TypeState } from './types';
 import { substitute } from './substitute';
 import type { RecordStructure, StructureFieldType } from '../ast';
+import { concreteArguments, descriptorAccepts } from './trait-slots';
 
 // Helper function to resolve nested structure constraints recursively
 export function resolveNestedStructure(
@@ -84,6 +85,17 @@ export function tryResolveConstraints(
 				// Apply substitution to get the actual type
 				const substitutedArgType = substitute(argType, state.substitution);
 				const argTypeName = getTypeName(substitutedArgType);
+				const matchingHead = state.traitRegistry.implementations
+					.get(traitName)
+					?.get(argTypeName ?? '');
+				if (
+					matchingHead?.slotDescriptor &&
+					!descriptorAccepts(matchingHead.slotDescriptor, substitutedArgType)
+				) {
+					throw new Error(
+						`No matching ${traitName} implementation for the fixed constructor arguments`
+					);
+				}
 
 				// Check if we have an implementation of this trait for this argument type
 				let hasImplementation = false;
@@ -107,27 +119,23 @@ export function tryResolveConstraints(
 				}
 
 				if (hasImplementation) {
-					// This argument type satisfies the constraint!
-					// Create a substitution and apply it to the return type
 					const substitution = new Map(state.substitution);
-
-									if (argType.kind === 'list') {
-					// For List types, substitute the type constructor variable with List variant
-					substitution.set(varName, {
-						kind: 'variant',
-						name: 'List',
-						args: [], // Empty args since this is just the constructor
-					});
-				} else if (argType.kind === 'variant') {
-						// For variant types, substitute with the constructor
+					const traitDef = state.traitRegistry.definitions.get(traitName);
+					const implementation = state.traitRegistry.implementations
+						.get(traitName)
+						?.get(argTypeName!);
+					const descriptor = implementation?.slotDescriptor;
+					if ((traitDef?.constructorArity ?? 0) > 0 && descriptor) {
+						const args = concreteArguments(substitutedArgType, descriptor);
+						if (!args) continue;
 						substitution.set(varName, {
 							kind: 'variant',
-							name: argType.name,
-							args: [], // Just the constructor
+							name: argTypeName!,
+							args,
+							traitSlots: descriptor,
 						});
 					} else {
-						// For other types, substitute directly
-						substitution.set(varName, argType);
+						substitution.set(varName, substitutedArgType);
 					}
 
 					// Accumulate this constraint's substitution and move on to the

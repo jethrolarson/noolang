@@ -365,7 +365,7 @@ unwrapHelper = fn w => match w ( Wrap v => v );
 constraint Unwrapper f (
   unwrapW : f a -> a
 );
-implement Unwrapper Wrap (
+implement Unwrapper (Wrap _) (
   unwrapW = fn w => unwrapHelper w
 );
 {@makeWrap fn x => Wrap x}

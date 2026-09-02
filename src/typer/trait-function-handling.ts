@@ -23,6 +23,7 @@ import {
 } from './trait-system';
 import { tryResolveConstraints } from './constraint-resolution';
 import { freshenTypeVariables, freshTypeVariable } from './type-operations';
+import { concreteArguments } from './trait-slots';
 
 // Helper function to handle trait function resolution
 export function handleTraitFunctionApplication(
@@ -128,7 +129,11 @@ function handlePartialTraitFunctionApplication(
 			// These represent type parameters like 'f' in 'f a' (for Functor-style traits).
 			// Concrete type constructors like 'Bool', 'Option', 'List' start with uppercase
 			// and must NOT be freshened — doing so replaces them with unresolved type vars.
-			if (type.name.length > 0 && type.name[0] === type.name[0].toLowerCase() && type.name[0] !== type.name[0].toUpperCase()) {
+			if (
+				type.name.length > 0 &&
+				type.name[0] === type.name[0].toLowerCase() &&
+				type.name[0] !== type.name[0].toUpperCase()
+			) {
 				freeVars.add(type.name);
 			}
 			type.args.forEach(collectVars);
@@ -138,7 +143,7 @@ function handlePartialTraitFunctionApplication(
 		}
 	};
 	collectVars(traitFuncType);
-	
+
 	// Also collect constraint variables to avoid collisions with lambda parameters
 	if (traitFuncType.constraints) {
 		for (const constraint of traitFuncType.constraints) {
@@ -243,25 +248,27 @@ function handlePartialTraitFunctionApplication(
 		const argType = argTypes[i];
 		if (argType.kind === 'function' && argType.constraints) {
 			// Filter to only structural constraints - don't propagate trait implementation constraints
-			const structuralConstraints = argType.constraints.filter(constraint => 
-				constraint.kind === 'has' // Only propagate structural constraints like accessor constraints
+			const structuralConstraints = argType.constraints.filter(
+				constraint => constraint.kind === 'has' // Only propagate structural constraints like accessor constraints
 			);
-			
-			const substitutedArgConstraints = structuralConstraints.map(constraint => {
-				// Apply substitution to update variable names
-				const substitutedVar = substitute(
-					{ kind: 'variable', name: constraint.typeVar },
-					partialState.substitution
-				);
 
-				if (substitutedVar.kind === 'variable') {
-					return {
-						...constraint,
-						typeVar: substitutedVar.name,
-					};
+			const substitutedArgConstraints = structuralConstraints.map(
+				constraint => {
+					// Apply substitution to update variable names
+					const substitutedVar = substitute(
+						{ kind: 'variable', name: constraint.typeVar },
+						partialState.substitution
+					);
+
+					if (substitutedVar.kind === 'variable') {
+						return {
+							...constraint,
+							typeVar: substitutedVar.name,
+						};
+					}
+					return constraint;
 				}
-				return constraint;
-			});
+			);
 			allConstraints.push(...substitutedArgConstraints);
 		}
 	}
@@ -429,11 +436,17 @@ function handleFullTraitFunctionApplication(
 				resolution.traitName!
 			);
 			if (traitDef) {
-				const traitTypeSubstitution = new Map();
+				const traitTypeSubstitution = new Map<string, Type>();
+				const descriptor = resolution.implementation?.slotDescriptor;
+				const matchedArgs =
+					descriptor && resolution.matchedType
+						? concreteArguments(resolution.matchedType, descriptor)
+						: [];
 				traitTypeSubstitution.set(traitDef.typeParam, {
 					kind: 'variant',
 					name: resolution.typeName!,
-					args: [],
+					args: matchedArgs ?? [],
+					traitSlots: descriptor,
 				});
 				resultType = substitute(resultType, traitTypeSubstitution);
 				// Normalize List variant to canonical list type
@@ -464,6 +477,11 @@ function handleFullTraitFunctionApplication(
 			);
 		}
 	} else if (resolution.found === false) {
+		if (resolution.headMismatch) {
+			throw new Error(
+				`No matching ${resolution.traitName} implementation for the fixed constructor arguments`
+			);
+		}
 		// No trait implementation found - create constrained type based on trait function signature
 		let funcName = 'unknown';
 		if (expr.func.kind === 'variable') {
