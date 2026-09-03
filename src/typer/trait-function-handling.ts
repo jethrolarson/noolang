@@ -23,6 +23,7 @@ import {
 } from './trait-system';
 import { tryResolveConstraints } from './constraint-resolution';
 import { freshenTypeVariables, freshTypeVariable } from './type-operations';
+import { matchConstructorAbstraction } from './kinded-constructors';
 
 // Helper function to handle trait function resolution
 export function handleTraitFunctionApplication(
@@ -429,12 +430,25 @@ function handleFullTraitFunctionApplication(
 				resolution.traitName!
 			);
 			if (traitDef) {
-				const traitTypeSubstitution = new Map();
-				traitTypeSubstitution.set(traitDef.typeParam, {
-					kind: 'variant',
-					name: resolution.typeName!,
-					args: [],
-				});
+				const traitTypeSubstitution = new Map<string, Type>();
+				const abstraction = resolution.implementation?.constructorAbstraction;
+				const bindings =
+					abstraction && resolution.matchedType
+						? matchConstructorAbstraction(
+								abstraction,
+								resolution.matchedType
+							)
+						: null;
+				traitTypeSubstitution.set(
+					traitDef.typeParam,
+					abstraction && bindings
+						? { kind: 'constructor', abstraction, bindings }
+						: {
+								kind: 'variant',
+								name: resolution.typeName!,
+								args: [],
+							}
+				);
 				resultType = substitute(resultType, traitTypeSubstitution);
 				// Normalize List variant to canonical list type
 				resultType = normalizeListType(resultType);

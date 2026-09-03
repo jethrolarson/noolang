@@ -7,19 +7,24 @@ import {
 	FunctionExpression,
 	ConstraintExpr,
 	FunctionType,
+	TypeConstructorAbstraction,
+	TypeConstructorAbstractionExpression,
 } from '../ast';
+import { matchConstructorAbstraction } from './kinded-constructors';
 import { TypeState } from './types';
 
 // Simple trait definition - just a name and function signatures
 export type TraitDefinition = {
 	name: string;
 	typeParam: string; // Usually 'a' or 'f'
+	constructorArity?: number;
 	functions: Map<string, FunctionType>; // function name -> function type
 };
 
 // Simple trait implementation - concrete functions for a specific type
 export type TraitImplementation = {
 	typeName: string; // e.g., "Option", "List", "Float"
+	constructorAbstraction?: TypeConstructorAbstraction;
 	functions: Map<string, Expression>; // function name -> implementation expression (AST)
 	givenConstraints?: ConstraintExpr; // Optional given constraints for conditional implementations
 	/**
@@ -141,8 +146,10 @@ export function addTraitImplementation(
 }
 
 // Get the concrete type name for trait lookup
-export function getTypeName(type: Type): string {
+export function getTypeName(type: Type | TypeConstructorAbstractionExpression): string {
 	switch (type.kind) {
+		case 'type-constructor-abstraction':
+			return getTypeName(type.body);
 		case 'primitive':
 			return type.name;
 		case 'variant':
@@ -175,6 +182,8 @@ export function resolveTraitFunction(
 	traitName?: string;
 	typeName?: string;
 	impl?: Expression;
+	implementation?: TraitImplementation;
+	matchedType?: Type;
 	needsConstraint?: boolean;
 } {
 	if (argTypes.length === 0) {
@@ -206,6 +215,8 @@ export function resolveTraitFunction(
 		traitName: string;
 		typeName: string;
 		impl: Expression;
+		implementation: TraitImplementation;
+		matchedType: Type;
 	}> = [];
 
 	// Check each argument type to see if we can find a concrete implementation
@@ -218,10 +229,17 @@ export function resolveTraitFunction(
 				if (traitImpls) {
 					const impl = traitImpls.get(typeName);
 					if (impl && impl.functions.has(functionName)) {
+						if (
+							impl.constructorAbstraction &&
+							!matchConstructorAbstraction(impl.constructorAbstraction, argType)
+						)
+							continue;
 						candidateImplementations.push({
 							traitName: candidateTraitName,
 							typeName,
 							impl: impl.functions.get(functionName)!,
+							implementation: impl,
+							matchedType: argType,
 						});
 					}
 				}
@@ -255,6 +273,8 @@ export function resolveTraitFunction(
 			traitName: candidate.traitName,
 			typeName: candidate.typeName,
 			impl: candidate.impl,
+			implementation: candidate.implementation,
+			matchedType: candidate.matchedType,
 		};
 	}
 

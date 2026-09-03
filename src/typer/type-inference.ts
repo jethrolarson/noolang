@@ -107,6 +107,10 @@ import {
 	getTypeName,
 	addTraitImplementation,
 } from './trait-system';
+import {
+	compileConstructorAbstraction,
+	constructorParameterArity,
+} from './kinded-constructors';
 
 export const typeLiteral = (
 	expr: LiteralExpression,
@@ -1738,9 +1742,15 @@ export const typeConstraintDefinition = (
 		}
 	}
 
+	const typeParam = typeParams.length > 0 ? typeParams[0] : 'a';
 	const traitDef = {
 		name,
-		typeParam: typeParams.length > 0 ? typeParams[0] : 'a', // Use first type param or default to 'a'
+		typeParam,
+		constructorArity: constructorParameterArity(
+			functionMap.values(),
+			typeParam,
+			name
+		),
 		functions: functionMap,
 	};
 
@@ -1758,7 +1768,7 @@ export const typeImplementDefinition = (
 ): TypeResult => {
 	const { constraintName, typeExpr, implementations, givenConstraints } = expr;
 
-	// Extract type name from type expression - support all type kinds
+	// Runtime coherence remains nominal even when the compile-time target is abstract.
 	const typeName = getTypeName(typeExpr);
 
 	// Check if trait exists in trait registry
@@ -1766,6 +1776,15 @@ export const typeImplementDefinition = (
 	if (!traitDef) {
 		throw new Error(`Trait '${constraintName}' not defined`);
 	}
+
+	const constructorAbstraction =
+		typeExpr.kind === 'type-constructor-abstraction'
+			? compileConstructorAbstraction(
+					typeExpr,
+					traitDef.constructorArity ?? 0,
+					state.adtRegistry
+				)
+			: undefined;
 
 	// Type each implementation and store as expressions
 	const implementationMap = new Map<string, Expression>();
@@ -1805,6 +1824,7 @@ export const typeImplementDefinition = (
 	// Create trait implementation
 	const traitImpl = {
 		typeName,
+		constructorAbstraction,
 		functions: implementationMap,
 		givenConstraints, // Include given constraints if present
 	};

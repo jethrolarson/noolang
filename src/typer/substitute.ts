@@ -1,5 +1,6 @@
 import { type Type, type Constraint, type StructureFieldType } from '../ast';
 import { mapObject } from './helpers';
+import { reduceConstructorValue } from './kinded-constructors';
 
 // Apply substitution to a type
 export const substitute = (
@@ -33,6 +34,16 @@ const substituteImpl =
 				}
 				return type;
 			}
+			case 'constructor':
+				return {
+					...type,
+					bindings: new Map(
+						Array.from(type.bindings, ([name, value]) => [
+							name,
+							substituteImpl(substitution, seen)(value),
+						])
+					),
+				};
 			case 'function':
 				return {
 					...type,
@@ -69,6 +80,12 @@ const substituteImpl =
 				// Check if the variant name itself should be substituted
 				const substitutedName = substitution.get(type.name);
 				if (substitutedName) {
+					if (substitutedName.kind === 'constructor') {
+						return reduceConstructorValue(
+							substitutedName,
+							type.args.map(substituteImpl(substitution, seen))
+						);
+					}
 					// The variant name is being substituted
 					if (substitutedName.kind === 'variant' && substitutedName.name === 'List') {
 						// Special case: substituting with List constructor -> create list type

@@ -13,6 +13,7 @@ import { addConstraints, getConstraints } from './constraint-store';
 // Legacy constraint imports removed
 import { functionApplicationError } from './type-errors';
 import { getTypeName } from './trait-system';
+import { matchConstructorAbstraction } from './kinded-constructors';
 
 // Valid primitive type names (must match PrimitiveType['name'] union)
 const VALID_PRIMITIVES = new Set(['Float', 'String'] as const);
@@ -985,6 +986,24 @@ function tryUnifyConstrainedVariant(
 			if (traitImpls && traitImpls.has(concreteTypeName)) {
 				// Constraint is satisfied! Perform the substitution
 				const newSubstitution = new Map(state.substitution);
+				const abstraction =
+					traitImpls.get(concreteTypeName)?.constructorAbstraction;
+				const bindings = abstraction
+					? matchConstructorAbstraction(abstraction, concreteType)
+					: null;
+				if (abstraction && bindings) {
+					newSubstitution.set(variantType.name, {
+						kind: 'constructor',
+						abstraction,
+						bindings,
+					});
+					return unify(
+						substitute(variantType, newSubstitution),
+						concreteType,
+						{ ...state, substitution: newSubstitution },
+						location
+					);
+				}
 
 				if (concreteType.kind === 'list') {
 					// For List types, substitute the type constructor
