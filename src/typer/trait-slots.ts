@@ -49,6 +49,20 @@ export const traitConstructorArity = (
 	return arity;
 };
 
+const containsTypeHole = (type: Type): boolean => {
+	if (type.kind === 'variable') return type.name === '_';
+	if (type.kind === 'variant') return type.args.some(containsTypeHole);
+	if (type.kind === 'function')
+		return type.params.some(containsTypeHole) || containsTypeHole(type.return);
+	if (type.kind === 'list') return containsTypeHole(type.element);
+	if (type.kind === 'tuple') return type.elements.some(containsTypeHole);
+	if (type.kind === 'record')
+		return Object.values(type.fields).some(containsTypeHole);
+	if (type.kind === 'union') return type.types.some(containsTypeHole);
+	if (type.kind === 'constrained') return containsTypeHole(type.baseType);
+	return false;
+};
+
 const headArguments = (
 	type: Type
 ): {
@@ -93,6 +107,11 @@ export const createTraitSlotDescriptor = (
 
 	const roles: TraitSlotRole[] = head.args.map(arg => {
 		if (arg.kind === 'variable' && arg.name === '_') return { kind: 'modeled' };
+		if (containsTypeHole(arg)) {
+			throw new Error(
+				`Modeled '_' holes in implementation of '${traitName}' must be direct arguments of '${head.name}', not nested inside a fixed argument`
+			);
+		}
 		if (arg.kind === 'variable') return { kind: 'free', type: arg };
 		return { kind: 'fixed', type: arg };
 	});

@@ -59,6 +59,18 @@ right_map (fn x => x + 1) (RightMap "kept" 2)
 		).toBe('RightMap String Float');
 	});
 
+	test('nested modeled holes are rejected at the implementation declaration', () => {
+		expect(() =>
+			parseAndType(`
+constraint F f (fm : (a -> b) -> f a -> f b);
+variant Outer error value nested = Outer error value nested;
+implement F (Outer error _ (Option _)) (
+  fm = fn f outer => outer
+)
+`)
+		).toThrow(/direct|nested|hole/i);
+	});
+
 	test('grouped fixed applications share direct named free variables', () => {
 		expect(
 			inferredType(`
