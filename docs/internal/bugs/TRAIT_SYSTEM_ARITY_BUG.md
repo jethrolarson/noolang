@@ -1,6 +1,13 @@
 # Trait system assumes kind `* -> *`; breaks on arity-2+ variants
 
-Status: open, partially fixed
+Status: fixed by ADR 0010 implementation
+
+The production fix represents constructor variables and applications directly and
+requires explicit `typefn` implementation heads. Constructor applications now
+beta-reduce before ordinary unification, so no positional trailing-argument
+reconstruction remains. Rigid member checking also rejects incompatible instances at
+the declaration, and `Applicative Option::apply` uses the direct `Some g => map g opt`
+form.
 
 Filed 2026-07-20, found while fixing `Applicative Result` in PR #156
 (stdlib.noo, KNOWN WRONG comment on the `apply` implementation).

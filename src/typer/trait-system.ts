@@ -7,19 +7,24 @@ import {
 	FunctionExpression,
 	ConstraintExpr,
 	FunctionType,
+	TypeConstructorAbstraction,
+	TypeConstructorAbstractionExpression,
 } from '../ast';
+import { matchConstructorAbstraction } from './kinded-constructors';
 import { TypeState } from './types';
 
 // Simple trait definition - just a name and function signatures
 export type TraitDefinition = {
 	name: string;
 	typeParam: string; // Usually 'a' or 'f'
+	constructorArity?: number;
 	functions: Map<string, FunctionType>; // function name -> function type
 };
 
 // Simple trait implementation - concrete functions for a specific type
 export type TraitImplementation = {
 	typeName: string; // e.g., "Option", "List", "Float"
+	constructorAbstraction?: TypeConstructorAbstraction;
 	functions: Map<string, Expression>; // function name -> implementation expression (AST)
 	givenConstraints?: ConstraintExpr; // Optional given constraints for conditional implementations
 	/**
@@ -141,8 +146,10 @@ export function addTraitImplementation(
 }
 
 // Get the concrete type name for trait lookup
-export function getTypeName(type: Type): string {
+export function getTypeName(type: Type | TypeConstructorAbstractionExpression): string {
 	switch (type.kind) {
+		case 'type-constructor-abstraction':
+			return getTypeName(type.body);
 		case 'primitive':
 			return type.name;
 		case 'variant':
@@ -175,6 +182,8 @@ export function resolveTraitFunction(
 	traitName?: string;
 	typeName?: string;
 	impl?: Expression;
+	implementation?: TraitImplementation;
+	matchedType?: Type;
 	needsConstraint?: boolean;
 } {
 	if (argTypes.length === 0) {
@@ -206,6 +215,8 @@ export function resolveTraitFunction(
 		traitName: string;
 		typeName: string;
 		impl: Expression;
+		implementation: TraitImplementation;
+		matchedType: Type;
 	}> = [];
 
 	// Check each argument type to see if we can find a concrete implementation
@@ -218,10 +229,17 @@ export function resolveTraitFunction(
 				if (traitImpls) {
 					const impl = traitImpls.get(typeName);
 					if (impl && impl.functions.has(functionName)) {
+						if (
+							impl.constructorAbstraction &&
+							!matchConstructorAbstraction(impl.constructorAbstraction, argType)
+						)
+							continue;
 						candidateImplementations.push({
 							traitName: candidateTraitName,
 							typeName,
 							impl: impl.functions.get(functionName)!,
+							implementation: impl,
+							matchedType: argType,
 						});
 					}
 				}
@@ -255,6 +273,8 @@ export function resolveTraitFunction(
 			traitName: candidate.traitName,
 			typeName: candidate.typeName,
 			impl: candidate.impl,
+			implementation: candidate.implementation,
+			matchedType: candidate.matchedType,
 		};
 	}
 
@@ -268,8 +288,15 @@ export function resolveTraitFunction(
 		switch (type.kind) {
 			case 'variable':
 				return type.name === paramName;
+			case 'constructor-variable':
+				return type.name === paramName;
+			case 'type-application':
+				return (
+					containsTypeParameter(type.constructor, paramName) ||
+					containsTypeParameter(type.argument, paramName)
+				);
 			case 'variant':
-				return type.name === paramName || type.args.some(arg => containsTypeParameter(arg, paramName));
+				return type.args.some(arg => containsTypeParameter(arg, paramName));
 			case 'function':
 				return type.params.some(param => containsTypeParameter(param, paramName)) ||
 					   containsTypeParameter(type.return, paramName);
@@ -338,22 +365,7 @@ export function getTraitFunctionInfo(
 	const traitDef = registry.definitions.get(traitName)!;
 	const rawFunctionType = traitDef.functions.get(functionName)!;
 
-	// Find the actual variable name that corresponds to the trait parameter
-	// The trait parameter (e.g., 'f' for Functor) appears as a variant type in the function
-	let actualTypeVar = traitDef.typeParam; // fallback
-	if (
-		rawFunctionType.kind === 'function' &&
-		rawFunctionType.params.length > 0
-	) {
-		const firstParam = rawFunctionType.params[0];
-		if (
-			firstParam.kind === 'variant' &&
-			firstParam.name === traitDef.typeParam
-		) {
-			// This is the trait parameter, use its name
-			actualTypeVar = firstParam.name;
-		}
-	}
+	const actualTypeVar = traitDef.typeParam;
 
 	// Attach the trait constraint to the function type
 	const functionTypeWithConstraints = {

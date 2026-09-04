@@ -241,10 +241,20 @@ const parseTypeConstructorOrVariable = (
 				typeNameResult.remaining
 			);
 			if (argsResult.success && argsResult.value.length > 0) {
-				// Type constructor with arguments (like Option a, f a, List String)
+				const isUpperCase = typeName[0] === typeName[0].toUpperCase();
+				const applied = isUpperCase
+					? { kind: 'variant' as const, name: typeName, args: argsResult.value }
+					: argsResult.value.reduce<Type>(
+							(constructor, argument) => ({
+								kind: 'type-application',
+								constructor,
+								argument,
+							}),
+							{ kind: 'constructor-variable', name: typeName }
+						);
 				return {
 					success: true,
-					value: { kind: 'variant', name: typeName, args: argsResult.value },
+					value: applied,
 					remaining: argsResult.remaining,
 				};
 			} else {

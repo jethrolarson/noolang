@@ -23,6 +23,7 @@ import {
 } from './trait-system';
 import { tryResolveConstraints } from './constraint-resolution';
 import { freshenTypeVariables, freshTypeVariable } from './type-operations';
+import { matchConstructorAbstraction } from './kinded-constructors';
 
 // Helper function to handle trait function resolution
 export function handleTraitFunctionApplication(
@@ -121,16 +122,12 @@ function handlePartialTraitFunctionApplication(
 
 	// Collect all free type variables in the trait function type
 	const collectVars = (type: Type) => {
-		if (type.kind === 'variable') {
+		if (type.kind === 'variable' || type.kind === 'constructor-variable') {
 			freeVars.add(type.name);
+		} else if (type.kind === 'type-application') {
+			collectVars(type.constructor);
+			collectVars(type.argument);
 		} else if (type.kind === 'variant') {
-			// Only include lowercase variant names as type variables to be freshened.
-			// These represent type parameters like 'f' in 'f a' (for Functor-style traits).
-			// Concrete type constructors like 'Bool', 'Option', 'List' start with uppercase
-			// and must NOT be freshened — doing so replaces them with unresolved type vars.
-			if (type.name.length > 0 && type.name[0] === type.name[0].toLowerCase() && type.name[0] !== type.name[0].toUpperCase()) {
-				freeVars.add(type.name);
-			}
 			type.args.forEach(collectVars);
 		} else if (type.kind === 'function') {
 			type.params.forEach(collectVars);
@@ -338,8 +335,13 @@ function handleFullTraitFunctionApplication(
 
 			// Collect all free type variables in the trait implementation type
 			const collectVars = (type: Type) => {
-				if (type.kind === 'variable') {
+				if (type.kind === 'variable' || type.kind === 'constructor-variable') {
 					freeVars.add(type.name);
+				} else if (type.kind === 'type-application') {
+					collectVars(type.constructor);
+					collectVars(type.argument);
+				} else if (type.kind === 'variant') {
+					type.args.forEach(collectVars);
 				} else if (type.kind === 'function') {
 					type.params.forEach(collectVars);
 					collectVars(type.return);
@@ -429,15 +431,23 @@ function handleFullTraitFunctionApplication(
 				resolution.traitName!
 			);
 			if (traitDef) {
-				const traitTypeSubstitution = new Map();
-				traitTypeSubstitution.set(traitDef.typeParam, {
-					kind: 'variant',
-					name: resolution.typeName!,
-					args: [],
-				});
-				resultType = substitute(resultType, traitTypeSubstitution);
-				// Normalize List variant to canonical list type
-				resultType = normalizeListType(resultType);
+				const traitTypeSubstitution = new Map<string, Type>();
+				const abstraction = resolution.implementation?.constructorAbstraction;
+				const bindings =
+					abstraction && resolution.matchedType
+						? matchConstructorAbstraction(
+								abstraction,
+								resolution.matchedType
+							)
+						: null;
+				if (abstraction && bindings) {
+					traitTypeSubstitution.set(traitDef.typeParam, {
+						kind: 'constructor',
+						abstraction,
+						bindings,
+					});
+					resultType = substitute(resultType, traitTypeSubstitution);
+				}
 			}
 
 			const resultEffects = unionEffects(
@@ -491,8 +501,16 @@ function handleFullTraitFunctionApplication(
 				const freeVars = new Set<string>();
 
 				const collectVars = (type: Type) => {
-					if (type.kind === 'variable') {
+					if (
+						type.kind === 'variable' ||
+						type.kind === 'constructor-variable'
+					) {
 						freeVars.add(type.name);
+					} else if (type.kind === 'type-application') {
+						collectVars(type.constructor);
+						collectVars(type.argument);
+					} else if (type.kind === 'variant') {
+						type.args.forEach(collectVars);
 					} else if (type.kind === 'function') {
 						type.params.forEach(collectVars);
 						collectVars(type.return);
@@ -599,7 +617,9 @@ function handleFullTraitFunctionApplication(
 // Utility: check if a type is fully concrete (no variables anywhere)
 function isFullyConcrete(type: Type): boolean {
 	if (type.kind === 'primitive' || type.kind === 'unit') return true;
-	if (type.kind === 'variable') return false;
+	if (type.kind === 'variable' || type.kind === 'constructor-variable')
+		return false;
+	if (type.kind === 'type-application') return false;
 	if (type.kind === 'variant') {
 		return (type.args ?? []).every(isFullyConcrete);
 	}
@@ -617,7 +637,11 @@ function isFullyConcrete(type: Type): boolean {
 
 // Utility: check if a type has any type variables (is polymorphic)
 function hasTypeVariables(type: Type): boolean {
-	if (type.kind === 'variable') return true;
+	if (type.kind === 'variable' || type.kind === 'constructor-variable') return true;
+	if (type.kind === 'type-application')
+		return (
+			hasTypeVariables(type.constructor) || hasTypeVariables(type.argument)
+		);
 	if (type.kind === 'primitive' || type.kind === 'unit') return false;
 	if (type.kind === 'variant') {
 		return (type.args ?? []).some(hasTypeVariables);
@@ -632,33 +656,4 @@ function hasTypeVariables(type: Type): boolean {
 		return type.params.some(hasTypeVariables) || hasTypeVariables(type.return);
 	}
 	return false;
-}
-
-// Helper to normalize List variant to canonical list type
-function normalizeListType(type: Type): Type {
-	if (
-		type &&
-		type.kind === 'variant' &&
-		type.name === 'List' &&
-		type.args.length === 1
-	) {
-		return { kind: 'list', element: normalizeListType(type.args[0]) };
-	}
-	if (type && type.kind === 'function') {
-		return {
-			...type,
-			params: type.params.map(normalizeListType),
-			return: normalizeListType(type.return),
-		};
-	}
-	if (type && type.kind === 'tuple') {
-		return { ...type, elements: type.elements.map(normalizeListType) };
-	}
-	if (type && type.kind === 'record') {
-		const newFields: Record<string, Type> = {};
-		for (const k in type.fields)
-			newFields[k] = normalizeListType(type.fields[k]);
-		return { ...type, fields: newFields };
-	}
-	return type;
 }

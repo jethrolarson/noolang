@@ -1,5 +1,9 @@
 import { type Type, type Constraint, type StructureFieldType } from '../ast';
 import { mapObject } from './helpers';
+import {
+	flattenTypeApplication,
+	reduceConstructorValue,
+} from './kinded-constructors';
 
 // Apply substitution to a type
 export const substitute = (
@@ -33,6 +37,39 @@ const substituteImpl =
 				}
 				return type;
 			}
+			case 'constructor-variable': {
+				return substitution.get(type.name) ?? type;
+			}
+			case 'type-application': {
+				const application = flattenTypeApplication(type);
+				const constructor = substituteImpl(substitution, seen)(
+					application.constructor
+				);
+				const args = application.arguments.map(
+					substituteImpl(substitution, seen)
+				);
+				if (constructor.kind === 'constructor') {
+					return reduceConstructorValue(constructor, args);
+				}
+				return args.reduce<Type>(
+					(result, argument) => ({
+						kind: 'type-application',
+						constructor: result,
+						argument,
+					}),
+					constructor
+				);
+			}
+			case 'constructor':
+				return {
+					...type,
+					bindings: new Map(
+						Array.from(type.bindings, ([name, value]) => [
+							name,
+							substituteImpl(substitution, seen)(value),
+						])
+					),
+				};
 			case 'function':
 				return {
 					...type,
@@ -65,47 +102,11 @@ const substituteImpl =
 					...type,
 					types: type.types.map(substituteImpl(substitution, seen)),
 				};
-			case 'variant': {
-				// Check if the variant name itself should be substituted
-				const substitutedName = substitution.get(type.name);
-				if (substitutedName) {
-					// The variant name is being substituted
-					if (substitutedName.kind === 'variant' && substitutedName.name === 'List') {
-						// Special case: substituting with List constructor -> create list type
-						if (type.args.length === 1) {
-							return {
-								kind: 'list',
-								element: substituteImpl(substitution, seen)(type.args[0])
-							};
-						}
-					} else if (substitutedName.kind === 'variant') {
-						// Substituting with another variant constructor. `type.args` are
-						// this occurrence's own generic args (e.g. the `a` in `m a`);
-						// `substitutedName.args` are "extra" args the concrete constructor
-						// carries beyond what the trait models (e.g. Result's error type,
-						// which the unary `Monad m` signature never mentions) — see
-						// tryUnifyConstrainedVariant in unify.ts, which stores exactly
-						// those extras rather than the full concrete arg list. Appending
-						// them preserves arity instead of silently truncating to
-						// `type.args.length`.
-						return {
-							...type,
-							name: substitutedName.name,
-							args: [
-								...type.args.map(substituteImpl(substitution, seen)),
-								...substitutedName.args.map(substituteImpl(substitution, seen)),
-							],
-						};
-					}
-					// For other substitution types, fall through to normal arg substitution
-				}
-				
-				// Normal case: just substitute the arguments
+			case 'variant':
 				return {
 					...type,
 					args: type.args.map(substituteImpl(substitution, seen)),
 				};
-			}
 			case 'constrained':
 				return {
 					...type,

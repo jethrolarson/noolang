@@ -106,6 +106,41 @@ export type VariantType = {
 	args: Type[];
 };
 
+export type TypeKind =
+	| { kind: 'Type' }
+	| { kind: 'arrow'; from: TypeKind; to: TypeKind };
+
+export type ConstructorVariableType = {
+	kind: 'constructor-variable';
+	name: string;
+	typeKind?: TypeKind;
+};
+
+export type TypeApplicationType = {
+	kind: 'type-application';
+	constructor: Type;
+	argument: Type;
+};
+
+export type TypeConstructorAbstraction = {
+	parameters: string[];
+	body: Type;
+	typeKind: TypeKind;
+	nominalName: string;
+};
+
+export type ConstructorType = {
+	kind: 'constructor';
+	abstraction: TypeConstructorAbstraction;
+	bindings: Map<string, Type>;
+};
+
+export type TypeConstructorAbstractionExpression = {
+	kind: 'type-constructor-abstraction';
+	parameters: string[];
+	body: Type;
+};
+
 export type ADTType = {
 	kind: 'adt';
 	name: string;
@@ -160,6 +195,9 @@ export type Type =
 	| RecordType
 	| UnionType
 	| VariantType
+	| ConstructorVariableType
+	| TypeApplicationType
+	| ConstructorType
 	| ADTType
 	| UnitType
 	| UnknownType
@@ -581,7 +619,7 @@ export interface ConstraintFunction {
 export interface ImplementDefinitionExpression {
 	kind: 'implement-definition';
 	constraintName: string;
-	typeExpr: Type; // Changed from typeName to support type applications like (Result e)
+	typeExpr: Type | TypeConstructorAbstractionExpression;
 	givenConstraints?: ConstraintExpr; // Optional given constraints for conditional implementations
 	implementations: ImplementationFunction[];
 	type?: Type;

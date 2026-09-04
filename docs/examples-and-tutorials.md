@@ -31,7 +31,7 @@ fact_5 = factorial 5;       # => 120 : Float
 
 # Lists and higher-order functions
 numbers = [1, 2, 3, 4, 5];
-squared = map (fn x => x * x) numbers;  # => [1, 4, 9, 16, 25] : List a
+squared = map (fn x => x * x) numbers;  # => [1, 4, 9, 16, 25] : List Float
 
 # Records
 person = { @name "Alice", @age 30 };

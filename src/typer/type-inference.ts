@@ -2,7 +2,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Lexer } from '../lexer/lexer';
 import { parse } from '../parser/parser';
-import { loadModule, resolveModulePath, mergeModuleCacheIntoTypeState } from '../module-loader';
+import {
+	loadModule,
+	resolveModulePath,
+	mergeModuleCacheIntoTypeState,
+} from '../module-loader';
 import { emptyManifest, mergeManifests } from './module-manifest';
 import {
 	type Expression,
@@ -34,6 +38,7 @@ import {
 	type FunctionType,
 	type Constraint,
 	type Effect,
+	type TypeConstructorAbstraction,
 	type RecordDestructuringField,
 	floatType,
 	stringType,
@@ -107,6 +112,12 @@ import {
 	getTypeName,
 	addTraitImplementation,
 } from './trait-system';
+import {
+	annotateConstructorKind,
+	arrowKind,
+	compileConstructorAbstraction,
+	constructorParameterArity,
+} from './kinded-constructors';
 
 export const typeLiteral = (
 	expr: LiteralExpression,
@@ -131,7 +142,7 @@ export const typeVariableExpr = (
 	const scheme = state.environment.get(expr.name);
 	if (!scheme) {
 		if (isTraitFunction(state.traitRegistry, expr.name)) {
-				const traitInfo = getTraitFunctionInfo(state.traitRegistry, expr.name);
+			const traitInfo = getTraitFunctionInfo(state.traitRegistry, expr.name);
 			if (traitInfo) {
 				const typeVars = new Set<string>();
 				collectTypeVariables(traitInfo.functionType, typeVars);
@@ -519,9 +530,16 @@ function buildNormalFunctionType(
 		for (const [typeVar, constraints] of bodyType.constraints.entries()) {
 			for (const constraint of constraints) {
 				if (constraint.kind === 'implements') {
+					const resolvedConstructor = substitute(
+						{ kind: 'constructor-variable', name: typeVar },
+						state.substitution
+					);
 					bodyConstraints.push({
 						kind: 'implements',
-						typeVar,
+						typeVar:
+							resolvedConstructor.kind === 'constructor-variable'
+								? resolvedConstructor.name
+								: typeVar,
 						interfaceName: constraint.interfaceName,
 					});
 				}
@@ -585,7 +603,9 @@ function buildNormalFunctionType(
 	// Combine implicit constraints with body and lifted parameter constraints
 	const allConstraints = [...implicitConstraints, ...bodyConstraints];
 	for (const constraint of paramConstraints) {
-		if (!allConstraints.some(existing => constraintsEqual(existing, constraint))) {
+		if (
+			!allConstraints.some(existing => constraintsEqual(existing, constraint))
+		) {
 			allConstraints.push(constraint);
 		}
 	}
@@ -594,7 +614,7 @@ function buildNormalFunctionType(
 	if (allConstraints.length > 0 && funcType.kind === 'function') {
 		// Only apply constraints if the function has type variables (is polymorphic)
 		const hasTypeVariables = paramTypes.some(
-			paramType => paramType.kind === 'variable'
+			paramType => freeTypeVars(paramType).size > 0
 		);
 
 		if (hasTypeVariables) {
@@ -751,11 +771,15 @@ function usesOperator(expr: Expression, targetOperator: string): boolean {
 
 const usesAddOperator = (expr: Expression): boolean => usesOperator(expr, '+');
 
-
 function collectTypeVariables(type: Type, vars: Set<string>): void {
 	switch (type.kind) {
 		case 'variable':
+		case 'constructor-variable':
 			vars.add(type.name);
+			break;
+		case 'type-application':
+			collectTypeVariables(type.constructor, vars);
+			collectTypeVariables(type.argument, vars);
 			break;
 		case 'function':
 			for (const param of type.params) {
@@ -906,7 +930,6 @@ export const typeIf = (expr: IfExpression, state: TypeState): TypeResult => {
 	);
 };
 
-
 // Thrush `a | f` is equivalent to the application `f a`. Delegating to
 // typeApplication (rather than a bespoke unify) reuses the full constraint
 // resolution machinery, so trait-constrained functions like `map` resolve
@@ -925,7 +948,15 @@ const handleThrush = (expr: BinaryExpression, state: TypeState): TypeResult =>
 	);
 
 const handleDollar = (expr: BinaryExpression, state: TypeState): TypeResult =>
-	typeApplication({ kind: 'application', func: expr.left, args: [expr.right], location: expr.location }, state);
+	typeApplication(
+		{
+			kind: 'application',
+			func: expr.left,
+			args: [expr.right],
+			location: expr.location,
+		},
+		state
+	);
 
 const handleSafeThrush = (
 	expr: BinaryExpression,
@@ -1191,7 +1222,9 @@ export const typeUserDefinedType = (
 
 	// If stdlib and builtins are loaded (protected set is non-empty), enforce global no-shadowing
 	const strictShadowing =
-		state.protectedTypeNames && state.protectedTypeNames.size > 0 && !state.allowShadowing;
+		state.protectedTypeNames &&
+		state.protectedTypeNames.size > 0 &&
+		!state.allowShadowing;
 	if (strictShadowing) {
 		if (state.protectedTypeNames.has(name)) {
 			throw new Error(`Type shadowing is not allowed: ${name}`);
@@ -1325,7 +1358,10 @@ export const typeImport = (
 		// with the importer's accumulated manifest. mergeManifests throws on any
 		// (trait, type) or ADT conflict, naming both conflicting paths.
 		const currentImporterManifest = state.importerManifest ?? emptyManifest();
-		const mergedImporterManifest = mergeManifests(currentImporterManifest, cached.manifest);
+		const mergedImporterManifest = mergeManifests(
+			currentImporterManifest,
+			cached.manifest
+		);
 
 		// Merge the module's declarations into the importer's TypeState.
 		let newState = mergeModuleCacheIntoTypeState(cached, state);
@@ -1335,7 +1371,10 @@ export const typeImport = (
 
 		// Instantiate the export type scheme with fresh type variables so each
 		// import site gets independent polymorphism.
-		const [instantiatedType, finalState] = instantiate(cached.exportType, newState);
+		const [instantiatedType, finalState] = instantiate(
+			cached.exportType,
+			newState
+		);
 
 		return createPureTypeResult(instantiatedType, finalState);
 	} catch (error) {
@@ -1344,7 +1383,11 @@ export const typeImport = (
 		const reason = error instanceof Error ? error.message : String(error);
 		throwTypeError(
 			location =>
-				createTypeError(`Failed to import '${expr.path}': ${reason}`, {}, location),
+				createTypeError(
+					`Failed to import '${expr.path}': ${reason}`,
+					{},
+					location
+				),
 			getExprLocation(expr)
 		);
 	}
@@ -1640,7 +1683,6 @@ const resolveTypeAliases = (
 	}
 };
 
-
 export const typeTyped = (
 	expr: TypedExpression,
 	state: TypeState
@@ -1664,7 +1706,10 @@ export const typeTyped = (
 
 	// Effect enforcement: a function annotation may over-declare effects (a
 	// conservative claim) but must not omit an effect the body performs.
-	const inferredType = substitute(inferredResult.type, currentState.substitution);
+	const inferredType = substitute(
+		inferredResult.type,
+		currentState.substitution
+	);
 	if (inferredType.kind === 'function' && resolvedType.kind === 'function') {
 		const performed = collectSpineEffects(inferredType);
 		const declared = collectSpineEffects(resolvedType);
@@ -1738,9 +1783,29 @@ export const typeConstraintDefinition = (
 		}
 	}
 
+	const typeParam = typeParams.length > 0 ? typeParams[0] : 'a';
+	const constructorArity = constructorParameterArity(
+		functionMap.values(),
+		typeParam,
+		name
+	);
+	if (constructorArity > 0) {
+		const typeKind = arrowKind(constructorArity);
+		for (const [functionName, functionType] of functionMap) {
+			functionMap.set(
+				functionName,
+				annotateConstructorKind(
+					functionType,
+					typeParam,
+					typeKind
+				) as FunctionType
+			);
+		}
+	}
 	const traitDef = {
 		name,
-		typeParam: typeParams.length > 0 ? typeParams[0] : 'a', // Use first type param or default to 'a'
+		typeParam,
+		constructorArity,
 		functions: functionMap,
 	};
 
@@ -1751,6 +1816,188 @@ export const typeConstraintDefinition = (
 	return createPureTypeResult(unitType(), state);
 };
 
+const nominalImplementationTarget = (type: Type, state: TypeState): Type => {
+	if (type.kind === 'primitive' || type.kind === 'list') return type;
+	if (type.kind !== 'variant') {
+		throw new Error(
+			`Trait implementations require nominal identity; structural ${type.kind} types cannot select an implementation. Define a nominal variant.`
+		);
+	}
+	if (state.adtRegistry.has(type.name)) return type;
+	const resolved = resolveTypeAliases(type, state);
+	if (resolved !== type) {
+		const underlying = getTypeName(resolved);
+		throw new Error(
+			`Alias '${type.name}' is erased and cannot provide implementation identity; implement the underlying nominal type '${underlying}' instead.`
+		);
+	}
+	throw new Error(
+		`Unknown nominal constructor '${type.name}'; trait implementations require a declared nominal variant.`
+	);
+};
+
+const saturateValueImplementationTarget = (
+	type: Type,
+	state: TypeState,
+	memberName: string
+): Type => {
+	if (type.kind !== 'variant' || type.args.length > 0) return type;
+	const arity = state.adtRegistry.get(type.name)?.typeParams.length ?? 0;
+	return {
+		...type,
+		args: Array.from({ length: arity }, (_, index) =>
+			typeVariable(`$impl:${memberName}:${index}`)
+		),
+	};
+};
+
+const rigidify = (type: Type, names = new Map<string, Type>()): Type => {
+	const rigid = (name: string): Type => {
+		const existing = names.get(name);
+		if (existing) return existing;
+		const created: Type = { kind: 'variant', name: `$rigid:${name}`, args: [] };
+		names.set(name, created);
+		return created;
+	};
+	switch (type.kind) {
+		case 'variable':
+			return rigid(type.name);
+		case 'constructor-variable':
+			return rigid(type.name);
+		case 'type-application':
+			return {
+				...type,
+				constructor: rigidify(type.constructor, names),
+				argument: rigidify(type.argument, names),
+			};
+		case 'variant':
+			return { ...type, args: type.args.map(arg => rigidify(arg, names)) };
+		case 'list':
+			return { ...type, element: rigidify(type.element, names) };
+		case 'function':
+			return {
+				...type,
+				params: type.params.map(param => rigidify(param, names)),
+				return: rigidify(type.return, names),
+			};
+		case 'tuple':
+			return {
+				...type,
+				elements: type.elements.map(element => rigidify(element, names)),
+			};
+		case 'record':
+			return {
+				...type,
+				fields: Object.fromEntries(
+					Object.entries(type.fields).map(([name, field]) => [
+						name,
+						rigidify(field, names),
+					])
+				),
+			};
+		case 'union':
+			return {
+				...type,
+				types: type.types.map(member => rigidify(member, names)),
+			};
+		case 'constrained':
+			return { ...type, baseType: rigidify(type.baseType, names) };
+		default:
+			return type;
+	}
+};
+
+const canonicalizeFunctionSpines = (type: Type): Type => {
+	if (type.kind !== 'function') return type;
+	const params = type.params.map(canonicalizeFunctionSpines);
+	const returnType = canonicalizeFunctionSpines(type.return);
+	if (returnType.kind !== 'function')
+		return { ...type, params, return: returnType };
+	return {
+		...type,
+		params: [...params, ...returnType.params],
+		return: returnType.return,
+		effects: new Set([...type.effects, ...returnType.effects]),
+	};
+};
+
+const assertEffectSubsumption = (
+	actual: Type,
+	expected: Type,
+	traitName: string,
+	memberName: string
+): void => {
+	if (actual.kind !== 'function' || expected.kind !== 'function') return;
+	const undeclared = [...actual.effects].filter(
+		effect => !expected.effects.has(effect)
+	);
+	if (undeclared.length > 0) {
+		throw new Error(
+			`Implementation member '${memberName}' for '${traitName}' performs undeclared effect${undeclared.length > 1 ? 's' : ''} !${undeclared.join(' !')}`
+		);
+	}
+	actual.params.forEach((param, index) => {
+		const expectedParam = expected.params[index];
+		if (expectedParam) {
+			assertEffectSubsumption(param, expectedParam, traitName, memberName);
+		}
+	});
+	assertEffectSubsumption(
+		actual.return,
+		expected.return,
+		traitName,
+		memberName
+	);
+};
+
+const expectedMemberType = (
+	required: FunctionType,
+	traitParameter: string,
+	target: Type,
+	abstraction?: TypeConstructorAbstraction
+): Type =>
+	substitute(
+		required,
+		new Map([
+			[
+				traitParameter,
+				abstraction
+					? ({ kind: 'constructor', abstraction, bindings: new Map() } as Type)
+					: target,
+			],
+		])
+	);
+
+const assertMemberCompatibility = (
+	actual: Type,
+	required: FunctionType,
+	traitName: string,
+	traitParameter: string,
+	target: Type,
+	state: TypeState,
+	memberName: string,
+	abstraction?: TypeConstructorAbstraction
+): void => {
+	const expected = canonicalizeFunctionSpines(
+		expectedMemberType(required, traitParameter, target, abstraction)
+	);
+	const resolvedActual = canonicalizeFunctionSpines(
+		substitute(actual, state.substitution)
+	);
+	assertEffectSubsumption(resolvedActual, expected, traitName, memberName);
+	try {
+		unify(resolvedActual, rigidify(expected), {
+			...state,
+			substitution: new Map(state.substitution),
+		});
+	} catch (cause) {
+		throw new Error(
+			`Implementation member '${memberName}' is incompatible with the rigid '${traitName}' signature: expected ${typeToString(expected)}, inferred ${typeToString(resolvedActual)}`,
+			{ cause }
+		);
+	}
+};
+
 // Type implement definition
 export const typeImplementDefinition = (
 	expr: ImplementDefinitionExpression,
@@ -1758,7 +2005,7 @@ export const typeImplementDefinition = (
 ): TypeResult => {
 	const { constraintName, typeExpr, implementations, givenConstraints } = expr;
 
-	// Extract type name from type expression - support all type kinds
+	// Runtime coherence remains nominal even when the compile-time target is abstract.
 	const typeName = getTypeName(typeExpr);
 
 	// Check if trait exists in trait registry
@@ -1766,6 +2013,26 @@ export const typeImplementDefinition = (
 	if (!traitDef) {
 		throw new Error(`Trait '${constraintName}' not defined`);
 	}
+
+	if (
+		(traitDef.constructorArity ?? 0) > 0 &&
+		typeExpr.kind !== 'type-constructor-abstraction'
+	) {
+		throw new Error(
+			`Higher-kinded implementation of '${constraintName}' requires an explicit typefn abstraction`
+		);
+	}
+	const constructorAbstraction =
+		typeExpr.kind === 'type-constructor-abstraction'
+			? compileConstructorAbstraction(
+					typeExpr,
+					traitDef.constructorArity ?? 0,
+					state.adtRegistry
+				)
+			: undefined;
+	const implementationTarget = constructorAbstraction
+		? constructorAbstraction.body
+		: nominalImplementationTarget(typeExpr as Type, state);
 
 	// Type each implementation and store as expressions
 	const implementationMap = new Map<string, Expression>();
@@ -1786,8 +2053,21 @@ export const typeImplementDefinition = (
 		currentState = implResult.state;
 		allEffects = unionEffects(allEffects, implResult.effects);
 
-		// TODO: Check that implementation type matches required type
-		// For now, we'll trust the implementation
+		const memberTarget = saturateValueImplementationTarget(
+			implementationTarget,
+			currentState,
+			impl.name
+		);
+		assertMemberCompatibility(
+			implResult.type,
+			requiredType,
+			constraintName,
+			traitDef.typeParam,
+			memberTarget,
+			currentState,
+			impl.name,
+			constructorAbstraction
+		);
 
 		// Store the expression (not the type scheme)
 		implementationMap.set(impl.name, impl.value);
@@ -1805,6 +2085,7 @@ export const typeImplementDefinition = (
 	// Create trait implementation
 	const traitImpl = {
 		typeName,
+		constructorAbstraction,
 		functions: implementationMap,
 		givenConstraints, // Include given constraints if present
 	};
