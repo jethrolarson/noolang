@@ -184,6 +184,17 @@ fmap_fn (fn x => x + 1) (Handler (fn y => y + 1) 5)`)
 		);
 	});
 
+	test('an undischarged kind-* trait constraint survives a wrapper lambda', () => {
+		expect(inferredType('fn x => show x')).toBe(
+			'a -> String given a implements Show'
+		);
+		expect(
+			inferredType(
+				'constraint Blorp a (blorp : a -> String); fn x => blorp x'
+			)
+		).toBe('a -> String given a implements Blorp');
+	});
+
 	test('nested type-application arguments render parenthesized', () => {
 		expect(
 			inferredType(`constraint AppFixed f (fmap_app : (a -> b) -> f a -> f b);

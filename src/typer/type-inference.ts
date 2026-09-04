@@ -534,9 +534,13 @@ function buildNormalFunctionType(
 						{ kind: 'constructor-variable', name: typeVar },
 						state.substitution
 					);
-					// A constructor variable resolved to a concrete constructor is
-					// already discharged.
-					if (resolvedConstructor.kind === 'constructor-variable') {
+					// Re-emit under the resolved name while it's still a free
+					// variable; a constraint whose variable resolved to a
+					// concrete constructor/variant/list is discharged and dropped.
+					if (
+						resolvedConstructor.kind === 'constructor-variable' ||
+						resolvedConstructor.kind === 'variable'
+					) {
 						bodyConstraints.push({
 							kind: 'implements',
 							typeVar: resolvedConstructor.name,
