@@ -96,7 +96,7 @@ implement F (typefn value => Outer error value (Option error)) (
 			expect(
 				inferredType(`{@make} = import "${modulePath.replace(/\.noo$/, '')}";
 fm (fn x => x + 1) (make "kept" 2)`)
-			).toBe('Outer String Float Option String');
+			).toBe('Outer String Float (Option String)');
 		} finally {
 			clearModuleCache();
 			fs.rmSync(dir, { recursive: true, force: true });
@@ -130,7 +130,7 @@ implement F (typefn value => Outer error value (Option error)) (
   )
 );
 fm (fn x => x + 1) (Outer "kept" 2 (Some "kept"))`)
-		).toBe('Outer String Float Option String');
+		).toBe('Outer String Float (Option String)');
 	});
 
 	test('a bare trait function rebind remains polymorphic', () => {
@@ -163,6 +163,38 @@ implement RightFunctor (typefn value => RightMap String value) (
 );
 right_map (fn x => x + 1) (RightMap 42 2)`)
 		).toThrow(/implementation|mismatch|RightFunctor/i);
+	});
+
+	test('a function-typed fixed constructor argument dispatches', () => {
+		expect(
+			inferredType(`constraint FnFixed f (fmap_fn : (a -> b) -> f a -> f b);
+variant Handler tag value = Handler tag value;
+implement FnFixed (typefn value => Handler (Float -> Float) value) (
+  fmap_fn = fn f h => match h (
+    Handler tag value => Handler tag (f value)
+  )
+);
+fmap_fn (fn x => x + 1) (Handler (fn y => y + 1) 5)`)
+		).toBe('Handler (Float -> Float) Float');
+	});
+
+	test('a discharged constructor constraint is not re-emitted as an orphan clause', () => {
+		expect(inferredType('fn r => bind r (fn x => Ok x)')).toBe(
+			'Result a b -> Result a b'
+		);
+	});
+
+	test('nested type-application arguments render parenthesized', () => {
+		expect(
+			inferredType(`constraint AppFixed f (fmap_app : (a -> b) -> f a -> f b);
+variant Two tag value = Two tag value;
+implement AppFixed (typefn value => Two (Option String) value) (
+  fmap_app = fn f t => match t (
+    Two tag value => Two tag (f value)
+  )
+);
+fmap_app (fn x => x + 1) (Two (Some "t") 5)`)
+		).toBe('Two (Option String) Float');
 	});
 
 	test('kind checking rejects inconsistent constructor application arities', () => {

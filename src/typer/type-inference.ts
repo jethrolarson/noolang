@@ -534,14 +534,15 @@ function buildNormalFunctionType(
 						{ kind: 'constructor-variable', name: typeVar },
 						state.substitution
 					);
-					bodyConstraints.push({
-						kind: 'implements',
-						typeVar:
-							resolvedConstructor.kind === 'constructor-variable'
-								? resolvedConstructor.name
-								: typeVar,
-						interfaceName: constraint.interfaceName,
-					});
+					// A constructor variable resolved to a concrete constructor is
+					// already discharged.
+					if (resolvedConstructor.kind === 'constructor-variable') {
+						bodyConstraints.push({
+							kind: 'implements',
+							typeVar: resolvedConstructor.name,
+							interfaceName: constraint.interfaceName,
+						});
+					}
 				}
 			}
 		}

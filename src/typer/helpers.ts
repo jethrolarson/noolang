@@ -477,6 +477,18 @@ export const typeToString = (
 		}
 	}
 
+	// Parenthesize a compound argument so it reads as one argument to the
+	// enclosing constructor: `Two (Option String) Float`.
+	function argAtom(t: Type): string {
+		const needsParens =
+			t.kind === 'function' ||
+			t.kind === 'type-application' ||
+			t.kind === 'list' ||
+			t.kind === 'constrained' ||
+			(t.kind === 'variant' && t.args.length > 0);
+		return needsParens ? `(${norm(t)})` : norm(t);
+	}
+
 	// Helper to assign/display variable names
 	function norm(t: Type): string {
 		switch (t.kind) {
@@ -514,11 +526,7 @@ export const typeToString = (
 				return mapping.get(t.name)!;
 			}
 			case 'type-application':
-				return `${norm(t.constructor)} ${
-					t.argument.kind === 'function'
-						? `(${norm(t.argument)})`
-						: norm(t.argument)
-				}`;
+				return `${norm(t.constructor)} ${argAtom(t.argument)}`;
 			case 'constructor':
 				return `<constructor ${t.abstraction.nominalName}>`;
 			case 'list':
@@ -552,7 +560,7 @@ export const typeToString = (
 				if (t.args.length === 0) {
 					return variantName;
 				} else {
-					return `${variantName} ${t.args.map(norm).join(' ')}`;
+					return `${variantName} ${t.args.map(argAtom).join(' ')}`;
 				}
 			}
 			case 'unit':

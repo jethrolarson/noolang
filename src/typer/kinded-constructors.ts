@@ -286,6 +286,42 @@ const matchTemplate = (
 			bindings
 		);
 	}
+	// Structural match, not equality: an inferred function type carries effect
+	// and field detail a parsed typefn body lacks. Effects don't affect
+	// dispatch and are not compared.
+	if (template.kind === 'function' && concrete.kind === 'function') {
+		return (
+			template.params.length === concrete.params.length &&
+			template.params.every((param, index) =>
+				matchTemplate(param, concrete.params[index], parameters, bindings)
+			) &&
+			matchTemplate(template.return, concrete.return, parameters, bindings)
+		);
+	}
+	if (template.kind === 'tuple' && concrete.kind === 'tuple') {
+		return (
+			template.elements.length === concrete.elements.length &&
+			template.elements.every((element, index) =>
+				matchTemplate(element, concrete.elements[index], parameters, bindings)
+			)
+		);
+	}
+	if (template.kind === 'record' && concrete.kind === 'record') {
+		const templateKeys = Object.keys(template.fields);
+		return (
+			templateKeys.length === Object.keys(concrete.fields).length &&
+			templateKeys.every(
+				key =>
+					key in concrete.fields &&
+					matchTemplate(
+						template.fields[key],
+						concrete.fields[key],
+						parameters,
+						bindings
+					)
+			)
+		);
+	}
 	return sameType(template, concrete);
 };
 
