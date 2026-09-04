@@ -30,6 +30,7 @@ import {
 	type ConstraintDefinitionExpression,
 	type ImplementDefinitionExpression,
 	type TypeConstructorAbstractionExpression,
+	type Type,
 	type ConstraintFunction,
 	type ImplementationFunction,
 	type MutationExpression,
@@ -1572,7 +1573,7 @@ const parseTypeConstructorAbstraction: C.Parser<TypeConstructorAbstractionExpres
 	);
 
 const parseImplementTarget: C.Parser<
-	TypeConstructorAbstractionExpression | import('../ast').Type
+	TypeConstructorAbstractionExpression | Type
 > = tokens => {
 	const abstraction = parseTypeConstructorAbstraction(tokens);
 	return abstraction.success ? abstraction : parseTypeExpression(tokens);
