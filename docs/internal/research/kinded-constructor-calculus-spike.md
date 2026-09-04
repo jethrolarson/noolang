@@ -2,140 +2,175 @@
 
 Date: 2026-09-03
 
-## Recommendation: revise, do not merge this prototype
+## Recommendation: proceed to a replacement ADR, not a production merge
 
-The constructor calculus is promising but does not yet meet ADR 0010's proceed gate.
-A provisional `typefn` target can model a non-leading argument and the same compiled
-abstraction survives module transport. A partially applied local or imported trait
-method beta-reduces to the correct `RightMap String Float`. However, a plain lambda
-wrapper still loses the constructor constraint and confidently infers the wrong
-`RightMap Float`, dropping the fixed leading argument. The existing `Result` apply
-and bind wrapper regressions also remain.
+The bounded revision meets ADR 0010's architectural gate. Noolang can represent
+constructor variables and applications honestly, beta-reduce an explicit nominal
+abstraction, and then use ordinary first-order unification. Local calls, plain
+wrappers, partial applications, imported implementations, non-leading modeled
+arguments, multiple modeled arguments, and shared fixed/free arguments all preserve
+exact constructor order.
 
-This is enough evidence to revise the model once, specifically by representing the
-constructor variable and its applications honestly in trait signatures. If that
-revision still needs wrapper-specific metadata or reconstruction, retain ADR 0009's
-bounded descriptor approach instead. PR #194 should remain parked meanwhile.
+The four legacy mechanisms named by ADR 0010 are deleted rather than hidden behind
+the new model. The prototype remains unsuitable for merge: `typefn` is provisional,
+implementation members are still not checked against rigidly instantiated trait
+signatures, and the complete PR #194 negative declaration matrix was not migrated.
+A replacement implementation ADR should define production syntax and an atomic
+migration plan. PR #194 should remain parked until that decision.
 
-The prototype is deliberately deletable evidence. `typefn` is not proposed syntax,
-and none of this branch should merge as production behavior.
+## Representation and boundary
 
-## What was built
-
-- `Type` now has an internal constructor value, while constructor terms distinguish
-  `nominal-constructor`, `constructor-variable`, and `type-application`
-  (`src/ast.ts`; `src/typer/kinded-constructors.ts:11-19, 113-125`).
-- The provisional implementation target
-  `implement RightFunctor (typefn value => RightMap context value) ...` is parsed only
-  in an implementation head (`src/parser/parser.ts:1547-1598`).
-- Declaration compilation checks the trait's application arity, nominal saturation,
-  and the initial linear/direct-argument restriction
-  (`src/typer/kinded-constructors.ts:62-126`; registration at
-  `src/typer/type-inference.ts:1745-1790`).
-- Matching binds fixed/free constructor arguments from the dispatched concrete type;
-  beta-reduction substitutes both those bindings and modeled arguments
-  (`src/typer/kinded-constructors.ts:203-271`).
-- Constructor values travel on the existing nominal trait implementation object, so
-  the module loader transports them without a second metadata channel
-  (`src/typer/trait-system.ts`; existing transport in `src/module-loader.ts`).
-- `substitute` beta-reduces a constructor application before ordinary unification
-  (`src/typer/substitute.ts`; selection in `src/typer/unify.ts:984-1012`). Runtime
-  dispatch and coherence remain keyed by `(trait, nominal constructor)`.
+- `ConstructorVariableType` and `TypeApplicationType` are real `Type` alternatives,
+  distinct from nominal `VariantType` and concrete constructor substitutions
+  (`src/ast.ts:113-140,198-200`).
+- Parsing `f a` now builds a constructor variable plus application, not a lowercase
+  variant (`src/parser/parse-type.ts:231-260`). Uppercase saturated nominal types keep
+  their existing runtime representation.
+- Trait declaration analysis assigns `Type -> ... -> Type` kinds and rejects
+  inconsistent application arities (`src/typer/kinded-constructors.ts:57-120`;
+  `src/typer/type-inference.ts:1760-1783`). There is no kind polymorphism or inference
+  of unknown type-level functions.
+- Provisional `typefn` remains restricted to implementation heads. Compilation
+  requires one saturated nominal constructor and each modeled parameter exactly once
+  as a direct argument (`src/parser/parser.ts`; `src/typer/kinded-constructors.ts:122-157`).
+- Matching binds fixed/free arguments from the concrete nominal type, and beta
+  reduction emits an ordinary `VariantType` or canonical `ListType`
+  (`src/typer/kinded-constructors.ts:230-287`). No runtime type lambda exists.
+- Runtime identity and coherence remain nominal. The abstraction rides on the existing
+  trait implementation registry object, which module transport already copies
+  (`src/typer/trait-system.ts:20-30,219-277`).
 
 ## Executable evidence
 
-The focused spike test is
-`src/typer/__tests__/kinded-constructor-spike.test.ts`.
+The focused matrix is in
+`src/typer/__tests__/kinded-constructor-spike.test.ts`. Tests were changed to require
+correct wrappers before the revision and failed red with dropped `RightMap` arguments
+and the two `Result` regressions.
 
-TDD began with four parser-red tests (0 passed, 4 failed). After the prototype, the
-focused regression set reports 43 passed, 0 failed:
+After the revision:
 
 ```text
-AGENT=1 bun test \
-  src/typer/__tests__/kinded-constructor-spike.test.ts \
-  src/typer/__tests__/trait-call-site-polymorphism.test.ts \
-  src/typer/__tests__/monad-result-arity.test.ts \
-  test/integration/module-loader.test.ts
-# 43 pass, 0 fail
+AGENT=1 bun test
+# 1480 passed, 8 skipped, 0 failed (1488 tests across 119 files)
+
+NO_COLOR=1 bun src/cli.ts test stdlib.test.noo
+# 89 passed, 0 failed across 2 suites
+
+bun run typecheck
+# pass
+
+node validate_examples.js
+# all validated markdown files pass
 ```
 
-`bun run typecheck` passes. The full suite, stdlib module suite, and documentation
-validation were intentionally not run because the stopping rule was reached and the
-prototype is not behaviorally complete.
+Exact manual inference probes:
 
-### Exact inference probes
-
-| Probe | Result |
+| Probe | Inferred type |
 | --- | --- |
-| Local non-leading `typefn`, through `mapper = right_map (fn ...)` | `RightMap String Float` |
-| Same partial application after importing implementation and constructor | `RightMap String Float` (automated exact assertion) |
-| Bare `b2 = bind` rebind | `Result Float a` |
-| `map` over `Option` | `Option Float` |
-| `map` over canonical `List` | `List Float` |
-| Plain `my_right_map = fn f rm => right_map f rm` wrapper | wrong: `RightMap Float` (expected `RightMap String Float`) |
-| `my_bind = fn res f => bind res f` | fails: `Variant name mismatch: α331 vs Result` |
-| Apply-shaped `Result` wrapper | fails: `Variant arity mismatch: Result has 1 vs 2 type arguments` |
+| apply-shaped `Result` wrapper | `Result Float String` |
+| `my_bind = fn res f => bind res f` | `Result Float a` |
+| bare `b2 = bind` rebind | `Result Float a` |
+| local non-leading `RightMap` partial application | `RightMap String Float` |
+| local plain `RightMap` wrapper | `RightMap String Float` |
+| imported plain `RightMap` wrapper | `RightMap String Float` (exact automated assertion) |
+| two modeled arguments in `Framed frame left right` | `Framed String Float String` |
+| shared free variable in `Outer error value (Option error)` | `Outer String Float Option String` |
+| `Option` map | `Option Float` |
+| canonical `List` map | `List Float` |
 
-The spike also has declaration-red assertions for an unsaturated nominal body and a
-parameter that is nested/duplicated rather than occurring exactly once directly.
-It does **not** cover multiple modeled parameters, fixed concrete arguments, shared
-free variables in grouped fixed applications, implementation-member compatibility,
-or the full PR #194 negative matrix. Those omissions are intentional rather than
-reported as success.
+The full suite exposed and the revision fixed a composition edge:
+`fn items => map show (map (fn x => x * 2) items)` initially detached the displayed
+Functor constraint from its constructor variable. Constructor-variable substitution
+now normalizes that relationship; the function infers
+`a Float -> a String given a implements Functor`, and applying it to a list infers
+`List String`.
 
 ## ADR 0010 questions
 
-### 1. Which existing special cases can be deleted rather than adapted?
+### 1. Which special cases were deleted?
 
-On the new path, argument placement is beta-reduction, not positional recovery. That
-can replace:
+All four named mechanisms:
 
-- trailing-argument slicing in `src/typer/unify.ts:1067-1080`;
-- argument appending in `src/typer/substitute.ts:101-115`;
-- synthetic `List` constructor substitution and later normalization in
-  `src/typer/substitute.ts` and `src/typer/trait-function-handling.ts:456-457,655-681`;
-- lowercase-name constructor-variable discovery in
-  `src/typer/trait-function-handling.ts:128-139`.
+1. **Lowercase fake-variant detection.** Trait signatures no longer encode `f a` as a
+   `VariantType`, and the lowercase-name scan was removed from
+   `trait-function-handling.ts`.
+2. **Variant `traitConstraint` metadata.** The prototype never introduced this PR #194
+   field; constraint identity remains on function/constrained types and constructor
+   identity has its own type node.
+3. **Positional append/slice reconstruction.** The trailing `slice` in `unify.ts` and
+   appended `substitutedName.args` in `substitute.ts` are gone. `substitute` has one
+   application case that flattens arguments and beta-reduces a selected constructor
+   (`src/typer/substitute.ts:43-69`).
+4. **Trait-specific List normalization.** Synthetic `VariantType("List")` substitution
+   and `normalizeListType` are gone. The `List` abstraction directly reduces to
+   canonical `ListType`.
 
-They cannot be deleted on this branch: stdlib and trait signatures still use the old
-lowercase `VariantType` representation. The prototype therefore demonstrates the
-replacement operation but not the required net deletion.
+A repository search for `extraArgs`, `substitutedName.args`, `normalizeListType`,
+`traitConstraint`, `tryUnifyConstrainedVariant`, and lowercase-constructor detection
+returns no implementation matches.
 
-### 2. Does one substitution/application path cover local calls, wrappers, and imported metadata?
+### 2. Does one substitution/application path cover local calls, wrappers, and imports?
 
-No. Local and imported partial applications share one path and preserve non-leading
-argument order. Plain wrappers do not: constructor constraints are lost when a fully
-applied unresolved trait call is generalized inside a lambda. Fixing this by tagging
-ordinary variants would recreate the metadata problem ADR 0010 is trying to remove.
-The next revision should make trait-signature constructor variables/applications real
-nodes and preserve their constraint as part of that typed representation.
+Yes. Generic signatures retain `TypeApplicationType`; concrete dispatch selects the
+nominal abstraction; both direct constrained applications and constrained wrapper
+results install the same `ConstructorType`; `substitute` beta-reduces it before the
+ordinary unifier (`src/typer/unify.ts:916-979,1020-1095`). Imported registries transport
+the same implementation object, so no module-specific reconstruction exists.
 
-### 3. What remains necessarily nominal or trait-specific?
+### 3. What remains nominal or trait-specific?
 
-Nominal identity remains necessary for coherence, registry lookup, module manifests,
-and evaluator dispatch. Trait-specific work remains at declaration validation,
-implementation selection, conditional-instance checking, and member compatibility.
-Kinds and beta-reduction do not replace those responsibilities.
+Necessarily nominal:
 
-### 4. Does the prototype stay first-order after explicit abstractions are reduced?
+- registry and evaluator dispatch identity;
+- coherence and manifest keys `(trait, constructor)`;
+- validating that an abstraction ends in an allowed nominal constructor;
+- matching fixed/free nominal arguments before beta reduction.
 
-Yes on the demonstrated path. `typefn value => RightMap context value` is selected by
-nominal identity, fixed/free `context` is matched to `String`, and beta-reduction emits
-ordinary `RightMap String a` before `unify` sees it. No higher-order unification or
-unknown type-level-function inference is present. The wrapper failure occurs before
-that boundary because the constructor constraint is no longer available.
+Necessarily trait-specific:
 
-### 5. Is production migration smaller and safer than completing ADR 0009?
+- determining the constructor parameter's declared kind;
+- selecting an implementation for an `implements` constraint;
+- conditional-instance checks and eventual member compatibility checking.
 
-Not yet demonstrated. The core itself is smaller than PR #194's descriptor machinery,
-but a production migration must replace trait-signature fake variants and remove the
-old paths atomically. Until the wrapper boundary works without a parallel metadata
-channel, claiming a smaller migration would be misleading.
+Value traits (`Eq`, `Show`, arithmetic), conditional instances, primitives, effects,
+and runtime dispatch retain their previous model.
 
-### 6. Proceed, revise, or retain the parked descriptor approach?
+### 4. Is unification still first-order after reduction?
 
-**Revise once, within the same narrow scope.** Replace lowercase fake variants in
-trait signatures with an explicit constructor-variable/type-application form, then
-rerun PR #194's exact matrix. Proceed only if that permits deleting the four legacy
-paths listed above and wrappers/imports use the same beta-reduction path. Otherwise
-retain ADR 0009/PR #194's descriptor design as the cheaper bounded fix.
+Yes. The only constructor-variable unification is first-order name substitution between
+explicit constructor variables of fixed kinds. A concrete implementation is never
+inferred as an unknown type function. Once selected, beta reduction produces ordinary
+Noolang value types before structural/nominal unification. There is no higher-order
+unification, composition, kind polymorphism, higher rank, or escaping lambda value.
+
+### 5. Is migration smaller and safer than ADR 0009?
+
+The measured core diff (AST/parser and typer source, excluding tests/report/docs) is
+819 insertions and 472 deletions, net +347 lines. Raw size is not tiny because every
+existing type traversal must acknowledge the two honest nodes. It is nevertheless
+smaller in state space than ADR 0009/PR #194: there is no slot descriptor algebra,
+variant metadata, List bridge, or separate module descriptor transport, and the old
+reconstruction code is deleted. Exact wrapper and composition probes show the safety
+benefit: constructor/argument relationships survive generalization rather than being
+recovered later.
+
+This is evidence for the architecture, not an estimate for polished production work.
+Member validation and syntax design remain material tasks.
+
+### 6. Proceed, revise, or retain the descriptor approach?
+
+**Proceed to a replacement ADR.** The bounded revision removed the known special-case
+surface and passed the mandatory order probes. Do not merge this spike or unpark PR
+#194 automatically. If production member validation or syntax work later requires a
+parallel slot descriptor/reconstruction channel, that would falsify this recommendation
+and the project should retain the parked bounded approach instead.
+
+## Deliberate gaps
+
+- `typefn` spelling and placement are not permanent syntax.
+- Implementation member types are not yet checked against rigid trait signatures;
+  therefore the wrong-head/member negative test is not evidence this spike claims.
+- Alias/newtype eligibility and improved kind diagnostics need production design.
+- The stdlib's `Applicative Option::apply` was expanded to a direct nested match because
+  typing an implementation body through its own unresolved trait method depends on
+  member-signature checking. Runtime behavior is unchanged and stdlib tests pass.

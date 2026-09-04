@@ -110,15 +110,21 @@ export type TypeKind =
 	| { kind: 'Type' }
 	| { kind: 'arrow'; from: TypeKind; to: TypeKind };
 
-export type TypeConstructorTerm =
-	| { kind: 'constructor-variable'; name: string; typeKind: TypeKind }
-	| { kind: 'nominal-constructor'; name: string; typeKind: TypeKind }
-	| { kind: 'type-application'; constructor: TypeConstructorTerm; argument: Type };
+export type ConstructorVariableType = {
+	kind: 'constructor-variable';
+	name: string;
+	typeKind?: TypeKind;
+};
+
+export type TypeApplicationType = {
+	kind: 'type-application';
+	constructor: Type;
+	argument: Type;
+};
 
 export type TypeConstructorAbstraction = {
 	parameters: string[];
 	body: Type;
-	term: TypeConstructorTerm;
 	typeKind: TypeKind;
 	nominalName: string;
 };
@@ -189,6 +195,8 @@ export type Type =
 	| RecordType
 	| UnionType
 	| VariantType
+	| ConstructorVariableType
+	| TypeApplicationType
 	| ConstructorType
 	| ADTType
 	| UnitType

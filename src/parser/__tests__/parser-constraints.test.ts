@@ -116,9 +116,11 @@ test('should parse Functor constraint with map function', () => {
 	// The return type should be f a -> f b
 	assertFunctionType(funcType.return);
 	expect(funcType.return.params.length).toBe(1);
-	assertVariantType(funcType.return.return);
-	expect(funcType.return.return.name).toBe('f');
-	expect(funcType.return.return.args.length).toBe(1);
-	assertVariableType(funcType.return.return.args[0]);
-	expect(funcType.return.return.args[0].name).toBe('b');
+	const returnApplication = funcType.return.return;
+	expect(returnApplication.kind).toBe('type-application');
+	if (returnApplication.kind !== 'type-application')
+		throw new Error('Expected type application');
+	expect(returnApplication.constructor.kind).toBe('constructor-variable');
+	assertVariableType(returnApplication.argument);
+	expect(returnApplication.argument.name).toBe('b');
 });

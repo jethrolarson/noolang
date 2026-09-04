@@ -391,10 +391,12 @@ describe('Trait System', () => {
 
 			const typeResult = parseAndType(code);
 			assertFunctionType(typeResult.type);
-			assertVariantType(typeResult.type.params[0]);
-			assertPrimitiveType(typeResult.type.params[0].args[0]);
-			expect(typeResult.type.params[0].args[0].name).toBe('Float');
-			assertVariantType(typeResult.type.return);
+			const parameter = typeResult.type.params[0];
+			expect(parameter.kind).toBe('type-application');
+			if (parameter.kind !== 'type-application') throw new Error('Expected type application');
+			assertPrimitiveType(parameter.argument);
+			expect(parameter.argument.name).toBe('Float');
+			expect(typeResult.type.return.kind).toBe('type-application');
 			expect(typeResult.type.constraints).toHaveLength(1);
 			assertImplementsConstraint(typeResult.type.constraints![0]);
 			expect(typeResult.type.constraints![0].interfaceName).toBe('Functor');

@@ -108,6 +108,8 @@ import {
 	addTraitImplementation,
 } from './trait-system';
 import {
+	annotateConstructorKind,
+	arrowKind,
 	compileConstructorAbstraction,
 	constructorParameterArity,
 } from './kinded-constructors';
@@ -523,9 +525,16 @@ function buildNormalFunctionType(
 		for (const [typeVar, constraints] of bodyType.constraints.entries()) {
 			for (const constraint of constraints) {
 				if (constraint.kind === 'implements') {
+					const resolvedConstructor = substitute(
+						{ kind: 'constructor-variable', name: typeVar },
+						state.substitution
+					);
 					bodyConstraints.push({
 						kind: 'implements',
-						typeVar,
+						typeVar:
+							resolvedConstructor.kind === 'constructor-variable'
+								? resolvedConstructor.name
+								: typeVar,
 						interfaceName: constraint.interfaceName,
 					});
 				}
@@ -598,7 +607,7 @@ function buildNormalFunctionType(
 	if (allConstraints.length > 0 && funcType.kind === 'function') {
 		// Only apply constraints if the function has type variables (is polymorphic)
 		const hasTypeVariables = paramTypes.some(
-			paramType => paramType.kind === 'variable'
+			paramType => freeTypeVars(paramType).size > 0
 		);
 
 		if (hasTypeVariables) {
@@ -759,7 +768,12 @@ const usesAddOperator = (expr: Expression): boolean => usesOperator(expr, '+');
 function collectTypeVariables(type: Type, vars: Set<string>): void {
 	switch (type.kind) {
 		case 'variable':
+		case 'constructor-variable':
 			vars.add(type.name);
+			break;
+		case 'type-application':
+			collectTypeVariables(type.constructor, vars);
+			collectTypeVariables(type.argument, vars);
 			break;
 		case 'function':
 			for (const param of type.params) {
@@ -1743,14 +1757,28 @@ export const typeConstraintDefinition = (
 	}
 
 	const typeParam = typeParams.length > 0 ? typeParams[0] : 'a';
+	const constructorArity = constructorParameterArity(
+		functionMap.values(),
+		typeParam,
+		name
+	);
+	if (constructorArity > 0) {
+		const typeKind = arrowKind(constructorArity);
+		for (const [functionName, functionType] of functionMap) {
+			functionMap.set(
+				functionName,
+				annotateConstructorKind(
+					functionType,
+					typeParam,
+					typeKind
+				) as FunctionType
+			);
+		}
+	}
 	const traitDef = {
 		name,
 		typeParam,
-		constructorArity: constructorParameterArity(
-			functionMap.values(),
-			typeParam,
-			name
-		),
+		constructorArity,
 		functions: functionMap,
 	};
 
@@ -1777,6 +1805,14 @@ export const typeImplementDefinition = (
 		throw new Error(`Trait '${constraintName}' not defined`);
 	}
 
+	if (
+		(traitDef.constructorArity ?? 0) > 0 &&
+		typeExpr.kind !== 'type-constructor-abstraction'
+	) {
+		throw new Error(
+			`Higher-kinded implementation of '${constraintName}' requires an explicit typefn abstraction`
+		);
+	}
 	const constructorAbstraction =
 		typeExpr.kind === 'type-constructor-abstraction'
 			? compileConstructorAbstraction(

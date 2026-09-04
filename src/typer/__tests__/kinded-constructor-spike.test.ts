@@ -34,12 +34,25 @@ mapper (RightMap "kept" 2)`)
 		).toBe('RightMap String Float');
 	});
 
-	test('documents the remaining wrapper boundary', () => {
-		const inferred = inferredType(`${rightFunctor}${implementation}
+	test('a plain wrapper preserves non-leading constructor arguments', () => {
+		expect(
+			inferredType(`${rightFunctor}${implementation}
 my_right_map = fn f rm => right_map f rm;
-my_right_map (fn x => x + 1) (RightMap "kept" 2)`);
-		expect(inferred).toBe('RightMap Float');
-		expect(inferred).not.toBe('RightMap String Float');
+my_right_map (fn x => x + 1) (RightMap "kept" 2)`)
+		).toBe('RightMap String Float');
+	});
+
+	test('Result wrappers preserve exact argument order', () => {
+		expect(
+			inferredType(`
+apply_result = fn f res => match f (Ok g => map g res; Err e => Err e);
+apply_result (Ok (fn x => x + 1)) ((Err "bad") : Result Float String)`)
+		).toBe('Result Float String');
+		expect(
+			inferredType(`
+my_bind = fn res f => bind res f;
+my_bind (Ok 1) (fn x => Ok (x + 1))`)
+		).toBe('Result Float a');
 	});
 
 	test('the same constructor abstraction and dispatch identity survive import', () => {
@@ -54,13 +67,52 @@ my_right_map (fn x => x + 1) (RightMap "kept" 2)`);
 		try {
 			expect(
 				inferredType(`{@make} = import "${modulePath.replace(/\.noo$/, '')}";
-mapper = right_map (fn x => x + 1);
-mapper (make "kept" 2)`)
+my_right_map = fn f rm => right_map f rm;
+my_right_map (fn x => x + 1) (make "kept" 2)`)
 			).toBe('RightMap String Float');
 		} finally {
 			clearModuleCache();
 			fs.rmSync(dir, { recursive: true, force: true });
 		}
+	});
+
+	test('multiple modeled arguments retain constructor order', () => {
+		expect(
+			inferredType(`
+constraint BiMap f (
+  bimap : (a -> c) -> (b -> d) -> f a b -> f c d
+);
+variant Framed frame left right = Framed frame left right;
+implement BiMap (typefn left right => Framed frame left right) (
+  bimap = fn fl fr value => match value (
+    Framed frame left right => Framed frame (fl left) (fr right)
+  )
+);
+bimap (fn x => x + 1) show (Framed "kept" 2 True)`)
+		).toBe('Framed String Float String');
+	});
+
+	test('shared free variables in fixed applications remain linked', () => {
+		expect(
+			inferredType(`
+constraint F f (fm : (a -> b) -> f a -> f b);
+variant Outer error value nested = Outer error value nested;
+implement F (typefn value => Outer error value (Option error)) (
+  fm = fn f outer => match outer (
+    Outer error value nested => Outer error (f value) nested
+  )
+);
+fm (fn x => x + 1) (Outer "kept" 2 (Some "kept"))`)
+		).toBe('Outer String Float Option String');
+	});
+
+	test('kind checking rejects inconsistent constructor application arities', () => {
+		expect(() =>
+			parseAndType(`constraint BadKinds f (
+  one : f a -> f a;
+  two : f a b -> f a b
+)`)
+		).toThrow(/inconsistently/i);
 	});
 
 	test('kind checking rejects unsaturated nominal bodies', () => {

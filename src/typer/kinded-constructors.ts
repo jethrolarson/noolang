@@ -1,16 +1,14 @@
 import type {
-	FunctionType,
 	Type,
 	TypeConstructorAbstraction,
 	TypeConstructorAbstractionExpression,
-	TypeConstructorTerm,
 	TypeKind,
 } from '../ast';
 import type { ADTRegistry } from './types';
 
 const TYPE: TypeKind = { kind: 'Type' };
 
-const arrowKind = (arity: number): TypeKind => {
+export const arrowKind = (arity: number): TypeKind => {
 	let result: TypeKind = TYPE;
 	for (let index = 0; index < arity; index++) {
 		result = { kind: 'arrow', from: TYPE, to: result };
@@ -63,10 +61,19 @@ export const constructorParameterArity = (
 ): number => {
 	const arities: number[] = [];
 	const visit = (type: Type): void => {
-		if (type.kind === 'variant' && type.name === parameter)
-			arities.push(type.args.length);
-		if (type.kind === 'variant') type.args.forEach(visit);
-		else if (type.kind === 'function')
+		if (type.kind === 'type-application') {
+			const { constructor, arguments: args } = flattenTypeApplication(type);
+			if (
+				constructor.kind === 'constructor-variable' &&
+				constructor.name === parameter
+			) {
+				arities.push(args.length);
+				args.forEach(visit);
+			} else {
+				visit(type.constructor);
+				visit(type.argument);
+			}
+		} else if (type.kind === 'function')
 			[...type.params, type.return].forEach(visit);
 		else if (type.kind === 'list') visit(type.element);
 		else if (type.kind === 'tuple') type.elements.forEach(visit);
@@ -82,6 +89,34 @@ export const constructorParameterArity = (
 		);
 	}
 	return arities[0];
+};
+
+export const annotateConstructorKind = (
+	type: Type,
+	parameter: string,
+	typeKind: TypeKind
+): Type => {
+	if (type.kind === 'constructor-variable' && type.name === parameter)
+		return { ...type, typeKind };
+	if (type.kind === 'type-application')
+		return {
+			...type,
+			constructor: annotateConstructorKind(
+				type.constructor,
+				parameter,
+				typeKind
+			),
+			argument: annotateConstructorKind(type.argument, parameter, typeKind),
+		};
+	if (type.kind === 'function')
+		return {
+			...type,
+			params: type.params.map(part =>
+				annotateConstructorKind(part, parameter, typeKind)
+			),
+			return: annotateConstructorKind(type.return, parameter, typeKind),
+		};
+	return type;
 };
 
 export const compileConstructorAbstraction = (
@@ -110,17 +145,9 @@ export const compileConstructorAbstraction = (
 			);
 		}
 	}
-	let term: TypeConstructorTerm = {
-		kind: 'nominal-constructor',
-		name: nominal.name,
-		typeKind: arrowKind(nominal.arity),
-	};
-	for (const argument of nominal.args)
-		term = { kind: 'type-application', constructor: term, argument };
 	return {
 		parameters: expression.parameters,
 		body: expression.body,
-		term,
 		typeKind: arrowKind(expression.parameters.length),
 		nominalName: nominal.name,
 	};
@@ -241,92 +268,22 @@ export const betaReduce = (
 	return instantiate(abstraction.body, applied);
 };
 
-export const reduceTraitApplications = (
-	type: Type,
-	parameter: string,
-	abstraction: TypeConstructorAbstraction,
-	bindings: Map<string, Type>
-): Type => {
-	if (type.kind === 'variant' && type.name === parameter) {
-		return betaReduce(
-			abstraction,
-			type.args.map(arg =>
-				reduceTraitApplications(arg, parameter, abstraction, bindings)
-			),
-			bindings
-		);
-	}
-	if (type.kind === 'variant')
-		return {
-			...type,
-			args: type.args.map(arg =>
-				reduceTraitApplications(arg, parameter, abstraction, bindings)
-			),
-		};
-	if (type.kind === 'function')
-		return {
-			...type,
-			params: type.params.map(arg =>
-				reduceTraitApplications(arg, parameter, abstraction, bindings)
-			),
-			return: reduceTraitApplications(
-				type.return,
-				parameter,
-				abstraction,
-				bindings
-			),
-		};
-	if (type.kind === 'list')
-		return {
-			...type,
-			element: reduceTraitApplications(
-				type.element,
-				parameter,
-				abstraction,
-				bindings
-			),
-		};
-	if (type.kind === 'tuple')
-		return {
-			...type,
-			elements: type.elements.map(arg =>
-				reduceTraitApplications(arg, parameter, abstraction, bindings)
-			),
-		};
-	if (type.kind === 'record')
-		return {
-			...type,
-			fields: Object.fromEntries(
-				Object.entries(type.fields).map(([name, field]) => [
-					name,
-					reduceTraitApplications(field, parameter, abstraction, bindings),
-				])
-			),
-		};
-	if (type.kind === 'union')
-		return {
-			...type,
-			types: type.types.map(arg =>
-				reduceTraitApplications(arg, parameter, abstraction, bindings)
-			),
-		};
-	if (type.kind === 'constrained')
-		return {
-			...type,
-			baseType: reduceTraitApplications(
-				type.baseType,
-				parameter,
-				abstraction,
-				bindings
-			),
-		};
-	return type;
-};
-
 export const reduceConstructorValue = (
 	type: Type,
 	arguments_: Type[]
 ): Type => {
 	if (type.kind !== 'constructor') return type;
 	return betaReduce(type.abstraction, arguments_, type.bindings);
+};
+
+export const flattenTypeApplication = (
+	type: Type
+): { constructor: Type; arguments: Type[] } => {
+	const arguments_: Type[] = [];
+	let constructor = type;
+	while (constructor.kind === 'type-application') {
+		arguments_.unshift(constructor.argument);
+		constructor = constructor.constructor;
+	}
+	return { constructor, arguments: arguments_ };
 };
