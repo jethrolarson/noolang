@@ -56,7 +56,7 @@ Infix operators for trait methods that have one (`==` for `Eq`, presumably `<`/`
 
 ## Fix shape (not investigated)
 
-Not attempted — would need tracing how constraint resolution is scoped during type inference: whether it's memoized/cached per-identifier-per-lambda instead of per-call-site, or whether unification of the constrained identifier's type variable is shared incorrectly across sibling call sites within one lambda's body. Likely related to, but a different code path from, the higher-kinded arity gap in `docs/internal/bugs/TRAIT_SYSTEM_ARITY_BUG.md` / `docs/internal/adrs/adr_0009.md` — both are trait-constraint-resolution gaps, but this one reproduces on ordinary arity-1 types and doesn't involve kind modeling at all.
+Not attempted — would need tracing how constraint resolution is scoped during type inference: whether it's memoized/cached per-identifier-per-lambda instead of per-call-site, or whether unification of the constrained identifier's type variable is shared incorrectly across sibling call sites within one lambda's body. Likely related to, but a different code path from, the higher-kinded arity gap in `docs/internal/adrs/adr_0009.md` / `docs/internal/adrs/adr_0010.md` (now fixed) — both are trait-constraint-resolution gaps, but this one reproduces on ordinary arity-1 types and doesn't involve kind modeling at all.
 
 ## Trigger for picking this up
 
