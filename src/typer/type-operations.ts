@@ -62,7 +62,12 @@ export const freeTypeVars = (
 ): Set<string> => {
 	switch (type.kind) {
 		case 'variable':
+		case 'constructor-variable':
 			acc.add(type.name);
+			break;
+		case 'type-application':
+			freeTypeVars(type.constructor, acc);
+			freeTypeVars(type.argument, acc);
 			break;
 		case 'function':
 			for (const param of type.params) freeTypeVars(param, acc);
@@ -140,6 +145,13 @@ const freeTypeVarsWithConstraints = (
 	visited: Set<string> = new Set()
 ): Set<string> => {
 	switch (type.kind) {
+		case 'constructor-variable':
+			acc.add(type.name);
+			break;
+		case 'type-application':
+			freeTypeVarsWithConstraints(type.constructor, acc, visited);
+			freeTypeVarsWithConstraints(type.argument, acc, visited);
+			break;
 		case 'variable': {
 			acc.add(type.name);
 			// Guard against constraint cycles (a constraint's structure can name a
@@ -284,6 +296,28 @@ export const freshenTypeVariables = (
 			}
 			return [type, state];
 		}
+		case 'constructor-variable': {
+			const fresh = mapping.get(type.name);
+			return [
+				fresh && fresh.kind === 'variable'
+					? { ...type, name: fresh.name }
+					: type,
+				state,
+			];
+		}
+		case 'type-application': {
+			const [constructor, nextState] = freshenTypeVariables(
+				type.constructor,
+				mapping,
+				state
+			);
+			const [argument, finalState] = freshenTypeVariables(
+				type.argument,
+				mapping,
+				nextState
+			);
+			return [{ ...type, constructor, argument }, finalState];
+		}
 		case 'function': {
 			let currentState = state;
 			const newParams: Type[] = [];
@@ -374,44 +408,18 @@ export const freshenTypeVariables = (
 			return [{ ...type, types: newTypes }, currentState];
 		}
 		case 'variant': {
-			// Check if this variant name is actually a type parameter that should be freshened
-			const mappedVar = mapping.get(type.name);
-			if (mappedVar && mappedVar.kind === 'variable') {
-				// This variant represents a type parameter, replace it with the fresh type variable
-				let currentState = state;
-				const newArgs: Type[] = [];
-				for (const arg of type.args) {
-					const [newArg, nextState] = freshenTypeVariables(
-						arg,
-						mapping,
-						currentState
-					);
-					newArgs.push(newArg);
-					currentState = nextState;
-				}
-				return [
-					{
-						kind: 'variant',
-						name: mappedVar.name,
-						args: newArgs,
-					},
-					currentState,
-				];
-			} else {
-				// This is a concrete variant type (Bool, Option, etc.), just freshen the args
-				let currentState = state;
-				const newArgs: Type[] = [];
-				for (const arg of type.args) {
-					const [newArg, nextState] = freshenTypeVariables(
-						arg,
-						mapping,
-						currentState
-					);
-					newArgs.push(newArg);
-					currentState = nextState;
-				}
-				return [{ ...type, args: newArgs }, currentState];
+			let currentState = state;
+			const newArgs: Type[] = [];
+			for (const arg of type.args) {
+				const [newArg, nextState] = freshenTypeVariables(
+					arg,
+					mapping,
+					currentState
+				);
+				newArgs.push(newArg);
+				currentState = nextState;
 			}
+			return [{ ...type, args: newArgs }, currentState];
 		}
 		default:
 			return [type, state];

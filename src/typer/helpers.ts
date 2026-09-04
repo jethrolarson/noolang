@@ -143,6 +143,16 @@ const typesEqualUncached = (t1: Type, t2: Type): boolean => {
 		case 'primitive':
 			return t1.name === (t2 as PrimitiveType).name;
 
+		case 'constructor-variable':
+			return t2.kind === 'constructor-variable' && t1.name === t2.name;
+
+		case 'type-application':
+			return (
+				t2.kind === 'type-application' &&
+				typesEqual(t1.constructor, t2.constructor) &&
+				typesEqual(t1.argument, t2.argument)
+			);
+
 		case 'function': {
 			const f2 = t2 as FunctionType;
 			if (t1.params.length !== f2.params.length) {
@@ -423,6 +433,12 @@ export const typeToString = (
 					allConstraints.push(...t.constraints);
 				}
 				break;
+			case 'constructor-variable':
+				break;
+			case 'type-application':
+				collectConstraints(t.constructor);
+				collectConstraints(t.argument);
+				break;
 			case 'function':
 				// For function types, prioritize function-level constraints over parameter constraints
 				if (t.constraints && t.constraints.length > 0) {
@@ -461,6 +477,18 @@ export const typeToString = (
 		}
 	}
 
+	// Parenthesize a compound argument so it reads as one argument to the
+	// enclosing constructor: `Two (Option String) Float`.
+	function argAtom(t: Type): string {
+		const needsParens =
+			t.kind === 'function' ||
+			t.kind === 'type-application' ||
+			t.kind === 'list' ||
+			t.kind === 'constrained' ||
+			(t.kind === 'variant' && t.args.length > 0);
+		return needsParens ? `(${norm(t)})` : norm(t);
+	}
+
 	// Helper to assign/display variable names
 	function norm(t: Type): string {
 		switch (t.kind) {
@@ -490,6 +518,17 @@ export const typeToString = (
 				}
 				return mapping.get(t.name)!;
 			}
+			case 'constructor-variable': {
+				if (!mapping.has(t.name)) {
+					mapping.set(t.name, latin[next] || `t${next}`);
+					next++;
+				}
+				return mapping.get(t.name)!;
+			}
+			case 'type-application':
+				return `${norm(t.constructor)} ${argAtom(t.argument)}`;
+			case 'constructor':
+				return `<constructor ${t.abstraction.nominalName}>`;
 			case 'list':
 				return `List ${norm(t.element)}`;
 			case 'tuple':
@@ -521,7 +560,7 @@ export const typeToString = (
 				if (t.args.length === 0) {
 					return variantName;
 				} else {
-					return `${variantName} ${t.args.map(norm).join(' ')}`;
+					return `${variantName} ${t.args.map(argAtom).join(' ')}`;
 				}
 			}
 			case 'unit':
@@ -539,7 +578,7 @@ export const typeToString = (
 					for (const constraint of constraints) {
 						if (constraint.kind === 'implements') {
 							constraintStrs.push(
-								`${varName} implements ${constraint.interfaceName}`
+								`${normalizeConstraintVariable(varName)} implements ${constraint.interfaceName}`
 							);
 						} else if (constraint.kind === 'hasField') {
 							constraintStrs.push(
@@ -803,7 +842,13 @@ function deduplicateConstraints(
 export const occursIn = (varName: string, type: Type): boolean => {
 	switch (type.kind) {
 		case 'variable':
+		case 'constructor-variable':
 			return type.name === varName;
+		case 'type-application':
+			return (
+				occursIn(varName, type.constructor) ||
+				occursIn(varName, type.argument)
+			);
 		case 'function':
 			return (
 				type.params.some(param => occursIn(varName, param)) ||

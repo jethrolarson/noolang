@@ -29,6 +29,8 @@ import {
 	type TupleExpression,
 	type ConstraintDefinitionExpression,
 	type ImplementDefinitionExpression,
+	type TypeConstructorAbstractionExpression,
+	type Type,
 	type ConstraintFunction,
 	type ImplementationFunction,
 	type MutationExpression,
@@ -1544,11 +1546,44 @@ const parseImplementationFunction: C.Parser<ImplementationFunction> = C.map(
 );
 
 // --- Implement Definition ---
+const parseTypefnKeyword: C.Parser<Token> = tokens =>
+	tokens[0]?.type === 'IDENTIFIER' && tokens[0].value === 'typefn'
+		? { success: true, value: tokens[0], remaining: tokens.slice(1) }
+		: {
+				success: false,
+				error: 'Expected typefn',
+				position: tokens[0]?.location.start.line ?? 0,
+			};
+
+const parseTypeConstructorAbstraction: C.Parser<TypeConstructorAbstractionExpression> =
+	C.map(
+		C.seq(
+			C.punctuation('('),
+			parseTypefnKeyword,
+			C.many1(C.identifier()),
+			C.operator('=>'),
+			C.lazy(() => parseTypeExpression),
+			C.punctuation(')')
+		),
+		([_open, _typefn, parameters, _arrow, body]) => ({
+			kind: 'type-constructor-abstraction',
+			parameters: parameters.map(parameter => parameter.value),
+			body,
+		})
+	);
+
+const parseImplementTarget: C.Parser<
+	TypeConstructorAbstractionExpression | Type
+> = tokens => {
+	const abstraction = parseTypeConstructorAbstraction(tokens);
+	return abstraction.success ? abstraction : parseTypeExpression(tokens);
+};
+
 const parseImplementDefinition: C.Parser<ImplementDefinitionExpression> = C.map(
 	C.seq(
 		C.keyword('implement'),
 		C.identifier(), // constraint name like "Monad"
-		C.lazy(() => parseTypeExpression), // type expression like "Option" or "(Result e)"
+		parseImplementTarget,
 		// Optional given constraints
 		C.optional(
 			C.seq(

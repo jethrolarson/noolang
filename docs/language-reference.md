@@ -621,6 +621,31 @@ Notes:
 - Constructors and types share the type namespace for shadowing checks.
 - Value-level shadowing rules are unchanged.
 
+## Traits and constructor-valued implementations
+
+Trait parameters may range over ordinary value types or over constructors. A
+constructor-valued parameter is recognized from applications such as `f a` in the
+trait signature. Its implementations must use an explicit compile-time `typefn`:
+
+```noolang
+constraint TaggedMap f (
+  tagged_map : (a -> b) -> f a -> f b
+);
+variant Tagged context value = Tagged context value;
+implement TaggedMap (typefn value => Tagged context value) (
+  tagged_map = fn transform tagged => match tagged (
+    Tagged context value => Tagged context (transform value)
+  )
+);
+tagged_map show (Tagged "kept" 2)  # => Tagged "kept" "2" : Tagged String String
+```
+
+Each `typefn` parameter must occur exactly once as a direct argument of one
+saturated nominal constructor. Fixed arguments can appear before, after, or between
+those parameters. Type aliases and structural types cannot identify an implementation
+because they have no nominal runtime tag. Implementations are coherent for the whole
+nominal constructor, not individual applications of it.
+
 ## Comments
 
 ```noolang

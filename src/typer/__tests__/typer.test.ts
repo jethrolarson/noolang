@@ -251,8 +251,8 @@ test('Constraint Propagation (Functional Typer) - should allow composition when 
       result = safeHead listId [[1, 2, 3], [4, 5, 6]]
     `);
 	const typeStr = typeToString(result.type, result.state.substitution);
-	// head now returns Option List Float instead of List Float
-	expect(typeStr).toBe('Option List Float');
+	// head now returns Option (List Float) instead of List Float
+	expect(typeStr).toBe('Option (List Float)');
 });
 
 test('Typer - optional accessor returns Option type', () => {

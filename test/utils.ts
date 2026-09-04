@@ -29,6 +29,7 @@ import type {
 	PrimitiveType,
 	VariantType,
 	Type,
+	TypeConstructorAbstractionExpression,
 	Expression,
 	Pattern,
 	TuplePattern,
@@ -246,7 +247,9 @@ export function assertPrimitiveType(type: Type): asserts type is PrimitiveType {
 	}
 }
 
-export function assertVariantType(type: Type): asserts type is VariantType {
+export function assertVariantType(
+	type: Type | TypeConstructorAbstractionExpression
+): asserts type is VariantType {
 	if (type.kind !== 'variant') {
 		throw new Error(`Expected kind 'variant', got '${type.kind}'`);
 	}

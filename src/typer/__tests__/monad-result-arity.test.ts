@@ -13,10 +13,9 @@
  * elsewhere in the same expression, throwing "Variant arity mismatch:
  * Result has 1 vs 2 type arguments" even though the program was well-typed.
  *
- * Fixed in unify.ts (tryUnifyConstrainedVariant) by binding the placeholder
- * to the concrete constructor's *extra* trailing args only, and in
- * substitute.ts by appending those extras after each occurrence's own args
- * instead of discarding them.
+ * The kinded-constructor spike removes that reconstruction: the explicit
+ * Result abstraction beta-reduces each `m ...` application in constructor
+ * order before ordinary unification.
  */
 import { describe, test, expect } from 'bun:test';
 import { expectSuccess, parseAndType } from '../../../test/utils';

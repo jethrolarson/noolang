@@ -1,4 +1,9 @@
-import { Type, Constraint, type RecordStructure } from '../ast';
+import {
+	Type,
+	Constraint,
+	type RecordStructure,
+	type TypeKind,
+} from '../ast';
 import { substitute } from './substitute';
 import { TypeState } from './types';
 import { isTypeKind, typesEqual, constraintsEqual } from './helpers';
@@ -13,15 +18,18 @@ import { addConstraints, getConstraints } from './constraint-store';
 // Legacy constraint imports removed
 import { functionApplicationError } from './type-errors';
 import { getTypeName } from './trait-system';
+import {
+	flattenTypeApplication,
+	matchConstructorAbstraction,
+} from './kinded-constructors';
 
-// Valid primitive type names (must match PrimitiveType['name'] union)
-const VALID_PRIMITIVES = new Set(['Float', 'String'] as const);
-type ValidPrimitiveName = 'Float' | 'String';
-
-// Type guard for valid primitive names
-function isValidPrimitiveName(name: string): name is ValidPrimitiveName {
-	return VALID_PRIMITIVES.has(name as ValidPrimitiveName);
-}
+const sameKind = (
+	left: TypeKind | undefined,
+	right: TypeKind | undefined
+): boolean =>
+	left === undefined ||
+	right === undefined ||
+	JSON.stringify(left) === JSON.stringify(right);
 
 const unifyCallSources = new Map<string, number>(); // Track where unify calls come from
 const unifyTypePatterns = new Map<string, number>(); // Track what types are being unified
@@ -31,6 +39,10 @@ const typeToPattern = (t: Type): string => {
 	switch (t.kind) {
 		case 'variable':
 			return `var:${t.name}`;
+		case 'constructor-variable':
+			return `ctor-var:${t.name}`;
+		case 'type-application':
+			return 'type-app';
 		case 'primitive':
 			return `prim:${t.name}`;
 		case 'function':
@@ -82,13 +94,13 @@ const unifyInternal = (
 
 	if (typesEqual(s1, s2)) return state;
 
-	// Handle constraint resolution EARLY to provide better error messages
-	// Check if one type is a variant with a constrained type variable name
+	// Constructor abstractions reduce before the ordinary first-order cases.
 	if (
 		context?.constraintContext &&
-		(isTypeKind(s1, 'variant') || isTypeKind(s2, 'variant'))
+		(isTypeKind(s1, 'type-application') ||
+			isTypeKind(s2, 'type-application'))
 	) {
-		const constraintResult = tryUnifyConstrainedVariant(
+		const constraintResult = tryUnifyConstrainedApplication(
 			s1,
 			s2,
 			state,
@@ -103,6 +115,52 @@ const unifyInternal = (
 	// Handle variables (either order)
 	if (isTypeKind(s1, 'variable')) return unifyVariable(s1, s2, state, location);
 	if (isTypeKind(s2, 'variable')) return unifyVariable(s2, s1, state, location);
+
+	if (isTypeKind(s1, 'constructor-variable')) {
+		if (isTypeKind(s2, 'constructor-variable') || isTypeKind(s2, 'constructor')) {
+			const rightKind =
+				s2.kind === 'constructor-variable'
+					? s2.typeKind
+					: s2.abstraction.typeKind;
+			if (!sameKind(s1.typeKind, rightKind)) {
+				throw new Error('Constructor kind mismatch');
+			}
+			const substitution = new Map(state.substitution);
+			substitution.set(s1.name, s2);
+			return { ...state, substitution };
+		}
+	}
+	if (isTypeKind(s2, 'constructor-variable')) {
+		if (isTypeKind(s1, 'constructor')) {
+			if (!sameKind(s2.typeKind, s1.abstraction.typeKind)) {
+				throw new Error('Constructor kind mismatch');
+			}
+			const substitution = new Map(state.substitution);
+			substitution.set(s2.name, s1);
+			return { ...state, substitution };
+		}
+	}
+
+	if (
+		isTypeKind(s1, 'type-application') &&
+		isTypeKind(s2, 'type-application')
+	) {
+		let nextState = unify(
+			s1.constructor,
+			s2.constructor,
+			state,
+			location,
+			context
+		);
+		nextState = unify(
+			s1.argument,
+			s2.argument,
+			nextState,
+			location,
+			context
+		);
+		return nextState;
+	}
 
 	// Handle function types
 	if (isTypeKind(s1, 'function') && isTypeKind(s2, 'function')) {
@@ -878,234 +936,82 @@ function unifyConstrained(
 	throw new Error('unifyConstrained called with non-constrained types');
 }
 
-// PHASE 3: Try to unify a variant type with a constrained type variable against a concrete type
-function tryUnifyConstrainedVariant(
+function tryUnifyConstrainedApplication(
 	s1: Type,
 	s2: Type,
 	state: TypeState,
 	location?: { line: number; column: number },
-	context?: {
-		reason?: string;
-		operation?: string;
-		hint?: string;
-		constraintContext?: Constraint[];
-	}
+	context?: { constraintContext?: Constraint[] }
 ): TypeState | null {
-	// Only proceed if we have constraint context
-	if (!context?.constraintContext) {
-		return null;
-	}
-
-	let variantType: Type & { kind: 'variant' };
-	let concreteType: Type;
-
-	if (isTypeKind(s1, 'variant') && !isTypeKind(s2, 'variant')) {
-		variantType = s1;
-		concreteType = s2;
-	} else if (isTypeKind(s2, 'variant') && !isTypeKind(s1, 'variant')) {
-		variantType = s2;
-		concreteType = s1;
-	} else if (isTypeKind(s1, 'variant') && isTypeKind(s2, 'variant')) {
-		// Both are variants - check if one is a constrained type variable
-		const s1Name = s1.name;
-		const s2Name = s2.name;
-
-		// Check if s1 is a constrained type variable
-		const s1HasConstraints = context.constraintContext.some(
-			c =>
-				(c.kind === 'implements' ||
-					c.kind === 'hasField' ||
-					c.kind === 'is' ||
-					c.kind === 'custom' ||
-					c.kind === 'has') &&
-				c.typeVar === s1Name
-		);
-		const s2HasConstraints = context.constraintContext.some(
-			c =>
-				(c.kind === 'implements' ||
-					c.kind === 'hasField' ||
-					c.kind === 'is' ||
-					c.kind === 'custom' ||
-					c.kind === 'has') &&
-				c.typeVar === s2Name
-		);
-
-		if (s1HasConstraints) {
-			variantType = s1;
-			concreteType = s2;
-		} else if (s2HasConstraints) {
-			variantType = s2;
-			concreteType = s1;
-		} else {
-			return null; // Neither variant is constrained
-		}
-	} else {
-		return null; // Neither is variant
-	}
-
-	// Check if this variant type variable has constraints
-	const constraints = context.constraintContext.filter(
-		c =>
-			(c.kind === 'implements' ||
-				c.kind === 'hasField' ||
-				c.kind === 'is' ||
-				c.kind === 'custom' ||
-				c.kind === 'has') &&
-			c.typeVar === variantType.name
+	if (!context?.constraintContext) return null;
+	const application =
+		s1.kind === 'type-application'
+			? s1
+			: s2.kind === 'type-application'
+				? s2
+				: null;
+	if (!application) return null;
+	const concreteType = application === s1 ? s2 : s1;
+	const flattened = flattenTypeApplication(application);
+	if (flattened.constructor.kind !== 'constructor-variable') return null;
+	const constructorName = flattened.constructor.name;
+	const constraint = context.constraintContext.find(
+		candidate =>
+			candidate.kind === 'implements' && candidate.typeVar === constructorName
 	);
-	if (constraints.length === 0) {
-		return null; // No constraints on this type variable
+	if (!constraint || constraint.kind !== 'implements') return null;
+
+	if (concreteType.kind === 'variable') {
+		const substitution = new Map(state.substitution);
+		substitution.set(concreteType.name, application);
+		return { ...state, substitution };
+	}
+	if (concreteType.kind === 'type-application') {
+		return unify(application, concreteType, state, location);
+	}
+	if (concreteType.kind === 'constrained') {
+		return unify(application, concreteType.baseType, state, location);
 	}
 
 	const concreteTypeName = getTypeName(concreteType);
-	const traitRegistry = state.traitRegistry;
-	if (!traitRegistry) {
-		return null;
+	const implementation = state.traitRegistry.implementations
+		.get(constraint.interfaceName)
+		?.get(concreteTypeName);
+	const abstraction = implementation?.constructorAbstraction;
+	const bindings = abstraction
+		? matchConstructorAbstraction(abstraction, concreteType)
+		: null;
+	if (!abstraction || !bindings) {
+		throw new Error(
+			formatTypeError(
+				createTypeError(
+					`No implementation of ${constraint.interfaceName} for ${concreteTypeName}; implement it with an explicit constructor abstraction`,
+					{},
+					location || { line: 1, column: 1 }
+				)
+			)
+		);
 	}
-
-	// Special case: if concreteType is also a type variable, check for constraint compatibility
-	if (
-		concreteType.kind === 'variable' ||
-		(concreteType.kind === 'variant' && concreteTypeName.startsWith('α')) ||
-		(concreteType.kind === 'constrained' && concreteTypeName.startsWith('α'))
-	) {
-		// Both are type variables - we can unify them by propagating constraints
-		// For now, substitute the variant type with the concrete type
-		const newSubstitution = new Map(state.substitution);
-		newSubstitution.set(variantType.name, concreteType);
-		return { ...state, substitution: newSubstitution };
-	}
-
-	// Check if any constraint can be satisfied by the concrete type
-	for (const constraint of constraints) {
-		if (constraint.kind === 'implements') {
-			const traitName = constraint.interfaceName;
-			const traitImpls = traitRegistry.implementations.get(traitName);
-
-			if (traitImpls && traitImpls.has(concreteTypeName)) {
-				// Constraint is satisfied! Perform the substitution
-				const newSubstitution = new Map(state.substitution);
-
-				if (concreteType.kind === 'list') {
-					// For List types, substitute the type constructor
-					newSubstitution.set(variantType.name, {
-						kind: 'variant',
-						name: 'List',
-						args: [], // Empty args since this is just the constructor
-					});
-
-					// Transform α130 Float -> List Float
-					const substitutedVariant = substitute(variantType, newSubstitution);
-
-					if (
-						substitutedVariant.kind === 'variant' &&
-						substitutedVariant.name === 'List' &&
-						substitutedVariant.args.length === 1
-					) {
-						// Create the proper List type
-						const listType = {
-							kind: 'list' as const,
-							element: substitutedVariant.args[0],
-						};
-
-						// Check if types match
-						if (concreteType.kind === 'list') {
-							// Unify the element types
-							const elementUnificationState = unify(
-								listType.element,
-								concreteType.element,
-								{ ...state, substitution: newSubstitution },
-								location
-							);
-							return elementUnificationState;
-						}
-					}
-				}
-
-				// PHASE 3 FIX: Handle variant types like Option, Result, etc.
-				if (concreteType.kind === 'variant') {
-					const concreteVariant = concreteType; // Type-safe access
-
-					// Validate that we're not trying to create an invalid primitive
-					if (isValidPrimitiveName(concreteVariant.name)) {
-						// Only valid primitives can be substituted as primitives
-						newSubstitution.set(variantType.name, {
-							kind: 'primitive',
-							name: concreteVariant.name, // TypeScript now knows this is ValidPrimitiveName
-						});
-					} else {
-						// For non-primitive variants (Option, Result, etc.), bind the
-						// constructor placeholder to the concrete constructor's name plus
-						// any "extra" trailing type args the concrete type carries beyond
-						// what the trait's (unary) signature models — e.g. `Monad m`
-						// declares only `m a`, but `Result a b` has a second (error) type
-						// param the trait never sees. substitute.ts re-appends these
-						// extras to each occurrence's own args, so storing the full
-						// concreteVariant here (old behavior) would double up/overwrite
-						// the wrong slot once args differ in length.
-						const extraArgs = concreteVariant.args.slice(
-							variantType.args.length
-						);
-						newSubstitution.set(variantType.name, {
-							kind: 'variant',
-							name: concreteVariant.name,
-							args: extraArgs,
-						});
-					}
-
-					// Transform α130 Float -> Option Float (variant)
-					const substitutedVariant = substitute(variantType, newSubstitution);
-
-					if (
-						substitutedVariant.kind === 'variant' &&
-						substitutedVariant.name === concreteVariant.name &&
-						substitutedVariant.args &&
-						concreteVariant.args &&
-						substitutedVariant.args.length === concreteVariant.args.length
-					) {
-						// Unify the type arguments
-						let currentState = { ...state, substitution: newSubstitution };
-						for (let i = 0; i < substitutedVariant.args.length; i++) {
-							currentState = unify(
-								substitutedVariant.args[i],
-								concreteVariant.args[i],
-								currentState,
-								location
-							);
-						}
-						return currentState;
-					}
-				}
-
-				// For other types, try direct substitution
-				newSubstitution.set(variantType.name, concreteType);
-				return { ...state, substitution: newSubstitution };
-			} else {
-				// Constraint not satisfied - throw specific error
-				throw new Error(
-					formatTypeError(
-						createTypeError(
-							`No implementation of ${traitName} for ${concreteTypeName}`,
-							{
-								suggestion:
-									`The constraint '${variantType.name} implements ${traitName}' cannot be satisfied by ${concreteTypeName}. ` +
-									`You need to add: implement ${traitName} ${concreteTypeName} (...)`,
-							},
-							location || { line: 1, column: 1 }
-						)
-					)
-				);
-			}
-		}
-	}
-
-	return null; // No constraint resolution possible
+	const substitution = new Map(state.substitution);
+	substitution.set(constructorName, { kind: 'constructor', abstraction, bindings });
+	return unify(
+		substitute(application, substitution),
+		concreteType,
+		{ ...state, substitution },
+		location
+	);
 }
 
 function containsTypeVariable(type: Type): boolean {
 	switch (type.kind) {
 		case 'variable':
+		case 'constructor-variable':
 			return true;
+		case 'type-application':
+			return (
+				containsTypeVariable(type.constructor) ||
+				containsTypeVariable(type.argument)
+			);
 		case 'function':
 			return (
 				type.params.some(containsTypeVariable) ||
@@ -1134,6 +1040,12 @@ function unifyConstrainedWithConcrete(
 	state: TypeState,
 	location?: { line: number; column: number }
 ): TypeState {
+	if (concreteType.kind === 'type-application') {
+		return unify(constrainedType.baseType, concreteType, state, location);
+	}
+	if (concreteType.kind === 'variable') {
+		return unify(concreteType, constrainedType.baseType, state, location);
+	}
 	const constraintDescribesOnlyInputs = !containsTypeVariable(
 		constrainedType.baseType
 	);
@@ -1141,115 +1053,70 @@ function unifyConstrainedWithConcrete(
 		return unify(constrainedType.baseType, concreteType, state, location);
 	}
 
-	// Get the concrete type name for trait lookup
 	const concreteTypeName = getTypeName(concreteType);
-
-	// Find which constrained type variable can be resolved to the concrete type
-	let resolvedVarName: string | null = null;
-
-	// Check each constraint to see if the concrete type satisfies it
-	for (const [varName, constraints] of constrainedType.constraints) {
-		for (const constraint of constraints) {
-			if (constraint.kind === 'implements') {
-				const traitName = constraint.interfaceName;
-
-				// Check if we have an implementation of this trait for the concrete type
-				const traitRegistry = state.traitRegistry;
-				if (!traitRegistry) {
-					throw new Error(
-						formatTypeError(
-							createTypeError(
-								`No trait registry available for constraint resolution`,
-								{},
-								location || { line: 1, column: 1 }
-							)
-						)
-					);
-				}
-
-				const traitImpls = traitRegistry.implementations.get(traitName);
-				if (!traitImpls || !traitImpls.has(concreteTypeName)) {
-					throw new Error(
-						formatTypeError(
-							createTypeError(
-								`No implementation of ${traitName} for ${concreteTypeName}`,
-								{
-									suggestion:
-										`The constraint '${varName} implements ${traitName}' cannot be satisfied by ${concreteTypeName}. ` +
-										`You need to add: implement ${traitName} ${concreteTypeName} (...)`,
-								},
-								location || { line: 1, column: 1 }
-							)
-						)
-					);
-				}
-
-				// This constraint is satisfied - remember it for substitution
-				resolvedVarName = varName;
-			}
-		}
+	const baseApplication = flattenTypeApplication(constrainedType.baseType);
+	const constructorVariable =
+		baseApplication.constructor.kind === 'constructor-variable'
+			? baseApplication.constructor.name
+			: null;
+	const entry = Array.from(constrainedType.constraints.entries())
+		.flatMap(([typeVar, constraints]) =>
+			constraints.map(constraint => ({ typeVar, constraint }))
+		)
+		.find(
+			({ typeVar, constraint }) =>
+				constraint.kind === 'implements' &&
+				(constructorVariable === null || typeVar === constructorVariable)
+		);
+	if (!entry || entry.constraint.kind !== 'implements') {
+		throw new Error(`No resolvable constraints found for ${concreteTypeName}`);
 	}
-
-	if (!resolvedVarName) {
+	if (constructorVariable === null) {
+		const implementation = state.traitRegistry.implementations
+			.get(entry.constraint.interfaceName)
+			?.get(concreteTypeName);
+		if (!implementation) {
+			throw new Error(
+				`No implementation of ${entry.constraint.interfaceName} for ${concreteTypeName}`
+			);
+		}
+		const substitution = new Map(state.substitution);
+		substitution.set(entry.typeVar, concreteType);
+		return unify(
+			substitute(constrainedType.baseType, substitution),
+			concreteType,
+			{ ...state, substitution },
+			location
+		);
+	}
+	const implementation = state.traitRegistry.implementations
+		.get(entry.constraint.interfaceName)
+		?.get(concreteTypeName);
+	const abstraction = implementation?.constructorAbstraction;
+	const bindings = abstraction
+		? matchConstructorAbstraction(abstraction, concreteType)
+		: null;
+	if (!abstraction || !bindings) {
 		throw new Error(
 			formatTypeError(
 				createTypeError(
-					`No resolvable constraints found for ${concreteTypeName}`,
+					`No implementation of ${entry.constraint.interfaceName} for ${concreteTypeName}; implement it with an explicit constructor abstraction`,
 					{},
 					location || { line: 1, column: 1 }
 				)
 			)
 		);
 	}
-
-	// Create substitution mapping the constrained variable to the concrete type constructor
-	const newSubstitution = new Map(state.substitution);
-
-	// CONSTRAINT COLLAPSE FIX: When we have a concrete type that satisfies the constraint,
-	// we should substitute the type variable with the concrete type constructor
-
-	if (concreteType.kind === 'list') {
-		// For List Float, we substitute the type constructor variable with the list type constructor
-		// We need to create a type constructor representation for List
-		newSubstitution.set(resolvedVarName, {
-			kind: 'variant',
-			name: 'List',
-			args: [], // Empty args since this is just the constructor
-		});
-	} else if (concreteType.kind === 'variant') {
-		// For Option Float, Maybe String, etc., we need to substitute with a type constructor
-		// We can't create a primitive with variant name, so we substitute with the variant type itself
-		// but extract just the constructor part
-		newSubstitution.set(resolvedVarName, {
-			kind: 'variant',
-			name: concreteType.name,
-			args: [], // Empty args since this is just the constructor
-		});
-	} else {
-		// For other types, substitute directly
-		newSubstitution.set(resolvedVarName, concreteType);
-	}
-
-	const newState = { ...state, substitution: newSubstitution };
-
-	// Apply the substitution to the base type
+	const substitution = new Map(state.substitution);
+	substitution.set(entry.typeVar, { kind: 'constructor', abstraction, bindings });
 	const substitutedBaseType = substitute(
 		constrainedType.baseType,
-		newSubstitution
+		substitution
 	);
-
-	// CRITICAL FIX: Instead of calling unify recursively (which might preserve constraints),
-	// check if the substituted base type now equals the concrete type.
-	// If so, the constraint is fully resolved and we can return the new state.
-
-	// Apply the substitution to make the comparison
-	const finalSubstitutedType = substitute(substitutedBaseType, newSubstitution);
-
-	// If the types are now equal after substitution, constraint is resolved
-	if (typesEqual(finalSubstitutedType, concreteType)) {
-		return newState;
-	}
-
-	// Otherwise, continue with normal unification
-	return unify(substitutedBaseType, concreteType, newState, location);
+	return unify(
+		substitutedBaseType,
+		concreteType,
+		{ ...state, substitution },
+		location
+	);
 }
