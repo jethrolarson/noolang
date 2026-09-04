@@ -79,14 +79,13 @@ that as a design signal and propose a refactor.
 
 Code must not lie: names, types, and structure reflect what the code actually does.
 Express intent by decomposition, not comments or procedural narration — extract a
-concept rather than introduce a procedural intermediate. Pipelines read linearly in
-source order. Push correctness into the type layer; make illegal states unrepresentable
-where practical.
+concept rather than introduce a procedural intermediate. Comment only unobvious "why"
+and public API where appropriate, other comments which only restate what code says can 
+be omitted. Pipelines read linearly in source order. Push correctness into the type 
+layer; make illegal states unrepresentable where practical.
 
 Minor duplication beats a premature abstraction, and YAGNI wins ties. Don't
 pre-optimize into something that's harder to maintain.
-
-Comments: Express meaning through decomposition and names--not narrative comments. Document only unobvious "why" and public API where appropriate.
 
 ## Prompting
 
