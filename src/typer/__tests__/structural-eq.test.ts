@@ -47,6 +47,24 @@ implement Eq Key (
 		expectSuccess(code, true);
 	});
 
+	test('explicit conditional instances match structural nominal arguments', () => {
+		const tupleInstance = `variant TupleBox a b = TupleBox {a, b};
+implement Eq (TupleBox {a, Float} b) given b implements Eq (
+  equals = fn left right => True
+);`;
+		const tupleValue = '(TupleBox {{fn x => x, 1}, "ok"})';
+		expectSuccess(`${tupleInstance}\n${tupleValue} == ${tupleValue}`, true);
+		expectSuccess(`${tupleInstance}\nequals ${tupleValue} ${tupleValue}`, true);
+
+		const recordInstance = `variant RecordBox a b = RecordBox {a, b};
+implement Eq (RecordBox {@call a, @rank Float} b) given b implements Eq (
+  equals = fn left right => True
+);`;
+		const recordValue = '(RecordBox {{@call (fn x => x), @rank 1}, "ok"})';
+		expectSuccess(`${recordInstance}\n${recordValue} == ${recordValue}`, true);
+		expectSuccess(`${recordInstance}\nequals ${recordValue} ${recordValue}`, true);
+	});
+
 	test('retains polymorphic structural Eq obligations until instantiation', () => {
 		expectSuccess('(fn x => {x} == {x}) 1', true);
 		expectError('(fn x => {x} == {x}) (fn y => y)', /No implementation/);

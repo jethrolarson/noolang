@@ -69,22 +69,52 @@ const bindTarget = (
 		}
 		return typesEqual(existing, actual);
 	}
-	if (pattern.kind === 'primitive' && actual.kind === 'primitive') {
-		return pattern.name === actual.name;
+	if (pattern.kind !== actual.kind) return false;
+	switch (pattern.kind) {
+		case 'list':
+			return actual.kind === 'list' &&
+				bindTarget(pattern.element, actual.element, bindings);
+		case 'variant':
+			return actual.kind === 'variant' &&
+				pattern.name === actual.name &&
+				bindTargets(pattern.args, actual.args, bindings);
+		case 'tuple':
+			return actual.kind === 'tuple' &&
+				bindTargets(pattern.elements, actual.elements, bindings);
+		case 'record':
+			return actual.kind === 'record' &&
+				Object.keys(pattern.fields).length === Object.keys(actual.fields).length &&
+				Object.entries(pattern.fields).every(([name, field]) =>
+					Object.hasOwn(actual.fields, name) &&
+					bindTarget(field, actual.fields[name], bindings)
+				);
+		case 'function':
+			return actual.kind === 'function' &&
+				bindTargets(pattern.params, actual.params, bindings) &&
+				bindTarget(pattern.return, actual.return, bindings);
+		case 'type-application':
+			return actual.kind === 'type-application' &&
+				bindTarget(pattern.constructor, actual.constructor, bindings) &&
+				bindTarget(pattern.argument, actual.argument, bindings);
+		case 'union':
+			return actual.kind === 'union' &&
+				bindTargets(pattern.types, actual.types, bindings);
+		case 'constrained':
+			return actual.kind === 'constrained' &&
+				bindTarget(pattern.baseType, actual.baseType, bindings);
+		default:
+			return typesEqual(pattern, actual);
 	}
-	if (pattern.kind === 'unit') return actual.kind === 'unit';
-	if (pattern.kind === 'list' && actual.kind === 'list') {
-		return bindTarget(pattern.element, actual.element, bindings);
-	}
-	if (pattern.kind === 'variant' && actual.kind === 'variant') {
-		return pattern.name === actual.name &&
-			pattern.args.length === actual.args.length &&
-			pattern.args.every((item, index) =>
-				bindTarget(item, actual.args[index], bindings)
-			);
-	}
-	return false;
 };
+
+const bindTargets = (
+	patterns: Type[],
+	actuals: Type[],
+	bindings: Map<string, Type>
+): boolean => patterns.length === actuals.length &&
+	patterns.every((pattern, index) =>
+		bindTarget(pattern, actuals[index], bindings)
+	);
 
 const typeKey = (type: Type): string => {
 	switch (type.kind) {
