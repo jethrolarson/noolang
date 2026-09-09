@@ -361,30 +361,6 @@ json_index = fn idx v => bind (json_as_array v) (fn items =>
   )
 ) : Float -> JsonValue -> Result JsonValue JsonError;
 
-# implement Eq (not a bare function) so Eq (List a)/Eq (Option a)'s existing
-# generic instances (stdlib.noo) pick up JsonValue for free, and `==` works
-# directly. Infix `==`, not prefix `equals`: the JObject case needs `equals`
-# resolved at two different types in one lambda (String for keys, JsonValue
-# for values, in the callback passed to primitive_list_all2) — a
-# trait-constrained identifier used at 2+ types within a single lambda body
-# doesn't get each call site independently resolved (confirmed unrelated to
-# self-recursion or to JsonValue specifically: docs/internal/bugs/
-# TRAIT_CONSTRAINT_SINGLE_LAMBDA_BUG.md). `==` doesn't go through that path.
-implement Eq JsonValue (
-  equals = fn a b => match a (
-    JNull => match b (JNull => True; _ => False);
-    JBool x => match b (JBool y => x == y; _ => False);
-    JNumber x => match b (JNumber y => x == y; _ => False);
-    JString x => match b (JString y => x == y; _ => False);
-    JArray xs => match b (JArray ys => primitive_list_all2 (fn x y => x == y) xs ys; _ => False);
-    JObject xs => match b (JObject ys => primitive_list_all2 (fn px py => (
-        {kx, vx} = px;
-        {ky, vy} = py;
-        (kx == ky) && (vx == vy)
-      )) xs ys; _ => False)
-  )
-);
-
 {
   @JNull JNull,
   @JBool JBool,

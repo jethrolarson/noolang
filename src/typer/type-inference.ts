@@ -71,7 +71,11 @@ import {
 	propagateConstraintToTypeVariable,
 	constraintsEqual,
 } from './helpers';
-import { addConstraint, resolveVarName } from './constraint-store';
+import {
+	addConstraint,
+	getConstraints,
+	resolveVarName,
+} from './constraint-store';
 import { collectSpineEffects } from './effects-utils';
 import {
 	composeConstraintChain,
@@ -112,6 +116,7 @@ import {
 	getTypeName,
 	addTraitImplementation,
 } from './trait-system';
+import { satisfyTrait } from './trait-satisfaction';
 import {
 	annotateConstructorKind,
 	arrowKind,
@@ -605,8 +610,30 @@ function buildNormalFunctionType(
 		}
 	}
 
-	// Combine implicit constraints with body and lifted parameter constraints
+	// Combine implicit constraints with body and lifted parameter constraints.
+	// Trait obligations recorded while checking a structural operation belong to
+	// the component variable, so lift them from every parameter variable even
+	// when the function's Bool result does not mention that variable.
 	const allConstraints = [...implicitConstraints, ...bodyConstraints];
+	for (const paramType of paramTypes) {
+		for (const typeVar of freeTypeVars(paramType)) {
+			for (const constraint of getConstraints(
+				state.structuralEqObligations,
+				typeVar,
+				state.substitution
+			)) {
+				if (
+					constraint.kind === 'implements' &&
+					constraint.interfaceName === 'Eq' &&
+					!allConstraints.some(existing =>
+						constraintsEqual(existing, constraint)
+					)
+				) {
+					allConstraints.push(constraint);
+				}
+			}
+		}
+	}
 	for (const constraint of paramConstraints) {
 		if (
 			!allConstraints.some(existing => constraintsEqual(existing, constraint))
@@ -664,12 +691,28 @@ export const typeFunction = (
 					currentState
 				);
 
+	// Obligations on this lambda's own parameters are encoded in funcType.
+	// Obligations on captured variables belong to an enclosing lambda and must
+	// remain in the store until that lambda can lift them.
+	const outwardObligations = new Map(currentState.structuralEqObligations);
+	for (const paramType of paramTypes) {
+		for (const typeVar of freeTypeVars(paramType)) {
+			const key = resolveVarName(typeVar, currentState.substitution);
+			const prior = state.structuralEqObligations.get(key);
+			if (prior) outwardObligations.set(key, prior);
+			else outwardObligations.delete(key);
+		}
+	}
+
 	// The latent effects now live on the function type (see
 	// buildNormalFunctionType) so they fire on application and show in the
 	// inferred type. They are also surfaced here as a conservative whole-program
 	// over-approximation (higher-order effect propagation is not yet tracked via
 	// effect variables).
-	return createTypeResult(funcType, bodyResult.effects, currentState);
+	return createTypeResult(funcType, bodyResult.effects, {
+		...currentState,
+		structuralEqObligations: outwardObligations,
+	});
 };
 
 function collectImplicitConstraints(
@@ -1182,9 +1225,36 @@ export const typeBinary = (
 				currentState
 			);
 			if (!constraintResult) {
-				// If both operand types are fully concrete (no type variables), then fail hard
+				let hasHardMiss = false;
+				for (const constraint of functionConstraints) {
+					if (constraint.kind !== 'implements') continue;
+					const satisfaction = satisfyTrait(
+						constraint.interfaceName,
+						substitutedArgTypes[0],
+						currentState
+					);
+					if (satisfaction.kind === 'missing') hasHardMiss = true;
+					if (
+						satisfaction.kind === 'unresolved' &&
+						constraint.interfaceName === 'Eq'
+					) {
+						for (const typeVar of satisfaction.typeVars) {
+							currentState = {
+								...currentState,
+								structuralEqObligations: addConstraint(
+									currentState.structuralEqObligations,
+									typeVar,
+									implementsConstraint(typeVar, constraint.interfaceName),
+									currentState.substitution
+								),
+							};
+						}
+					}
+				}
+				// A concrete unsupported shape is a hard miss even when its internal
+				// function type contains inference variables.
 				const hasVars = substitutedArgTypes.some(t => freeTypeVars(t).size > 0);
-				if (!hasVars) {
+				if (hasHardMiss || !hasVars) {
 					throw new Error(
 						`No implementation found for operator ${expr.operator} with operand types ${typeToString(
 							substitutedArgTypes[0],
@@ -2091,6 +2161,7 @@ export const typeImplementDefinition = (
 	const traitImpl = {
 		typeName,
 		constructorAbstraction,
+		targetType: implementationTarget,
 		functions: implementationMap,
 		givenConstraints, // Include given constraints if present
 	};

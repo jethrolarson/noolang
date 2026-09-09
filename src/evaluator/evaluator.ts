@@ -68,6 +68,7 @@ import {
 	isCell,
 	createCell,
 	valueToString,
+	compareStructuralValues,
 	type TupleValue,
 	RecordValue,
 	type Environment,
@@ -2618,35 +2619,8 @@ export class Evaluator {
 			}
 
 			if (expr.operator === '==' || expr.operator === '!=') {
-				const negate = expr.operator === '!=';
-				const asBool = (b: boolean) => createBool(negate ? !b : b);
-				if (isNumber(leftVal) && isNumber(rightVal)) {
-					return asBool(leftVal.value === rightVal.value);
-				}
-				if (isString(leftVal) && isString(rightVal)) {
-					return asBool(leftVal.value === rightVal.value);
-				}
-				if (isUnit(leftVal) && isUnit(rightVal)) {
-					return asBool(true);
-				}
-				// Structured types (variants, lists, records) go through Eq —
-				// falling through to the primitives-only native silently
-				// returned False for all of them
-				if (this.isTraitFunction('equals')) {
-					try {
-						const result = this.resolveTraitFunctionWithArgs(
-							'equals',
-							[leftVal, rightVal],
-							this.traitRegistry
-						);
-						if (isBool(result)) return asBool(boolValue(result));
-					} catch (_e) {
-						// Fall through to error
-					}
-				}
-				throw new Error(
-					`Cannot compare ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'} for equality`
-				);
+				const result = this.evaluateEquality(leftVal, rightVal, this.traitRegistry);
+				return expr.operator === '!=' ? createBool(!boolValue(result)) : result;
 			}
 
 			const operator = this.environment.get(expr.operator);
@@ -3106,6 +3080,48 @@ export class Evaluator {
 		}
 	}
 
+	private applyRegisteredTraitFunction(
+		functionName: string,
+		argValues: Value[],
+		traitRegistry: TraitRegistry
+	): Value | null {
+		const dispatchTypeName = this.getValueTypeName(argValues[0]);
+		for (const [traitName, traitDef] of traitRegistry.definitions) {
+			if (!traitDef.functions.has(functionName)) continue;
+			const impl = traitRegistry.implementations.get(traitName)?.get(dispatchTypeName);
+			const hasEvaluated = impl?.evaluatedFunctions?.has(functionName);
+			const hasAst = impl?.functions.has(functionName);
+			if (!impl || (!hasEvaluated && !hasAst)) continue;
+			let result = hasEvaluated
+				? impl.evaluatedFunctions!.get(functionName) as Value
+				: this.evaluateExpression(impl.functions.get(functionName)!);
+			for (const argument of argValues) {
+				if (isFunction(result) || isNativeFunction(result)) result = result.fn(argument);
+				else throw new Error('Cannot apply argument to non-function during trait resolution');
+			}
+			return result;
+		}
+		return null;
+	}
+
+	private evaluateEquality(left: Value, right: Value, traitRegistry: TraitRegistry): Value {
+		if (isNumber(left) && isNumber(right)) return createBool(left.value === right.value);
+		if (isString(left) && isString(right)) return createBool(left.value === right.value);
+		if (isUnit(left) && isUnit(right)) return createBool(true);
+
+		const registered = this.applyRegisteredTraitFunction('equals', [left, right], traitRegistry);
+		if (registered) return registered;
+
+		const structural = compareStructuralValues(
+			left,
+			right,
+			(a, b) => boolValue(this.evaluateEquality(a, b, traitRegistry)),
+			value => this.constructorVariants.has(value.name)
+		);
+		if (structural !== null) return createBool(structural);
+		throw new Error(`Cannot compare ${left?.tag || 'unit'} and ${right?.tag || 'unit'} for equality`);
+	}
+
 	private resolveTraitFunctionWithArgs(
 		functionName: string,
 		argValues: Value[],
@@ -3158,6 +3174,10 @@ export class Evaluator {
 					}
 				}
 			}
+		}
+
+		if (functionName === 'equals' && argValues.length >= 2) {
+			return this.evaluateEquality(argValues[0], argValues[1], traitRegistry);
 		}
 
 		// If we get here, we don't have enough type info yet - return a partial application

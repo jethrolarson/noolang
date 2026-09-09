@@ -552,6 +552,7 @@ export const createTypeState = (): TypeState => ({
 	substitution: new Map(),
 	counter: 0,
 	constraints: createConstraintStore(),
+	structuralEqObligations: createConstraintStore(),
 	adtRegistry: new Map(),
 	traitRegistry: createTraitRegistry(), // NEW: Simple trait system
 	protectedTypeNames: new Set(),
@@ -563,6 +564,7 @@ export const cleanSubstitutions = (state: TypeState): TypeState => ({
 	...state,
 	substitution: new Map(), // Clear substitutions but keep environment
 	constraints: createConstraintStore(), // Clear constraints as well
+	structuralEqObligations: createConstraintStore(),
 });
 
 // Centralized reserved type names (cannot be shadowed by user-defined types or variants)

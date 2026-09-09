@@ -24,6 +24,8 @@ import { unify } from './unify';
 import { typeExpression } from './expression-dispatcher';
 import { Expression } from '../ast';
 import { tryResolveConstraints } from './constraint-resolution';
+import { satisfyTrait } from './trait-satisfaction';
+import { addConstraint } from './constraint-store';
 import { handleComposeConstraintPropagation } from './function-composition';
 
 // Helper function to handle regular function application
@@ -194,8 +196,41 @@ export function handleRegularFunctionApplication(
 				finalReturnType = constraintResult.resolvedType;
 				currentState = constraintResult.updatedState;
 			} else {
-				// Could not resolve constraints, preserve them on the return type
-				if (returnType.kind === 'function') {
+				let deferredStructuralEq = functionConstraints.length > 0;
+				for (const constraint of functionConstraints) {
+					if (constraint.kind !== 'implements' || constraint.interfaceName !== 'Eq') {
+						deferredStructuralEq = false;
+						continue;
+					}
+					const boundType = substitute(
+						{ kind: 'variable', name: constraint.typeVar },
+						currentState.substitution
+					);
+					const satisfaction = satisfyTrait('Eq', boundType, currentState);
+					if (satisfaction.kind === 'missing') {
+						throw new Error(
+							`No implementation found for Eq on ${typeToString(boundType, currentState.substitution)}`
+						);
+					}
+					if (satisfaction.kind === 'unresolved') {
+						for (const typeVar of satisfaction.typeVars) {
+							currentState = {
+								...currentState,
+								structuralEqObligations: addConstraint(
+									currentState.structuralEqObligations,
+									typeVar,
+									{ kind: 'implements', typeVar, interfaceName: 'Eq' },
+									currentState.substitution
+								),
+							};
+						}
+					}
+				}
+				// Eq obligations live in the dedicated store so enclosing functions
+				// can lift them without wrapping intermediate values in ConstrainedType.
+				if (deferredStructuralEq) {
+					finalReturnType = returnType;
+				} else if (returnType.kind === 'function') {
 					finalReturnType = {
 						...returnType,
 						constraints: (returnType.constraints || []).concat(

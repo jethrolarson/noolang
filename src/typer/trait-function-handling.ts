@@ -24,6 +24,8 @@ import {
 import { tryResolveConstraints } from './constraint-resolution';
 import { freshenTypeVariables, freshTypeVariable } from './type-operations';
 import { matchConstructorAbstraction } from './kinded-constructors';
+import { satisfyTrait } from './trait-satisfaction';
+import { addConstraint } from './constraint-store';
 
 // Helper function to handle trait function resolution
 export function handleTraitFunctionApplication(
@@ -196,6 +198,34 @@ function handlePartialTraitFunctionApplication(
 		);
 	}
 
+	for (const constraint of freshenedTraitFuncType.constraints || []) {
+		if (constraint.kind !== 'implements' || constraint.interfaceName !== 'Eq')
+			continue;
+		const operandType = substitute(
+			{ kind: 'variable', name: constraint.typeVar },
+			partialState.substitution
+		);
+		const satisfaction = satisfyTrait('Eq', operandType, partialState);
+		if (satisfaction.kind === 'missing') {
+			throw new Error(
+				`No implementation of trait function 'equals' for ${typeToString(operandType, partialState.substitution)}`
+			);
+		}
+		if (satisfaction.kind === 'unresolved') {
+			for (const typeVar of satisfaction.typeVars) {
+				partialState = {
+					...partialState,
+					structuralEqObligations: addConstraint(
+						partialState.structuralEqObligations,
+						typeVar,
+						{ kind: 'implements', typeVar, interfaceName: 'Eq' },
+						partialState.substitution
+					),
+				};
+			}
+		}
+	}
+
 	// Build the remaining curried function type
 	// For curried functions, we need to handle the case where we've applied one argument
 	// and the return type is still a function
@@ -258,7 +288,8 @@ function handlePartialTraitFunctionApplication(
 					};
 				}
 				return constraint;
-			});
+				}
+			);
 			allConstraints.push(...substitutedArgConstraints);
 		}
 	}
@@ -282,6 +313,19 @@ function handlePartialTraitFunctionApplication(
 			curriedType = constraintResult.resolvedType;
 			partialState = constraintResult.updatedState;
 		} else {
+			const eqMiss = allConstraints.some(
+				constraint =>
+					constraint.kind === 'implements' &&
+					constraint.interfaceName === 'Eq' &&
+					substitutedArgTypes.some(
+						type => satisfyTrait('Eq', type, partialState).kind === 'missing'
+					)
+			);
+			if (eqMiss) {
+				throw new Error(
+					`No implementation of trait function 'equals' for ${substitutedArgTypes.map(type => typeToString(type, partialState.substitution)).join(', ')}`
+				);
+			}
 			// Could not resolve constraints, preserve them on the return type
 			curriedType = {
 				...resultType,
@@ -313,8 +357,34 @@ function handleFullTraitFunctionApplication(
 	const resolution = resolveTraitFunction(
 		currentState.traitRegistry,
 		funcName,
-		argTypes
+		argTypes,
+		currentState
 	);
+
+	if (resolution.found && resolution.derivedEq) {
+		const mapping = new Map<string, Type>();
+		let resultState = currentState;
+		const [freshVar, freshState] = freshTypeVariable(resultState);
+		mapping.set('a', freshVar);
+		const [freshened, nextState] = freshenTypeVariables(
+			traitFuncType,
+			mapping,
+			freshState
+		);
+		resultState = nextState;
+		if (freshened.kind !== 'function') return null;
+		for (let i = 0; i < argTypes.length; i++) {
+			resultState = unify(freshened.params[i], argTypes[i], resultState, {
+				line: expr.location?.start.line || 1,
+				column: expr.location?.start.column || 1,
+			});
+		}
+		return createTypeResult(
+			substitute(freshened.return, resultState.substitution),
+			allEffects,
+			resultState
+		);
+	}
 
 	if (resolution.found && resolution.impl) {
 		// We found a trait implementation - evaluate it with the arguments
@@ -435,10 +505,7 @@ function handleFullTraitFunctionApplication(
 				const abstraction = resolution.implementation?.constructorAbstraction;
 				const bindings =
 					abstraction && resolution.matchedType
-						? matchConstructorAbstraction(
-								abstraction,
-								resolution.matchedType
-							)
+						? matchConstructorAbstraction(abstraction, resolution.matchedType)
 						: null;
 				if (abstraction && bindings) {
 					traitTypeSubstitution.set(traitDef.typeParam, {
@@ -630,14 +697,17 @@ function isFullyConcrete(type: Type): boolean {
 		return isFullyConcrete(type.baseType);
 	}
 	if (type.kind === 'function') {
-		return type.params.every(isFullyConcrete) && isFullyConcrete(type.return);
+		// A function shape can never gain a trait implementation by resolving its
+		// internal inference variables; it is concrete for dispatch purposes.
+		return true;
 	}
 	return false;
 }
 
 // Utility: check if a type has any type variables (is polymorphic)
 function hasTypeVariables(type: Type): boolean {
-	if (type.kind === 'variable' || type.kind === 'constructor-variable') return true;
+	if (type.kind === 'variable' || type.kind === 'constructor-variable')
+		return true;
 	if (type.kind === 'type-application')
 		return (
 			hasTypeVariables(type.constructor) || hasTypeVariables(type.argument)

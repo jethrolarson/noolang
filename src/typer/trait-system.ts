@@ -12,6 +12,7 @@ import {
 } from '../ast';
 import { matchConstructorAbstraction } from './kinded-constructors';
 import { TypeState } from './types';
+import { satisfyTrait } from './trait-satisfaction';
 
 // Simple trait definition - just a name and function signatures
 export type TraitDefinition = {
@@ -27,6 +28,8 @@ export type TraitImplementation = {
 	constructorAbstraction?: TypeConstructorAbstraction;
 	functions: Map<string, Expression>; // function name -> implementation expression (AST)
 	givenConstraints?: ConstraintExpr; // Optional given constraints for conditional implementations
+	/** The checked implementation head, retained to instantiate `given` constraints. */
+	targetType?: Type;
 	/**
 	 * Pre-evaluated closure Values for each function, captured against the
 	 * defining module's runtime environment (§4 instance closure capture).
@@ -146,7 +149,9 @@ export function addTraitImplementation(
 }
 
 // Get the concrete type name for trait lookup
-export function getTypeName(type: Type | TypeConstructorAbstractionExpression): string {
+export function getTypeName(
+	type: Type | TypeConstructorAbstractionExpression
+): string {
 	switch (type.kind) {
 		case 'type-constructor-abstraction':
 			return getTypeName(type.body);
@@ -176,7 +181,8 @@ export function getTypeName(type: Type | TypeConstructorAbstractionExpression): 
 export function resolveTraitFunction(
 	registry: TraitRegistry,
 	functionName: string,
-	argTypes: Type[]
+	argTypes: Type[],
+	state?: TypeState
 ): {
 	found: boolean;
 	traitName?: string;
@@ -185,6 +191,7 @@ export function resolveTraitFunction(
 	implementation?: TraitImplementation;
 	matchedType?: Type;
 	needsConstraint?: boolean;
+	derivedEq?: boolean;
 } {
 	if (argTypes.length === 0) {
 		return { found: false };
@@ -234,6 +241,18 @@ export function resolveTraitFunction(
 							!matchConstructorAbstraction(impl.constructorAbstraction, argType)
 						)
 							continue;
+						if (state) {
+							const satisfaction = satisfyTrait(
+								candidateTraitName,
+								argType,
+								state
+							);
+							if (
+								satisfaction.kind !== 'registered' ||
+								satisfaction.implementation !== impl
+							)
+								continue;
+						}
 						candidateImplementations.push({
 							traitName: candidateTraitName,
 							typeName,
@@ -278,6 +297,20 @@ export function resolveTraitFunction(
 		};
 	}
 
+	if (state && functionName === 'equals') {
+		for (const argType of argTypes) {
+			const satisfaction = satisfyTrait('Eq', argType, state);
+			if (satisfaction.kind === 'derived-eq') {
+				return {
+					found: true,
+					traitName: 'Eq',
+					matchedType: argType,
+					derivedEq: true,
+				};
+			}
+		}
+	}
+
 	// No concrete implementation found - check if we should error or create constraint
 	// For functions where the trait type parameter is in the return type (like pure: a -> m a),
 	// we can't dispatch on arguments, so always create constrained type
@@ -298,8 +331,10 @@ export function resolveTraitFunction(
 			case 'variant':
 				return type.args.some(arg => containsTypeParameter(arg, paramName));
 			case 'function':
-				return type.params.some(param => containsTypeParameter(param, paramName)) ||
-					   containsTypeParameter(type.return, paramName);
+				return (
+					type.params.some(param => containsTypeParameter(param, paramName)) ||
+					containsTypeParameter(type.return, paramName)
+				);
 			case 'list':
 				return containsTypeParameter(type.element, paramName);
 			default:

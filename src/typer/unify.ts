@@ -14,7 +14,11 @@ import {
 	unificationError,
 } from './type-errors';
 import { mapSet, typeToString, occursIn } from './helpers';
-import { addConstraints, getConstraints } from './constraint-store';
+import {
+	addConstraints,
+	getConstraints,
+	resolveVarName,
+} from './constraint-store';
 // Legacy constraint imports removed
 import { functionApplicationError } from './type-errors';
 import { getTypeName } from './trait-system';
@@ -22,6 +26,7 @@ import {
 	flattenTypeApplication,
 	matchConstructorAbstraction,
 } from './kinded-constructors';
+import { satisfyTrait } from './trait-satisfaction';
 
 const sameKind = (
 	left: TypeKind | undefined,
@@ -676,10 +681,60 @@ function unifyVariable(
 		);
 	}
 
+	let structuralEqObligations = state.structuralEqObligations;
+	const oldObligationKey = resolveVarName(s1.name, state.substitution);
+	const structuralObligations =
+		state.structuralEqObligations.get(oldObligationKey) ?? [];
+	if (isTypeKind(s2, 'variable') && structuralObligations.length > 0) {
+		structuralEqObligations = addConstraints(
+			structuralEqObligations,
+			s2.name,
+			structuralObligations,
+			newSubstitution
+		);
+		const newKey = resolveVarName(s2.name, newSubstitution);
+		if (oldObligationKey !== newKey) {
+			structuralEqObligations = new Map(structuralEqObligations);
+			structuralEqObligations.delete(oldObligationKey);
+		}
+	} else if (structuralObligations.length > 0) {
+		structuralEqObligations = new Map(structuralEqObligations);
+		structuralEqObligations.delete(oldObligationKey);
+		const satisfactionState = {
+			...state,
+			substitution: newSubstitution,
+			structuralEqObligations,
+		};
+		for (const obligation of structuralObligations) {
+			if (obligation.kind !== 'implements') continue;
+			const satisfaction = satisfyTrait(
+				obligation.interfaceName,
+				s2,
+				satisfactionState
+			);
+			if (satisfaction.kind === 'missing') {
+				throw new Error(
+					`No implementation found for ${obligation.interfaceName} on ${typeToString(s2, newSubstitution)}`
+				);
+			}
+			if (satisfaction.kind === 'unresolved') {
+				for (const typeVar of satisfaction.typeVars) {
+					structuralEqObligations = addConstraints(
+						structuralEqObligations,
+						typeVar,
+						[{ ...obligation, typeVar }],
+						newSubstitution
+					);
+				}
+			}
+		}
+	}
+
 	let newState = {
 		...state,
 		substitution: newSubstitution,
 		constraints: newConstraints,
+		structuralEqObligations,
 	};
 	// If s2 is not a variable, propagate or check constraints
 	if (!isTypeKind(s2, 'variable')) {

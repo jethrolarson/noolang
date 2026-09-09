@@ -41,10 +41,9 @@ tail_tests = group "tail" [
     expect_eq 0 (length (tail [1])))
 ];
 
-# Tuples have no Eq instance (the trait system is nominal-type-only, and
-# tuples are structural), so these check behavior via assoc_get lookups
-# rather than comparing association lists structurally.
 assoc_tests = group "assoc_get/set/update" [
+  test_case "association lists compare structurally" (fn _ =>
+    expect_eq [{"a", 1}, {"b", 2}] [{"a", 1}, {"b", 2}]),
   test_case "assoc_get finds an existing key" (fn _ =>
     expect_eq (Some 2) (assoc_get "b" [{"a", 1}, {"b", 2}])),
   test_case "assoc_get on a missing key is None" (fn _ =>

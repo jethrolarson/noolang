@@ -123,6 +123,7 @@ function cloneTypeStateForModule(base: TypeState): TypeState {
 		// exercises. The counter is never reset to a colliding fixed value.
 		counter: base.counter,
 		constraints: createConstraintStore(),
+		structuralEqObligations: createConstraintStore(),
 		adtRegistry,
 		traitRegistry,
 		protectedTypeNames: new Set(base.protectedTypeNames),

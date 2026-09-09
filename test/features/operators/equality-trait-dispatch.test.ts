@@ -1,5 +1,5 @@
 import { test, describe, expect } from 'bun:test';
-import { expectSuccess, expectError, runCode } from '../../utils';
+import { expectSuccess, runCode } from '../../utils';
 
 // Regression: == and != had no trait-resolution fallback, so every
 // variant/list comparison silently returned False.
@@ -42,27 +42,20 @@ describe('==/!= trait dispatch', () => {
 	});
 });
 
-// Regression: == and != were unconstrained, so a no-Eq type only failed at
-// runtime. Now Eq-constrained like Ord's < > — enforced at the call site,
-// not shown in a generalized signature (same as <).
+// == and != remain Eq-constrained at the call site; records satisfy Eq
+// structurally when every field does.
 describe('==/!= Eq constraint', () => {
-	test('comparing a concrete no-Eq-instance type fails during type-checking', () => {
-		expectError(
-			`{@a 1} == {@a 1}`,
-			/No implementation found for operator ==/
-		);
+	test('records with Eq fields derive ==', () => {
+		expectSuccess(`{@a 1} == {@a 1}`, true);
 	});
 
-	test('!= on a concrete no-Eq-instance type also fails during type-checking', () => {
-		expectError(
-			`{@a 1} != {@a 1}`,
-			/No implementation found for operator !=/
-		);
+	test('records with Eq fields derive !=', () => {
+		expectSuccess(`{@a 1} != {@a 2}`, true);
 	});
 
-	test('a polymorphic, unresolved == use is not rejected eagerly', () => {
+	test('a polymorphic, unresolved == use retains its Eq obligation', () => {
 		const { finalType } = runCode(`fn a b => a == b`);
-		expect(finalType).toBe('a -> a -> Bool');
+		expect(finalType).toBe('a -> a -> Bool given a implements Eq');
 	});
 
 	test('== still resolves normally once operands are concrete and Eq-able', () => {
