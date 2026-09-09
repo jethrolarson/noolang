@@ -73,6 +73,7 @@ import {
 } from './helpers';
 import {
 	addConstraint,
+	addTraitObligations,
 	getConstraints,
 	resolveVarName,
 } from './constraint-store';
@@ -520,6 +521,32 @@ function handleConstrainedFunctionBody(
 	return funcType;
 }
 
+const structuralEqConstraintsFor = (
+	paramTypes: Type[],
+	state: TypeState
+): Constraint[] => {
+	const typeVars = new Set(
+		paramTypes.flatMap(paramType => [...freeTypeVars(paramType)])
+	);
+	const constraints = [...typeVars].flatMap(typeVar =>
+		getConstraints(
+			state.structuralEqObligations,
+			typeVar,
+			state.substitution
+		)
+	);
+	const byTypeVar = new Map<string, Constraint>();
+	for (const constraint of constraints) {
+		if (
+			constraint.kind === 'implements' &&
+			constraint.interfaceName === 'Eq'
+		) {
+			byTypeVar.set(constraint.typeVar, constraint);
+		}
+	}
+	return [...byTypeVar.values()];
+};
+
 function buildNormalFunctionType(
 	paramTypes: Type[],
 	bodyResult: TypeResult,
@@ -614,26 +641,11 @@ function buildNormalFunctionType(
 	// Trait obligations recorded while checking a structural operation belong to
 	// the component variable, so lift them from every parameter variable even
 	// when the function's Bool result does not mention that variable.
-	const allConstraints = [...implicitConstraints, ...bodyConstraints];
-	for (const paramType of paramTypes) {
-		for (const typeVar of freeTypeVars(paramType)) {
-			for (const constraint of getConstraints(
-				state.structuralEqObligations,
-				typeVar,
-				state.substitution
-			)) {
-				if (
-					constraint.kind === 'implements' &&
-					constraint.interfaceName === 'Eq' &&
-					!allConstraints.some(existing =>
-						constraintsEqual(existing, constraint)
-					)
-				) {
-					allConstraints.push(constraint);
-				}
-			}
-		}
-	}
+	const allConstraints = [
+		...implicitConstraints,
+		...bodyConstraints,
+		...structuralEqConstraintsFor(paramTypes, state),
+	];
 	for (const constraint of paramConstraints) {
 		if (
 			!allConstraints.some(existing => constraintsEqual(existing, constraint))
@@ -657,6 +669,25 @@ function buildNormalFunctionType(
 
 	return funcType;
 }
+
+const outwardEqObligations = (
+	paramTypes: Type[],
+	before: TypeState,
+	after: TypeState
+): TypeState['structuralEqObligations'] => {
+	const outward = new Map(after.structuralEqObligations);
+	const ownedKeys = paramTypes.flatMap(paramType =>
+		[...freeTypeVars(paramType)].map(typeVar =>
+			resolveVarName(typeVar, after.substitution)
+		)
+	);
+	for (const key of ownedKeys) {
+		const prior = before.structuralEqObligations.get(key);
+		if (prior) outward.set(key, prior);
+		else outward.delete(key);
+	}
+	return outward;
+};
 
 export const typeFunction = (
 	expr: FunctionExpression,
@@ -694,15 +725,11 @@ export const typeFunction = (
 	// Obligations on this lambda's own parameters are encoded in funcType.
 	// Obligations on captured variables belong to an enclosing lambda and must
 	// remain in the store until that lambda can lift them.
-	const outwardObligations = new Map(currentState.structuralEqObligations);
-	for (const paramType of paramTypes) {
-		for (const typeVar of freeTypeVars(paramType)) {
-			const key = resolveVarName(typeVar, currentState.substitution);
-			const prior = state.structuralEqObligations.get(key);
-			if (prior) outwardObligations.set(key, prior);
-			else outwardObligations.delete(key);
-		}
-	}
+	const outwardObligations = outwardEqObligations(
+		paramTypes,
+		state,
+		currentState
+	);
 
 	// The latent effects now live on the function type (see
 	// buildNormalFunctionType) so they fire on application and show in the
@@ -1097,6 +1124,39 @@ const bindingStatementKinds = new Set<Expression['kind']>([
 const isBindingStatement = (statement: Expression): boolean =>
 	bindingStatementKinds.has(statement.kind);
 
+const deferOperatorConstraints = (
+	constraints: Constraint[],
+	operandType: Type,
+	state: TypeState
+): { state: TypeState; hardMiss: boolean } => {
+	let nextState = state;
+	let hardMiss = false;
+	for (const constraint of constraints) {
+		if (constraint.kind !== 'implements') continue;
+		const satisfaction = satisfyTrait(
+			constraint.interfaceName,
+			operandType,
+			nextState
+		);
+		hardMiss ||= satisfaction.kind === 'missing';
+		if (
+			satisfaction.kind === 'unresolved' &&
+			constraint.interfaceName === 'Eq'
+		) {
+			nextState = {
+				...nextState,
+				structuralEqObligations: addTraitObligations(
+					nextState.structuralEqObligations,
+					satisfaction.typeVars,
+					'Eq',
+					nextState.substitution
+				),
+			};
+		}
+	}
+	return { state: nextState, hardMiss };
+};
+
 export const typeBinary = (
 	expr: BinaryExpression,
 	state: TypeState
@@ -1225,36 +1285,16 @@ export const typeBinary = (
 				currentState
 			);
 			if (!constraintResult) {
-				let hasHardMiss = false;
-				for (const constraint of functionConstraints) {
-					if (constraint.kind !== 'implements') continue;
-					const satisfaction = satisfyTrait(
-						constraint.interfaceName,
-						substitutedArgTypes[0],
-						currentState
-					);
-					if (satisfaction.kind === 'missing') hasHardMiss = true;
-					if (
-						satisfaction.kind === 'unresolved' &&
-						constraint.interfaceName === 'Eq'
-					) {
-						for (const typeVar of satisfaction.typeVars) {
-							currentState = {
-								...currentState,
-								structuralEqObligations: addConstraint(
-									currentState.structuralEqObligations,
-									typeVar,
-									implementsConstraint(typeVar, constraint.interfaceName),
-									currentState.substitution
-								),
-							};
-						}
-					}
-				}
+				const deferred = deferOperatorConstraints(
+					functionConstraints,
+					substitutedArgTypes[0],
+					currentState
+				);
+				currentState = deferred.state;
 				// A concrete unsupported shape is a hard miss even when its internal
 				// function type contains inference variables.
 				const hasVars = substitutedArgTypes.some(t => freeTypeVars(t).size > 0);
-				if (hasHardMiss || !hasVars) {
+				if (deferred.hardMiss || !hasVars) {
 					throw new Error(
 						`No implementation found for operator ${expr.operator} with operand types ${typeToString(
 							substitutedArgTypes[0],

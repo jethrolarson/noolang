@@ -149,9 +149,7 @@ export function addTraitImplementation(
 }
 
 // Get the concrete type name for trait lookup
-export function getTypeName(
-	type: Type | TypeConstructorAbstractionExpression
-): string {
+export function getTypeName(type: Type | TypeConstructorAbstractionExpression): string {
 	switch (type.kind) {
 		case 'type-constructor-abstraction':
 			return getTypeName(type.body);
@@ -331,10 +329,8 @@ export function resolveTraitFunction(
 			case 'variant':
 				return type.args.some(arg => containsTypeParameter(arg, paramName));
 			case 'function':
-				return (
-					type.params.some(param => containsTypeParameter(param, paramName)) ||
-					containsTypeParameter(type.return, paramName)
-				);
+				return type.params.some(param => containsTypeParameter(param, paramName)) ||
+					   containsTypeParameter(type.return, paramName);
 			case 'list':
 				return containsTypeParameter(type.element, paramName);
 			default:

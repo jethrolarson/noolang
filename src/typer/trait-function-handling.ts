@@ -25,7 +25,7 @@ import { tryResolveConstraints } from './constraint-resolution';
 import { freshenTypeVariables, freshTypeVariable } from './type-operations';
 import { matchConstructorAbstraction } from './kinded-constructors';
 import { satisfyTrait } from './trait-satisfaction';
-import { addConstraint } from './constraint-store';
+import { addTraitObligations } from './constraint-store';
 
 // Helper function to handle trait function resolution
 export function handleTraitFunctionApplication(
@@ -212,17 +212,15 @@ function handlePartialTraitFunctionApplication(
 			);
 		}
 		if (satisfaction.kind === 'unresolved') {
-			for (const typeVar of satisfaction.typeVars) {
-				partialState = {
-					...partialState,
-					structuralEqObligations: addConstraint(
-						partialState.structuralEqObligations,
-						typeVar,
-						{ kind: 'implements', typeVar, interfaceName: 'Eq' },
-						partialState.substitution
-					),
-				};
-			}
+			partialState = {
+				...partialState,
+				structuralEqObligations: addTraitObligations(
+					partialState.structuralEqObligations,
+					satisfaction.typeVars,
+					'Eq',
+					partialState.substitution
+				),
+			};
 		}
 	}
 
@@ -288,8 +286,7 @@ function handlePartialTraitFunctionApplication(
 					};
 				}
 				return constraint;
-				}
-			);
+			});
 			allConstraints.push(...substitutedArgConstraints);
 		}
 	}
@@ -313,19 +310,6 @@ function handlePartialTraitFunctionApplication(
 			curriedType = constraintResult.resolvedType;
 			partialState = constraintResult.updatedState;
 		} else {
-			const eqMiss = allConstraints.some(
-				constraint =>
-					constraint.kind === 'implements' &&
-					constraint.interfaceName === 'Eq' &&
-					substitutedArgTypes.some(
-						type => satisfyTrait('Eq', type, partialState).kind === 'missing'
-					)
-			);
-			if (eqMiss) {
-				throw new Error(
-					`No implementation of trait function 'equals' for ${substitutedArgTypes.map(type => typeToString(type, partialState.substitution)).join(', ')}`
-				);
-			}
 			// Could not resolve constraints, preserve them on the return type
 			curriedType = {
 				...resultType,
@@ -505,7 +489,10 @@ function handleFullTraitFunctionApplication(
 				const abstraction = resolution.implementation?.constructorAbstraction;
 				const bindings =
 					abstraction && resolution.matchedType
-						? matchConstructorAbstraction(abstraction, resolution.matchedType)
+						? matchConstructorAbstraction(
+								abstraction,
+								resolution.matchedType
+							)
 						: null;
 				if (abstraction && bindings) {
 					traitTypeSubstitution.set(traitDef.typeParam, {
@@ -706,8 +693,7 @@ function isFullyConcrete(type: Type): boolean {
 
 // Utility: check if a type has any type variables (is polymorphic)
 function hasTypeVariables(type: Type): boolean {
-	if (type.kind === 'variable' || type.kind === 'constructor-variable')
-		return true;
+	if (type.kind === 'variable' || type.kind === 'constructor-variable') return true;
 	if (type.kind === 'type-application')
 		return (
 			hasTypeVariables(type.constructor) || hasTypeVariables(type.argument)

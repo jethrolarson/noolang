@@ -63,10 +63,13 @@ export const compareStructuralValues = (
 			left.values.every((value, i) => equals(value, right.values[i]));
 	}
 	if (isRecord(left) && isRecord(right)) {
-		const leftKeys = Object.keys(left.fields).sort();
-		const rightKeys = Object.keys(right.fields).sort();
+		const leftKeys = Object.keys(left.fields);
+		const rightKeys = Object.keys(right.fields);
 		return leftKeys.length === rightKeys.length &&
-			leftKeys.every((key, i) => key === rightKeys[i] && equals(left.fields[key], right.fields[key]));
+			leftKeys.every(key =>
+				Object.hasOwn(right.fields, key) &&
+				equals(left.fields[key], right.fields[key])
+			);
 	}
 	if (isConstructor(left) && isConstructor(right) && isDeclaredConstructor(left) && isDeclaredConstructor(right)) {
 		return left.name === right.name && left.args.length === right.args.length &&

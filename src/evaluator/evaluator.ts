@@ -2619,8 +2619,14 @@ export class Evaluator {
 			}
 
 			if (expr.operator === '==' || expr.operator === '!=') {
-				const result = this.evaluateEquality(leftVal, rightVal, this.traitRegistry);
-				return expr.operator === '!=' ? createBool(!boolValue(result)) : result;
+				const result = this.evaluateEquality(
+					leftVal,
+					rightVal,
+					this.traitRegistry
+				);
+				return expr.operator === '!='
+					? createBool(!boolValue(result))
+					: result;
 			}
 
 			const operator = this.environment.get(expr.operator);
@@ -3083,33 +3089,53 @@ export class Evaluator {
 	private applyRegisteredTraitFunction(
 		functionName: string,
 		argValues: Value[],
-		traitRegistry: TraitRegistry
+		traitRegistry: TraitRegistry,
+		dispatchValue = argValues[0]
 	): Value | null {
-		const dispatchTypeName = this.getValueTypeName(argValues[0]);
+		const dispatchTypeName = this.getValueTypeName(dispatchValue);
 		for (const [traitName, traitDef] of traitRegistry.definitions) {
 			if (!traitDef.functions.has(functionName)) continue;
-			const impl = traitRegistry.implementations.get(traitName)?.get(dispatchTypeName);
+			const impl = traitRegistry.implementations
+				.get(traitName)
+				?.get(dispatchTypeName);
 			const hasEvaluated = impl?.evaluatedFunctions?.has(functionName);
 			const hasAst = impl?.functions.has(functionName);
 			if (!impl || (!hasEvaluated && !hasAst)) continue;
 			let result = hasEvaluated
-				? impl.evaluatedFunctions!.get(functionName) as Value
+				? (impl.evaluatedFunctions!.get(functionName) as Value)
 				: this.evaluateExpression(impl.functions.get(functionName)!);
 			for (const argument of argValues) {
-				if (isFunction(result) || isNativeFunction(result)) result = result.fn(argument);
-				else throw new Error('Cannot apply argument to non-function during trait resolution');
+				if (isFunction(result) || isNativeFunction(result)) {
+					result = result.fn(argument);
+				} else {
+					throw new Error(
+						'Cannot apply argument to non-function during trait resolution'
+					);
+				}
 			}
 			return result;
 		}
 		return null;
 	}
 
-	private evaluateEquality(left: Value, right: Value, traitRegistry: TraitRegistry): Value {
-		if (isNumber(left) && isNumber(right)) return createBool(left.value === right.value);
-		if (isString(left) && isString(right)) return createBool(left.value === right.value);
+	private evaluateEquality(
+		left: Value,
+		right: Value,
+		traitRegistry: TraitRegistry
+	): Value {
+		if (isNumber(left) && isNumber(right)) {
+			return createBool(left.value === right.value);
+		}
+		if (isString(left) && isString(right)) {
+			return createBool(left.value === right.value);
+		}
 		if (isUnit(left) && isUnit(right)) return createBool(true);
 
-		const registered = this.applyRegisteredTraitFunction('equals', [left, right], traitRegistry);
+		const registered = this.applyRegisteredTraitFunction(
+			'equals',
+			[left, right],
+			traitRegistry
+		);
 		if (registered) return registered;
 
 		const structural = compareStructuralValues(
@@ -3119,7 +3145,9 @@ export class Evaluator {
 			value => this.constructorVariants.has(value.name)
 		);
 		if (structural !== null) return createBool(structural);
-		throw new Error(`Cannot compare ${left?.tag || 'unit'} and ${right?.tag || 'unit'} for equality`);
+		throw new Error(
+			`Cannot compare ${left?.tag || 'unit'} and ${right?.tag || 'unit'} for equality`
+		);
 	}
 
 	private resolveTraitFunctionWithArgs(
@@ -3136,44 +3164,13 @@ export class Evaluator {
 			argTypeNames.length > 1 ? [argTypeNames.length - 1, 0] : [0];
 
 		for (const dispatchIndex of possibleDispatchIndices) {
-			const dispatchTypeName = argTypeNames[dispatchIndex];
-			if (dispatchTypeName === 'Unknown') continue;
-
-			for (const [traitName, traitDef] of traitRegistry.definitions) {
-				if (traitDef.functions.has(functionName)) {
-					// First try user-defined implementations in the registry
-					const traitImpls = traitRegistry.implementations.get(traitName);
-					if (traitImpls) {
-						const impl = traitImpls.get(dispatchTypeName);
-						const hasEvaledFn = impl?.evaluatedFunctions?.has(functionName);
-						const hasAstFn = impl?.functions.has(functionName);
-						if (impl && (hasEvaledFn || hasAstFn)) {
-							// Apply the implementation to all accumulated arguments.
-							// Prefer pre-evaluated closure (§4) to avoid re-evaluation in
-							// a foreign environment (which would miss home-module helpers).
-							let result: Value;
-							if (hasEvaledFn) {
-								result = impl.evaluatedFunctions!.get(functionName) as Value;
-							} else {
-								const implExpr = impl.functions.get(functionName)!;
-								result = this.evaluateExpression(implExpr);
-							}
-							for (const argValue of argValues) {
-								if (isFunction(result)) {
-									result = result.fn(argValue);
-								} else if (isNativeFunction(result)) {
-									result = result.fn(argValue);
-								} else {
-									throw new Error(
-										`Cannot apply argument to non-function during trait resolution`
-									);
-								}
-							}
-							return result;
-						}
-					}
-				}
-			}
+			const result = this.applyRegisteredTraitFunction(
+				functionName,
+				argValues,
+				traitRegistry,
+				argValues[dispatchIndex]
+			);
+			if (result) return result;
 		}
 
 		if (functionName === 'equals' && argValues.length >= 2) {

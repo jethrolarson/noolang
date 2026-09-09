@@ -77,3 +77,21 @@ export const addConstraints = (
 	}
 	return next;
 };
+
+export const addTraitObligations = (
+	store: ConstraintStore,
+	varNames: Iterable<string>,
+	interfaceName: string,
+	substitution: Map<string, Type>
+): ConstraintStore => {
+	let next = store;
+	for (const typeVar of varNames) {
+		next = addConstraint(
+			next,
+			typeVar,
+			{ kind: 'implements', typeVar, interfaceName },
+			substitution
+		);
+	}
+	return next;
+};

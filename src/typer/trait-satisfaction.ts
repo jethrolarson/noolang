@@ -1,12 +1,13 @@
 import type { ConstraintExpr, Type } from '../ast';
 import { substitute } from './substitute';
+import { typesEqual } from './helpers';
 import type { TraitImplementation, TraitRegistry } from './trait-system';
 import type { TypeState } from './types';
 
 export type TraitSatisfaction =
 	| { kind: 'registered'; implementation: TraitImplementation }
 	| { kind: 'derived-eq' }
-	| { kind: 'unresolved'; typeVars: string[] }
+	| { kind: 'unresolved'; typeVars: ReadonlySet<string> }
 	| { kind: 'missing' };
 
 type SatisfactionState = Pick<
@@ -14,16 +15,22 @@ type SatisfactionState = Pick<
 	'substitution' | 'environment' | 'adtRegistry' | 'traitRegistry'
 >;
 
-const unresolvedTypeVars = (type: Type): string[] => {
-	if (type.kind === 'variable' || type.kind === 'constructor-variable') return [type.name];
-	if (type.kind === 'type-application') return [
-		...unresolvedTypeVars(type.constructor),
-		...unresolvedTypeVars(type.argument),
-	];
-	return [];
+const unresolvedTypeVars = (type: Type): ReadonlySet<string> => {
+	if (type.kind === 'variable' || type.kind === 'constructor-variable') {
+		return new Set([type.name]);
+	}
+	if (type.kind === 'type-application') {
+		return mergeTypeVars(
+			unresolvedTypeVars(type.constructor),
+			unresolvedTypeVars(type.argument)
+		);
+	}
+	return new Set();
 };
 
-const mergeTypeVars = (...groups: string[][]): string[] => [...new Set(groups.flat())];
+const mergeTypeVars = (
+	...groups: Iterable<string>[]
+): ReadonlySet<string> => new Set(groups.flatMap(group => [...group]));
 
 const resolveAliases = (
 	type: Type,
@@ -31,56 +38,22 @@ const resolveAliases = (
 	seen = new Set<string>()
 ): Type => {
 	const resolved = substitute(type, state.substitution);
-	if (resolved.kind === 'variant') {
-		if (state.adtRegistry.has(resolved.name)) {
-			return {
-				...resolved,
-				args: resolved.args.map(arg =>
-					resolveAliases(arg, state, new Set(seen))
-				),
-			};
-		}
-		const scheme = state.environment.get(resolved.name);
-		if (
-			scheme &&
-			!seen.has(resolved.name) &&
-			scheme.quantifiedVars.length === resolved.args.length
-		) {
-			seen.add(resolved.name);
-			const bindings = new Map<string, Type>();
-			scheme.quantifiedVars.forEach((name, index) =>
-				bindings.set(name, resolved.args[index])
-			);
-			return resolveAliases(substitute(scheme.type, bindings), state, seen);
-		}
-		return {
-			...resolved,
-			args: resolved.args.map(arg => resolveAliases(arg, state, new Set(seen))),
-		};
+	if (resolved.kind !== 'variant' || state.adtRegistry.has(resolved.name)) {
+		return resolved;
 	}
-	if (resolved.kind === 'tuple')
-		return {
-			...resolved,
-			elements: resolved.elements.map(t =>
-				resolveAliases(t, state, new Set(seen))
-			),
-		};
-	if (resolved.kind === 'record')
-		return {
-			...resolved,
-			fields: Object.fromEntries(
-				Object.entries(resolved.fields).map(([k, v]) => [
-					k,
-					resolveAliases(v, state, new Set(seen)),
-				])
-			),
-		};
-	if (resolved.kind === 'list')
-		return {
-			...resolved,
-			element: resolveAliases(resolved.element, state, new Set(seen)),
-		};
-	return resolved;
+	const scheme = state.environment.get(resolved.name);
+	if (
+		!scheme ||
+		seen.has(resolved.name) ||
+		scheme.quantifiedVars.length !== resolved.args.length
+	) {
+		return resolved;
+	}
+	seen.add(resolved.name);
+	const bindings = new Map(
+		scheme.quantifiedVars.map((name, index) => [name, resolved.args[index]])
+	);
+	return resolveAliases(substitute(scheme.type, bindings), state, seen);
 };
 
 const bindTarget = (
@@ -94,54 +67,75 @@ const bindTarget = (
 			bindings.set(pattern.name, actual);
 			return true;
 		}
-		return JSON.stringify(existing) === JSON.stringify(actual);
+		return typesEqual(existing, actual);
 	}
-	if (pattern.kind !== actual.kind) return false;
-	switch (pattern.kind) {
-		case 'primitive':
-			return actual.kind === 'primitive' && pattern.name === actual.name;
-		case 'unit':
-			return true;
-		case 'list':
-			return (
-				actual.kind === 'list' &&
-				bindTarget(pattern.element, actual.element, bindings)
+	if (pattern.kind === 'primitive' && actual.kind === 'primitive') {
+		return pattern.name === actual.name;
+	}
+	if (pattern.kind === 'unit') return actual.kind === 'unit';
+	if (pattern.kind === 'list' && actual.kind === 'list') {
+		return bindTarget(pattern.element, actual.element, bindings);
+	}
+	if (pattern.kind === 'variant' && actual.kind === 'variant') {
+		return pattern.name === actual.name &&
+			pattern.args.length === actual.args.length &&
+			pattern.args.every((item, index) =>
+				bindTarget(item, actual.args[index], bindings)
 			);
-		case 'variant':
-			return (
-				actual.kind === 'variant' &&
-				pattern.name === actual.name &&
-				pattern.args.length === actual.args.length &&
-				pattern.args.every((p, i) => bindTarget(p, actual.args[i], bindings))
-			);
-		case 'tuple':
-			return (
-				actual.kind === 'tuple' &&
-				pattern.elements.length === actual.elements.length &&
-				pattern.elements.every((p, i) =>
-					bindTarget(p, actual.elements[i], bindings)
-				)
-			);
-		case 'record':
-			return (
-				actual.kind === 'record' &&
-				Object.keys(pattern.fields).length ===
-					Object.keys(actual.fields).length &&
-				Object.entries(pattern.fields).every(
-					([k, p]) =>
-						k in actual.fields && bindTarget(p, actual.fields[k], bindings)
-				)
-			);
-		default:
-			return JSON.stringify(pattern) === JSON.stringify(actual);
+	}
+	return false;
+};
+
+const typeKey = (type: Type): string => {
+	switch (type.kind) {
+		case 'variable':
+		case 'constructor-variable': return `${type.kind}:${type.name}`;
+		case 'primitive': return type.name;
+		case 'unit': return 'Unit';
+		case 'function': return 'function';
+		case 'type-application': return `${typeKey(type.constructor)}(${typeKey(type.argument)})`;
+		case 'constructor': {
+			const bindings = [...type.bindings.entries()]
+				.sort(([left], [right]) => left.localeCompare(right))
+				.map(([name, value]) => `${name}:${typeKey(value)}`);
+			return `constructor:${type.abstraction.nominalName}:${bindings.join(',')}`;
+		}
+		case 'list': return `List(${typeKey(type.element)})`;
+		case 'tuple': return `{${type.elements.map(typeKey).join(',')}}`;
+		case 'record': {
+			const fields = Object.keys(type.fields)
+				.sort()
+				.map(name => `${name}:${typeKey(type.fields[name])}`);
+			return `{${fields.join(',')}}`;
+		}
+		case 'variant': return `${type.name}(${type.args.map(typeKey).join(',')})`;
+		case 'union': return type.types.map(typeKey).join('|');
+		case 'constrained': return typeKey(type.baseType);
+		default: return type.kind;
 	}
 };
+
+const satisfactionKey = (traitName: string, type: Type): string =>
+	`${traitName}:${typeKey(type)}`;
 
 const nominalName = (type: Type): string | null => {
 	if (type.kind === 'primitive' || type.kind === 'variant') return type.name;
 	if (type.kind === 'list') return 'List';
 	if (type.kind === 'unit') return 'Unit';
 	return null;
+};
+
+const combineSatisfactions = (
+	results: TraitSatisfaction[]
+): TraitSatisfaction => {
+	if (results.some(result => result.kind === 'missing')) return { kind: 'missing' };
+	const unresolved = results.filter(
+		(result): result is Extract<TraitSatisfaction, { kind: 'unresolved' }> =>
+			result.kind === 'unresolved'
+	);
+	return unresolved.length > 0
+		? { kind: 'unresolved', typeVars: mergeTypeVars(...unresolved.map(result => result.typeVars)) }
+		: { kind: 'derived-eq' };
 };
 
 const satisfyGiven = (
@@ -153,19 +147,10 @@ const satisfyGiven = (
 	if (constraint.kind === 'paren')
 		return satisfyGiven(constraint.expr, bindings, state, memo);
 	if (constraint.kind === 'and') {
-		const left = satisfyGiven(constraint.left, bindings, state, memo);
-		if (left.kind === 'missing') return left;
-		const right = satisfyGiven(constraint.right, bindings, state, memo);
-		if (right.kind === 'missing') return right;
-		return left.kind === 'unresolved' || right.kind === 'unresolved'
-			? {
-					kind: 'unresolved',
-					typeVars: mergeTypeVars(
-						left.kind === 'unresolved' ? left.typeVars : [],
-						right.kind === 'unresolved' ? right.typeVars : []
-					),
-				}
-			: { kind: 'derived-eq' };
+		return combineSatisfactions([
+			satisfyGiven(constraint.left, bindings, state, memo),
+			satisfyGiven(constraint.right, bindings, state, memo),
+		]);
 	}
 	if (constraint.kind === 'or')
 		throw new Error(
@@ -175,7 +160,24 @@ const satisfyGiven = (
 	const bound = bindings.get(constraint.typeVar);
 	return bound
 		? satisfyTrait(constraint.interfaceName, bound, state, memo)
-		: { kind: 'unresolved', typeVars: [constraint.typeVar] };
+		: { kind: 'unresolved', typeVars: new Set([constraint.typeVar]) };
+};
+
+const structuralEqComponents = (
+	type: Type,
+	state: SatisfactionState
+): Type[] | null => {
+	if (type.kind === 'tuple') return type.elements;
+	if (type.kind === 'record') return Object.values(type.fields);
+	if (type.kind !== 'variant') return null;
+	const adt = state.adtRegistry.get(type.name);
+	if (!adt) return null;
+	const bindings = new Map(
+		adt.typeParams.map((param, index) => [param, type.args[index]])
+	);
+	return [...adt.constructors.values()]
+		.flat()
+		.map(payload => substitute(payload, bindings));
 };
 
 export const satisfyTrait = (
@@ -185,12 +187,6 @@ export const satisfyTrait = (
 	memo = new Map<string, 'checking' | TraitSatisfaction>()
 ): TraitSatisfaction => {
 	const type = resolveAliases(input, state);
-	const key = `${traitName}:${JSON.stringify(type)}`;
-	const cached = memo.get(key);
-	if (cached === 'checking') return { kind: 'derived-eq' };
-	if (cached) return cached;
-	memo.set(key, 'checking');
-
 	const name = nominalName(type);
 	const implementation = name
 		? state.traitRegistry.implementations.get(traitName)?.get(name)
@@ -202,17 +198,16 @@ export const satisfyTrait = (
 			!implementation.targetType ||
 			bindTarget(implementation.targetType, type, bindings);
 		if (targetMatches) {
-			const given = implementation.givenConstraints
-				? satisfyGiven(implementation.givenConstraints, bindings, state, memo)
-				: { kind: 'derived-eq' as const };
-			const result: TraitSatisfaction =
-				given.kind === 'missing'
-					? { kind: 'missing' }
-					: given.kind === 'unresolved'
-						? given
-						: { kind: 'registered', implementation };
-			memo.set(key, result);
-			return result;
+			if (implementation.givenConstraints) {
+				const given = satisfyGiven(
+					implementation.givenConstraints,
+					bindings,
+					state,
+					memo
+				);
+				if (given.kind === 'missing' || given.kind === 'unresolved') return given;
+			}
+			return { kind: 'registered', implementation };
 		}
 	}
 
@@ -225,45 +220,28 @@ export const satisfyTrait = (
 			kind: 'unresolved',
 			typeVars: unresolvedTypeVars(type),
 		};
-		memo.set(key, result);
 		return result;
 	}
 	if (type.kind === 'constrained')
 		return satisfyTrait(traitName, type.baseType, state, memo);
 
 	if (traitName === 'Eq') {
-		let components: Type[] | null = null;
-		if (type.kind === 'tuple') components = type.elements;
-		if (type.kind === 'record') components = Object.values(type.fields);
-		if (type.kind === 'variant') {
-			const adt = state.adtRegistry.get(type.name);
-			if (adt) {
-				const bindings = new Map<string, Type>();
-				adt.typeParams.forEach((param, i) => bindings.set(param, type.args[i]));
-				components = Array.from(adt.constructors.values())
-					.flat()
-					.map(payload => substitute(payload, bindings));
-			}
-		}
+		const key = type.kind === 'variant'
+			? satisfactionKey(traitName, type)
+			: null;
+		const cached = key ? memo.get(key) : undefined;
+		if (cached === 'checking') return { kind: 'derived-eq' };
+		if (cached) return cached;
+		if (key) memo.set(key, 'checking');
+
+		const components = structuralEqComponents(type, state);
 		if (components) {
-			const results = components.map(component =>
-				satisfyTrait('Eq', component, state, memo)
+			const result = combineSatisfactions(
+				components.map(component => satisfyTrait('Eq', component, state, memo))
 			);
-			const result: TraitSatisfaction = results.some(r => r.kind === 'missing')
-				? { kind: 'missing' }
-				: results.some(r => r.kind === 'unresolved')
-					? {
-							kind: 'unresolved',
-							typeVars: mergeTypeVars(
-								...results.map(r => r.kind === 'unresolved' ? r.typeVars : [])
-							),
-						}
-					: { kind: 'derived-eq' };
-			memo.set(key, result);
+			if (key) memo.set(key, result);
 			return result;
 		}
 	}
-	const result: TraitSatisfaction = { kind: 'missing' };
-	memo.set(key, result);
-	return result;
+	return { kind: 'missing' };
 };
