@@ -97,7 +97,6 @@ This documentation covers all aspects of Noolang, from basic syntax to advanced 
 ### Development Tools
 - [Development Scripts](scripts/): Build automation and testing utilities
 - [Benchmark Suite](benchmark.js): Performance testing and optimization analysis
-- [Test Reports](test-reports/): Test coverage and quality metrics
 
 ### Language Server (WIP)
 - [LSP Implementation](lsp/): Language Server Protocol for VS Code integration

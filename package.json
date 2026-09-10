@@ -19,6 +19,8 @@
     "lint:fix": "npx eslint src/**/*.ts --fix",
     "test:repl-automation": "bun scripts/test-repl-automation.ts",
     "test:repl-simple": "node scripts/simple-repl-test.js",
+    "validate:docs:links": "bun scripts/validate-doc-links.ts",
+    "test:docs:commands": "bun scripts/smoke-documented-commands.ts",
     "test:lsp": "echo 'LSP tests moved to VSCode extension (no cargo)'",
     "test:lsp-build": "cd lsp/extension && npm install && npm run compile",
     "test:all": "bun test && bun run test:repl-simple && bun run test:lsp",
