@@ -167,27 +167,40 @@ jobs:
     - name: Build TypeScript project
       run: bun run build
     
-    - name: Build VSCode extension (TS LSP server)
+    - name: Install extension dependencies
+      working-directory: lsp/extension
+      run: npm ci
+
+    - name: Compile extension and protocol tests
+      working-directory: lsp/extension
+      run: npm run compile
+
+    - name: Run extension protocol tests
+      working-directory: lsp/extension
+      run: npm test
+
+    - name: Package VS Code extension
+      working-directory: lsp/extension
+      run: npm run package
+
+    - name: Verify packaged extension
+      working-directory: lsp/extension
       run: |
-        cd lsp/extension
-        npm ci
-        npm run compile
-    
-    - name: Upload LSP server artifact
+        VERSION=$(node -p "require('./package.json').version")
+        VSIX="noolang-lsp-${VERSION}.vsix"
+        test -f "$VSIX"
+        unzip -l "$VSIX" | tee /tmp/noolang-lsp-vsix.txt
+        grep -q 'extension/out/extension.js' /tmp/noolang-lsp-vsix.txt
+        grep -q 'extension/out/server/server.js' /tmp/noolang-lsp-vsix.txt
+        grep -q 'extension/syntaxes/noolang.tmLanguage.json' /tmp/noolang-lsp-vsix.txt
+
+    - name: Upload installable VSIX
       uses: actions/upload-artifact@v4
       with:
-        name: lsp-extension-out
-        path: |
-          lsp/extension/out/**
+        name: noolang-lsp-vsix
+        path: lsp/extension/noolang-lsp-*.vsix
+        if-no-files-found: error
         retention-days: 14
-    
-    - name: LSP checks (TS server)
-      run: |
-        node --version
-        npm --version
-        # Ensure server output exists
-        test -f lsp/extension/out/server/server.js
-        test -f lsp/extension/out/extension.js
 
   # Validate documentation examples (all examples in stable docs must pass)
   documentation-validation:
