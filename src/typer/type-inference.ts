@@ -521,7 +521,7 @@ function handleConstrainedFunctionBody(
 	return funcType;
 }
 
-const structuralEqConstraintsFor = (
+const liftParameterEqObligations = (
 	paramTypes: Type[],
 	state: TypeState
 ): Constraint[] => {
@@ -644,7 +644,7 @@ function buildNormalFunctionType(
 	const allConstraints = [
 		...implicitConstraints,
 		...bodyConstraints,
-		...structuralEqConstraintsFor(paramTypes, state),
+		...liftParameterEqObligations(paramTypes, state),
 	];
 	for (const constraint of paramConstraints) {
 		if (
