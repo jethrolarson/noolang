@@ -218,6 +218,12 @@ jobs:
     - name: Build project
       run: bun run build
     
+    - name: Validate local documentation links
+      run: bun run validate:docs:links
+
+    - name: Smoke-test documented CLI commands
+      run: bun run test:docs:commands
+
     - name: Validate all documentation examples
       run: |
         echo "🔍 Validating all Noolang examples in stable documentation..."

@@ -97,6 +97,7 @@ Thumbs.db
 
 # Test outputs
 test-results/
+test-reports/repl-automation-report.json
 playwright-report/
 
 # LSP (VS Code extension) build artifacts
