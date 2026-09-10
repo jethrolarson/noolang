@@ -21,8 +21,7 @@
     "test:repl-simple": "node scripts/simple-repl-test.js",
     "validate:docs:links": "bun scripts/validate-doc-links.ts",
     "test:docs:commands": "bun scripts/smoke-documented-commands.ts",
-    "test:lsp": "echo 'LSP tests moved to VSCode extension (no cargo)'",
-    "test:lsp-build": "cd lsp/extension && npm install && npm run compile",
+    "test:lsp": "npm --prefix lsp/extension ci && npm --prefix lsp/extension run compile && npm --prefix lsp/extension test",
     "test:all": "bun test && bun run test:repl-simple && bun run test:lsp",
     "test:all-repl": "bun run test:repl-simple && bun run test:repl-automation",
     "test:fast": "bun test",
@@ -33,8 +32,7 @@
     "benchmark:repl": "bun run build && node benchmark.js --repl",
     "benchmark:all": "bun run build && node benchmark.js && bun run benchmark:repl",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"*.ts\" \"*.js\" \"*.json\"",
-    "vscode:package": "vsce package",
-    "vscode:publish": "vsce publish"
+    "vscode:package": "npm --prefix lsp/extension ci && npm --prefix lsp/extension run package"
   },
   "keywords": [
     "programming-language",
@@ -49,36 +47,7 @@
     "noo": "dist/cli.js"
   },
   "engines": {
-    "node": ">=20.0.0",
-    "vscode": "^1.74.0"
-  },
-  "categories": [
-    "Programming Languages"
-  ],
-  "activationEvents": [
-    "onLanguage:noolang"
-  ],
-  "contributes": {
-    "languages": [
-      {
-        "id": "noolang",
-        "aliases": [
-          "Noolang",
-          "noolang"
-        ],
-        "extensions": [
-          ".noo"
-        ],
-        "configuration": "./language-configuration.json"
-      }
-    ],
-    "grammars": [
-      {
-        "language": "noolang",
-        "scopeName": "source.noolang",
-        "path": "./syntaxes/noolang.tmLanguage.json"
-      }
-    ]
+    "node": ">=20.0.0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.6",
@@ -86,10 +55,8 @@
     "@swc/core": "^1.15.47",
     "@types/bun": "^1.3.14",
     "@types/node": "^26.1.2",
-    "@types/vscode": "1.74.0",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.65.0",
-    "@vscode/vsce": "^3.9.2",
     "c8": "^12.0.0",
     "eslint": "^10.8.0",
     "prettier": "^3.9.6",
@@ -98,12 +65,7 @@
     "typescript": "^6.0.3",
     "uvu": "^0.5.6"
   },
-  "dependencies": {
-    "vscode-languageserver": "^10.1.0",
-    "vscode-uri": "^3.1.0"
-  },
   "trustedDependencies": [
-    "@swc/core",
-    "@vscode/vsce-sign"
+    "@swc/core"
   ]
 }
