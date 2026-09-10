@@ -135,6 +135,7 @@ jobs:
           repl-test-*.log
           test-automation-*.json
           test-results/
+          test-reports/
         retention-days: 14
 
   # Run LSP tests separately
