@@ -223,22 +223,22 @@ export const satisfyTrait = (
 		: undefined;
 	if (implementation) {
 		const bindings = new Map<string, Type>();
-		const targetMatches =
-			!implementation.givenConstraints ||
-			!implementation.targetType ||
-			bindTarget(implementation.targetType, type, bindings);
-		if (targetMatches) {
-			if (implementation.givenConstraints) {
-				const given = satisfyGiven(
-					implementation.givenConstraints,
-					bindings,
-					state,
-					memo
-				);
-				if (given.kind === 'missing' || given.kind === 'unresolved') return given;
-			}
-			return { kind: 'registered', implementation };
+		if (
+			implementation.targetType &&
+			!bindTarget(implementation.targetType, type, bindings)
+		) {
+			return { kind: 'missing' };
 		}
+		if (implementation.givenConstraints) {
+			const given = satisfyGiven(
+				implementation.givenConstraints,
+				bindings,
+				state,
+				memo
+			);
+			if (given.kind === 'missing' || given.kind === 'unresolved') return given;
+		}
+		return { kind: 'registered', implementation };
 	}
 
 	if (

@@ -65,6 +65,23 @@ implement Eq (RecordBox {@call a, @rank Float} b) given b implements Eq (
 		expectSuccess(`${recordInstance}\nequals ${recordValue} ${recordValue}`, true);
 	});
 
+	test('specialized instances reject mismatched repeated bindings', () => {
+		const instance = `variant Duo a b = Duo {a, b};
+implement Eq (Duo a a) given a implements Eq (
+  equals = fn left right => True
+);`;
+		const mismatched = '(Duo {{@value 1}, {@value "x"}})';
+		expectError(`${instance}\n${mismatched} == ${mismatched}`, /No implementation/);
+		expectError(
+			`${instance}\nequals ${mismatched} ${mismatched}`,
+			/No implementation/
+		);
+
+		const reordered = '(Duo {{@x 1, @y "left"}, {@y "right", @x 2}})';
+		expectSuccess(`${instance}\n${reordered} == ${reordered}`, true);
+		expectSuccess(`${instance}\nequals ${reordered} ${reordered}`, true);
+	});
+
 	test('retains polymorphic structural Eq obligations until instantiation', () => {
 		expectSuccess('(fn x => {x} == {x}) 1', true);
 		expectError('(fn x => {x} == {x}) (fn y => y)', /No implementation/);
