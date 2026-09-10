@@ -607,7 +607,7 @@ const withoutConstraintKey = (
 	return next;
 };
 
-const transitionStructuralEqObligations = (
+const rebindEqObligations = (
 	variableName: string,
 	boundType: Type,
 	state: TypeState,
@@ -742,7 +742,7 @@ function unifyVariable(
 		);
 	}
 
-	const structuralEqObligations = transitionStructuralEqObligations(
+	const structuralEqObligations = rebindEqObligations(
 		s1.name,
 		s2,
 		state,

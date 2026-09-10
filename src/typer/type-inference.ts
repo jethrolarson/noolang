@@ -670,12 +670,12 @@ function buildNormalFunctionType(
 	return funcType;
 }
 
-const outwardEqObligations = (
+const restoreOuterEqObligations = (
 	paramTypes: Type[],
 	before: TypeState,
 	after: TypeState
 ): TypeState['structuralEqObligations'] => {
-	const outward = new Map(after.structuralEqObligations);
+	const restored = new Map(after.structuralEqObligations);
 	const ownedKeys = paramTypes.flatMap(paramType =>
 		[...freeTypeVars(paramType)].map(typeVar =>
 			resolveVarName(typeVar, after.substitution)
@@ -683,10 +683,10 @@ const outwardEqObligations = (
 	);
 	for (const key of ownedKeys) {
 		const prior = before.structuralEqObligations.get(key);
-		if (prior) outward.set(key, prior);
-		else outward.delete(key);
+		if (prior) restored.set(key, prior);
+		else restored.delete(key);
 	}
-	return outward;
+	return restored;
 };
 
 export const typeFunction = (
@@ -725,7 +725,7 @@ export const typeFunction = (
 	// Obligations on this lambda's own parameters are encoded in funcType.
 	// Obligations on captured variables belong to an enclosing lambda and must
 	// remain in the store until that lambda can lift them.
-	const outwardObligations = outwardEqObligations(
+	const outerObligations = restoreOuterEqObligations(
 		paramTypes,
 		state,
 		currentState
@@ -738,7 +738,7 @@ export const typeFunction = (
 	// effect variables).
 	return createTypeResult(funcType, bodyResult.effects, {
 		...currentState,
-		structuralEqObligations: outwardObligations,
+		structuralEqObligations: outerObligations,
 	});
 };
 
@@ -1124,7 +1124,7 @@ const bindingStatementKinds = new Set<Expression['kind']>([
 const isBindingStatement = (statement: Expression): boolean =>
 	bindingStatementKinds.has(statement.kind);
 
-const deferOperatorConstraints = (
+const checkAndDeferOperatorConstraints = (
 	constraints: Constraint[],
 	operandType: Type,
 	state: TypeState
@@ -1285,7 +1285,7 @@ export const typeBinary = (
 				currentState
 			);
 			if (!constraintResult) {
-				const deferred = deferOperatorConstraints(
+				const deferred = checkAndDeferOperatorConstraints(
 					functionConstraints,
 					substitutedArgTypes[0],
 					currentState

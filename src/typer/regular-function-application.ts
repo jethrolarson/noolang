@@ -28,7 +28,7 @@ import { satisfyTrait } from './trait-satisfaction';
 import { addTraitObligations } from './constraint-store';
 import { handleComposeConstraintPropagation } from './function-composition';
 
-const deferEqConstraints = (
+const resolveOrDeferEqConstraints = (
 	constraints: Constraint[],
 	state: TypeState
 ): TypeState | null => {
@@ -62,7 +62,7 @@ const deferEqConstraints = (
 	return nextState;
 };
 
-const preserveConstraints = (
+const attachConstraintsToReturnType = (
 	returnType: Type,
 	constraints: Constraint[]
 ): Type => {
@@ -253,7 +253,7 @@ export function handleRegularFunctionApplication(
 				finalReturnType = constraintResult.resolvedType;
 				currentState = constraintResult.updatedState;
 			} else {
-				const deferredState = deferEqConstraints(
+				const deferredState = resolveOrDeferEqConstraints(
 					functionConstraints,
 					currentState
 				);
@@ -261,7 +261,10 @@ export function handleRegularFunctionApplication(
 					currentState = deferredState;
 					finalReturnType = returnType;
 				} else {
-					finalReturnType = preserveConstraints(returnType, functionConstraints);
+					finalReturnType = attachConstraintsToReturnType(
+						returnType,
+						functionConstraints
+					);
 				}
 			}
 		}
