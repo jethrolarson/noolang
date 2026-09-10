@@ -330,4 +330,4 @@ Additional tools for Noolang development:
 
 - **Learn more**: Read [Language Reference](language-reference.md) for syntax details
 - **See examples**: Check [Examples & Tutorials](examples-and-tutorials.md) for practical usage
-- **Contribute**: Read [Development Guide](development-guide.md) for contributing to tools
+- **Contribute**: Read [Development Guide](internal/development-guide.md) for contributing to tools

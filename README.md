@@ -25,8 +25,8 @@ A functional, expression-based, LLM-friendly programming language designed for l
 ## Installation
 
 ```bash
-npm install
-npm run build
+bun install
+bun run build
 ```
 
 ## Usage
@@ -36,13 +36,7 @@ npm run build
 Start the interactive REPL:
 
 ```bash
-npm run dev
-```
-
-Or run the compiled version:
-
-```bash
-npm start
+bun start
 ```
 
 ### Literate Programming
@@ -51,7 +45,7 @@ npm start
 concatenated and executed. This README is one — run it yourself:
 
 ```bash
-npm start -- README.md
+bun start -- README.md
 ```
 
 An optional frontmatter block (`shadow`/`assert`, see this file's own top) lets
@@ -64,8 +58,6 @@ Reference §Literate Programming](docs/language-reference.md#literate-programmin
 See [Tools & CLI Guide](docs/tools-and-cli.md) for CLI debugging flags and REPL debugging commands.
 
 ### Examples
-
-**Note**: Some examples in the `examples/` directory have known issues due to current type system limitations. See `docs/LANGUAGE_WEAKNESSES.md` for details. 
 
 **Working examples include**: `basic.noo`, `adt_demo.noo`, `recursive_adts.noo`, `safe_thrush_demo.noo`, `simple_adt.noo`, `card_game.noo`, `math_functions.noo`, `shell_automation.noo` (type-safe shell scripting), and all import examples (`math_module.noo`, `power_module.noo`, `number_module.noo`, `string_module.noo`, `function_module.noo`, `list_module.noo`).
 
@@ -1575,11 +1567,8 @@ duck_name = duck_person | @name  # Returns "Bob";
 
 ## VSCode Support
 
-Noolang has full VSCode syntax highlighting support:
-
-1. **Install the extension**: Use the provided `noolang-0.1.0.vsix` file
-2. **Automatic activation**: `.noo` files will automatically use Noolang syntax highlighting
-3. **Features**: Keywords, operators, data structures, accessors, comments, and more are highlighted
+The VSCode extension source is maintained in [`lsp/extension/`](lsp/extension/).
+It provides syntax highlighting and language-server support for `.noo` files.
 
 ## Trait System with Constraint Resolution
 
@@ -1665,34 +1654,8 @@ Noolang provides several built-in constraints:
 - **`Function`** - Function types
 - **`Eq`** - Types that support equality comparison
 
-### Constraint Syntax
-
-TODO add examples
-
-### Constraint Propagation
-
-Constraints automatically propagate through function composition:
-
-TODO add examples
-
-### Constraint Validation
-
-The type system validates constraints during unification:
-
-TODO add examples
-
-### Constraint Examples
-
-#### List Operations with Constraints
-
-TODO add examples
-
-#### Record Operations with Constraints
-
-TODO add examples
-
-#### Function Composition with Constraints
-TODO add examples
+Constraint syntax, propagation, and validation are covered in the [Type System
+Guide](docs/type-system.md#constraint-system).
 
 
 ## Development
@@ -1700,19 +1663,19 @@ TODO add examples
 ### Running Tests
 
 ```bash
-npm test
+bun test
 ```
 
 ### Building
 
 ```bash
-npm run build
+bun run build
 ```
 
 ### Performance Benchmarking
 
 ```bash
-npm run benchmark
+bun run benchmark
 ```
 
 Runs three benchmark suites:
@@ -1722,11 +1685,6 @@ Runs three benchmark suites:
 
 Results saved to `benchmark-results/` for historical analysis.
 
-### VSCode Extension
-
-```bash
-npm run vscode:package  # Create extension package
-```
 
 ## Language Design Decisions
 

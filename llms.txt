@@ -4,11 +4,6 @@
 
 This documentation covers all aspects of Noolang, from basic syntax to advanced type system features and language implementation details.
 
-## Recent Development
-
-- [Current Progress](docs-wip/PROGRESS.md): Development status, completed features, and roadmap
-- [Language Weaknesses](docs-wip/LANGUAGE_WEAKNESSES.md): Known limitations and areas for improvement
-
 ## Getting Started
 
 - [Getting Started Guide](docs/getting-started.md): Installation, setup, and first steps with Noolang
@@ -19,16 +14,16 @@ This documentation covers all aspects of Noolang, from basic syntax to advanced 
 ## Language Documentation
 
 - [Type System Guide](docs/type-system.md): Complete guide to type inference, constraints, and polymorphism
-- [Trait System Design](docs-wip/TRAIT_SYSTEM_DESIGN.md): Constraint-based polymorphism and trait implementations (WIP)
-- [Pattern Matching Design](docs-wip/PATTERN_MATCHING_DESIGN.md): Pattern matching system design and usage patterns (WIP)
-- [Operator Overloading Plan](docs-wip/OPERATOR_OVERLOADING_PLAN.md): Planned operator overloading system (WIP)
-- [Constraint Resolution](docs-wip/DEPTH_FIRST_CONSTRAINT_PLAN.md): Type constraint resolution algorithm details (WIP)
+- [Trait System](docs/type-system.md#constraint-system): Constraint-based polymorphism and trait implementations
+- [Pattern Matching](docs/language-reference.md#pattern-matching-and-exhaustiveness): Pattern matching syntax and usage
+- [Operator Overloading Plan](docs/internal/specs/OPERATOR_OVERLOADING_PLAN.md): Draft operator overloading plan
+- [Constraint Resolution](src/typer/constraint-resolution.ts): Type constraint resolution implementation
 
 ## Advanced Topics
 
-- [Accessor Composition](docs-wip/ACCESSOR_COMPOSITION_FLOW.md): Data access composition patterns and flow control
-- [Advanced Introspection](docs-wip/ADVANCED_INTROSPECTION_IDEAS.md): Language introspection and metaprogramming features
-- [Development Guide](docs/development-guide.md): Contributing, architecture, and building from source
+- [Accessors](docs/language-reference.md#accessor-patterns): Data access and composition
+- [Advanced Introspection](docs/internal/ideas/ADVANCED_INTROSPECTION_IDEAS.md): Language introspection and metaprogramming ideas
+- [Development Guide](docs/internal/development-guide.md): Contributing, architecture, and building from source
 
 ## Source Code
 
@@ -50,7 +45,7 @@ This documentation covers all aspects of Noolang, from basic syntax to advanced 
 - [Evaluator](src/evaluator/evaluator.ts): Expression evaluation engine with closure support
 - [Evaluator Utils](src/evaluator/evaluator-utils.ts): Runtime utility functions and value operations
 - [Evaluator Tests](src/evaluator/__tests__/): Runtime behavior and evaluation tests
-- [Effect System](src/effects.ts): Effect tracking and inference implementation
+- [Effect Utilities](src/typer/effects-utils.ts): Effect-set operations used by inference
 
 ### Interactive Tools
 - [REPL](src/repl.ts): Interactive development environment with debugging commands
@@ -85,7 +80,7 @@ This documentation covers all aspects of Noolang, from basic syntax to advanced 
 
 ### Type System Tests
 - [Type System Tests](test/type-system/): Comprehensive type inference and constraint tests
-- [ADT Limitations](test/type-system/adt_limitations.uvu.ts): Known algebraic data type limitations
+- [ADT Limitations](test/type-system/adt_limitations.test.ts): Known algebraic data type limitations
 - [Constraint Bug Tests](test/type-system/constraint-bug.test.ts): Constraint resolution edge cases
 
 ### Language Feature Tests
@@ -106,7 +101,7 @@ This documentation covers all aspects of Noolang, from basic syntax to advanced 
 
 ### Language Server (WIP)
 - [LSP Implementation](lsp/): Language Server Protocol for VS Code integration
-- [Syntax Highlighting](): Editor support and syntax highlighting definitions
+- [Syntax Highlighting](lsp/extension/syntaxes/noolang.tmLanguage.json): VSCode syntax definition
 
 ### Build & CI
 - [GitHub Actions](.github/): Continuous integration and automated testing
@@ -119,8 +114,8 @@ This documentation follows a progressive disclosure pattern:
 
 1. **Start Here**: [Getting Started](docs/getting-started.md) → [Language Reference](docs/language-reference.md)
 2. **Learn by Example**: [Examples & Tutorials](docs/examples-and-tutorials.md) → [Basic Examples](examples/basic.noo)
-3. **Deep Dive**: [Type System](docs/TYPE_SYSTEM.md) → [Trait System](docs/TRAIT_SYSTEM_DESIGN.md)
-4. **Advanced Usage**: [Tools & CLI](docs/tools-and-cli.md) → [Development Guide](docs/development-guide.md)
+3. **Deep Dive**: [Type System](docs/type-system.md) → [Trait System](docs/type-system.md#constraint-system)
+4. **Advanced Usage**: [Tools & CLI](docs/tools-and-cli.md) → [Development Guide](docs/internal/development-guide.md)
 5. **Implementation**: [Source Code](src/) → [Tests](test/) → [Examples](examples/)
 
 ## Quick Reference

@@ -1,5 +1,5 @@
 /**
- * Module loader — Phase 1 Step 2.
+ * Module loader.
  *
  * Implements `loadModule(realpath)` with:
  *   - Realpath-keyed memoisation
@@ -8,11 +8,10 @@
  *     builtins+stdlib base (computed once, never re-checked per module)
  *   - Top-level effect rejection and top-level `mut` rejection
  *   - Transitive manifest extraction + mergeManifests
- *   - Instance closure capture (§4): each implement member evaluated against
+ *   - Instance closure capture: each implement member evaluated against
  *     the defining module's environment, stored as a pre-evaluated Value
  *
- * No file I/O policy changes here — resolution stays CWD-based (step 3 adds
- * file-relative resolution and the import map).
+ * Relative imports resolve from the importing file.
  */
 
 import * as fs from 'node:fs';
@@ -35,9 +34,6 @@ import {
 	emptyManifest,
 	mergeManifests,
 	type Manifest,
-	type ManifestADT,
-	type ManifestInstance,
-	type ManifestTraitDef,
 } from './typer/module-manifest';
 import type {
 	TypeState,
@@ -50,7 +46,7 @@ import type {
 	TraitDefinition,
 	TraitImplementation,
 } from './typer/trait-system';
-import { createTraitRegistry, getTypeName } from './typer/trait-system';
+import { getTypeName } from './typer/trait-system';
 import { Evaluator } from './evaluator/evaluator';
 import type { Value } from './evaluator/evaluator-utils';
 import { Lexer } from './lexer/lexer';
