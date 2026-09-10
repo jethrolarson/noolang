@@ -435,6 +435,6 @@ Check the test files in [`test/`](../test/) for comprehensive examples and solut
 
 ## Next Steps
 
-- **Deep dive**: Read [Type System Guide](type-system-guide.md) for advanced type features
-- **Build tools**: Check [Development Guide](development-guide.md) for contributing
+- **Deep dive**: Read [Type System Guide](type-system.md) for advanced type features
+- **Build tools**: Check [Development Guide](internal/development-guide.md) for contributing
 - **Performance**: Run `bun run benchmark` to see performance characteristics

@@ -2,11 +2,11 @@
 
 ## Problem
 
-The evaluator is tree-walking and uses the JS call stack as its own: control flow
-(recursion, branching) and environment capture (closures) both ride directly on JS
-function calls and JS closures. That coupling is a ceiling, not a single bug — it
-shows up as stack overflow on deep recursion ([[TAIL_CALL_OPTIMIZATION]]), but the
-same coupling also blocks: decent stepping/debugging support, real perf work
+The evaluator is tree-walking and still uses the JS call stack for non-tail calls;
+tail-position calls are now trampolined as specified by
+[ADR 0008](../adrs/adr_0008.md). Control flow and environment capture otherwise ride
+directly on JS function calls and closures. That coupling is a ceiling, not a single
+bug: it blocks decent stepping/debugging support, real perf work
 (everything pays JS call overhead + GC churn per node), and any future bytecode-level
 optimization (constant folding, inline caching, etc.) — there is no intermediate
 representation to optimize, only the AST itself.
@@ -28,8 +28,8 @@ new VM doesn't crash, not that its semantics match the old evaluator, and there'
 cheap way to diff "silently different behavior" across two different execution
 models.
 
-[[TAIL_CALL_OPTIMIZATION]] (option A there) fixes the concrete problem that's
-actually been hit — stack overflow on tail recursion — without this. Do that first.
+[ADR 0008](../adrs/adr_0008.md) fixed the concrete problem that had actually been
+hit — stack overflow on tail recursion — without requiring this rewrite.
 
 ## Status
 

@@ -3,7 +3,7 @@
 # Shipped with the interpreter but written as plain userland noolang: no
 # evaluator hooks, no typer access. Tests are values — a test file's last
 # expression is its Test tree; the runner imports it and walks it.
-# Design rationale: docs-wip/TESTING_FRAMEWORK_PLAN.md.
+# Design rationale: docs/internal/specs/TESTING_FRAMEWORK_PLAN.md.
 #
 # Use the lowercase helpers (test_case, group, expect_*), not the raw
 # constructors. The constructors are public only because the language cannot

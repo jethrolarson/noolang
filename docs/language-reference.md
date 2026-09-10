@@ -815,6 +815,6 @@ show result1;  # => "Some(5)" : String
 
 ## Next Steps
 
-- **Type System**: Read [Type System Guide](type-system-guide.md) for details on inference and constraints
+- **Type System**: Read [Type System Guide](type-system.md) for details on inference and constraints
 - **Standard Library**: See [`stdlib.noo`](../stdlib.noo) for built-in functions and traits
 - **Examples**: Check [Examples & Tutorials](examples-and-tutorials.md) for practical usage patterns

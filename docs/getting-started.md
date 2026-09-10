@@ -152,12 +152,12 @@ Explore the examples to learn more:
 ## Next Steps
 
 1. **Learn the syntax**: Read [Language Reference](language-reference.md)
-2. **Understand types**: Study [Type System Guide](type-system-guide.md)
+2. **Understand types**: Study [Type System Guide](type-system.md)
 3. **Explore tools**: Check [Tools & CLI Guide](tools-and-cli.md)
 4. **Try examples**: Work through [Examples & Tutorials](examples-and-tutorials.md)
 
 ## Getting Help
 
 - Use `.help` in the REPL for command reference
-- Check [Development Guide](development-guide.md) for contributing
+- Check [Development Guide](internal/development-guide.md) for contributing
 - Examine source code in [`src/`](../src/) for implementation details
