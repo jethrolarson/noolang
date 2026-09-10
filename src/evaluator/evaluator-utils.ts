@@ -52,6 +52,32 @@ export type NativeFunctionValue = {
 };
 export type UnitValue = { tag: 'unit' };
 
+export const compareStructuralValues = (
+	left: Value,
+	right: Value,
+	equals: (left: Value, right: Value) => boolean,
+	isDeclaredConstructor: (value: ConstructorValue) => boolean
+): boolean | null => {
+	if (isTuple(left) && isTuple(right)) {
+		return left.values.length === right.values.length &&
+			left.values.every((value, i) => equals(value, right.values[i]));
+	}
+	if (isRecord(left) && isRecord(right)) {
+		const leftKeys = Object.keys(left.fields);
+		const rightKeys = Object.keys(right.fields);
+		return leftKeys.length === rightKeys.length &&
+			leftKeys.every(key =>
+				Object.hasOwn(right.fields, key) &&
+				equals(left.fields[key], right.fields[key])
+			);
+	}
+	if (isConstructor(left) && isConstructor(right) && isDeclaredConstructor(left) && isDeclaredConstructor(right)) {
+		return left.name === right.name && left.args.length === right.args.length &&
+			left.args.every((value, i) => equals(value, right.args[i]));
+	}
+	return null;
+};
+
 // --- Mutable Cell type ---
 export type Cell = { cell: true; value: Value };
 export const isCell = (val: any): val is Cell =>

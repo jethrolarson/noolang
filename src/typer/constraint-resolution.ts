@@ -7,6 +7,7 @@ import {
 import { type TypeState } from './types';
 import { substitute } from './substitute';
 import type { RecordStructure, StructureFieldType } from '../ast';
+import { satisfyTrait } from './trait-satisfaction';
 
 // Helper function to resolve nested structure constraints recursively
 export function resolveNestedStructure(
@@ -97,13 +98,13 @@ export function tryResolveConstraints(
 				} else if (traitName === 'Numeric' && argTypeName === 'Float') {
 					hasImplementation = true;
 				} else {
-					// Check trait registry for user-defined implementations
-					const traitRegistry = state.traitRegistry;
-					if (traitRegistry) {
-						const traitImpls = traitRegistry.implementations.get(traitName);
+					const satisfaction = satisfyTrait(traitName, substitutedArgType, {
+						...state,
+						substitution: mergedSubstitution,
+					});
 						hasImplementation =
-							!!argTypeName && !!traitImpls && traitImpls.has(argTypeName);
-					}
+						satisfaction.kind === 'registered' ||
+						satisfaction.kind === 'derived-eq';
 				}
 
 				if (hasImplementation) {

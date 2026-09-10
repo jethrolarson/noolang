@@ -52,6 +52,13 @@ export type TypeState = {
 	 * `Constraint[]` field that was declared, initialised, and never used.
 	 */
 	constraints: ConstraintStore;
+	/**
+	 * Unresolved Eq leaves introduced by structural/conditional satisfaction.
+	 * Keys are current variable representatives: unification moves, discharges,
+	 * rejects, or recursively re-homes them; lambda inference lifts owned keys
+	 * and propagates captured keys; fresh module states never inherit them.
+	 */
+	structuralEqObligations: ConstraintStore;
 	adtRegistry: ADTRegistry; // Track ADT definitions
 	traitRegistry: TraitRegistry;
 	protectedTypeNames: Set<string>; // Names of types reserved/protected from shadowing

@@ -24,6 +24,8 @@ import {
 import { tryResolveConstraints } from './constraint-resolution';
 import { freshenTypeVariables, freshTypeVariable } from './type-operations';
 import { matchConstructorAbstraction } from './kinded-constructors';
+import { satisfyTrait } from './trait-satisfaction';
+import { addTraitObligations } from './constraint-store';
 
 // Helper function to handle trait function resolution
 export function handleTraitFunctionApplication(
@@ -196,6 +198,32 @@ function handlePartialTraitFunctionApplication(
 		);
 	}
 
+	for (const constraint of freshenedTraitFuncType.constraints || []) {
+		if (constraint.kind !== 'implements' || constraint.interfaceName !== 'Eq')
+			continue;
+		const operandType = substitute(
+			{ kind: 'variable', name: constraint.typeVar },
+			partialState.substitution
+		);
+		const satisfaction = satisfyTrait('Eq', operandType, partialState);
+		if (satisfaction.kind === 'missing') {
+			throw new Error(
+				`No implementation of trait function 'equals' for ${typeToString(operandType, partialState.substitution)}`
+			);
+		}
+		if (satisfaction.kind === 'unresolved') {
+			partialState = {
+				...partialState,
+				structuralEqObligations: addTraitObligations(
+					partialState.structuralEqObligations,
+					satisfaction.typeVars,
+					'Eq',
+					partialState.substitution
+				),
+			};
+		}
+	}
+
 	// Build the remaining curried function type
 	// For curried functions, we need to handle the case where we've applied one argument
 	// and the return type is still a function
@@ -313,8 +341,34 @@ function handleFullTraitFunctionApplication(
 	const resolution = resolveTraitFunction(
 		currentState.traitRegistry,
 		funcName,
-		argTypes
+		argTypes,
+		currentState
 	);
+
+	if (resolution.found && resolution.derivedEq) {
+		const mapping = new Map<string, Type>();
+		let resultState = currentState;
+		const [freshVar, freshState] = freshTypeVariable(resultState);
+		mapping.set('a', freshVar);
+		const [freshened, nextState] = freshenTypeVariables(
+			traitFuncType,
+			mapping,
+			freshState
+		);
+		resultState = nextState;
+		if (freshened.kind !== 'function') return null;
+		for (let i = 0; i < argTypes.length; i++) {
+			resultState = unify(freshened.params[i], argTypes[i], resultState, {
+				line: expr.location?.start.line || 1,
+				column: expr.location?.start.column || 1,
+			});
+		}
+		return createTypeResult(
+			substitute(freshened.return, resultState.substitution),
+			allEffects,
+			resultState
+		);
+	}
 
 	if (resolution.found && resolution.impl) {
 		// We found a trait implementation - evaluate it with the arguments
@@ -630,7 +684,9 @@ function isFullyConcrete(type: Type): boolean {
 		return isFullyConcrete(type.baseType);
 	}
 	if (type.kind === 'function') {
-		return type.params.every(isFullyConcrete) && isFullyConcrete(type.return);
+		// A function shape can never gain a trait implementation by resolving its
+		// internal inference variables; it is concrete for dispatch purposes.
+		return true;
 	}
 	return false;
 }

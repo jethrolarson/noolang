@@ -24,7 +24,66 @@ import { unify } from './unify';
 import { typeExpression } from './expression-dispatcher';
 import { Expression } from '../ast';
 import { tryResolveConstraints } from './constraint-resolution';
+import { satisfyTrait } from './trait-satisfaction';
+import { addTraitObligations } from './constraint-store';
 import { handleComposeConstraintPropagation } from './function-composition';
+
+const resolveOrDeferEqConstraints = (
+	constraints: Constraint[],
+	state: TypeState
+): TypeState | null => {
+	if (!constraints.every(
+		constraint => constraint.kind === 'implements' && constraint.interfaceName === 'Eq'
+	)) return null;
+
+	let nextState = state;
+	for (const constraint of constraints) {
+		const boundType = substitute(
+			{ kind: 'variable', name: constraint.typeVar },
+			nextState.substitution
+		);
+		const satisfaction = satisfyTrait('Eq', boundType, nextState);
+		if (satisfaction.kind === 'missing') {
+			throw new Error(
+				`No implementation found for Eq on ${typeToString(boundType, nextState.substitution)}`
+			);
+		}
+		if (satisfaction.kind !== 'unresolved') continue;
+		nextState = {
+			...nextState,
+			structuralEqObligations: addTraitObligations(
+				nextState.structuralEqObligations,
+				satisfaction.typeVars,
+				'Eq',
+				nextState.substitution
+			),
+		};
+	}
+	return nextState;
+};
+
+const attachConstraintsToReturnType = (
+	returnType: Type,
+	constraints: Constraint[]
+): Type => {
+	if (returnType.kind === 'function') {
+		return {
+			...returnType,
+			constraints: (returnType.constraints || []).concat(constraints),
+		};
+	}
+	const grouped = new Map<string, Constraint[]>();
+	for (const constraint of constraints) {
+		if (constraint.kind !== 'implements') continue;
+		grouped.set(constraint.typeVar, [
+			...(grouped.get(constraint.typeVar) || []),
+			constraint,
+		]);
+	}
+	return grouped.size > 0
+		? { kind: 'constrained', baseType: returnType, constraints: grouped }
+		: returnType;
+};
 
 // Helper function to handle regular function application
 export function handleRegularFunctionApplication(
@@ -194,38 +253,18 @@ export function handleRegularFunctionApplication(
 				finalReturnType = constraintResult.resolvedType;
 				currentState = constraintResult.updatedState;
 			} else {
-				// Could not resolve constraints, preserve them on the return type
-				if (returnType.kind === 'function') {
-					finalReturnType = {
-						...returnType,
-						constraints: (returnType.constraints || []).concat(
-							functionConstraints
-						),
-					};
+				const deferredState = resolveOrDeferEqConstraints(
+					functionConstraints,
+					currentState
+				);
+				if (deferredState) {
+					currentState = deferredState;
+					finalReturnType = returnType;
 				} else {
-					// For non-function types, create a constrained type to preserve the constraints
-					// This handles cases like `map f list` returning `f b given f implements Functor`
-					const constraintMap = new Map<string, Constraint[]>();
-
-					// Group constraints by type variable
-					for (const constraint of functionConstraints) {
-						if (constraint.kind === 'implements') {
-							const typeVar = constraint.typeVar;
-							const existing = constraintMap.get(typeVar) || [];
-							existing.push(constraint);
-							constraintMap.set(typeVar, existing);
-						}
-					}
-
-					if (constraintMap.size > 0) {
-						finalReturnType = {
-							kind: 'constrained',
-							baseType: returnType,
-							constraints: constraintMap,
-						};
-					} else {
-						finalReturnType = returnType;
-					}
+					finalReturnType = attachConstraintsToReturnType(
+						returnType,
+						functionConstraints
+					);
 				}
 			}
 		}

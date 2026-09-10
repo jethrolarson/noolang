@@ -71,7 +71,12 @@ import {
 	propagateConstraintToTypeVariable,
 	constraintsEqual,
 } from './helpers';
-import { addConstraint, resolveVarName } from './constraint-store';
+import {
+	addConstraint,
+	addTraitObligations,
+	getConstraints,
+	resolveVarName,
+} from './constraint-store';
 import { collectSpineEffects } from './effects-utils';
 import {
 	composeConstraintChain,
@@ -112,6 +117,7 @@ import {
 	getTypeName,
 	addTraitImplementation,
 } from './trait-system';
+import { satisfyTrait } from './trait-satisfaction';
 import {
 	annotateConstructorKind,
 	arrowKind,
@@ -515,6 +521,32 @@ function handleConstrainedFunctionBody(
 	return funcType;
 }
 
+const liftParameterEqObligations = (
+	paramTypes: Type[],
+	state: TypeState
+): Constraint[] => {
+	const typeVars = new Set(
+		paramTypes.flatMap(paramType => [...freeTypeVars(paramType)])
+	);
+	const constraints = [...typeVars].flatMap(typeVar =>
+		getConstraints(
+			state.structuralEqObligations,
+			typeVar,
+			state.substitution
+		)
+	);
+	const byTypeVar = new Map<string, Constraint>();
+	for (const constraint of constraints) {
+		if (
+			constraint.kind === 'implements' &&
+			constraint.interfaceName === 'Eq'
+		) {
+			byTypeVar.set(constraint.typeVar, constraint);
+		}
+	}
+	return [...byTypeVar.values()];
+};
+
 function buildNormalFunctionType(
 	paramTypes: Type[],
 	bodyResult: TypeResult,
@@ -605,8 +637,15 @@ function buildNormalFunctionType(
 		}
 	}
 
-	// Combine implicit constraints with body and lifted parameter constraints
-	const allConstraints = [...implicitConstraints, ...bodyConstraints];
+	// Combine implicit constraints with body and lifted parameter constraints.
+	// Trait obligations recorded while checking a structural operation belong to
+	// the component variable, so lift them from every parameter variable even
+	// when the function's Bool result does not mention that variable.
+	const allConstraints = [
+		...implicitConstraints,
+		...bodyConstraints,
+		...liftParameterEqObligations(paramTypes, state),
+	];
 	for (const constraint of paramConstraints) {
 		if (
 			!allConstraints.some(existing => constraintsEqual(existing, constraint))
@@ -630,6 +669,25 @@ function buildNormalFunctionType(
 
 	return funcType;
 }
+
+const restoreOuterEqObligations = (
+	paramTypes: Type[],
+	before: TypeState,
+	after: TypeState
+): TypeState['structuralEqObligations'] => {
+	const restored = new Map(after.structuralEqObligations);
+	const ownedKeys = paramTypes.flatMap(paramType =>
+		[...freeTypeVars(paramType)].map(typeVar =>
+			resolveVarName(typeVar, after.substitution)
+		)
+	);
+	for (const key of ownedKeys) {
+		const prior = before.structuralEqObligations.get(key);
+		if (prior) restored.set(key, prior);
+		else restored.delete(key);
+	}
+	return restored;
+};
 
 export const typeFunction = (
 	expr: FunctionExpression,
@@ -664,12 +722,24 @@ export const typeFunction = (
 					currentState
 				);
 
+	// Obligations on this lambda's own parameters are encoded in funcType.
+	// Obligations on captured variables belong to an enclosing lambda and must
+	// remain in the store until that lambda can lift them.
+	const outerObligations = restoreOuterEqObligations(
+		paramTypes,
+		state,
+		currentState
+	);
+
 	// The latent effects now live on the function type (see
 	// buildNormalFunctionType) so they fire on application and show in the
 	// inferred type. They are also surfaced here as a conservative whole-program
 	// over-approximation (higher-order effect propagation is not yet tracked via
 	// effect variables).
-	return createTypeResult(funcType, bodyResult.effects, currentState);
+	return createTypeResult(funcType, bodyResult.effects, {
+		...currentState,
+		structuralEqObligations: outerObligations,
+	});
 };
 
 function collectImplicitConstraints(
@@ -1054,6 +1124,39 @@ const bindingStatementKinds = new Set<Expression['kind']>([
 const isBindingStatement = (statement: Expression): boolean =>
 	bindingStatementKinds.has(statement.kind);
 
+const checkAndDeferOperatorConstraints = (
+	constraints: Constraint[],
+	operandType: Type,
+	state: TypeState
+): { state: TypeState; hardMiss: boolean } => {
+	let nextState = state;
+	let hardMiss = false;
+	for (const constraint of constraints) {
+		if (constraint.kind !== 'implements') continue;
+		const satisfaction = satisfyTrait(
+			constraint.interfaceName,
+			operandType,
+			nextState
+		);
+		hardMiss ||= satisfaction.kind === 'missing';
+		if (
+			satisfaction.kind === 'unresolved' &&
+			constraint.interfaceName === 'Eq'
+		) {
+			nextState = {
+				...nextState,
+				structuralEqObligations: addTraitObligations(
+					nextState.structuralEqObligations,
+					satisfaction.typeVars,
+					'Eq',
+					nextState.substitution
+				),
+			};
+		}
+	}
+	return { state: nextState, hardMiss };
+};
+
 export const typeBinary = (
 	expr: BinaryExpression,
 	state: TypeState
@@ -1182,9 +1285,16 @@ export const typeBinary = (
 				currentState
 			);
 			if (!constraintResult) {
-				// If both operand types are fully concrete (no type variables), then fail hard
+				const deferred = checkAndDeferOperatorConstraints(
+					functionConstraints,
+					substitutedArgTypes[0],
+					currentState
+				);
+				currentState = deferred.state;
+				// A concrete unsupported shape is a hard miss even when its internal
+				// function type contains inference variables.
 				const hasVars = substitutedArgTypes.some(t => freeTypeVars(t).size > 0);
-				if (!hasVars) {
+				if (deferred.hardMiss || !hasVars) {
 					throw new Error(
 						`No implementation found for operator ${expr.operator} with operand types ${typeToString(
 							substitutedArgTypes[0],
@@ -2091,6 +2201,7 @@ export const typeImplementDefinition = (
 	const traitImpl = {
 		typeName,
 		constructorAbstraction,
+		targetType: implementationTarget,
 		functions: implementationMap,
 		givenConstraints, // Include given constraints if present
 	};

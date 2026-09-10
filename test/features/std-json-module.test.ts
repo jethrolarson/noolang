@@ -36,8 +36,21 @@ match (json_parse ${jsonText}) (
 )`;
 
 test('the module export types are visible to the importer', () => {
-	const { finalType } = runCode(`{@json_parse} = import "std/json"; json_parse`);
+	const { finalType } = runCode(
+		`{@json_parse} = import "std/json"; json_parse`
+	);
 	expect(finalType).toContain('JsonValue');
+});
+
+test('imported JsonValue derives equality through nested arrays and objects', () => {
+	expectSuccess(
+		`${importJson}
+match (json_parse "{\\\"items\\\":[{\\\"x\\\":1}]}") (
+  Ok a => match (json_parse "{\\\"items\\\":[{\\\"x\\\":1}]}") (Ok b => a == b; Err _ => False);
+  Err _ => False
+)`,
+		true
+	);
 });
 
 // Regression: scan_string used to recurse once per input character with a
