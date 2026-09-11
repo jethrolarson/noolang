@@ -41,6 +41,8 @@ import {
   type AstNode,
 } from './infer-annotation';
 
+const packageJson = require('../../package.json') as { version: string };
+
 export interface ServerOptions {
   workspacePath?: string;
   cliPath?: string;
@@ -59,6 +61,7 @@ const CLI_PATH = options.cliPath || process.env.NOOLANG_CLI_PATH || path.join(WO
 const CLI_RUNTIME = options.cliRuntime || process.env.NOOLANG_CLI_RUNTIME || 'node';
 const materializedPaths = new Map<string, string>();
 const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'noolang-lsp-'));
+let astOutputCounter = 0;
 
 function analysisPath(uri: string, originalPath: string): string {
   const content = documents.get(uri);
@@ -221,16 +224,46 @@ function getExpressionTypes(expr: string): string[] {
 }
 
 function getAstFile(filePath: string): any | undefined {
-  const res = runNodeCli(['--ast-file', filePath]);
-  if (res.status !== 0) return undefined;
-  const lines = (res.stdout || '').split(/\r?\n/);
-  const start = lines.findIndex((l) => l.trim().startsWith('{'));
-  if (start >= 0) {
+  const outputPath = path.join(tempDirectory, `ast-${astOutputCounter++}.json`);
+  let outputFd: number | undefined;
+  try {
+    outputFd = fs.openSync(outputPath, 'w', 0o600);
+    const res = spawnSync(CLI_RUNTIME, [CLI_PATH, '--ast-file', filePath], {
+      encoding: 'utf8',
+      stdio: ['ignore', outputFd, 'pipe'],
+    });
+    fs.closeSync(outputFd);
+    outputFd = undefined;
+
+    if (res.error || res.status !== 0) {
+      const reason = res.error?.message || res.stderr?.trim() || `exit status ${res.status}`;
+      connection.console.error(`Failed to produce AST for ${filePath}: ${reason}`);
+      return undefined;
+    }
+
+    const output = fs.readFileSync(outputPath, 'utf8');
+    const jsonStart = output.search(/^\s*\{/m);
+    if (jsonStart < 0) {
+      connection.console.error(`Failed to parse AST for ${filePath}: CLI output contained no JSON object`);
+      return undefined;
+    }
     try {
-      return JSON.parse(lines.slice(start).join('\n'));
+      return JSON.parse(output.slice(jsonStart));
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      connection.console.error(`Failed to parse AST for ${filePath}: ${reason}`);
+      return undefined;
+    }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    connection.console.error(`Failed to read AST for ${filePath}: ${reason}`);
+    return undefined;
+  } finally {
+    if (outputFd !== undefined) fs.closeSync(outputFd);
+    try {
+      fs.unlinkSync(outputPath);
     } catch {}
   }
-  return undefined;
 }
 
 function simplifyTypeString(typeStr: string): string {
@@ -527,7 +560,7 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
       workspaceSymbolProvider: true,
       codeActionProvider: true,
     },
-    serverInfo: { name: 'Noolang Language Server', version: '0.1.0' },
+    serverInfo: { name: 'Noolang Language Server', version: packageJson.version },
   };
 });
 
@@ -574,7 +607,7 @@ connection.onDidSaveTextDocument((params: DidSaveTextDocumentParams) => {
   }
 });
 
-connection.onCompletion((params: CompletionParams): CompletionItem[] => {
+connection.onCompletion((_params: CompletionParams): CompletionItem[] => {
   const items: CompletionItem[] = [];
   const keywords = ['fn', 'if', 'then', 'else', 'match', 'with', 'variant', 'mut', 'constraint', 'implement'];
   const ctors = ['True', 'False', 'Some', 'None', 'Ok', 'Err'];
