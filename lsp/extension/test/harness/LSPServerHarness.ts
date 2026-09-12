@@ -3,14 +3,10 @@
  * Provides a simple way to start the server and send requests in tests.
  */
 
-import { createConnection, InitializeParams, Connection } from 'vscode-languageserver/node';
+import { createConnection, InitializeParams, InitializeResult, Connection } from 'vscode-languageserver/node';
 import * as path from 'path';
 import * as fs from 'fs';
-import {
-	createInMemoryTransportPair,
-	InMemoryMessageReader,
-	InMemoryMessageWriter,
-} from './InMemoryTransport';
+import { createInMemoryTransportPair } from './InMemoryTransport';
 import { createServer } from '../../server/src/server';
 
 export interface HarnessOptions {
@@ -54,7 +50,7 @@ export class LSPServerHarness {
 	/**
 	 * Initialize the server with mock params.
 	 */
-	async initialize(params?: Partial<InitializeParams>): Promise<void> {
+	async initialize(params?: Partial<InitializeParams>): Promise<InitializeResult> {
 		if (this.isInitialized) {
 			throw new Error('Server already initialized');
 		}
@@ -82,11 +78,12 @@ export class LSPServerHarness {
 		await new Promise(resolve => setTimeout(resolve, 50));
 
 		// Send initialize request from client to server
-		const result = await this.clientConnection.sendRequest('initialize', defaultParams);
+		const result = await this.clientConnection.sendRequest<InitializeResult>('initialize', defaultParams);
 		this.isInitialized = true;
 
 		// Send initialized notification
 		await this.clientConnection.sendNotification('initialized', {});
+		return result;
 	}
 
 	/**
@@ -163,6 +160,20 @@ export class LSPServerHarness {
 	}
 
 	/**
+	 * Request code actions for a position.
+	 */
+	async requestCodeActions(uri: string, line: number, character: number): Promise<any> {
+		return this.clientConnection.sendRequest('textDocument/codeAction', {
+			textDocument: { uri },
+			range: {
+				start: { line, character },
+				end: { line, character },
+			},
+			context: { diagnostics: [] },
+		});
+	}
+
+	/**
 	 * Close the harness and cleanup resources.
 	 */
 	async close(): Promise<void> {
@@ -170,7 +181,7 @@ export class LSPServerHarness {
 			try {
 				await this.clientConnection.sendNotification('shutdown');
 				await this.clientConnection.sendNotification('exit');
-			} catch (e) {
+			} catch {
 				// Ignore errors during shutdown
 			}
 		}
