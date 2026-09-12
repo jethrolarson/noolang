@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { runCode, expectError } from '../../../test/utils';
+import { runCode, expectError } from '../../utils';
 
 // Record destructuring should bind a SUBSET of a record's fields, like match
 // record patterns already do (issue: destructuring was total, match is partial).

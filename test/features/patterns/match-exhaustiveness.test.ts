@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { parseAndType, runCode } from '../../../test/utils';
+import { parseAndType, runCode } from '../../utils';
 
 // A match on a concrete variant must cover every constructor or have a
 // catch-all; otherwise it is a type error.
