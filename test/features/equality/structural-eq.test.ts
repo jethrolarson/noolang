@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { expectError, expectSuccess, parseAndType } from '../../../test/utils';
-import { typeToString } from '../helpers';
+import { expectError, expectSuccess, parseAndType } from '../../utils';
+import { typeToString } from '../../../src/typer/helpers';
 
 const expectBool = (code: string) => {
 	const result = parseAndType(code);
