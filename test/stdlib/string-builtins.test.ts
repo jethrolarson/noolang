@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'bun:test';
-import { expectSuccess, expectError, runCode } from '../../../test/utils';
+import { expectSuccess, expectError, runCode } from '../utils';
 
 describe('String decomposition builtins', () => {
 	test('split breaks a string on a delimiter', () => {

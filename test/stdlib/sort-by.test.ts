@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'bun:test';
-import { expectSuccess } from '../../../test/utils';
+import { expectSuccess } from '../utils';
 
 describe('sort_by (stdlib)', () => {
 	test('sorts numbers ascending with an explicit less-than predicate', () => {

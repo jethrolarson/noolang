@@ -22,6 +22,11 @@ confidently wrong concrete type is not.
 
 ## Tests
 
+Keep focused lower-layer module tests colocated under `src/**/__tests__`. Put full
+lexer → parser → typer → evaluator pipeline tests, language-feature tests, CLI tests,
+module tests, and stdlib tests under `test/**`; this boundary makes test location
+predict its intent.
+
 `test/utils.ts` has the helpers — start from `runCode` / `parseAndType` /
 `expectSuccess` / `expectError`, and read the file for the assert zoo. Do NOT hand-roll
 `new Lexer(...) → parse → typeAndDecorate → new Evaluator`; the helpers keep tests
@@ -80,8 +85,8 @@ that as a design signal and propose a refactor.
 Code must not lie: names, types, and structure reflect what the code actually does.
 Express intent by decomposition, not comments or procedural narration — extract a
 concept rather than introduce a procedural intermediate. Comment only unobvious "why"
-and public API where appropriate, other comments which only restate what code says can 
-be omitted. Pipelines read linearly in source order. Push correctness into the type 
+and public API where appropriate, other comments which only restate what code says can
+be omitted. Pipelines read linearly in source order. Push correctness into the type
 layer; make illegal states unrepresentable where practical.
 
 Minor duplication beats a premature abstraction, and YAGNI wins ties. Don't
