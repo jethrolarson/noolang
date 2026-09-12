@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'bun:test';
-import { expectSuccess, runCode } from '../../../test/utils';
+import { expectSuccess, runCode } from '../utils';
 
 describe('Association-list helpers (stdlib)', () => {
 	test('assoc_get finds the value for a matching key', () => {
