@@ -119,56 +119,52 @@ const fieldsToRecord = (
 	return fieldObj;
 };
 
-// Parse record type {field: Type, ...} or {@field Type, ...}
-const parseRecordType: C.Parser<Type> = C.choice(
-	// Record type with accessor syntax (without colons): { @field Type, @field2 Type }
-	C.map(
-		C.seq(
-			C.punctuation('{'),
-			C.optional(
-				C.sepBy(
-					C.map(
-						C.seq(
-							C.accessor(),
-							C.lazy(() => parseTypeExpression)
-						),
-						([accessor, type]): [string, Type] => [accessor.value, type]
-					),
-					C.punctuation(',')
-				)
-			),
-			C.punctuation('}')
-		),
-		([_open, fields, _close]) => recordType(fieldsToRecord(fields))
-	),
+export const COLON_RECORD_TYPE_ERROR =
+	"Colon record type syntax is not supported; use '{@field Type}'";
 
-	// Record type with colon syntax: { field: Type, @field: Type }
-	C.map(
-		C.seq(
-			C.punctuation('{'),
-			C.optional(
-				C.sepBy(
-					C.map(
-						C.seq(
-							C.choice2(
-								// Support @field syntax (ACCESSOR tokens)
-								C.map(C.accessor(), accessor => ({ value: accessor.value })),
-								// Also support plain identifier for backward compatibility
-								C.identifier()
-							),
-							C.punctuation(':'),
-							C.lazy(() => parseTypeExpression)
-						),
-						([name, _colon, type]): [string, Type] => [name.value, type]
+// Parse record type {@field Type, ...}
+const parseRecordType: C.Parser<Type> = C.map(
+	C.seq(
+		C.punctuation('{'),
+		C.optional(
+			C.sepBy(
+				C.map(
+					C.seq(
+						C.accessor(),
+						C.lazy(() => parseTypeExpression)
 					),
-					C.punctuation(',')
-				)
-			),
-			C.punctuation('}')
+					([accessor, type]): [string, Type] => [accessor.value, type]
+				),
+				C.punctuation(',')
+			)
 		),
-		([_open, fields, _close]) => recordType(fieldsToRecord(fields))
-	)
+		C.punctuation('}')
+	),
+	([_open, fields, _close]) => recordType(fieldsToRecord(fields))
 );
+
+const findColonInBracedType = (tokens: Token[]): Token | undefined => {
+	let start = 0;
+	while (
+		tokens[start]?.type === 'PUNCTUATION' &&
+		tokens[start].value === '('
+	) {
+		start++;
+	}
+	if (tokens[start]?.type !== 'PUNCTUATION' || tokens[start].value !== '{') {
+		return undefined;
+	}
+
+	let braceDepth = 0;
+	for (const token of tokens.slice(start)) {
+		if (token.type !== 'PUNCTUATION') continue;
+		if (token.value === '{') braceDepth++;
+		if (token.value === '}') braceDepth--;
+		if (token.value === ':' && braceDepth === 1) return token;
+		if (braceDepth === 0) return undefined;
+	}
+	return undefined;
+};
 
 // Parse tuple type {Type, Type, ...}
 const parseTupleType: C.Parser<Type> = C.map(
@@ -429,8 +425,20 @@ const parseEffects: C.Parser<Set<Effect>> = (tokens: Token[]) => {
 
 // Parse function type with effects: a -> b !effect
 export const parseTypeExpression: C.Parser<Type> = (tokens: Token[]) => {
+	const colon = findColonInBracedType(tokens);
+	if (colon) {
+		return {
+			success: false,
+			error: COLON_RECORD_TYPE_ERROR,
+			position: colon.location.start.line,
+		};
+	}
+
 	const leftResult = parseTypeAtom(tokens);
 	if (!leftResult.success) {
+		if (leftResult.error === COLON_RECORD_TYPE_ERROR) {
+			return leftResult;
+		}
 		// Return a more generic error message for consistency
 		return {
 			success: false,

@@ -41,6 +41,7 @@ import {
 	parseTypeDefinition,
 	parseUserDefinedType,
 	parseTypeExpression,
+	COLON_RECORD_TYPE_ERROR,
 	parseConstraintExpr,
 } from './parse-type';
 import * as C from './combinators';
@@ -395,7 +396,7 @@ const parseLambdaExpression: C.Parser<Expression> = tokens => {
 	}
 
 	// Try unit parameter patterns first
-	let paramNames: string[] = [];
+	let paramNames: string[];
 	let remaining = fnResult.remaining;
 
 	const parenResult = C.seq(C.punctuation('('), C.punctuation(')'))(remaining);
@@ -1342,7 +1343,9 @@ const parseDefinition: C.Parser<Expression> = tokens => {
 	) {
 		// Parse the type annotation
 		const typeResult = parseTypeAnnotation(remaining);
-		if (typeResult.success) {
+		if (!typeResult.success) {
+			if (typeResult.error === COLON_RECORD_TYPE_ERROR) return typeResult;
+		} else {
 			// Modify the definition to have a typed value
 			const originalDef = regularResult.value as DefinitionExpression;
 			const annotationEnd =
@@ -2111,7 +2114,11 @@ const parseExprWithType: C.Parser<Expression> = tokens => {
 	if (!colonResult.success) return parseSequenceTerm(tokens);
 
 	const typeResult = parseTypeExpression(colonResult.remaining);
-	if (!typeResult.success) return parseSequenceTerm(tokens);
+	if (!typeResult.success) {
+		return typeResult.error === COLON_RECORD_TYPE_ERROR
+			? typeResult
+			: parseSequenceTerm(tokens);
+	}
 
 	const givenResult = C.seq(C.keyword('given'), parseConstraintExpr)(typeResult.remaining);
 	if (givenResult.success) {
