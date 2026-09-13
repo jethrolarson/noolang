@@ -1,5 +1,5 @@
 import { formatValue, formatValueWithType } from '../format';
-import type { Value } from '../evaluator/evaluator';
+import type { Value } from '../evaluator/evaluator-utils';
 import { floatType } from '../ast';
 import { test, expect } from 'bun:test';
 

@@ -74,7 +74,8 @@ import {
 	type Environment,
 } from './evaluator-utils';
 
-// Re-export commonly used utilities for backward compatibility
+// Retained compatibility surface: repository code imports evaluator-utils directly,
+// but downstream consumers cannot be exhaustively audited without an owner decision.
 export {
 	type Value,
 	type Environment,
