@@ -67,15 +67,45 @@ describe('Type annotations', () => {
 	});
 
 	describe('Type annotation parsing', () => {
-		test(' parses record type annotation', () => {
-			const result = parseType('{ name: String, age: Float }');
+		test.each([
+			'{ name: String, age: Float }',
+			'{ @name: String, @age: Float }',
+			'{ @name String, @age: Float }',
+			'{ @name: String, @age Float }',
+			'({ @name: String })',
+		])('rejects legacy colon record type annotation %s', source => {
+			const result = parseType(source);
+			assertParseError(result);
+			expect(result.error).toBe(
+				"Colon record type syntax is not supported; use '{@field Type}'"
+			);
+			expect(() =>
+				parseDefinition(`person = { @name "Ada", @age 42 } : ${source}`)
+			).toThrow(
+				"Parse error: Colon record type syntax is not supported; use '{@field Type}' at line 1"
+			);
+		});
+
+		test.each([
+			'{ @name String, @age Float }',
+			'({ @name String, @age Float })',
+		])('parses canonical record type annotation %s', source => {
+			const result = parseType(source);
 			assertParseSuccess(result);
+			expect(result.remaining.map(token => token.type)).toEqual(['EOF']);
 			assertRecordType(result.value);
-			expect(result.value.kind).toBe('record');
 			expect(result.value.fields).toHaveProperty('name');
 			expect(result.value.fields).toHaveProperty('age');
 			expect(result.value.fields.name.kind).toBe('primitive');
 			expect(result.value.fields.age.kind).toBe('primitive');
+		});
+
+		test('parses a parenthesized non-record type', () => {
+			const result = parseType('(String)');
+			assertParseSuccess(result);
+			expect(result.remaining.map(token => token.type)).toEqual(['EOF']);
+			assertPrimitiveType(result.value);
+			expect(result.value.name).toBe('String');
 		});
 
 		test(' parses tuple type annotation', () => {
