@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
-import { parseAndType } from '../../../test/utils';
-import { typeToString } from '../helpers';
+import { parseAndType } from '../utils';
+import { typeToString } from '../../src/typer/helpers';
 
 test('Constraint Deferral Investigation - Structural constraints should be deferred in function bodies (CURRENTLY FAILING)', () => {
 	const result = parseAndType('fn obj => @name obj');

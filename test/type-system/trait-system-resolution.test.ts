@@ -1,10 +1,10 @@
-import { typeToString } from '../helpers';
+import { typeToString } from '../../src/typer/helpers';
 import { test, expect, describe } from 'bun:test';
 import {
 	assertListType,
 	assertPrimitiveType,
 	parseAndType,
-} from '../../../test/utils';
+} from '../utils';
 
 const parseToString = (code: string) => {
 	const typeResult = parseAndType(code);

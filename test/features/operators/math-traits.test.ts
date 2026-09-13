@@ -1,9 +1,9 @@
-import { parse } from '../../parser/parser';
-import { Lexer } from '../../lexer/lexer';
-import { typeAndDecorate } from '../index';
-import { floatType, stringType, optionType } from '../../ast';
+import { parse } from '../../../src/parser/parser';
+import { Lexer } from '../../../src/lexer/lexer';
+import { typeAndDecorate } from '../../../src/typer/index';
+import { floatType, stringType, optionType } from '../../../src/ast';
 import { test, expect } from 'bun:test';
-import { parseAndType } from '../../../test/utils';
+import { parseAndType } from '../../utils';
 
 test('Unified Math Trait System (Float-only) - Add Trait (supports Float, String) - should add numbers', () => {
 	const code = '3 + 4';

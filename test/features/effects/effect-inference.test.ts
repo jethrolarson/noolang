@@ -1,9 +1,9 @@
-import { Lexer } from '../../lexer/lexer';
-import { parse } from '../../parser/parser';
-import { typeAndDecorate } from '../index';
-import { typeToString } from '../helpers';
+import { Lexer } from '../../../src/lexer/lexer';
+import { parse } from '../../../src/parser/parser';
+import { typeAndDecorate } from '../../../src/typer/index';
+import { typeToString } from '../../../src/typer/helpers';
 import { test, expect } from 'bun:test';
-import { parseAndType } from '../../../test/utils';
+import { parseAndType } from '../../utils';
 
 const typeStr = (code: string) => {
 	const r = parseAndType(code);

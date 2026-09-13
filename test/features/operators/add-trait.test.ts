@@ -1,15 +1,15 @@
-import { Lexer } from '../../lexer/lexer';
-import { parse } from '../../parser/parser';
-import { typeAndDecorate } from '../index';
-import { typeToString } from '../helpers';
-import { floatType, stringType } from '../../ast';
-import { Evaluator } from '../../evaluator/evaluator';
+import { Lexer } from '../../../src/lexer/lexer';
+import { parse } from '../../../src/parser/parser';
+import { typeAndDecorate } from '../../../src/typer/index';
+import { typeToString } from '../../../src/typer/helpers';
+import { floatType, stringType } from '../../../src/ast';
+import { Evaluator } from '../../../src/evaluator/evaluator';
 import { test, expect } from 'bun:test';
 import {
 	assertNumberValue,
 	assertStringValue,
 	parseAndType,
-} from '../../../test/utils';
+} from '../../utils';
 
 test('Add Trait System - Type Checking - should type 1 + 2 as Float', () => {
 	const code = '1 + 2';

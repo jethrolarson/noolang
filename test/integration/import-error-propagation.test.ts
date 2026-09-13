@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import * as fs from 'node:fs';
-import { runCode, parseAndType } from '../../../test/utils';
+import { runCode, parseAndType } from '../utils';
 
 // Regression: a type error inside an imported module must surface. Previously
 // typeImport swallowed any import failure and returned a fresh type variable,

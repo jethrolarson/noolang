@@ -9,9 +9,9 @@ import {
 	parseAndType,
 	assertStructureFieldType,
 	assertNestedStructureFieldType,
-} from '../../../test/utils';
-import type { RecordType } from '../../ast';
-import { typeToString } from '../helpers';
+} from '../utils';
+import type { RecordType } from '../../src/ast';
+import { typeToString } from '../../src/typer/helpers';
 
 describe('Structural Constraints', () => {
 	describe('Annotations', () => {

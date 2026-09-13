@@ -1,5 +1,5 @@
 import { test, describe } from 'bun:test';
-import { expectSuccess } from '../../../test/utils';
+import { expectSuccess } from '../../utils';
 
 describe('&& / || (short-circuiting logical operators)', () => {
 	test('&& truth table', () => {

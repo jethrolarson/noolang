@@ -6,7 +6,7 @@ import {
 	assertVariantType,
 	parseAndType,
 	assertImplementsConstraint,
-} from '../../../test/utils';
+} from '../utils';
 
 test('built-in equality operator returns Bool type', () => {
 	const input = '1.0 == 2.0';

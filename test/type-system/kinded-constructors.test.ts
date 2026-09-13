@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { clearModuleCache } from '../../module-loader';
-import { parseAndType } from '../../../test/utils';
-import { typeToString } from '../helpers';
+import { clearModuleCache } from '../../src/module-loader';
+import { parseAndType } from '../utils';
+import { typeToString } from '../../src/typer/helpers';
 
 const inferredType = (source: string): string => {
 	const decorated = parseAndType(source);
