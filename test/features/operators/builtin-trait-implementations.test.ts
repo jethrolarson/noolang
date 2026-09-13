@@ -1,15 +1,15 @@
-import { Lexer } from '../../lexer/lexer';
-import { parse } from '../../parser/parser';
-import { typeAndDecorate } from '../index';
-import { floatType, stringType, optionType } from '../../ast';
-import { Evaluator } from '../../evaluator/evaluator';
+import { Lexer } from '../../../src/lexer/lexer';
+import { parse } from '../../../src/parser/parser';
+import { typeAndDecorate } from '../../../src/typer/index';
+import { floatType, stringType, optionType } from '../../../src/ast';
+import { Evaluator } from '../../../src/evaluator/evaluator';
 import { test, expect } from 'bun:test';
 import {
 	assertListValue,
 	assertNumberValue,
 	assertStringValue,
 	assertConstructorValue,
-} from '../../../test/utils';
+} from '../../utils';
 
 const parseTypeAndEvaluate = (code: string) => {
 	const lexer = new Lexer(code);

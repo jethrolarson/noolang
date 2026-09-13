@@ -1,10 +1,10 @@
 import { test, expect, describe } from 'bun:test';
-import { assertListValue, runCode } from '../../../test/utils';
+import { assertListValue, runCode } from '../../utils';
 import {
 	createList,
 	createNumber,
 	createString,
-} from '../../evaluator/evaluator-utils';
+} from '../../../src/evaluator/evaluator-utils';
 
 describe('Trait System Evaluation', () => {
 	test('map should work with unary trait functions', () => {

@@ -7,8 +7,8 @@
  * variables to freshen, replacing them with fresh unresolved variables.
  */
 import { test, expect, describe } from 'bun:test';
-import { typeToString } from '../helpers';
-import { parseAndType } from '../../../test/utils';
+import { typeToString } from '../../src/typer/helpers';
+import { parseAndType } from '../utils';
 
 describe('trait function direct calls resolve concrete return types', () => {
 	test('equals 1 2 returns Bool', () => {

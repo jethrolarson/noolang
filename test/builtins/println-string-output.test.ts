@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { runCode } from '../../../test/utils';
+import { runCode } from '../utils';
 
 test('println prints a String value unquoted, same as print', () => {
 	const originalLog = console.log;

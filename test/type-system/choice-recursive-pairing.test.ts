@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { parseAndType, expectSuccess } from '../../../test/utils';
+import { parseAndType, expectSuccess } from '../utils';
 
 // Self-recursive `value_p` with two `choice` branches (array, object), where
 // the object branch pairs the recursive result with a string key — used to

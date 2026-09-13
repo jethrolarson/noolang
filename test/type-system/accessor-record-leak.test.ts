@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { parseAndType, expectError } from '../../../test/utils';
+import { parseAndType, expectError } from '../utils';
 
 // Regression tests for issue #103: "Required field missing" leaking across
 // top-level statements.

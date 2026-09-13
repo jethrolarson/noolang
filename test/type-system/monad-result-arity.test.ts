@@ -18,8 +18,8 @@
  * order before ordinary unification.
  */
 import { describe, test, expect } from 'bun:test';
-import { expectSuccess, parseAndType } from '../../../test/utils';
-import { typeToString } from '../helpers';
+import { expectSuccess, parseAndType } from '../utils';
+import { typeToString } from '../../src/typer/helpers';
 
 describe('Monad Result trait dispatch preserves Result arity', () => {
 	test('bind on a Result infers a two-arg Result type', () => {

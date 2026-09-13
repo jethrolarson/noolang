@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { expectSuccess, parseAndType } from '../../../test/utils';
-import { typeToString } from '../helpers';
+import { expectSuccess, parseAndType } from '../utils';
+import { typeToString } from '../../src/typer/helpers';
 
 const inferredType = (code: string): string => {
 	const decorated = parseAndType(code);

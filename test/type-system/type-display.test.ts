@@ -1,6 +1,6 @@
 import { test, expect, describe } from 'bun:test';
-import { parseAndType } from '../../../test/utils';
-import { typeToString } from '../helpers';
+import { parseAndType } from '../utils';
+import { typeToString } from '../../src/typer/helpers';
 
 describe('Type Display', () => {
 	test('add partially applied', () => {

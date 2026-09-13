@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { assertPrimitiveType, parseAndType } from '../../../test/utils';
+import { assertPrimitiveType, parseAndType } from '../utils';
 
 test('Trait System Conflicting Functions Safety - should allow multiple traits to define the same function name', () => {
 	// This should work because multiple traits can define the same function name

@@ -5,7 +5,7 @@ import {
 	assertPrimitiveType,
 	assertVariantType,
 	parseAndType,
-} from '../../../test/utils';
+} from '../utils';
 
 test('trait functions work with descriptive type parameter names', () => {
 	const program = `

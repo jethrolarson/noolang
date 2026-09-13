@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { runCode } from '../../../test/utils';
+import { runCode } from '../utils';
 
 // Regression test for the empty-list type-variable collision bug
 // (doc retired once this fix landed).

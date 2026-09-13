@@ -1,9 +1,9 @@
-import { Lexer } from '../../lexer/lexer';
-import { parse } from '../../parser/parser';
-import { typeAndDecorate } from '../index';
-import { Evaluator } from '../../evaluator/evaluator';
+import { Lexer } from '../../../src/lexer/lexer';
+import { parse } from '../../../src/parser/parser';
+import { typeAndDecorate } from '../../../src/typer/index';
+import { Evaluator } from '../../../src/evaluator/evaluator';
 import { test, expect } from 'bun:test';
-import { assertConstructorValue } from '../../../test/utils';
+import { assertConstructorValue } from '../../utils';
 
 const evaluate = (code: string) => {
 	const program = parse(new Lexer(code).tokenize());

@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { runCode } from '../../../test/utils';
+import { runCode } from '../utils';
 
 test('Trailing lambda type annotation binds to lambda and evaluates', () => {
 	const code = `

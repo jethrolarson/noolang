@@ -1,5 +1,5 @@
-import { parseAndType } from '../../../test/utils';
-import { typeToString } from '../helpers';
+import { parseAndType } from '../utils';
+import { typeToString } from '../../src/typer/helpers';
 import { test, expect } from 'bun:test';
 
 test('Functional Typer - Let-Polymorphism - Core Let-Polymorphism - should generalize polymorphic identity function', () => {
