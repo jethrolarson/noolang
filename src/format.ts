@@ -14,7 +14,7 @@ import {
 	isConstructor,
 	type Value,
 	boolValue,
-} from './evaluator/evaluator';
+} from './evaluator/evaluator-utils';
 
 // A constructor argument that is itself a multi-arg constructor application
 // needs parens, or nesting depth is ambiguous: `Cons 2 Cons 3 Cons 4 Nil`

@@ -5,7 +5,7 @@ import {
 	assertStringValue,
 } from '../../../test/utils';
 import { describe, test, expect } from 'bun:test';
-import { createNumber } from '../evaluator';
+import { createNumber } from '../evaluator-utils';
 
 describe('Evaluator', () => {
 	test('should set a field in a record using set', () => {

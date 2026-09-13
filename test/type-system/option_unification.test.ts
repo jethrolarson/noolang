@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import { assertConstructorValue, runCode } from '../utils';
-import { createNumber } from '../../src/evaluator/evaluator';
+import { createNumber } from '../../src/evaluator/evaluator-utils';
 
 test('should handle simple Option construction', () => {
 	const result = runCode(`Some 42`);
