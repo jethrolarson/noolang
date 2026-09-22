@@ -503,7 +503,7 @@ export const parseTypeDefinition: C.Parser<TypeDefinitionExpression> = C.map(
 );
 
 // --- User-Defined Type Definition ---
-export const parseUserDefinedType: C.Parser<UserDefinedTypeExpression> = C.map(
+const parseUserDefinedTypeBase: C.Parser<UserDefinedTypeExpression> = C.map(
 	C.seq(
 		C.keyword('type'),
 		parseTypeName,
@@ -525,6 +525,25 @@ export const parseUserDefinedType: C.Parser<UserDefinedTypeExpression> = C.map(
 		location: createLocation(typeKeyword.location.start, equals.location.end),
 	})
 );
+
+export const parseUserDefinedType: C.Parser<UserDefinedTypeExpression> = tokens => {
+	const result = parseUserDefinedTypeBase(tokens);
+	if (!result.success) return result;
+
+	const next = result.remaining[0];
+	if (
+		next &&
+		next.type !== 'EOF' &&
+		(next.type !== 'PUNCTUATION' || next.value !== ';')
+	) {
+		return {
+			success: false,
+			error: `Unexpected ${next.type} '${next.value}' after type definition`,
+			position: next.location.start.line,
+		};
+	}
+	return result;
+};
 
 // Parse record type definition: {@field Type, ...}
 const parseRecordTypeDefinition: C.Parser<RecordTypeDefinition> = C.map(
@@ -577,16 +596,24 @@ const parseTupleTypeDefinition: C.Parser<TupleTypeDefinition> = C.map(
 );
 
 // Parse union type definition: Type1 | Type2 | ...
-const parseUnionTypeDefinition: C.Parser<UnionTypeDefinition> = C.map(
-	C.sepBy(
+const parseUnionTypeDefinition: C.Parser<UnionTypeDefinition> = tokens => {
+	const result = C.sepBy(
 		C.lazy(() => parseTypeExpression),
 		C.operator('|')
-	),
-	(types: Type[]): UnionTypeDefinition => ({
-		kind: 'union-type',
-		types,
-	})
-);
+	)(tokens);
+	if (!result.success || result.value.length === 0) {
+		return {
+			success: false,
+			error: 'Expected type definition',
+			position: tokens[0]?.location.start.line || 0,
+		};
+	}
+	return {
+		success: true,
+		value: { kind: 'union-type', types: result.value },
+		remaining: result.remaining,
+	};
+};
 
 // Parse structured type definition (record or tuple based on content)
 const parseStructuredTypeDefinition: C.Parser<
