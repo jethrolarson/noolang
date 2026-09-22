@@ -320,7 +320,8 @@ bun start --eval "
 
 Additional tools for Noolang development:
 
-- **Test Suite**: `bun test` - Run all tests
+- **Core Test Suite**: `bun test` - Run root tests; the separately installed LSP workspace is excluded
+- **Full Test Suite**: `bun run test:all` - Run core, REPL, and dedicated LSP tests
 - Set `AGENT=1` to reduce test output verbosity: `AGENT=1 bun test`
 - **Type Checking**: `bun run typecheck` - TypeScript validation
 - **Linting**: `bun run lint` - Code style checking

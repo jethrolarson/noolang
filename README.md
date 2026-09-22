@@ -1663,7 +1663,8 @@ Guide](docs/type-system.md#constraint-system).
 ### Running Tests
 
 ```bash
-bun test
+bun test          # Core tests
+bun run test:all  # Core, REPL, and dedicated LSP tests
 ```
 
 ### Building
