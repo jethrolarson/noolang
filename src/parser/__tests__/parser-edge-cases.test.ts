@@ -154,7 +154,7 @@ describe('Parser Edge Cases', () => {
 	});
 
 	test('should handle record type edge case', () => {
-		const lexer = new Lexer('{ name: String }');
+		const lexer = new Lexer('{ @name String }');
 		const tokens = lexer.tokenize();
 		const result = parseTypeExpression(tokens);
 		assertParseSuccess(result);
