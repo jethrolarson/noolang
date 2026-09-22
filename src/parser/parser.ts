@@ -41,7 +41,6 @@ import {
 	parseTypeDefinition,
 	parseUserDefinedType,
 	parseTypeExpression,
-	COLON_RECORD_TYPE_ERROR,
 	parseConstraintExpr,
 } from './parse-type';
 import * as C from './combinators';
@@ -1096,6 +1095,23 @@ const parseTypeAnnotation = C.map(
 	})
 );
 
+const TYPE_ANNOTATION_BOUNDARIES = new Set([';', ',', ')', ']', '}']);
+
+const isTypeAnnotationBoundary = (tokens: Token[]): boolean => {
+	const next = tokens[0];
+	return (
+		!next ||
+		next.type === 'EOF' ||
+		(next.type === 'PUNCTUATION' && TYPE_ANNOTATION_BOUNDARIES.has(next.value))
+	);
+};
+
+const unexpectedAfterTypeAnnotation = (tokens: Token[]): C.ParseError => ({
+	success: false,
+	error: `Unexpected ${tokens[0].type} '${tokens[0].value}' after type annotation`,
+	position: tokens[0].location.start.line,
+});
+
 // --- Destructuring Element Parser ---
 const parseDestructuringElement: C.Parser<DestructuringElement> = C.choice(
 	C.map(
@@ -1343,9 +1359,11 @@ const parseDefinition: C.Parser<Expression> = tokens => {
 	) {
 		// Parse the type annotation
 		const typeResult = parseTypeAnnotation(remaining);
-		if (!typeResult.success) {
-			if (typeResult.error === COLON_RECORD_TYPE_ERROR) return typeResult;
-		} else {
+		if (!typeResult.success) return typeResult;
+		if (!isTypeAnnotationBoundary(typeResult.remaining)) {
+			return unexpectedAfterTypeAnnotation(typeResult.remaining);
+		}
+		if (typeResult.success) {
 			// Modify the definition to have a typed value
 			const originalDef = regularResult.value as DefinitionExpression;
 			const annotationEnd =
@@ -2114,11 +2132,7 @@ const parseExprWithType: C.Parser<Expression> = tokens => {
 	if (!colonResult.success) return parseSequenceTerm(tokens);
 
 	const typeResult = parseTypeExpression(colonResult.remaining);
-	if (!typeResult.success) {
-		return typeResult.error === COLON_RECORD_TYPE_ERROR
-			? typeResult
-			: parseSequenceTerm(tokens);
-	}
+	if (!typeResult.success) return typeResult;
 
 	const givenResult = C.seq(C.keyword('given'), parseConstraintExpr)(typeResult.remaining);
 	if (givenResult.success) {
@@ -2134,6 +2148,10 @@ const parseExprWithType: C.Parser<Expression> = tokens => {
 			location: createLocation(exprResult.value.location.start, constrainedEnd),
 		};
 		return { success: true, value: constrained, remaining: givenResult.remaining };
+	}
+
+	if (!isTypeAnnotationBoundary(typeResult.remaining)) {
+		return unexpectedAfterTypeAnnotation(typeResult.remaining);
 	}
 
 	const typedEnd =

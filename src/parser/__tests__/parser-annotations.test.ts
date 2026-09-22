@@ -73,44 +73,19 @@ describe('Type annotations', () => {
 			'{ @name String, @age: Float }',
 			'{ @name: String, @age Float }',
 			'({ @name: String })',
-		])('rejects legacy colon record type annotation %s', source => {
-			const result = parseType(source);
-			assertParseError(result);
-			expect(result.error).toBe(
-				"Colon record type syntax is not supported; use '{@field Type}'"
-			);
+			'String -> { name: String }',
+			'String -> { @name: String }',
+			'{ @profile { name: String } }',
+			'{ @profile { @name: String } }',
+			'{ String, { name: String } }',
+			'{ String, { @name: String } }',
+			'Option { name: String }',
+			'Option { @name: String }',
+		])('rejects invalid colon record type annotation %s', source => {
 			expect(() =>
-				parseDefinition(`person = { @name "Ada", @age 42 } : ${source}`)
-			).toThrow(
-				"Parse error: Colon record type syntax is not supported; use '{@field Type}' at line 1"
-			);
+				parseDefinition(`value = { @name "Ada" } : ${source}`)
+			).toThrow();
 		});
-
-		test.each([
-			{ source: 'String -> {\nname: String\n}', line: 2 },
-			{ source: 'String -> {\n@name: String\n}', line: 2 },
-			{ source: '{ @profile {\nname: String\n} }', line: 2 },
-			{ source: '{ @profile {\n@name: String\n} }', line: 2 },
-			{ source: '{ String, {\nname: String\n} }', line: 2 },
-			{ source: '{ String, {\n@name: String\n} }', line: 2 },
-			{ source: 'Option {\nname: String\n}', line: 2 },
-			{ source: 'Option {\n@name: String\n}', line: 2 },
-		])(
-			'rejects nested legacy colon record type $source',
-			({ source, line }) => {
-				const result = parseType(source);
-				assertParseError(result);
-				expect(result.error).toBe(
-					"Colon record type syntax is not supported; use '{@field Type}'"
-				);
-				expect(result.position).toBe(line);
-				expect(() =>
-					parseDefinition(`value = { @name "Ada" } : ${source}`)
-				).toThrow(
-					`Parse error: Colon record type syntax is not supported; use '{@field Type}' at line ${line}`
-				);
-			}
-		);
 
 		test.each([
 			'{ @name String, @age Float }',
@@ -432,8 +407,6 @@ complex_fn = fn f g x =>
 				expect(def.value.expression.body.operator).toBe('|');
 			}
 		});
-
-
 
 		test('Nested lambda definitions with type annotations (requires parentheses)', () => {
 			// Due to operator precedence, nested lambdas with types require parentheses

@@ -119,9 +119,6 @@ const fieldsToRecord = (
 	return fieldObj;
 };
 
-export const COLON_RECORD_TYPE_ERROR =
-	"Colon record type syntax is not supported; use '{@field Type}'";
-
 // Parse record type {@field Type, ...}
 const parseRecordType: C.Parser<Type> = C.map(
 	C.seq(
@@ -142,37 +139,6 @@ const parseRecordType: C.Parser<Type> = C.map(
 	),
 	([_open, fields, _close]) => recordType(fieldsToRecord(fields))
 );
-
-const TYPE_BOUNDARY_PUNCTUATION = new Set([';', ',', '}', ')']);
-
-const isTypeBoundary = (
-	token: Token,
-	braceDepth: number,
-	parenthesisDepth: number
-): boolean => {
-	if (braceDepth !== 0 || parenthesisDepth !== 0) return false;
-	if (token.type === 'EOF') return true;
-	if (token.type === 'KEYWORD') return token.value === 'given';
-	return (
-		token.type === 'PUNCTUATION' && TYPE_BOUNDARY_PUNCTUATION.has(token.value)
-	);
-};
-
-const findColonInRecordType = (tokens: Token[]): Token | undefined => {
-	let braceDepth = 0;
-	let parenthesisDepth = 0;
-
-	for (const token of tokens) {
-		if (isTypeBoundary(token, braceDepth, parenthesisDepth)) return undefined;
-		if (token.type !== 'PUNCTUATION') continue;
-		if (token.value === '{') braceDepth++;
-		if (token.value === '}') braceDepth--;
-		if (token.value === '(') parenthesisDepth++;
-		if (token.value === ')') parenthesisDepth--;
-		if (token.value === ':' && braceDepth > 0) return token;
-	}
-	return undefined;
-};
 
 // Parse tuple type {Type, Type, ...}
 const parseTupleType: C.Parser<Type> = C.map(
@@ -433,20 +399,8 @@ const parseEffects: C.Parser<Set<Effect>> = (tokens: Token[]) => {
 
 // Parse function type with effects: a -> b !effect
 export const parseTypeExpression: C.Parser<Type> = (tokens: Token[]) => {
-	const colon = findColonInRecordType(tokens);
-	if (colon) {
-		return {
-			success: false,
-			error: COLON_RECORD_TYPE_ERROR,
-			position: colon.location.start.line,
-		};
-	}
-
 	const leftResult = parseTypeAtom(tokens);
 	if (!leftResult.success) {
-		if (leftResult.error === COLON_RECORD_TYPE_ERROR) {
-			return leftResult;
-		}
 		// Return a more generic error message for consistency
 		return {
 			success: false,
