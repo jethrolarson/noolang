@@ -526,6 +526,8 @@ const parseUserDefinedTypeBase: C.Parser<UserDefinedTypeExpression> = C.map(
 	})
 );
 
+const TYPE_DEFINITION_BOUNDARIES = new Set([';', ',', ')', '}']);
+
 export const parseUserDefinedType: C.Parser<UserDefinedTypeExpression> = tokens => {
 	const result = parseUserDefinedTypeBase(tokens);
 	if (!result.success) return result;
@@ -534,7 +536,8 @@ export const parseUserDefinedType: C.Parser<UserDefinedTypeExpression> = tokens 
 	if (
 		next &&
 		next.type !== 'EOF' &&
-		(next.type !== 'PUNCTUATION' || next.value !== ';')
+		(next.type !== 'PUNCTUATION' ||
+			!TYPE_DEFINITION_BOUNDARIES.has(next.value))
 	) {
 		return {
 			success: false,

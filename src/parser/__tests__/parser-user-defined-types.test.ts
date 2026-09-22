@@ -31,7 +31,14 @@ describe('user-defined type declarations', () => {
 		expect(() => parseProgram(source)).not.toThrow();
 	});
 
-	test('accepts a following program expression after a declaration boundary', () => {
-		expect(() => parseProgram('type Alias = String; "ok"')).not.toThrow();
+	test.each([
+		'type Alias = String; "ok"',
+		'(type Alias = String)',
+		'{type Alias = String, "ok"}',
+		'{type Alias = String}',
+		'{@x (type Alias = String)}',
+		'{@x type Alias = String}',
+	])('accepts type declarations at expression boundaries %s', source => {
+		expect(() => parseProgram(source)).not.toThrow();
 	});
 });
