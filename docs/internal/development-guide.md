@@ -210,13 +210,8 @@ bun run typecheck       # Check types without building
 bun test               # Run core tests (the LSP npm workspace is separate)
 bun run test:watch     # Run core tests in watch mode
 bun run test:bail      # Stop core tests on first failure
-bun run test:all       # Execute core, both REPL suites, and LSP tests
+bun run test:all       # Run core, both REPL suites, and LSP tests
 ```
-
-`test:all` runs REPL automation, but that script intentionally reports scenario
-failures without a nonzero exit. Its current baseline is 4/10 scenarios passing;
-inspect `test-reports/repl-automation-report.json` rather than treating command
-success as evidence that every scenario passed.
 
 #### Development
 
@@ -421,13 +416,12 @@ time bun start --types-file examples/complex_types.noo
 
 #### Pre-release Checklist
 
-1. Blocking core, simple REPL, and LSP tests pass: `bun run test:all`
-2. Review the non-blocking REPL automation report separately; the known baseline is 4/10 scenarios passing
-3. Type checking passes: `bun run typecheck`
-4. Linting passes: `bun run lint`
-5. Benchmarks are stable: `bun run benchmark`
-6. Documentation is updated
-7. Examples work correctly
+1. All tests pass: `bun run test:all`
+2. Type checking passes: `bun run typecheck`
+3. Linting passes: `bun run lint`
+4. Benchmarks are stable: `bun run benchmark`
+5. Documentation is updated
+6. Examples work correctly
 
 #### Version Management
 
