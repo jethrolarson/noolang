@@ -143,25 +143,33 @@ const parseRecordType: C.Parser<Type> = C.map(
 	([_open, fields, _close]) => recordType(fieldsToRecord(fields))
 );
 
-const findColonInBracedType = (tokens: Token[]): Token | undefined => {
-	let start = 0;
-	while (
-		tokens[start]?.type === 'PUNCTUATION' &&
-		tokens[start].value === '('
-	) {
-		start++;
-	}
-	if (tokens[start]?.type !== 'PUNCTUATION' || tokens[start].value !== '{') {
-		return undefined;
-	}
+const TYPE_BOUNDARY_PUNCTUATION = new Set([';', ',', '}', ')']);
 
+const isTypeBoundary = (
+	token: Token,
+	braceDepth: number,
+	parenthesisDepth: number
+): boolean => {
+	if (braceDepth !== 0 || parenthesisDepth !== 0) return false;
+	if (token.type === 'EOF') return true;
+	if (token.type === 'KEYWORD') return token.value === 'given';
+	return (
+		token.type === 'PUNCTUATION' && TYPE_BOUNDARY_PUNCTUATION.has(token.value)
+	);
+};
+
+const findColonInRecordType = (tokens: Token[]): Token | undefined => {
 	let braceDepth = 0;
-	for (const token of tokens.slice(start)) {
+	let parenthesisDepth = 0;
+
+	for (const token of tokens) {
+		if (isTypeBoundary(token, braceDepth, parenthesisDepth)) return undefined;
 		if (token.type !== 'PUNCTUATION') continue;
 		if (token.value === '{') braceDepth++;
 		if (token.value === '}') braceDepth--;
-		if (token.value === ':' && braceDepth === 1) return token;
-		if (braceDepth === 0) return undefined;
+		if (token.value === '(') parenthesisDepth++;
+		if (token.value === ')') parenthesisDepth--;
+		if (token.value === ':' && braceDepth > 0) return token;
 	}
 	return undefined;
 };
@@ -425,7 +433,7 @@ const parseEffects: C.Parser<Set<Effect>> = (tokens: Token[]) => {
 
 // Parse function type with effects: a -> b !effect
 export const parseTypeExpression: C.Parser<Type> = (tokens: Token[]) => {
-	const colon = findColonInBracedType(tokens);
+	const colon = findColonInRecordType(tokens);
 	if (colon) {
 		return {
 			success: false,

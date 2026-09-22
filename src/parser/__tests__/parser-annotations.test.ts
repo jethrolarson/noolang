@@ -87,6 +87,32 @@ describe('Type annotations', () => {
 		});
 
 		test.each([
+			{ source: 'String -> {\nname: String\n}', line: 2 },
+			{ source: 'String -> {\n@name: String\n}', line: 2 },
+			{ source: '{ @profile {\nname: String\n} }', line: 2 },
+			{ source: '{ @profile {\n@name: String\n} }', line: 2 },
+			{ source: '{ String, {\nname: String\n} }', line: 2 },
+			{ source: '{ String, {\n@name: String\n} }', line: 2 },
+			{ source: 'Option {\nname: String\n}', line: 2 },
+			{ source: 'Option {\n@name: String\n}', line: 2 },
+		])(
+			'rejects nested legacy colon record type $source',
+			({ source, line }) => {
+				const result = parseType(source);
+				assertParseError(result);
+				expect(result.error).toBe(
+					"Colon record type syntax is not supported; use '{@field Type}'"
+				);
+				expect(result.position).toBe(line);
+				expect(() =>
+					parseDefinition(`value = { @name "Ada" } : ${source}`)
+				).toThrow(
+					`Parse error: Colon record type syntax is not supported; use '{@field Type}' at line ${line}`
+				);
+			}
+		);
+
+		test.each([
 			'{ @name String, @age Float }',
 			'({ @name String, @age Float })',
 		])('parses canonical record type annotation %s', source => {
@@ -98,6 +124,17 @@ describe('Type annotations', () => {
 			expect(result.value.fields).toHaveProperty('age');
 			expect(result.value.fields.name.kind).toBe('primitive');
 			expect(result.value.fields.age.kind).toBe('primitive');
+		});
+
+		test.each([
+			'String -> { @name String }',
+			'{ @profile { @name String } }',
+			'{ String, { @name String } }',
+			'Option { @name String }',
+		])('parses complete canonical nested type %s', source => {
+			const result = parseType(source);
+			assertParseSuccess(result);
+			expect(result.remaining.map(token => token.type)).toEqual(['EOF']);
 		});
 
 		test('parses a parenthesized non-record type', () => {
