@@ -6,7 +6,7 @@ a TypeScript interpreter (lexer → parser → typer → tree-walking evaluator)
 ## Toolchain
 
 - Runtime/tests use **bun**, not npm.
-- Run core tests: `AGENT=1 bun test` (`AGENT=1` keeps output non-interactive). The root suite excludes `lsp/extension/**` because that npm workspace has its own install; use `bun run test:lsp` for its compile and protocol tests, or `bun run test:all` for both.
+- Run tests: `AGENT=1 bun test` (`AGENT=1` keeps output non-interactive).
 - Typecheck: `bun run typecheck`. Doc examples: `node validate_examples.js` (must exit 0).
 - Quick probes: `bun src/cli.ts -e "<expr>"`, `--types "<expr>"` for inferred types,
   `bun src/cli.ts file.noo` for a file. Prefix `NO_COLOR=1` to strip ANSI.

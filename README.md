@@ -1664,8 +1664,12 @@ Guide](docs/type-system.md#constraint-system).
 
 ```bash
 bun test          # Core tests
-bun run test:all  # Core, REPL, and dedicated LSP tests
+bun run test:all  # Core, both REPL suites, and dedicated LSP tests
 ```
+
+REPL automation is currently non-blocking and has a known baseline of 4/10
+scenarios passing. A successful `test:all` exit means the blocking suites passed;
+review `test-reports/repl-automation-report.json` for automation scenario results.
 
 ### Building
 
