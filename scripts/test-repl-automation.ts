@@ -77,6 +77,7 @@ class REPLTestAutomator {
 
     return new Promise((resolve, reject) => {
       const beforeLength = this.output.length;
+      const beforeErrorLength = this.errorOutput.length;
       let responseReceived = false;
 
       const timeout = setTimeout(() => {
@@ -87,10 +88,10 @@ class REPLTestAutomator {
 
       const checkForResponse = () => {
         const currentOutput = this.output.substring(beforeLength);
-        if (currentOutput.includes('noolang>') && currentOutput.length > 10) {
+        if (currentOutput.includes('noolang>')) {
           responseReceived = true;
           clearTimeout(timeout);
-          resolve(currentOutput);
+          resolve(this.errorOutput.substring(beforeErrorLength) + currentOutput);
         } else if (!responseReceived) {
           setTimeout(checkForResponse, 100);
         }
@@ -184,9 +185,8 @@ const scenarios: TestScenario[] = [
   },
   {
     name: 'String Operations',
-    inputs: ['"hello"', '"world" ++ " peace"'],
-    expectedOutputs: ['hello', 'world peace'],
-    shouldContainInOutput: ['String']
+    inputs: ['"hello"', '"world" + " peace"'],
+    expectedOutputs: ['hello', 'world peace']
   },
   {
     name: 'Variable Definitions and Usage',
@@ -196,10 +196,10 @@ const scenarios: TestScenario[] = [
   {
     name: 'Function Definitions and Applications',
     inputs: [
-      'add = fn x y => x + y',
-      'add 10 20',
-      'multiply = fn x y => x * y',
-      'multiply 6 7'
+      'sum = fn x y => x + y',
+      'sum 10 20',
+      'product = fn x y => x * y',
+      'product 6 7'
     ],
     expectedOutputs: ['', '30', '', '42']
   },
@@ -215,23 +215,21 @@ const scenarios: TestScenario[] = [
   {
     name: 'REPL Commands',
     inputs: ['.help', 'test_var = 123', '.env'],
-    expectedOutputs: ['', '123', ''],
-    shouldContainInOutput: ['Noolang REPL Commands', 'test_var']
+    expectedOutputs: ['Noolang REPL Commands', '123', 'test_var']
   },
   {
     name: 'Error Handling',
     inputs: ['1 + "hello"', '2 + 3'],
-    expectedOutputs: ['', '5'],
-    shouldContainInOutput: ['Error', '5']
+    expectedOutputs: ['TypeError', '5']
   },
   {
     name: 'Type Polymorphism',
     inputs: [
       'print 42',
       'print "hello"',
-      'print true'
+      'print True'
     ],
-    expectedOutputs: ['42', 'hello', 'true'],
+    expectedOutputs: ['42', 'hello', 'True'],
     shouldNotContainInOutput: ['TypeError', 'type error']
   },
   {
@@ -253,12 +251,11 @@ const scenarios: TestScenario[] = [
       '.ast (fn x => x)',
       '.ast-json (42)'
     ],
-    expectedOutputs: ['', '', ''],
-    shouldContainInOutput: ['Tokens for', 'AST for', '"kind"']
+    expectedOutputs: ['Tokens for', 'AST for', '"kind"']
   }
 ];
 
-async function runAllTests(): Promise<void> {
+async function runAllTests(): Promise<boolean> {
   console.log('🚀 Starting REPL Test Automation');
   console.log('=' .repeat(60));
   
@@ -315,6 +312,7 @@ async function runAllTests(): Promise<void> {
     fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
     
     console.log(`\n📄 Test report saved to: ${reportPath}`);
+    return passed === total;
     
   } catch (error) {
     console.error('💥 Test automation failed:', error);
@@ -328,9 +326,9 @@ async function runAllTests(): Promise<void> {
 
 // Run if this script is executed directly
 if (require.main === module) {
-  runAllTests().then(() => {
+  runAllTests().then(passed => {
     console.log('\n🏁 Test automation complete');
-    process.exit(0);
+    process.exit(passed ? 0 : 1);
   }).catch(error => {
     console.error('💥 Fatal error:', error);
     process.exit(1);

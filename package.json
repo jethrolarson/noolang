@@ -22,7 +22,7 @@
     "validate:docs:links": "bun scripts/validate-doc-links.ts",
     "test:docs:commands": "bun scripts/smoke-documented-commands.ts",
     "test:lsp": "npm --prefix lsp/extension ci && npm --prefix lsp/extension run compile && npm --prefix lsp/extension test",
-    "test:all": "bun test && bun run test:repl-simple && bun run test:lsp",
+    "test:all": "bun test && bun run test:all-repl && bun run test:lsp",
     "test:all-repl": "bun run test:repl-simple && bun run test:repl-automation",
     "test:fast": "bun test",
     "test:uvu:single": "uvu test/type-system adt_limitations.uvu.ts --require tsx/cjs",

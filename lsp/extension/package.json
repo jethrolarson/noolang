@@ -67,7 +67,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./ && tsc -p ./server && tsc -p ./test",
     "watch": "tsc -watch -p ./ & tsc -watch -p ./server",
-    "test": "bun test test/*.test.ts",
+    "test": "bun test",
     "package": "vsce package",
     "test:watch": "bun test --watch test/*.test.ts"
   },

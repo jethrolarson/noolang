@@ -207,10 +207,10 @@ bun run typecheck       # Check types without building
 #### Testing
 
 ```bash
-bun test               # Run all tests
-bun run test:watch     # Run tests in watch mode  
-bun run test:bail      # Stop on first test failure
-bun run test:all       # Run all test suites (including LSP)
+bun test               # Run core tests (the LSP npm workspace is separate)
+bun run test:watch     # Run core tests in watch mode
+bun run test:bail      # Stop core tests on first failure
+bun run test:all       # Run core, both REPL suites, and LSP tests
 ```
 
 #### Development
