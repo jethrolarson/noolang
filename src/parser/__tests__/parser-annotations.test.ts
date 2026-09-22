@@ -73,17 +73,18 @@ describe('Type annotations', () => {
 			'{ @name String, @age: Float }',
 			'{ @name: String, @age Float }',
 			'({ @name: String })',
-		])('rejects legacy colon record type annotation %s', source => {
-			const result = parseType(source);
-			assertParseError(result);
-			expect(result.error).toBe(
-				"Colon record type syntax is not supported; use '{@field Type}'"
-			);
+			'String -> { name: String }',
+			'String -> { @name: String }',
+			'{ @profile { name: String } }',
+			'{ @profile { @name: String } }',
+			'{ String, { name: String } }',
+			'{ String, { @name: String } }',
+			'Option { name: String }',
+			'Option { @name: String }',
+		])('rejects invalid colon record type annotation %s', source => {
 			expect(() =>
-				parseDefinition(`person = { @name "Ada", @age 42 } : ${source}`)
-			).toThrow(
-				"Parse error: Colon record type syntax is not supported; use '{@field Type}' at line 1"
-			);
+				parseDefinition(`value = { @name "Ada" } : ${source}`)
+			).toThrow();
 		});
 
 		test.each([
@@ -98,6 +99,17 @@ describe('Type annotations', () => {
 			expect(result.value.fields).toHaveProperty('age');
 			expect(result.value.fields.name.kind).toBe('primitive');
 			expect(result.value.fields.age.kind).toBe('primitive');
+		});
+
+		test.each([
+			'String -> { @name String }',
+			'{ @profile { @name String } }',
+			'{ String, { @name String } }',
+			'Option { @name String }',
+		])('parses complete canonical nested type %s', source => {
+			const result = parseType(source);
+			assertParseSuccess(result);
+			expect(result.remaining.map(token => token.type)).toEqual(['EOF']);
 		});
 
 		test('parses a parenthesized non-record type', () => {
@@ -395,8 +407,6 @@ complex_fn = fn f g x =>
 				expect(def.value.expression.body.operator).toBe('|');
 			}
 		});
-
-
 
 		test('Nested lambda definitions with type annotations (requires parentheses)', () => {
 			// Due to operator precedence, nested lambdas with types require parentheses

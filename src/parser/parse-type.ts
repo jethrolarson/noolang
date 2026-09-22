@@ -119,9 +119,6 @@ const fieldsToRecord = (
 	return fieldObj;
 };
 
-export const COLON_RECORD_TYPE_ERROR =
-	"Colon record type syntax is not supported; use '{@field Type}'";
-
 // Parse record type {@field Type, ...}
 const parseRecordType: C.Parser<Type> = C.map(
 	C.seq(
@@ -142,29 +139,6 @@ const parseRecordType: C.Parser<Type> = C.map(
 	),
 	([_open, fields, _close]) => recordType(fieldsToRecord(fields))
 );
-
-const findColonInBracedType = (tokens: Token[]): Token | undefined => {
-	let start = 0;
-	while (
-		tokens[start]?.type === 'PUNCTUATION' &&
-		tokens[start].value === '('
-	) {
-		start++;
-	}
-	if (tokens[start]?.type !== 'PUNCTUATION' || tokens[start].value !== '{') {
-		return undefined;
-	}
-
-	let braceDepth = 0;
-	for (const token of tokens.slice(start)) {
-		if (token.type !== 'PUNCTUATION') continue;
-		if (token.value === '{') braceDepth++;
-		if (token.value === '}') braceDepth--;
-		if (token.value === ':' && braceDepth === 1) return token;
-		if (braceDepth === 0) return undefined;
-	}
-	return undefined;
-};
 
 // Parse tuple type {Type, Type, ...}
 const parseTupleType: C.Parser<Type> = C.map(
@@ -425,20 +399,8 @@ const parseEffects: C.Parser<Set<Effect>> = (tokens: Token[]) => {
 
 // Parse function type with effects: a -> b !effect
 export const parseTypeExpression: C.Parser<Type> = (tokens: Token[]) => {
-	const colon = findColonInBracedType(tokens);
-	if (colon) {
-		return {
-			success: false,
-			error: COLON_RECORD_TYPE_ERROR,
-			position: colon.location.start.line,
-		};
-	}
-
 	const leftResult = parseTypeAtom(tokens);
 	if (!leftResult.success) {
-		if (leftResult.error === COLON_RECORD_TYPE_ERROR) {
-			return leftResult;
-		}
 		// Return a more generic error message for consistency
 		return {
 			success: false,
@@ -541,7 +503,7 @@ export const parseTypeDefinition: C.Parser<TypeDefinitionExpression> = C.map(
 );
 
 // --- User-Defined Type Definition ---
-export const parseUserDefinedType: C.Parser<UserDefinedTypeExpression> = C.map(
+const parseUserDefinedTypeBase: C.Parser<UserDefinedTypeExpression> = C.map(
 	C.seq(
 		C.keyword('type'),
 		parseTypeName,
@@ -563,6 +525,28 @@ export const parseUserDefinedType: C.Parser<UserDefinedTypeExpression> = C.map(
 		location: createLocation(typeKeyword.location.start, equals.location.end),
 	})
 );
+
+const TYPE_DEFINITION_BOUNDARIES = new Set([';', ',', ')', '}']);
+
+export const parseUserDefinedType: C.Parser<UserDefinedTypeExpression> = tokens => {
+	const result = parseUserDefinedTypeBase(tokens);
+	if (!result.success) return result;
+
+	const next = result.remaining[0];
+	if (
+		next &&
+		next.type !== 'EOF' &&
+		(next.type !== 'PUNCTUATION' ||
+			!TYPE_DEFINITION_BOUNDARIES.has(next.value))
+	) {
+		return {
+			success: false,
+			error: `Unexpected ${next.type} '${next.value}' after type definition`,
+			position: next.location.start.line,
+		};
+	}
+	return result;
+};
 
 // Parse record type definition: {@field Type, ...}
 const parseRecordTypeDefinition: C.Parser<RecordTypeDefinition> = C.map(
@@ -615,16 +599,24 @@ const parseTupleTypeDefinition: C.Parser<TupleTypeDefinition> = C.map(
 );
 
 // Parse union type definition: Type1 | Type2 | ...
-const parseUnionTypeDefinition: C.Parser<UnionTypeDefinition> = C.map(
-	C.sepBy(
+const parseUnionTypeDefinition: C.Parser<UnionTypeDefinition> = tokens => {
+	const result = C.sepBy(
 		C.lazy(() => parseTypeExpression),
 		C.operator('|')
-	),
-	(types: Type[]): UnionTypeDefinition => ({
-		kind: 'union-type',
-		types,
-	})
-);
+	)(tokens);
+	if (!result.success || result.value.length === 0) {
+		return {
+			success: false,
+			error: 'Expected type definition',
+			position: tokens[0]?.location.start.line || 0,
+		};
+	}
+	return {
+		success: true,
+		value: { kind: 'union-type', types: result.value },
+		remaining: result.remaining,
+	};
+};
 
 // Parse structured type definition (record or tuple based on content)
 const parseStructuredTypeDefinition: C.Parser<
