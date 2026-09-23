@@ -1,6 +1,5 @@
 # std/json — JSON parse/serialize, built on std/parser's combinators.
 # Design notes and history: docs/internal/specs/std-json.md.
-#
 { @ParseError, @parse_error, @is_digit, @peek_char, @satisfy, @char,
   @string_lit, @skip_ws, @pmap, @pbind, @choice2, @choice, @many, @between,
   @sep_by, @lexeme, @take_while } = import "std/parser";
@@ -34,16 +33,21 @@ variant JsonError =
 # PARSER — combinator-style, built entirely from std/parser.noo primitives.
 # ========================================
 
+# Digit character to its numeric value; non-digits map to 0 (callers only
+# ever pass characters already checked by `is_digit`/`is_hex_digit`).
 digit_value = fn c => match c (
   "0" => 0; "1" => 1; "2" => 2; "3" => 3; "4" => 4;
   "5" => 5; "6" => 6; "7" => 7; "8" => 8; "9" => 9;
   _ => 0
 ) : String -> Float;
 
+# 10^n for a nonnegative integer `n` (0 for n <= 0).
 pow10 = fn n => if n <= 0 then 1 else 10 * pow10 (n - 1);
 
+# a / b, defaulting to 0 on division by zero (`/` is safe division, `Option`-returning).
 divide_or_zero = fn a b => option_get_or 0 (a / b);
 
+# Scales `value` by 10^exp (exp may be negative).
 apply_exponent = fn value exp =>
   if exp == 0 then value
   else if exp > 0 then value * pow10 exp
@@ -54,6 +58,7 @@ apply_exponent = fn value exp =>
 json_null_p = pmap (fn _ => JNull) (string_lit "null");
 json_true_p = pmap (fn _ => JBool True) (string_lit "true");
 json_false_p = pmap (fn _ => JBool False) (string_lit "false");
+# Either literal, `true` first.
 json_bool_p = choice2 json_true_p json_false_p;
 
 # --- numbers ---
@@ -62,6 +67,8 @@ json_bool_p = choice2 json_true_p json_false_p;
 # threaded, not `pbind`-chained — each is optional but commits once its
 # leading character matches, and `choice`/`optional` retry from the start
 # position on failure, which would un-commit that character.
+# Consumes a run of digits (possibly zero), returning their combined value,
+# how many there were, and the position just past them. Never fails.
 digit_run = (fn pos s => (
   r = take_while is_digit pos s;
   digits = chars (r | @value);
@@ -132,6 +139,9 @@ json_number_p = fn pos s => (
 
 # --- strings ---
 
+# The decoded character for a single-char escape (the letter after `\`),
+# e.g. "n" -> "\n". Passes unrecognized input through unchanged; callers
+# only reach this after `is_supported_escape` has already validated `c`.
 escape_to_char = fn c => match c (
   "\"" => "\""; "\\" => "\\"; "/" => "/";
   "n" => "\n"; "r" => "\r"; "t" => "\t";
@@ -149,20 +159,26 @@ is_supported_escape = fn c =>
 is_hex_digit = fn c =>
   (is_digit c) || ((c >= "a") && (c <= "f")) || ((c >= "A") && (c <= "F"));
 
+# Hex digit character to its numeric value (0-15), covering "0"-"9" and
+# both-case "a"-"f".
 hex_digit_value = fn c => match c (
   "a" => 10; "b" => 11; "c" => 12; "d" => 13; "e" => 14; "f" => 15;
   "A" => 10; "B" => 11; "C" => 12; "D" => 13; "E" => 14; "F" => 15;
   _ => digit_value c
 ) : String -> Float;
 
+# True if `pred` holds for every element of the list (vacuously true for []).
+# TODO how would noolang do this and exit early? Also, make this stdlib?
+_every = fn pred => reduce (fn acc x => acc && pred x) True : (a -> Bool) -> List a -> Bool;
+
 # Exactly 4 hex digits (RFC 8259 §7's `\uXXXX`), not `take_while`'s "as many
 # as match" — a short run (e.g. "\u12" at end of input) must fail, not
 # silently succeed on fewer digits.
 read_hex4 = fn pos s => (
   cs = [peek_char pos s, peek_char (pos + 1) s, peek_char (pos + 2) s, peek_char (pos + 3) s];
-  all_hex = reduce (fn acc c => acc && (match c (Some d => is_hex_digit d; None => False))) True cs;
+  all_hex =  cs | _every (fn c => (match c (Some d => is_hex_digit d; None => False)));
   if not all_hex then parse_error "expected 4 hex digits" pos else (
-    values = list_map (fn c => match c (Some d => hex_digit_value d; None => 0)) cs;
+    values = cs | map (fn c => match c (Some d => hex_digit_value d; None => 0));
     n = reduce (fn acc v => acc * 16 + v) 0 values;
     Ok {@value n, @pos (pos + 4)}
   )
@@ -171,6 +187,7 @@ read_hex4 = fn pos s => (
 # High/low surrogate ranges, UTF-16 (RFC 8259 §7's astral-codepoint escape).
 is_high_surrogate = fn n => (n >= 55296) && (n <= 56319);
 is_low_surrogate = fn n => (n >= 56320) && (n <= 57343);
+# Combines a UTF-16 high/low surrogate pair into its astral codepoint.
 combine_surrogates = fn hi lo => 65536 + ((hi - 55296) * 1024) + (lo - 56320);
 
 # from_char_code returns Option String (it's a general builtin, not every
@@ -227,13 +244,17 @@ json_escaped_char_p = fn pos s =>
 # `\` excluded from "plain" so an unrecognized escape fails the string
 # parse outright, instead of backtracking into treating `\` as a literal.
 json_plain_char_p = satisfy "string char" (fn c => (not (c == "\"")) && (not (c == "\\")) && (not (c < " ")));
+# One string character, escaped or plain.
 json_string_char_p = choice2 json_escaped_char_p json_plain_char_p;
 
+# A `"`-delimited string's raw text (no JsonValue wrapping) — reused by
+# json_value_p below for parsing object keys.
 json_string_raw_p = between (char "\"") (char "\"") (pmap (fn cs => join "" cs) (many json_string_char_p));
 json_string_p = pmap JString json_string_raw_p;
 
 # --- values, arrays, objects ---
 
+# Any non-container JSON value: null, bool, string, or number.
 json_scalar_p = choice [json_null_p, json_bool_p, json_string_p, json_number_p];
 
 # Duplicate keys: last value wins, first position kept — matches
@@ -270,20 +291,21 @@ json_value_p = fn pos s => (
 
 # Wraps std/parser's ParseError into JsonParseError (see its declaration above).
 json_parse = fn input =>
-  map_err (fn e => match e (ParseError info => JsonParseError info)) (
+  (
     bind (json_value_p 0 input) (fn r => (
-      p = skip_ws (r | @pos) input;
+      p = input | skip_ws (@pos r);
       match (peek_char p input) (
-        None => Ok (r | @value);
+        None => Ok $ @value r;
         Some c => Err (ParseError {@message ("unexpected trailing character '" + c + "'"), @position p})
       )
     ))
-  );
+  ) | map_err (fn e => match e (ParseError info => JsonParseError info));
 
 # ========================================
 # SERIALIZER
 # ========================================
 
+# A 0-15 value to its single lowercase hex digit character.
 hex_nibble = fn n => match n (
   0 => "0"; 1 => "1"; 2 => "2"; 3 => "3"; 4 => "4";
   5 => "5"; 6 => "6"; 7 => "7"; 8 => "8"; 9 => "9";
@@ -302,6 +324,8 @@ escape_control_char = fn n => (
   "\\u00" + hex_nibble hi + hex_nibble lo
 );
 
+# A single character to its JSON-escaped form (identity for anything that
+# doesn't need escaping).
 escape_char = fn c => match c (
   "\"" => "\\\"";
   "\\" => "\\\\";
@@ -311,8 +335,12 @@ escape_char = fn c => match c (
   _ => if c < " " then escape_control_char (option_get_or 0 (char_code c)) else c
 );
 
+# Escapes every character of `s` for embedding in a JSON string literal
+# (without the surrounding quotes).
 escape_string = fn s => join "" (list_map escape_char (chars s));
 
+# True if `n`'s string form is one of the non-finite float values, which
+# JSON has no literal for.
 non_finite_number_text = fn n => (
   text = toString n;
   (text == "Infinity") || (text == "-Infinity") || (text == "NaN")
@@ -341,12 +369,15 @@ json_stringify = fn v => match v (
 # EXTRACTION API
 # ========================================
 
+# Unwraps a JsonValue to its expected shape, or the matching JsonExpected*
+# error if it's a different variant.
 json_as_string = fn v => match v (JString s => Ok s; _ => Err JsonExpectedString)
 json_as_number = fn v => match v (JNumber n => Ok n; _ => Err JsonExpectedNumber)
 json_as_bool = fn v => match v (JBool b => Ok b; _ => Err JsonExpectedBool)
 json_as_array = fn v => match v (JArray items => Ok items; _ => Err JsonExpectedArray)
 json_as_object = fn v => match v (JObject members => Ok members; _ => Err JsonExpectedObject)
 
+# Looks up `key` in `v`, which must be a JObject; JsonMissingField if absent.
 json_field = fn key v => bind (json_as_object v) (fn members =>
   match (assoc_get key members) (
     Some found => Ok found;
@@ -354,6 +385,7 @@ json_field = fn key v => bind (json_as_object v) (fn members =>
   )
 ) : String -> JsonValue -> Result JsonValue JsonError;
 
+# Looks up index `idx` in `v`, which must be a JArray; JsonIndexOutOfBounds if out of range.
 json_index = fn idx v => bind (json_as_array v) (fn items =>
   match (at idx items) (
     Some found => Ok found;

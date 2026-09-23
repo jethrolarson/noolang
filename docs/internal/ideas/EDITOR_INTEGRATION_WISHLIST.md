@@ -1,0 +1,3 @@
+- vscode rainbow bracket support not working seemingly because vscode doesn't know what is a bracket in noolang
+- Fill in a bunch of expected refactorings like rename symbol etc
+- JSDoc style documentation inferred from docstrings on hovered symbols

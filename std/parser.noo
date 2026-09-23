@@ -37,6 +37,7 @@
 
 variant ParseError = ParseError {@message String, @position Float};
 
+# Builds a failed parse `Result` from a message and the position it failed at.
 parse_error = fn message pos => Err (ParseError {@message message, @position pos});
 
 # Deliberately not using the Monad/Applicative `bind`/`map` trait methods —
@@ -59,19 +60,23 @@ result_map = fn f res => match res (
 # library, not JSON-specific.
 # ========================================
 
+# True for a single ASCII digit character "0"–"9".
 is_digit = fn c => match c (
   "0" => True; "1" => True; "2" => True; "3" => True; "4" => True;
   "5" => True; "6" => True; "7" => True; "8" => True; "9" => True;
   _ => False
 );
 
+# True for space, tab, newline, or carriage return.
 is_whitespace = fn c => match c (
   " " => True; "\t" => True; "\n" => True; "\r" => True; _ => False
 );
 
+# True for an ASCII letter, upper or lower case.
 is_alpha = fn c =>
   ((c >= "a") && (c <= "z")) || ((c >= "A") && (c <= "Z"));
 
+# True for an ASCII letter or digit.
 is_alnum = fn c => (is_alpha c) || (is_digit c);
 
 # ========================================
@@ -87,10 +92,10 @@ peek_char = fn pos s => (
 
 # Single character matching `pred`, described by `label` for error messages.
 satisfy = fn label pred pos s => match (peek_char pos s) (
-  None => parse_error ("expected " + label + " but reached end of input") pos;
+  None => pos | parse_error ("expected " + label + " but reached end of input");
   Some c => if pred c
     then Ok {@value c, @pos (pos + 1)}
-    else parse_error ("expected " + label) pos
+    else pos | parse_error ("expected " + label)
 );
 
 # Exact single character.
@@ -117,17 +122,28 @@ take_while = fn pred pos s => (
   step = fn state ch =>
     if state | @done then state
     else if pred ch
-      then {@parts (append (state | @parts) [ch]), @i ((state | @i) + 1), @done False}
-      else {@parts (state | @parts), @i (state | @i), @done True};
+      then {
+        @parts [ch] | append (@parts state),
+        @i ((@i state) + 1), 
+        @done False
+      }
+      else {
+        @parts (state | @parts),
+        @i (state | @i),
+        @done True
+      };
   final = reduce step init remaining;
-  {@value (join "" (final | @parts)), @pos (final | @i)}
+  {
+    @value (join "" (final | @parts)),
+    @pos (final | @i)
+  }
 );
 
 # Same as `take_while`, but fails (rather than succeeding with "") if no
 # character matches.
 take_while1 = fn label pred pos s => (
   r = take_while pred pos s;
-  if (length (chars (r | @value))) == 0
+  if (r | @value | chars | length) == 0
     then parse_error ("expected at least one " + label) pos
     else Ok r
 );
@@ -135,7 +151,7 @@ take_while1 = fn label pred pos s => (
 # Skips leading whitespace; returns the position just past it (a plain
 # `Float`, not a `Result` — this is a position-only helper, not itself a
 # `Parser a`, matching std/json.noo's existing `skip_ws`).
-skip_ws = fn pos s => (take_while is_whitespace pos s) | @pos;
+skip_ws = fn pos s => s | take_while is_whitespace pos | @pos;
 
 # Runs `p` after skipping leading whitespace. Does not skip trailing
 # whitespace — callers that need "surrounded by whitespace" compose this
@@ -146,20 +162,26 @@ lexeme = fn p pos s => p (skip_ws pos s) s;
 # Functor/monad-shaped combinators
 # ========================================
 
-pmap = fn f p => fn pos s =>
-  result_map (fn r => {@value (f (r | @value)), @pos (r | @pos)}) (p pos s);
+# Runs `p`, then transforms its value with `f`; position/failure pass through.
+pmap = fn f p pos s =>
+  s | (p pos) | result_map (fn r => {@value (f (r | @value)), @pos (r | @pos)});
 
-pbind = fn f p => fn pos s =>
+# Runs `p`, then feeds its value and resulting position into `f` to build the
+# next parser (monadic sequencing for parsers).
+pbind = fn f p pos s =>
   result_bind (p pos s) (fn r => (f (r | @value)) (r | @pos) s);
 
-succeed = fn v => fn pos s => Ok {@value v, @pos pos};
+# A parser that consumes nothing and always succeeds with `v`.
+succeed = fn v pos s => Ok {@value v, @pos pos};
 
-fail = fn message => fn pos s => parse_error message pos;
+# A parser that consumes nothing and always fails with `message`.
+fail = fn message pos s => parse_error message pos;
 
 # ========================================
 # Choice / optional
 # ========================================
 
+# Tries `p1`; on failure, tries `p2` at the same starting position.
 choice2 = fn p1 p2 => fn pos s => match (p1 pos s) (
   Ok r => Ok r;
   Err _ => p2 pos s
@@ -177,6 +199,8 @@ choice = fn ps pos s => (
   reduce try_next (parse_error "no alternative matched" pos) ps
 );
 
+# Tries `p`; wraps its value in `Some` on success, or succeeds with `None`
+# at the original position on failure. Never itself fails.
 optional = fn p pos s => match (p pos s) (
   Ok r => Ok {@value (Some (r | @value)), @pos (r | @pos)};
   Err _ => Ok {@value None, @pos pos}
@@ -188,18 +212,24 @@ optional = fn p pos s => match (p pos s) (
 # elements, object members, ...).
 # ========================================
 
+# Accumulator loop behind `many`/`many1`: keeps applying `p` until it fails,
+# stopping (not erroring) at the last successful position.
 many_go = fn p acc pos s => match (p pos s) (
   Err _ => Ok {@value acc, @pos pos};
   Ok r => many_go p (append acc [r | @value]) (r | @pos) s
 );
 
+# Zero or more `p`, as a list. Never itself fails.
 many = fn p pos s => many_go p [] pos s;
 
+# One or more `p`, as a list. Fails if `p` doesn't match at least once.
 many1 = fn p pos s => match (p pos s) (
   Err e => Err e;
   Ok r => many_go p [r | @value] (r | @pos) s
 );
 
+# Accumulator loop behind `sep_by`/`sep_by1`: alternates `p` and `sep`,
+# stopping cleanly when `sep` fails to match.
 sep_by_go = fn p sep acc pos s => match (sep pos s) (
   Err _ => Ok {@value acc, @pos pos};
   # A separator with no following element is a hard error (matches JSON's
@@ -209,11 +239,14 @@ sep_by_go = fn p sep acc pos s => match (sep pos s) (
   )
 );
 
+# Zero or more `p` separated by `sep`, as a list of `p`'s values. Never
+# itself fails — zero matches is a valid (empty) result.
 sep_by = fn p sep pos s => match (p pos s) (
   Err _ => Ok {@value [], @pos pos};
   Ok r => sep_by_go p sep [r | @value] (r | @pos) s
 );
 
+# One or more `p` separated by `sep`. Fails if `p` doesn't match at least once.
 sep_by1 = fn p sep pos s => match (p pos s) (
   Err e => Err e;
   Ok r => sep_by_go p sep [r | @value] (r | @pos) s
@@ -226,9 +259,9 @@ sep_by1 = fn p sep pos s => match (p pos s) (
 # `p` surrounded by `open`/`close`; the result is `p`'s value, positioned
 # just past `close`.
 between = fn open close p pos s =>
-  result_bind (open pos s) (fn o =>
-    result_bind (p (o | @pos) s) (fn r =>
-      result_bind (close (r | @pos) s) (fn c =>
+  bind (open pos s) (fn o =>
+    bind (p (o | @pos) s) (fn r =>
+      bind (close (r | @pos) s) (fn c =>
         Ok {@value (r | @value), @pos (c | @pos)}
       )
     )
