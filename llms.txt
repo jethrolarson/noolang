@@ -80,7 +80,7 @@ This documentation covers all aspects of Noolang, from basic syntax to advanced 
 
 ### Type System Tests
 - [Type System Tests](test/type-system/): Comprehensive type inference and constraint tests
-- [ADT Limitations](test/type-system/adt_limitations.test.ts): Known algebraic data type limitations
+- [Multiple ADTs](test/type-system/multiple-adts.test.ts): Multiple algebraic data types in one program
 - [Constraint Bug Tests](test/type-system/constraint-bug.test.ts): Constraint resolution edge cases
 
 ### Language Feature Tests
