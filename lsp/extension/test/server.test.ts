@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -32,10 +32,14 @@ describe('LSP server protocol', () => {
 		harness = await LSPServerHarness.create({ workspacePath: repoRoot });
 
 		try {
-			const uri = pathToFileURL(
-				join(linkedWorkspace, 'std', 'json.noo')
-			).toString();
-			const actions = await harness.requestCodeActions(uri, 145, 0);
+			const jsonPath = join(linkedWorkspace, 'std', 'json.noo');
+			const uri = pathToFileURL(jsonPath).toString();
+			const targetLine = readFileSync(jsonPath, 'utf8')
+				.split('\n')
+				.findIndex((line) => line.startsWith('is_supported_escape ='));
+			expect(targetLine).toBeGreaterThanOrEqual(0);
+
+			const actions = await harness.requestCodeActions(uri, targetLine, 0);
 
 			expect(actions).toHaveLength(1);
 			expect(actions[0].title).toBe('Infer type annotation');
