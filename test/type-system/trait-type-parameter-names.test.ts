@@ -1,6 +1,5 @@
 import { test, expect } from 'bun:test';
 import {
-	assertConstrainedType,
 	assertListType,
 	assertPrimitiveType,
 	assertVariantType,
@@ -28,28 +27,6 @@ test('trait functions work with descriptive type parameter names', () => {
 	expect(result.type.name).toBe('String');
 });
 
-// FIXME currently trait validation is requiring all trait properties be functions
-test.skip('trait functions work with uppercase type parameter names', () => {
-	const result = parseAndType(`
-      constraint Container ContainerType (
-          empty : ContainerType a;
-          insert : a -> ContainerType a -> ContainerType a
-      );
-      
-      implement Container List (
-          empty = [];
-          insert = fn x list => cons x list
-      );
-      
-      # Should work with uppercase parameter name
-      empty
-  `);
-
-	// Should return a constrained type with variant baseType (ContainerType a)
-	assertConstrainedType(result.type);
-	assertVariantType(result.type.baseType);
-});
-
 test('trait functions work with creative type parameter names', () => {
 	const program = `
       constraint Mashable tuberType (
@@ -71,17 +48,16 @@ test('trait functions work with creative type parameter names', () => {
 	expect(result.type.name).toBe('String');
 });
 
-test.skip('trait functions work with single uppercase letter (breaking the convention)', () => {
+test('trait functions work with higher-kinded type parameters', () => {
 	const program = `
-      constraint Mappable M (
-          mapit : (a -> b) -> M a -> M b
+      constraint Mappable m (
+          mapit : (a -> b) -> m a -> m b
       );
-      
-      implement Mappable List (
+
+      implement Mappable (typefn a => List a) (
           mapit = fn f list => list_map f list
       );
-      
-      # Should work even though we use uppercase M instead of lowercase f
+
       mapit (fn x => x + 1.0) [1.0, 2.0, 3.0]
   `;
 

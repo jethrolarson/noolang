@@ -47,12 +47,8 @@ describe('Constraint inference bug tests', () => {
 		expect(recordType.constraints).toBeUndefined(); // 'Record constructor should have no constraints - it does not use +'
 	});
 
-	test('constraint inference should add Add constraint only when + is actually used - SKIPPED: exposes bad heuristic', () => {
-		// This test currently fails because the constraint system doesn't properly
-		// analyze the function body for actual + usage
-		// Skip until we implement proper trait-based constraint inference
-
-		// Functions that DO use + should get Add constraints
+	test('constraint inference should add Add constraint only when + is actually used', () => {
+		// Functions that use + should get Add constraints
 
 		const addCode = 'f = fn x y => x + y';
 		const addLexer = new Lexer(addCode);

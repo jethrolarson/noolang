@@ -125,14 +125,17 @@ test('type error when partially applying add with wrong type', () => {
 // WEAKNESS INVESTIGATION: TRAIT FUNCTION INTEGRATION
 // =============================================================================
 
-// Need ability to have heterogenous List types
-test.skip('| operator with trait functions', () => {
+test('| operator maps trait functions over union-typed lists', () => {
 	expectSuccess(
 		`
-      values = [1, "hello", 3] : List (Float | String);
-      values | list_map show;
+      type Showable = Float | String;
+      first = 1 : Showable;
+      second = "hello" : Showable;
+      third = 3 : Showable;
+      values = [first, second, third];
+      values | list_map show
     `,
-		'TODO'
+		['1', 'hello', '3']
 	);
 });
 

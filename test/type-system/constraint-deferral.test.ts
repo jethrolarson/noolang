@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { parseAndType } from '../utils';
 import { typeToString } from '../../src/typer/helpers';
 
-test('Constraint Deferral Investigation - Structural constraints should be deferred in function bodies (CURRENTLY FAILING)', () => {
+test('Constraint Deferral Investigation - Structural constraints should be deferred in function bodies', () => {
 	const result = parseAndType('fn obj => @name obj');
 	const typeStr = typeToString(result.type, result.state.substitution);
 	expect(typeStr).toBe('a -> b given a has {@name b}');
@@ -16,7 +16,7 @@ test('Constraint Deferral Investigation - Direct structural constraint resolutio
 	expect(typeStr).toBe('String');
 });
 
-test.skip('Constraint Deferral Investigation - Function body structural constraints should resolve when applied', () => {
+test('Constraint Deferral Investigation - Function body structural constraints should resolve when applied', () => {
 	const result = parseAndType(`
     getName = fn obj => @name obj;
     getName {@name "Alice"}
