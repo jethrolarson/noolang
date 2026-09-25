@@ -1,8 +1,8 @@
 // std/json is an ordinary unprivileged userland noolang module (not part
 // of stdlib.noo, which every program gets for free) — its behavior is
-// exercised in json.test.noo (run via `noo test`), the way an idiomatic
+// exercised in std/json.test.noo (run via `noo test`), the way an idiomatic
 // noolang library gets tested by its own users. This file holds only what
-// json.test.noo cannot express: inferred-type assertions (Expectation in
+// std/json.test.noo cannot express: inferred-type assertions (Expectation in
 // std/test only wraps runtime Pass/Fail), and a stack-depth stress test
 // that needs a trivially-built huge string (no `repeat`/`replicate` in
 // stdlib.noo, and building one via recursion in .noo would risk hitting a
@@ -43,10 +43,11 @@ test('the module export types are visible to the importer', () => {
 });
 
 test('imported JsonValue derives equality through nested arrays and objects', () => {
+	const nestedJsonLiteral = JSON.stringify('{"items":[{"x":1}]}');
 	expectSuccess(
 		`${importJson}
-match (json_parse "{\\\"items\\\":[{\\\"x\\\":1}]}") (
-  Ok a => match (json_parse "{\\\"items\\\":[{\\\"x\\\":1}]}") (Ok b => a == b; Err _ => False);
+match (json_parse ${nestedJsonLiteral}) (
+  Ok a => match (json_parse ${nestedJsonLiteral}) (Ok b => a == b; Err _ => False);
   Err _ => False
 )`,
 		true
