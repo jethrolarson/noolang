@@ -8,7 +8,7 @@
  * handle the `trait-function` value kind.
  */
 import { describe, test, expect } from 'bun:test';
-import { expectSuccess, expectError } from '../utils';
+import { expectSuccess } from '../utils';
 
 describe('reduce with bare trait functions', () => {
 	test('reduce add 0 [1,2,3] → 6', () => {

@@ -16,7 +16,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { runCode, parseAndType } from '../utils';
-import { clearModuleCache, resolveModulePath } from '../../src/module-loader';
+import { clearModuleCache } from '../../src/module-loader';
 
 // ─── helpers ───────────────────────────────────────────────────────────────────
 

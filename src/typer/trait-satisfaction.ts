@@ -1,7 +1,7 @@
 import type { ConstraintExpr, Type } from '../ast';
 import { substitute } from './substitute';
 import { typesEqual } from './helpers';
-import type { TraitImplementation, TraitRegistry } from './trait-system';
+import type { TraitImplementation } from './trait-system';
 import type { TypeState } from './types';
 
 export type TraitSatisfaction =

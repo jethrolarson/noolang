@@ -34,10 +34,6 @@ function writeTmp(relPath: string, content: string): string {
 	return fullPath;
 }
 
-function nooPath(relPath: string): string {
-	return path.join(TMPDIR, relPath).replace(/\.noo$/, '');
-}
-
 beforeEach(() => {
 	fs.mkdirSync(TMPDIR, { recursive: true });
 	clearModuleCache();
@@ -56,8 +52,7 @@ afterEach(() => {
 
 describe('HEADLINE: hermetic type identity', () => {
 	test('module imported by two importers yields identical export type', () => {
-		// D is a simple module
-		const dPath = writeTmp('d.noo', `
+		writeTmp('d.noo', `
 fn x => x + 1
 `);
 
@@ -102,8 +97,7 @@ s = (@idB b) "hi";
 	});
 
 	test('import order does not change the export type', () => {
-		// Module with a clear type
-		const mPath = writeTmp('ordered.noo', `
+		writeTmp('ordered.noo', `
 {@x 42, @y "hello"}
 `);
 		const p = path.join(TMPDIR, 'ordered');
@@ -402,9 +396,7 @@ double 5
 	});
 
 	test('module imported twice evaluates only once (cache)', () => {
-		// Use a module with a known output; if evaluated twice the count would be off
-		// We verify this by importing the same module twice and checking we get same ref
-		const mPath = writeTmp('cached.noo', `
+		writeTmp('cached.noo', `
 {@value 42}
 `);
 		const p = path.join(TMPDIR, 'cached');

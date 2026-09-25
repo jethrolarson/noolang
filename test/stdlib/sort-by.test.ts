@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'bun:test';
+import { test, describe } from 'bun:test';
 import { expectSuccess } from '../utils';
 
 describe('sort_by (stdlib)', () => {

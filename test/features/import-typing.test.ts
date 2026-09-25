@@ -1,5 +1,5 @@
 import { test, expect, describe, beforeAll, afterAll } from 'bun:test';
-import { runCode, expectSuccess, parseAndType } from '../utils';
+import { runCode, parseAndType } from '../utils';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 

@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'bun:test';
 import { parseAndType } from '../utils';
-import { Lexer } from '../../src/lexer/lexer';
-import { parse } from '../../src/parser/parser';
 
 describe('Variant Type Annotation Bug', () => {
   it('should handle variant types in polymorphic annotations without hanging', async () => {
@@ -65,16 +63,16 @@ describe('Variant Type Annotation Bug', () => {
     const start = Date.now();
     
     try {
-      const result = parseAndType(code);
-      const duration = Date.now() - start;
-      
-      // This currently hangs but should complete quickly
-      expect(duration).toBeLessThan(1000);
-      expect(result).toBeDefined();
-    } catch (error) {
-      // Better to fail fast than hang
-      const duration = Date.now() - start;
-      expect(duration).toBeLessThan(5000);
-    }
+			const result = parseAndType(code);
+			const duration = Date.now() - start;
+
+			// This currently hangs but should complete quickly
+			expect(duration).toBeLessThan(1000);
+			expect(result).toBeDefined();
+		} catch (_error) {
+			// Better to fail fast than hang
+			const duration = Date.now() - start;
+			expect(duration).toBeLessThan(5000);
+		}
   });
 });

@@ -508,25 +508,6 @@ export class REPLCore {
 		}
 	}
 
-	private showASTAsJSON(input: string): void {
-		if (!input) {
-			this.output.log(colorize.warning('Usage: .ast-json (expression)'));
-			return;
-		}
-
-		try {
-			const lexer = new Lexer(input);
-			const tokens = lexer.tokenize();
-			const program = parse(tokens);
-
-			this.output.log(JSON.stringify(program.statements[0], null, 2));
-		} catch (error) {
-			this.output.error(
-				colorize.error(`Error parsing: ${(error as Error).message}`)
-			);
-		}
-	}
-
 	private showErrorDetail(): void {
 		this.output.log(
 			colorize.warning('Error detail not available - no recent error')
