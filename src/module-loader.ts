@@ -96,6 +96,9 @@ function cloneTypeStateForModule(base: TypeState): TypeState {
 		functionTraits: new Map(
 			Array.from(base.traitRegistry.functionTraits.entries()).map(([k, v]) => [k, [...v]])
 		),
+		valueTraits: new Map(
+			Array.from(base.traitRegistry.valueTraits?.entries() ?? []).map(([k, v]) => [k, [...v]])
+		),
 	};
 	for (const [traitName, impls] of base.traitRegistry.implementations) {
 		traitRegistry.implementations.set(traitName, new Map(impls));
@@ -491,9 +494,17 @@ function captureInstanceClosures(
 			// No try/catch: a throw here is a real error, surfaced with context.
 			evaluated.set(fnName, evaluator.evaluateExpression(fnExpr) as Value);
 		}
-		// Attach onto the shared impl object so functions + evaluatedFunctions
-		// stay together in the cache's traitImplDiff.
+		const evaluatedValues = new Map<string, unknown>();
+		for (const [valueName, valueExpr] of impl.values ?? []) {
+			evaluatedValues.set(
+				valueName,
+				evaluator.evaluateExpression(valueExpr) as Value
+			);
+		}
+		// Attach onto the shared impl object so source expressions and captured
+		// values stay together in the cache's traitImplDiff.
 		impl.evaluatedFunctions = evaluated;
+		impl.evaluatedValues = evaluatedValues;
 	}
 }
 
@@ -696,6 +707,9 @@ export function mergeModuleCacheIntoTypeState(
 	const newFunctionTraits = new Map(
 		Array.from(importerState.traitRegistry.functionTraits.entries()).map(([k, v]) => [k, [...v]])
 	);
+	const newValueTraits = new Map(
+		Array.from(importerState.traitRegistry.valueTraits?.entries() ?? []).map(([k, v]) => [k, [...v]])
+	);
 
 	// Build newImpls here so trait-def additions can also create empty impl entries
 	const newImpls = new Map(importerState.traitRegistry.implementations);
@@ -718,11 +732,17 @@ export function mergeModuleCacheIntoTypeState(
 			if (!newImpls.has(name)) {
 				newImpls.set(name, new Map());
 			}
-			// Register function names
+			// Register member names
 			for (const fnName of traitDef.functions.keys()) {
 				const existing = newFunctionTraits.get(fnName) ?? [];
 				if (!existing.includes(name)) {
 					newFunctionTraits.set(fnName, [...existing, name]);
+				}
+			}
+			for (const valueName of traitDef.values?.keys() ?? []) {
+				const existing = newValueTraits.get(valueName) ?? [];
+				if (!existing.includes(name)) {
+					newValueTraits.set(valueName, [...existing, name]);
 				}
 			}
 		}
@@ -732,6 +752,7 @@ export function mergeModuleCacheIntoTypeState(
 		definitions: newDefs,
 		implementations: newImpls,
 		functionTraits: newFunctionTraits,
+		valueTraits: newValueTraits,
 	};
 
 	// Also update protected type names

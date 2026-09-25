@@ -1,7 +1,3 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { Lexer } from '../lexer/lexer';
-import { parse } from '../parser/parser';
 import {
 	loadModule,
 	resolveModulePath,
@@ -37,7 +33,6 @@ import {
 	type Type,
 	type FunctionType,
 	type Constraint,
-	type Effect,
 	type TypeConstructorAbstraction,
 	type RecordDestructuringField,
 	floatType,
@@ -112,6 +107,8 @@ import { typeApplication } from './function-application';
 
 import {
 	isTraitFunction,
+	isTraitValue,
+	resolveTraitValue,
 	getTraitFunctionInfo,
 	addTraitDefinition,
 	getTypeName,
@@ -123,6 +120,7 @@ import {
 	arrowKind,
 	compileConstructorAbstraction,
 	constructorParameterArity,
+	matchConstructorAbstraction,
 } from './kinded-constructors';
 
 export const typeLiteral = (
@@ -147,6 +145,12 @@ export const typeVariableExpr = (
 ): TypeResult => {
 	const scheme = state.environment.get(expr.name);
 	if (!scheme) {
+		if (isTraitValue(state.traitRegistry, expr.name)) {
+			throw new Error(
+				`Associated value '${expr.name}' is ambiguous without an expected type annotation`
+			);
+		}
+
 		if (isTraitFunction(state.traitRegistry, expr.name)) {
 			const traitInfo = getTraitFunctionInfo(state.traitRegistry, expr.name);
 			if (traitInfo) {
@@ -700,9 +704,7 @@ export const typeFunction = (
 		createParameterTypesAndTypeBody(expr, functionEnv, state);
 	const implicitConstraints = collectImplicitConstraints(
 		substitute(bodyResult.type, currentState.substitution),
-		paramTypes,
-		originalBody,
-		expr.params
+		originalBody
 	);
 	const substitutedParamTypes = paramTypes.map(t =>
 		substitute(t, currentState.substitution)
@@ -744,9 +746,7 @@ export const typeFunction = (
 
 function collectImplicitConstraints(
 	bodyType: Type,
-	paramTypes: Type[],
-	bodyExpr?: Expression,
-	paramNames?: string[]
+	bodyExpr?: Expression
 ): Constraint[] {
 	const constraints: Constraint[] = [];
 
@@ -1692,11 +1692,9 @@ export const typeWhere = (
 		} else if (def.kind === 'tuple-destructuring') {
 			const tupleResult = typeTupleDestructuring(def, currentState);
 			currentState = tupleResult.state;
-			whereEnv = currentState.environment;
 		} else if (def.kind === 'record-destructuring') {
 			const recordResult = typeRecordDestructuring(def, currentState);
 			currentState = recordResult.state;
-			whereEnv = currentState.environment;
 		}
 	}
 
@@ -1798,18 +1796,99 @@ const resolveTypeAliases = (
 	}
 };
 
+const typeTraitValueWithExpectedType = (
+	expr: VariableExpression,
+	resolvedType: Type,
+	state: TypeState
+): TypeResult => {
+	const candidates = resolveTraitValue(
+		state.traitRegistry,
+		expr.name,
+		resolvedType,
+		state
+	);
+	if (candidates.length === 0) {
+		throw new Error(
+			`No implementation of associated value '${expr.name}' matches expected type ${typeToString(resolvedType)}`
+		);
+	}
+	if (candidates.length > 1) {
+		throw new Error(
+			`Ambiguous associated value '${expr.name}' for expected type ${typeToString(resolvedType)}: ${candidates
+				.map(candidate => candidate.traitName)
+				.join(', ')}`
+		);
+	}
+
+	const candidate = candidates[0];
+	const required = candidate.definition.values?.get(expr.name);
+	if (!required) {
+		throw new Error(
+			`Associated value '${expr.name}' is missing from trait '${candidate.traitName}'`
+		);
+	}
+	let traitTarget: Type = resolvedType;
+	if (candidate.implementation.constructorAbstraction) {
+		const abstraction = candidate.implementation.constructorAbstraction;
+		const bindings = matchConstructorAbstraction(abstraction, resolvedType);
+		if (!bindings) {
+			throw new Error(
+				`Associated value '${expr.name}' does not match expected type ${typeToString(resolvedType)}`
+			);
+		}
+		traitTarget = {
+			kind: 'constructor',
+			abstraction,
+			bindings,
+		};
+	}
+	const memberType = substitute(
+		required,
+		new Map([[candidate.definition.typeParam, traitTarget]])
+	);
+	const memberScheme: TypeScheme = {
+		type: memberType,
+		quantifiedVars: [...freeTypeVars(memberType)],
+	};
+	const [instantiatedMemberType, instantiatedState] = instantiate(
+		memberScheme,
+		state
+	);
+	const selectedState = unify(
+		instantiatedMemberType,
+		resolvedType,
+		instantiatedState,
+		getExprLocation(expr)
+	);
+	expr.traitValueSelection = {
+		traitName: candidate.traitName,
+		typeName: candidate.typeName,
+	};
+	expr.type = resolvedType;
+	return createPureTypeResult(resolvedType, selectedState);
+};
+
 export const typeTyped = (
 	expr: TypedExpression,
 	state: TypeState
 ): TypeResult => {
 	// For typed expressions, trust the explicit type annotation's structure but
 	// still validate that it does not hide effects performed by the expression.
+	const resolvedType = resolveTypeAliases(expr.type, state);
+	if (
+		expr.expression.kind === 'variable' &&
+		!state.environment.has(expr.expression.name) &&
+		isTraitValue(state.traitRegistry, expr.expression.name)
+	) {
+		return typeTraitValueWithExpectedType(
+			expr.expression,
+			resolvedType,
+			state
+		);
+	}
 
 	// Infer the expression to get effects only
 	const inferredResult = typeExpression(expr.expression, state);
-
-	// Resolve any type aliases in the explicit type annotation
-	const resolvedType = resolveTypeAliases(expr.type, inferredResult.state);
 
 	// Verify that the inferred type is compatible with the annotation
 	const currentState = unify(
@@ -1888,19 +1967,17 @@ export const typeConstraintDefinition = (
 ): TypeResult => {
 	const { name, typeParams, functions } = expr;
 
-	// Create trait definition
 	const functionMap = new Map<string, FunctionType>();
+	const valueMap = new Map<string, Type>();
 
-	for (const { type, name: funcName } of functions) {
-		// Type the function signature, substituting the constraint type parameter
-		if (type.kind == 'function') {
-			functionMap.set(funcName, type);
-		}
+	for (const { type, name: memberName } of functions) {
+		if (type.kind === 'function') functionMap.set(memberName, type);
+		else valueMap.set(memberName, type);
 	}
 
 	const typeParam = typeParams.length > 0 ? typeParams[0] : 'a';
 	const constructorArity = constructorParameterArity(
-		functionMap.values(),
+		[...functionMap.values(), ...valueMap.values()],
 		typeParam,
 		name
 	);
@@ -1916,12 +1993,19 @@ export const typeConstraintDefinition = (
 				) as FunctionType
 			);
 		}
+		for (const [valueName, valueType] of valueMap) {
+			valueMap.set(
+				valueName,
+				annotateConstructorKind(valueType, typeParam, typeKind)
+			);
+		}
 	}
 	const traitDef = {
 		name,
 		typeParam,
 		constructorArity,
 		functions: functionMap,
+		values: valueMap,
 	};
 
 	// Add to trait registry using the new trait system
@@ -2066,7 +2150,7 @@ const assertEffectSubsumption = (
 };
 
 const expectedMemberType = (
-	required: FunctionType,
+	required: Type,
 	traitParameter: string,
 	target: Type,
 	abstraction?: TypeConstructorAbstraction
@@ -2085,7 +2169,7 @@ const expectedMemberType = (
 
 const assertMemberCompatibility = (
 	actual: Type,
-	required: FunctionType,
+	required: Type,
 	traitName: string,
 	traitParameter: string,
 	target: Type,
@@ -2149,17 +2233,19 @@ export const typeImplementDefinition = (
 		? constructorAbstraction.body
 		: nominalImplementationTarget(typeExpr as Type, state);
 
-	// Type each implementation and store as expressions
+	// Type each implementation and store callable members separately from values.
 	const implementationMap = new Map<string, Expression>();
+	const valueImplementationMap = new Map<string, Expression>();
 	let currentState = state;
 	let allEffects = emptyEffects();
 
 	for (const impl of implementations) {
-		// Check if function is required by trait
-		const requiredType = traitDef.functions.get(impl.name);
+		const requiredFunctionType = traitDef.functions.get(impl.name);
+		const requiredValueType = traitDef.values?.get(impl.name);
+		const requiredType = requiredFunctionType ?? requiredValueType;
 		if (!requiredType) {
 			throw new Error(
-				`Function '${impl.name}' not required by trait '${constraintName}'`
+				`Member '${impl.name}' not required by trait '${constraintName}'`
 			);
 		}
 
@@ -2167,6 +2253,11 @@ export const typeImplementDefinition = (
 		const implResult = typeExpression(impl.value, currentState);
 		currentState = implResult.state;
 		allEffects = unionEffects(allEffects, implResult.effects);
+		if (requiredValueType && implResult.effects.size > 0) {
+			throw new Error(
+				`Associated value '${impl.name}' for '${constraintName}' performs effects that cannot be declared`
+			);
+		}
 
 		const memberTarget = saturateValueImplementationTarget(
 			implementationTarget,
@@ -2185,14 +2276,21 @@ export const typeImplementDefinition = (
 		);
 
 		// Store the expression (not the type scheme)
-		implementationMap.set(impl.name, impl.value);
+		if (requiredFunctionType) implementationMap.set(impl.name, impl.value);
+		else valueImplementationMap.set(impl.name, impl.value);
 	}
 
-	// Check that all required functions are implemented
-	for (const [funcName] of traitDef.functions) {
-		if (!implementationMap.has(funcName)) {
+	// Check that all required members are implemented.
+	for (const memberName of [
+		...traitDef.functions.keys(),
+		...(traitDef.values?.keys() ?? []),
+	]) {
+		if (
+			!implementationMap.has(memberName) &&
+			!valueImplementationMap.has(memberName)
+		) {
 			throw new Error(
-				`Missing implementation for '${funcName}' in implementation of '${constraintName}' for '${typeName}'`
+				`Missing implementation for '${memberName}' in implementation of '${constraintName}' for '${typeName}'`
 			);
 		}
 	}
@@ -2203,6 +2301,7 @@ export const typeImplementDefinition = (
 		constructorAbstraction,
 		targetType: implementationTarget,
 		functions: implementationMap,
+		values: valueImplementationMap,
 		givenConstraints, // Include given constraints if present
 	};
 

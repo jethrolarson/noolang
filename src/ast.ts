@@ -248,6 +248,10 @@ export interface VariableExpression {
 	kind: 'variable';
 	name: string;
 	type?: Type;
+	traitValueSelection?: {
+		traitName: string;
+		typeName: string;
+	};
 	location: Location;
 }
 
