@@ -95,10 +95,11 @@ Thumbs.db
 # TypeScript
 *.tsbuildinfo
 
-# Test outputs
+# Test and benchmark outputs
 test-results/
 test-reports/repl-automation-report.json
 playwright-report/
+/benchmark-results/
 
 # LSP (VS Code extension) build and package artifacts
 lsp/extension/out/

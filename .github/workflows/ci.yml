@@ -592,16 +592,20 @@ jobs:
         log "## Performance Comparison"
         log "Comparing current branch against main..."
 
-        # Check if benchmark files exist with proper globbing
+        # Compare the newest core benchmark from each run. Excluding
+        # repl-results-*.json keeps unlike benchmark suites from being compared.
+        latest_core_result() {
+          find "$1" -maxdepth 1 -type f -name "results-*.json" | sort | tail -1
+        }
         CURRENT_RESULTS=""
         MAIN_RESULTS=""
 
         if [ -d "benchmark-results-current" ]; then
-          CURRENT_RESULTS=$(find benchmark-results-current -name "*.json" 2>/dev/null | head -1)
+          CURRENT_RESULTS=$(latest_core_result benchmark-results-current)
         fi
 
         if [ -d "benchmark-results-main" ]; then
-          MAIN_RESULTS=$(find benchmark-results-main -name "*.json" 2>/dev/null | head -1)
+          MAIN_RESULTS=$(latest_core_result benchmark-results-main)
         fi
 
         if [ -n "$CURRENT_RESULTS" ] && [ -n "$MAIN_RESULTS" ]; then
@@ -616,15 +620,25 @@ jobs:
           # this always fell through to "Could not extract performance
           # metrics" regardless of the actual data. jq handles both the
           # whitespace and the string-to-number conversion.
-          CURRENT_AVG=$(jq -r '[.results[].avg | tonumber] | add / length' "$CURRENT_RESULTS" 2>/dev/null)
-          MAIN_AVG=$(jq -r '[.results[].avg | tonumber] | add / length' "$MAIN_RESULTS" 2>/dev/null)
+          CURRENT_AVG=$(
+            jq -r '[.results[].avg | tonumber] | add / length' \
+              "$CURRENT_RESULTS" 2>/dev/null
+          )
+          MAIN_AVG=$(
+            jq -r '[.results[].avg | tonumber] | add / length' \
+              "$MAIN_RESULTS" 2>/dev/null
+          )
+          valid_average() { [ -n "$1" ] && [ "$1" != "null" ]; }
 
-          if [ -n "$CURRENT_AVG" ] && [ "$CURRENT_AVG" != "null" ] && [ -n "$MAIN_AVG" ] && [ "$MAIN_AVG" != "null" ]; then
+          if valid_average "$CURRENT_AVG" && valid_average "$MAIN_AVG"; then
             log "- Current branch average: ${CURRENT_AVG}ms"
             log "- Main branch average: ${MAIN_AVG}ms"
 
             # Calculate percentage difference (using awk for floating point)
-            DIFF_PERCENT=$(awk "BEGIN {printf \"%.1f\", (($CURRENT_AVG - $MAIN_AVG) / $MAIN_AVG) * 100}")
+            DIFF_PERCENT=$(
+              awk -v current="$CURRENT_AVG" -v main="$MAIN_AVG" \
+                'BEGIN {printf "%.1f", ((current - main) / main) * 100}'
+            )
             log "- Performance difference: ${DIFF_PERCENT}%"
 
             # Flag significant regressions. awk's `exit N` sets the process
@@ -632,8 +646,14 @@ jobs:
             # N — so `exit (cond)` runs the `if` body when cond is FALSE
             # (awk exit 0), backwards from what's intended. Negate with `!`.
             if awk "BEGIN {exit !($DIFF_PERCENT > 20)}"; then
-              log "⚠️ **WARNING: Performance regression detected (>20% slower)**"
-              echo "::warning::Performance regression: ${DIFF_PERCENT}% slower than main"
+              REGRESSION_WARNING=$(
+                printf '%s%s' \
+                  '⚠️ **WARNING: Performance regression detected ' \
+                  '(>20% slower)**'
+              )
+              log "$REGRESSION_WARNING"
+              echo "::warning::Performance regression: "\
+                "${DIFF_PERCENT}% slower than main"
             elif awk "BEGIN {exit !($DIFF_PERCENT < -10)}"; then
               log "🚀 **Performance improvement detected (>10% faster)**"
             else
@@ -667,8 +687,12 @@ jobs:
         { echo "$MARKER"; cat perf-comment.md; } > "$BODY_FILE"
 
         PR_NUMBER="${{ github.event.pull_request.number }}"
-        EXISTING_ID=$(gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/comments" \
-          --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -1)
+        EXISTING_ID=$(
+          gh api \
+            "repos/${{ github.repository }}/issues/$PR_NUMBER/comments" \
+            --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" |
+            head -1
+        )
 
         if [ -n "$EXISTING_ID" ]; then
           # -F (not -f) is what expands @<path> to the file's contents; -f
