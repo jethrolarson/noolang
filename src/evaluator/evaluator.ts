@@ -22,7 +22,6 @@ import type {
 	TypeDefinitionExpression,
 	UserDefinedTypeExpression,
 	MatchExpression,
-	Pattern,
 	WhereExpression,
 	MutableDefinitionExpression,
 	MutationExpression,
@@ -73,6 +72,9 @@ import {
 	RecordValue,
 	type Environment,
 } from './evaluator-utils';
+import { matchPattern } from './pattern-matching';
+import { containsVariable } from './recursion-analysis';
+import { expressionToString } from './trace-format';
 
 // Retained compatibility surface: repository code imports evaluator-utils directly,
 // but downstream consumers cannot be exhaustively audited without an owner decision.
@@ -1522,7 +1524,7 @@ export class Evaluator {
 
 			// Add to execution trace
 			executionTrace.push({
-				expression: this.expressionToString(statement),
+				expression: expressionToString(statement),
 				result: result,
 				location: {
 					line: statement.location.start.line,
@@ -1582,7 +1584,7 @@ export class Evaluator {
 				const result = this.evaluateExpression(leaf);
 
 				executionTrace.push({
-					expression: this.expressionToString(leaf),
+					expression: expressionToString(leaf),
 					result: result,
 					type: leaf.type,
 					location: {
@@ -1609,7 +1611,7 @@ export class Evaluator {
 
 	private evaluateDefinition(def: DefinitionExpression): Value {
 		// Check if this definition might be recursive by looking for the name in the value
-		const isRecursive = this.containsVariable(def.value, def.name);
+		const isRecursive = containsVariable(def.value, def.name);
 
 		if (isRecursive) {
 			// For recursive definitions, we need a placeholder that gets updated
@@ -2022,7 +2024,7 @@ export class Evaluator {
 				// Mirrors evaluateMatch.
 				const value = this.evaluateExpression(expr.expression);
 				for (const matchCase of expr.cases) {
-					const matchResult = this.tryMatchPattern(matchCase.pattern, value);
+					const matchResult = matchPattern(matchCase.pattern, value);
 					if (matchResult.matched) {
 						return this.withNewEnvironment(() => {
 							for (const [name, boundValue] of matchResult.bindings) {
@@ -2872,76 +2874,6 @@ export class Evaluator {
 		});
 	}
 
-	private containsVariable(expr: Expression, varName: string): boolean {
-		switch (expr.kind) {
-			case 'variable':
-				return expr.name === varName;
-			case 'function':
-				// Don't check function parameters
-				return this.containsVariable(expr.body, varName);
-			case 'application':
-				return (
-					this.containsVariable(expr.func, varName) ||
-					expr.args.some(arg => this.containsVariable(arg, varName))
-				);
-			case 'binary':
-				return (
-					this.containsVariable(expr.left, varName) ||
-					this.containsVariable(expr.right, varName)
-				);
-			case 'if':
-				return (
-					this.containsVariable(expr.condition, varName) ||
-					this.containsVariable(expr.then, varName) ||
-					this.containsVariable(expr.else, varName)
-				);
-			case 'definition':
-				return this.containsVariable(expr.value, varName);
-			case 'mutable-definition':
-				return this.containsVariable(expr.value, varName);
-			case 'mutation':
-				return (
-					expr.target === varName || this.containsVariable(expr.value, varName)
-				);
-			case 'record':
-				return expr.fields.some(field =>
-					this.containsVariable(field.value, varName)
-				);
-			case 'tuple':
-				return expr.elements.some(element =>
-					this.containsVariable(element, varName)
-				);
-			case 'list':
-				return expr.elements.some(element =>
-					this.containsVariable(element, varName)
-				);
-			case 'pipeline':
-				return expr.steps.some(step => this.containsVariable(step, varName));
-			case 'match':
-				return (
-					this.containsVariable(expr.expression, varName) ||
-					expr.cases.some(matchCase =>
-						this.containsVariable(matchCase.expression, varName)
-					)
-				);
-			case 'where':
-				return (
-					expr.definitions.some(def => this.containsVariable(def, varName)) ||
-					this.containsVariable(expr.main, varName)
-				);
-			case 'typed':
-			case 'constrained':
-				return this.containsVariable(expr.expression, varName);
-			case 'import':
-			case 'accessor':
-			case 'literal':
-			case 'unit':
-				return false;
-			default:
-				return false;
-		}
-	}
-
 	// Efficient environment stack management
 	private pushEnvironment(): void {
 		this.environmentStack.push(this.environment);
@@ -2972,68 +2904,6 @@ export class Evaluator {
 				isCell(v) ? v.value : v,
 			])
 		);
-	}
-
-	private expressionToString(expr: Expression): string {
-		switch (expr.kind) {
-			case 'literal':
-				if (Array.isArray(expr.value)) {
-					return `[${expr.value
-						.map(e => this.expressionToString(e as Expression))
-						.join(' ')}]`;
-				}
-				return String(expr.value);
-			case 'variable':
-				return expr.name;
-			case 'function':
-				return `fn ${expr.params.join(' ')} => ${this.expressionToString(
-					expr.body
-				)}`;
-			case 'application':
-				return `${this.expressionToString(expr.func)} ${expr.args
-					.map(arg => this.expressionToString(arg))
-					.join(' ')}`;
-			case 'pipeline':
-				return expr.steps
-					.map(step => this.expressionToString(step))
-					.join(' | ');
-			case 'binary':
-				return `${this.expressionToString(expr.left)} ${
-					expr.operator
-				} ${this.expressionToString(expr.right)}`;
-			case 'if':
-				return `if ${this.expressionToString(
-					expr.condition
-				)} then ${this.expressionToString(
-					expr.then
-				)} else ${this.expressionToString(expr.else)}`;
-			case 'definition':
-				return `${expr.name} = ${this.expressionToString(expr.value)}`;
-			case 'mutable-definition':
-				return `${expr.name} = ${this.expressionToString(expr.value)}`;
-			case 'mutation':
-				return `mut ${expr.target} = ${this.expressionToString(expr.value)}`;
-			case 'import':
-				return `import "${expr.path}"`;
-			case 'record':
-				return `{ ${expr.fields
-					.map(
-						field => `${field.name} = ${this.expressionToString(field.value)}`
-					)
-					.join(', ')} }`;
-			case 'accessor':
-				return `@${expr.field}${expr.optional ? '?' : ''}`;
-			case 'where':
-				return `${this.expressionToString(expr.main)} where (${expr.definitions
-					.map(d => this.expressionToString(d))
-					.join('; ')})`;
-			case 'constraint-definition':
-				return `constraint ${expr.name}`;
-			case 'implement-definition':
-				return `implement ${expr.constraintName}`;
-			default:
-				return 'unknown';
-		}
 	}
 
 	// Check if a function name is a trait function
@@ -3265,7 +3135,7 @@ export class Evaluator {
 		// Evaluate the expression being matched
 		const value = this.evaluateExpression(expr.expression);
 		for (const matchCase of expr.cases) {
-			const matchResult = this.tryMatchPattern(matchCase.pattern, value);
+			const matchResult = matchPattern(matchCase.pattern, value);
 			if (matchResult.matched) {
 				return this.withNewEnvironment(() => {
 					for (const [name, boundValue] of matchResult.bindings) {
@@ -3276,156 +3146,6 @@ export class Evaluator {
 			}
 		}
 		throw new Error('No pattern matched in match expression');
-	}
-
-	private tryMatchPattern(
-		pattern: Pattern,
-		value: Value
-	): { matched: boolean; bindings: Map<string, Value> } {
-		const bindings = new Map<string, Value>();
-
-		switch (pattern.kind) {
-			case 'wildcard':
-				// Wildcard always matches
-				return { matched: true, bindings };
-
-			case 'variable':
-				// Variable always matches and binds the value
-				bindings.set(pattern.name, value);
-				return { matched: true, bindings };
-
-			case 'constructor': {
-				// Constructor pattern only matches constructor values
-				if (value.tag !== 'constructor') {
-					return { matched: false, bindings };
-				}
-
-				// Check constructor name
-				if (value.name !== pattern.name) {
-					return { matched: false, bindings };
-				}
-
-				// Check argument count
-				if (pattern.args.length !== value.args.length) {
-					return { matched: false, bindings };
-				}
-
-				// Match each argument
-				for (let i = 0; i < pattern.args.length; i++) {
-					const argMatch = this.tryMatchPattern(pattern.args[i], value.args[i]);
-					if (!argMatch.matched) {
-						return { matched: false, bindings };
-					}
-
-					// Merge bindings
-					for (const [name, boundValue] of argMatch.bindings) {
-						bindings.set(name, boundValue);
-					}
-				}
-
-				return { matched: true, bindings };
-			}
-
-			case 'literal': {
-				// Literal pattern matches if values are equal
-				let matches = false;
-
-				if (typeof pattern.value === 'number' && isNumber(value)) {
-					matches = pattern.value === value.value;
-				} else if (typeof pattern.value === 'string' && isString(value)) {
-					matches = pattern.value === value.value;
-				}
-
-				return { matched: matches, bindings };
-			}
-
-			case 'tuple': {
-				// Tuple pattern only matches tuple values
-				if (value.tag !== 'tuple') {
-					return { matched: false, bindings };
-				}
-
-				// Check element count
-				if (pattern.elements.length !== value.values.length) {
-					return { matched: false, bindings };
-				}
-
-				// Match each element
-				for (let i = 0; i < pattern.elements.length; i++) {
-					const elementMatch = this.tryMatchPattern(
-						pattern.elements[i],
-						value.values[i]
-					);
-					if (!elementMatch.matched) {
-						return { matched: false, bindings };
-					}
-
-					// Merge bindings
-					for (const [name, boundValue] of elementMatch.bindings) {
-						bindings.set(name, boundValue);
-					}
-				}
-
-				return { matched: true, bindings };
-			}
-
-			case 'record': {
-				// Record pattern only matches record values
-				if (value.tag !== 'record') {
-					return { matched: false, bindings };
-				}
-
-				// Match each field pattern
-				for (const field of pattern.fields) {
-					const fieldValue = value.fields[field.fieldName];
-					if (fieldValue === undefined) {
-						// Field doesn't exist in the value - pattern doesn't match
-						return { matched: false, bindings };
-					}
-
-					const fieldMatch = this.tryMatchPattern(field.pattern, fieldValue);
-					if (!fieldMatch.matched) {
-						return { matched: false, bindings };
-					}
-
-					// Merge bindings
-					for (const [name, boundValue] of fieldMatch.bindings) {
-						bindings.set(name, boundValue);
-					}
-				}
-
-				return { matched: true, bindings };
-			}
-
-			default:
-				throw new Error(
-					`Unsupported pattern kind: ${(pattern as Pattern).kind}`
-				);
-		}
-	}
-
-	// Helper to ensure the result is properly wrapped in the same monad type as the input
-	private ensureMonadicResult(result: Value, originalMonad: Value): Value {
-		if (!isConstructor(originalMonad)) {
-			return result;
-		}
-
-		// If result is already a constructor (likely already wrapped), return as-is
-		if (isConstructor(result)) {
-			return result;
-		}
-
-		// Otherwise, wrap the result in the same monad type
-		if (originalMonad.name === 'Some' || originalMonad.name === 'None') {
-			// Option monad: wrap in Some
-			return createConstructor('Some', [result]);
-		} else if (originalMonad.name === 'Ok' || originalMonad.name === 'Err') {
-			// Result monad: wrap in Ok
-			return createConstructor('Ok', [result]);
-		}
-
-		// For other types, just return the result unwrapped
-		return result;
 	}
 
 	// Apply trait function directly with runtime values (used by $ operator)

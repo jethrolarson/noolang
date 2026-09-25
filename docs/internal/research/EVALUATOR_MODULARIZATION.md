@@ -10,7 +10,8 @@ are the durable identifiers.
 ## Recommendation
 
 Decompose the evaluator, but keep `Evaluator` as the public facade and as the owner of
-execution state. Start with pure leaf logic and the native-builtin catalogue, then
+execution state. Start with recursion analysis, trace formatting, and pattern matching,
+then extract the native-builtin catalogue before
 extract trait dispatch and imports behind narrow callback-based contexts. Extract the
 operator evaluator only after those dependencies exist. Do **not** split handlers into
 one file per AST node, move the trampoline independently, or introduce a general
@@ -25,8 +26,9 @@ A reasonable end state is:
 - `trait-dispatch.ts`: runtime trait lookup/application/equality;
 - `runtime-imports.ts`: runtime import resolution and cache-result merging;
 - `operators.ts`: binary and pipeline semantics;
-- `pattern-matching.ts`, `recursion-analysis.ts`, and `trace-format.ts`: pure leaf
-  operations;
+- `pattern-matching.ts`: runtime pattern matching and binding collection;
+- `recursion-analysis.ts`: recursive-reference detection;
+- `trace-format.ts`: expression rendering for execution traces;
 - `evaluator-utils.ts` (or a later, compatibility-managed rename): runtime value types,
   guards, constructors, cells, and value rendering.
 
@@ -248,7 +250,7 @@ Tests can accidentally canonize an unintended bug. Label such cases
 `[characterization]` and assert only behavior required for a mechanical move (including
 error text/side effects only where currently observable).
 
-### Phase 1 — Extract pure leaves
+### Phase 1 — Extract recursion analysis, trace formatting, and pattern matching
 
 **Move exact symbols**
 
