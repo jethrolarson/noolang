@@ -24,11 +24,15 @@ import type {
 	WhereExpression,
 	MutableDefinitionExpression,
 	MutationExpression,
+	ImplementDefinitionExpression,
 	DestructuringElement,
 	RecordDestructuringField,
 	Type,
 } from '../ast';
-import type { TraitRegistry } from '../typer/trait-system';
+import {
+	getTypeName,
+	type TraitRegistry,
+} from '../typer/trait-system';
 // Aliased: an existing local `flattenStatements` (below) fully recurses
 // through parens for stdlib loading; this one stops at a parenthesized `;`
 // boundary, matching the typer's own top-level-vs-nested-sequence
@@ -628,19 +632,32 @@ export class Evaluator {
 			case 'constraint-definition':
 				return createUnit();
 			case 'implement-definition':
-				// Registration into the traitRegistry happens in the typer
-				// (typeImplementDefinition → addTraitImplementation), which shares
-				// its registry with this evaluator. Instance-closure capture (§4)
-				// is performed once, post-evaluation, by the module loader against
-				// the fully-populated module environment — not eagerly here (which
-				// would capture before later bindings exist). Within a single
-				// non-module program, dispatch uses the AST `functions` fallback.
-				return createUnit();
+				return this.evaluateImplementDefinition(expr);
 			default:
 				throw new Error(
 					`Unknown expression kind: ${(expr as Expression).kind}`
 				);
 		}
+	}
+
+	private evaluateImplementDefinition(
+		expr: ImplementDefinitionExpression
+	): Value {
+		const typeName = getTypeName(expr.typeExpr);
+		const implementation = this.traitRegistry.implementations
+			.get(expr.constraintName)
+			?.get(typeName);
+		if (!implementation) return createUnit();
+
+		const evaluatedValues =
+			implementation.evaluatedValues ?? new Map<string, unknown>();
+		for (const [valueName, valueExpr] of implementation.values ?? []) {
+			if (!evaluatedValues.has(valueName)) {
+				evaluatedValues.set(valueName, this.evaluateExpression(valueExpr));
+			}
+		}
+		implementation.evaluatedValues = evaluatedValues;
+		return createUnit();
 	}
 
 	private evaluateLiteral(expr: LiteralExpression): Value {

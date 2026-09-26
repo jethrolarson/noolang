@@ -106,6 +106,18 @@ test('a shared associated value name reports trait ambiguity', () => {
 	);
 });
 
+test('associated values capture the implementation-definition environment', () => {
+	const result = runCode(`
+		helper = 41;
+		constraint Default value (default : value);
+		implement Default Float (default = helper + 1);
+		get = fn helper => (default : Float);
+		get 0
+	`);
+
+	expect(result.finalValue).toBe(42);
+});
+
 test('associated value initialization cannot perform undeclared effects', () => {
 	expectError(
 		`constraint Default value (default : value);
