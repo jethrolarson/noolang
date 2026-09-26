@@ -4,7 +4,6 @@ import {
 	floatType,
 	boolType,
 	stringType,
-	recordType,
 	listTypeWithElement,
 	typeVariable,
 	unitType,

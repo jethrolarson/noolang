@@ -1,4 +1,4 @@
-import type { Constraint, Type, Effect } from '../ast';
+import type { Type, Effect } from '../ast';
 import type { TraitRegistry } from './trait-system';
 import type { ConstraintStore } from './constraint-store';
 

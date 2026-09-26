@@ -4,19 +4,21 @@
 
 {@test_case test_case, @group group, @expect_eq expect_eq, @expect expect, @expect_all expect_all} = import "std/test";
 
+inc = fn x => x + 1;
+
 applicative_tests = group "Applicative apply" [
   test_case "Option: applies wrapped function" (fn _ =>
-    expect_eq (Some 3) (apply (Some (fn x => x + 1)) (Some 2))),
+    expect_eq (Some 3) (apply (Some inc) (Some 2))),
   test_case "Option: None function short-circuits" (fn _ =>
     expect_eq None (apply None (Some 2))),
   test_case "Option: None argument short-circuits" (fn _ =>
-    expect_eq None (apply (Some (fn x => x + 1)) None)),
+    expect_eq None (apply (Some inc) None)),
   test_case "Result: applies wrapped function" (fn _ =>
-    expect_eq (Ok 3) (apply (Ok (fn x => x + 1)) (Ok 2))),
+    expect_eq (Ok 3) (apply (Ok inc) (Ok 2))),
   test_case "Result: Err function short-circuits" (fn _ =>
     expect "Err in function position propagates" (is_err (apply (Err "bad") (Ok 2)))),
   test_case "Result: Err argument short-circuits" (fn _ =>
-    expect "Err in argument position propagates" (is_err (apply (Ok (fn x => x + 1)) (Err "bad"))))
+    expect "Err in argument position propagates" (is_err (apply (Ok inc) (Err "bad"))))
 ];
 
 join_tests = group "join" [

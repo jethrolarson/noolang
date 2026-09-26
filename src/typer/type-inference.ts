@@ -533,18 +533,11 @@ const liftParameterEqObligations = (
 		paramTypes.flatMap(paramType => [...freeTypeVars(paramType)])
 	);
 	const constraints = [...typeVars].flatMap(typeVar =>
-		getConstraints(
-			state.structuralEqObligations,
-			typeVar,
-			state.substitution
-		)
+		getConstraints(state.structuralEqObligations, typeVar, state.substitution)
 	);
 	const byTypeVar = new Map<string, Constraint>();
 	for (const constraint of constraints) {
-		if (
-			constraint.kind === 'implements' &&
-			constraint.interfaceName === 'Eq'
-		) {
+		if (constraint.kind === 'implements' && constraint.interfaceName === 'Eq') {
 			byTypeVar.set(constraint.typeVar, constraint);
 		}
 	}

@@ -144,7 +144,6 @@ test('semicolon-let-bound result stays linked to params and keeps its constraint
 
 test('should work with concrete types that implement traits', () => {
 	const code = 'addOne =fn x => x + 1';
-	const _typeResult = parseAndType(code);
 
 	// Apply the function to a concrete type that implements Add
 	const appliedCode = `

@@ -6,7 +6,7 @@ import {
 } from '../ast';
 import { type TypeState } from './types';
 import { substitute } from './substitute';
-import type { RecordStructure, StructureFieldType } from '../ast';
+import type { RecordStructure } from '../ast';
 import { satisfyTrait } from './trait-satisfaction';
 
 // Helper function to resolve nested structure constraints recursively

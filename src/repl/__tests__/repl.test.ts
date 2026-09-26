@@ -1,6 +1,6 @@
 // Import the testable REPL components
 import { REPLCore, REPLOutput } from '../../repl';
-import { describe, test, expect } from 'bun:test';
+import { test, expect } from 'bun:test';
 
 // Mock output for testing
 class MockOutput implements REPLOutput {
