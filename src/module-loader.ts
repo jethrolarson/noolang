@@ -96,6 +96,9 @@ function cloneTypeStateForModule(base: TypeState): TypeState {
 		functionTraits: new Map(
 			Array.from(base.traitRegistry.functionTraits.entries()).map(([k, v]) => [k, [...v]])
 		),
+		valueTraits: new Map(
+			Array.from(base.traitRegistry.valueTraits?.entries() ?? []).map(([k, v]) => [k, [...v]])
+		),
 	};
 	for (const [traitName, impls] of base.traitRegistry.implementations) {
 		traitRegistry.implementations.set(traitName, new Map(impls));
@@ -445,25 +448,15 @@ function extractDiffsAndManifest(
 // ─── instance closure capture ─────────────────────────────────────────────────
 
 /**
- * After the module's `evaluateProgram` has fully run, capture a pre-evaluated
- * closure Value for each implement member defined in this module's statements (§4).
+ * After the module's `evaluateProgram` has fully run, capture callable member
+ * closures defined in this module (§4). Associated values are evaluated earlier,
+ * at their `implement` statement, so they retain the definition environment;
+ * the value loop below only provides a defensive fallback for uncaptured values.
  *
- * We mutate `evaluatedFunctions` DIRECTLY on the shared `TraitImplementation`
- * objects (the same references held by `traitImplDiff` and the module's
- * traitRegistry). This guarantees the AST `functions` map and the
- * `evaluatedFunctions` map travel together and can never fall out of sync —
- * the dispatch AST fallback stays real.
- *
- * We evaluate AFTER the whole program has run, so every module-level binding
- * (including helpers referenced by an instance member) is in scope.
- *
- * We do NOT swallow evaluation errors. Trait members are function-typed, so
- * capturing them is just closure creation (lazy — it never touches the body's
- * free variables); any throw here is a genuine, otherwise-hidden error and must
- * surface. Undefined-helper references are already rejected earlier by the typer
- * (Noolang does not hoist top-level bindings), so a type-valid module cannot
- * throw here in practice — but if one ever does, we fail loudly rather than
- * silently dropping the member.
+ * We mutate the shared `TraitImplementation` objects held by `traitImplDiff` and
+ * the module registry, keeping source expressions and captured Values together.
+ * We do not swallow evaluation errors: any throw here is a genuine hidden error
+ * and must surface.
  */
 function captureInstanceClosures(
 	stmts: Expression[],
@@ -491,9 +484,20 @@ function captureInstanceClosures(
 			// No try/catch: a throw here is a real error, surfaced with context.
 			evaluated.set(fnName, evaluator.evaluateExpression(fnExpr) as Value);
 		}
-		// Attach onto the shared impl object so functions + evaluatedFunctions
-		// stay together in the cache's traitImplDiff.
+		const evaluatedValues =
+			impl.evaluatedValues ?? new Map<string, unknown>();
+		for (const [valueName, valueExpr] of impl.values ?? []) {
+			if (!evaluatedValues.has(valueName)) {
+				evaluatedValues.set(
+					valueName,
+					evaluator.evaluateExpression(valueExpr) as Value
+				);
+			}
+		}
+		// Attach onto the shared impl object so source expressions and captured
+		// values stay together in the cache's traitImplDiff.
 		impl.evaluatedFunctions = evaluated;
+		impl.evaluatedValues = evaluatedValues;
 	}
 }
 
@@ -696,6 +700,9 @@ export function mergeModuleCacheIntoTypeState(
 	const newFunctionTraits = new Map(
 		Array.from(importerState.traitRegistry.functionTraits.entries()).map(([k, v]) => [k, [...v]])
 	);
+	const newValueTraits = new Map(
+		Array.from(importerState.traitRegistry.valueTraits?.entries() ?? []).map(([k, v]) => [k, [...v]])
+	);
 
 	// Build newImpls here so trait-def additions can also create empty impl entries
 	const newImpls = new Map(importerState.traitRegistry.implementations);
@@ -718,11 +725,17 @@ export function mergeModuleCacheIntoTypeState(
 			if (!newImpls.has(name)) {
 				newImpls.set(name, new Map());
 			}
-			// Register function names
+			// Register member names
 			for (const fnName of traitDef.functions.keys()) {
 				const existing = newFunctionTraits.get(fnName) ?? [];
 				if (!existing.includes(name)) {
 					newFunctionTraits.set(fnName, [...existing, name]);
+				}
+			}
+			for (const valueName of traitDef.values?.keys() ?? []) {
+				const existing = newValueTraits.get(valueName) ?? [];
+				if (!existing.includes(name)) {
+					newValueTraits.set(valueName, [...existing, name]);
 				}
 			}
 		}
@@ -732,6 +745,7 @@ export function mergeModuleCacheIntoTypeState(
 		definitions: newDefs,
 		implementations: newImpls,
 		functionTraits: newFunctionTraits,
+		valueTraits: newValueTraits,
 	};
 
 	// Also update protected type names

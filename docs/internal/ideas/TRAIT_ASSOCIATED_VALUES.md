@@ -1,6 +1,6 @@
 # Trait-associated values
 
-Status: proposed
+Status: implemented
 
 ## Current behavior
 
@@ -10,7 +10,7 @@ The old skipped test did not isolate this limitation. It used uppercase `Contain
 
 ## Proposed boundary
 
-Traits may declare immutable associated values in addition to functions. Selection remains nominal and type-directed: a use must provide enough expected type information to choose an implementation. This proposal does not add mutable members, default definitions, associated types, or selection based only on there being a single implementation.
+Traits may declare immutable associated values in addition to functions. Selection remains nominal and type-directed: a use must provide an explicit expected type annotation to choose an implementation. This feature does not add mutable members, default definitions, associated types, or selection based only on there being a single implementation.
 
 ## Acceptance criteria
 

@@ -24,11 +24,15 @@ import type {
 	WhereExpression,
 	MutableDefinitionExpression,
 	MutationExpression,
+	ImplementDefinitionExpression,
 	DestructuringElement,
 	RecordDestructuringField,
 	Type,
 } from '../ast';
-import type { TraitRegistry } from '../typer/trait-system';
+import {
+	getTypeName,
+	type TraitRegistry,
+} from '../typer/trait-system';
 // Aliased: an existing local `flattenStatements` (below) fully recurses
 // through parens for stdlib loading; this one stops at a parenthesized `;`
 // boundary, matching the typer's own top-level-vs-nested-sequence
@@ -136,6 +140,13 @@ type TailCall = {
 
 function isTailCall(value: Value | TailCall): value is TailCall {
 	return (value as TailCall)?.tailcall === true;
+}
+
+function isTruthyValue(value: Value): boolean {
+	if (isBool(value)) return boolValue(value);
+	if (isNumber(value)) return value.value !== 0;
+	if (isString(value)) return value.value !== '';
+	return true;
 }
 
 export class Evaluator {
@@ -621,19 +632,32 @@ export class Evaluator {
 			case 'constraint-definition':
 				return createUnit();
 			case 'implement-definition':
-				// Registration into the traitRegistry happens in the typer
-				// (typeImplementDefinition → addTraitImplementation), which shares
-				// its registry with this evaluator. Instance-closure capture (§4)
-				// is performed once, post-evaluation, by the module loader against
-				// the fully-populated module environment — not eagerly here (which
-				// would capture before later bindings exist). Within a single
-				// non-module program, dispatch uses the AST `functions` fallback.
-				return createUnit();
+				return this.evaluateImplementDefinition(expr);
 			default:
 				throw new Error(
 					`Unknown expression kind: ${(expr as Expression).kind}`
 				);
 		}
+	}
+
+	private evaluateImplementDefinition(
+		expr: ImplementDefinitionExpression
+	): Value {
+		const typeName = getTypeName(expr.typeExpr);
+		const implementation = this.traitRegistry.implementations
+			.get(expr.constraintName)
+			?.get(typeName);
+		if (!implementation) return createUnit();
+
+		const evaluatedValues =
+			implementation.evaluatedValues ?? new Map<string, unknown>();
+		for (const [valueName, valueExpr] of implementation.values ?? []) {
+			if (!evaluatedValues.has(valueName)) {
+				evaluatedValues.set(valueName, this.evaluateExpression(valueExpr));
+			}
+		}
+		implementation.evaluatedValues = evaluatedValues;
+		return createUnit();
 	}
 
 	private evaluateLiteral(expr: LiteralExpression): Value {
@@ -669,6 +693,32 @@ export class Evaluator {
 	private evaluateVariable(expr: VariableExpression): Value {
 		const value = this.environment.get(expr.name);
 		if (value === undefined) {
+			if (expr.traitValueSelection) {
+				const { traitName, typeName } = expr.traitValueSelection;
+				const implementation = this.traitRegistry.implementations
+					.get(traitName)
+					?.get(typeName);
+				if (!implementation?.values?.has(expr.name)) {
+					throw new Error(
+						`Missing selected associated value ${traitName}.${expr.name} for ${typeName}`
+					);
+				}
+				const captured = implementation.evaluatedValues?.get(expr.name);
+				if (captured !== undefined) return captured as Value;
+				const valueExpression = implementation.values.get(expr.name);
+				if (!valueExpression) {
+					throw new Error(
+						`Missing selected associated value ${traitName}.${expr.name} for ${typeName}`
+					);
+				}
+				const evaluated = this.evaluateExpression(valueExpression);
+				if (!implementation.evaluatedValues) {
+					implementation.evaluatedValues = new Map();
+				}
+				implementation.evaluatedValues.set(expr.name, evaluated);
+				return evaluated;
+			}
+
 			// NEW: Check if this is a trait function before throwing error
 			if (this.isTraitFunction(expr.name)) {
 				// Return a special trait function value that will be resolved during application
@@ -727,18 +777,7 @@ export class Evaluator {
 			case 'if': {
 				// Mirrors evaluateIf.
 				const condition = this.evaluateExpression(expr.condition);
-				let isTruthy = false;
-				if (isBool(condition)) {
-					isTruthy = boolValue(condition);
-				} else if (isNumber(condition)) {
-					isTruthy = condition.value !== 0;
-				} else if (isString(condition)) {
-					isTruthy = condition.value !== '';
-				} else if (isUnit(condition)) {
-					isTruthy = true;
-				} else {
-					isTruthy = true;
-				}
+				const isTruthy = isTruthyValue(condition);
 				return this.evaluateTailPosition(isTruthy ? expr.then : expr.else);
 			}
 			case 'match': {
@@ -1374,20 +1413,8 @@ export class Evaluator {
 	private evaluateIf(expr: IfExpression): Value {
 		const condition = this.evaluateExpression(expr.condition);
 
-		// Check if condition is truthy - handle tagged boolean values
-		let isTruthy = false;
-		if (isBool(condition)) {
-			isTruthy = boolValue(condition);
-		} else if (isNumber(condition)) {
-			isTruthy = condition.value !== 0;
-		} else if (isString(condition)) {
-			isTruthy = condition.value !== '';
-		} else if (isUnit(condition)) {
-			isTruthy = true;
-		} else {
-			// For other types (functions, lists, records), consider them truthy
-			isTruthy = true;
-		}
+		// For other types (functions, lists, records), consider them truthy.
+		const isTruthy = isTruthyValue(condition);
 
 		if (isTruthy) {
 			return this.evaluateExpression(expr.then);
@@ -1433,6 +1460,8 @@ export class Evaluator {
 		try {
 			// Delegate to the hermetic module loader (Phase 1 Step 2).
 			// Resolve relative to the current file's directory if available.
+			// Keep this lazy: module-loader imports Evaluator to populate its cache.
+			// eslint-disable-next-line @typescript-eslint/no-var-requires
 			const { resolveModulePath, loadModule } = require('../module-loader') as typeof import('../module-loader');
 			const realpath = resolveModulePath(expr.path, this.currentFileDir);
 			const cached = loadModule(realpath);
@@ -1471,11 +1500,17 @@ export class Evaluator {
 						if (!existing.evaluatedFunctions && impl.evaluatedFunctions) {
 							existing.evaluatedFunctions = impl.evaluatedFunctions;
 						}
+						if (!existing.evaluatedValues && impl.evaluatedValues) {
+							existing.evaluatedValues = impl.evaluatedValues;
+						}
 					}
 				}
 			}
 
-			// Also merge trait definition metadata so dispatch can find function names
+			// Also merge trait definition metadata so dispatch can find member names.
+			const valueTraits =
+				this.traitRegistry.valueTraits ??
+				(this.traitRegistry.valueTraits = new Map());
 			for (const [traitName, traitDef] of cached.traitDefDiff) {
 				if (!this.traitRegistry.definitions.has(traitName)) {
 					this.traitRegistry.definitions.set(traitName, traitDef);
@@ -1483,6 +1518,12 @@ export class Evaluator {
 						const existing = this.traitRegistry.functionTraits.get(fnName) ?? [];
 						if (!existing.includes(traitName)) {
 							this.traitRegistry.functionTraits.set(fnName, [...existing, traitName]);
+						}
+					}
+					for (const valueName of traitDef.values?.keys() ?? []) {
+						const existing = valueTraits.get(valueName) ?? [];
+						if (!existing.includes(traitName)) {
+							valueTraits.set(valueName, [...existing, traitName]);
 						}
 					}
 					if (!this.traitRegistry.implementations.has(traitName)) {

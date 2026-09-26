@@ -19,14 +19,16 @@ export type TraitDefinition = {
 	name: string;
 	typeParam: string; // Usually 'a' or 'f'
 	constructorArity?: number;
-	functions: Map<string, FunctionType>; // function name -> function type
+	functions: Map<string, FunctionType>; // callable member name -> function type
+	values?: Map<string, Type>; // immutable associated value name -> value type
 };
 
 // Simple trait implementation - concrete functions for a specific type
 export type TraitImplementation = {
 	typeName: string; // e.g., "Option", "List", "Float"
 	constructorAbstraction?: TypeConstructorAbstraction;
-	functions: Map<string, Expression>; // function name -> implementation expression (AST)
+	functions: Map<string, Expression>; // callable member name -> implementation expression (AST)
+	values?: Map<string, Expression>; // associated value name -> implementation expression (AST)
 	givenConstraints?: ConstraintExpr; // Optional given constraints for conditional implementations
 	/** The checked implementation head, retained to instantiate `given` constraints. */
 	targetType?: Type;
@@ -38,14 +40,17 @@ export type TraitImplementation = {
 	 * bug when an implementation member calls a helper local to its defining file.
 	 */
 	evaluatedFunctions?: Map<string, unknown>; // Map<string, Value> — typed as unknown to avoid circular dep
+	/** Associated values captured once in their defining runtime environment. */
+	evaluatedValues?: Map<string, unknown>; // Map<string, Value>
 };
 
 // Registry holding all traits and their implementations
 export type TraitRegistry = {
 	definitions: Map<string, TraitDefinition>;
 	implementations: Map<string, Map<string, TraitImplementation>>; // trait -> type -> impl
-	// Track which traits define each function name for conflict detection
-	functionTraits: Map<string, string[]>; // function name -> trait names that define it
+	// Track which traits define each member name for conflict detection and selection
+	functionTraits: Map<string, string[]>; // callable member name -> defining traits
+	valueTraits?: Map<string, string[]>; // associated value name -> defining traits
 };
 
 // Helper function to count parameters in a function expression
@@ -71,6 +76,7 @@ export function createTraitRegistry(): TraitRegistry {
 		definitions: new Map(),
 		implementations: new Map(),
 		functionTraits: new Map(),
+		valueTraits: new Map(),
 	};
 }
 
@@ -91,6 +97,14 @@ export function addTraitDefinition(
 		if (!existingTraits.includes(trait.name)) {
 			existingTraits.push(trait.name);
 			registry.functionTraits.set(functionName, existingTraits);
+		}
+	}
+	if (!registry.valueTraits) registry.valueTraits = new Map();
+	for (const valueName of trait.values?.keys() ?? []) {
+		const existingTraits = registry.valueTraits.get(valueName) || [];
+		if (!existingTraits.includes(trait.name)) {
+			existingTraits.push(trait.name);
+			registry.valueTraits.set(valueName, existingTraits);
 		}
 	}
 }
@@ -138,6 +152,14 @@ export function addTraitImplementation(
 			throw new Error(
 				`Function signature mismatch for '${functionName}' in ${traitName} implementation for ${impl.typeName}: ` +
 					`expected ${expectedParamCount} parameters, got ${actualParamCount}`
+			);
+		}
+	}
+
+	for (const valueName of impl.values?.keys() ?? []) {
+		if (!traitDef.values?.has(valueName)) {
+			throw new Error(
+				`Associated value '${valueName}' not defined in trait ${traitName}`
 			);
 		}
 	}
@@ -376,6 +398,60 @@ export function isTraitFunction(
 	functionName: string
 ): boolean {
 	return registry.functionTraits.has(functionName);
+}
+
+export function isTraitValue(
+	registry: TraitRegistry,
+	valueName: string
+): boolean {
+	return registry.valueTraits?.has(valueName) ?? false;
+}
+
+export function resolveTraitValue(
+	registry: TraitRegistry,
+	valueName: string,
+	expectedType: Type,
+	state: TypeState
+): Array<{
+	traitName: string;
+	typeName: string;
+	definition: TraitDefinition;
+	implementation: TraitImplementation;
+}> {
+	const typeName = getTypeName(expectedType);
+	if (
+		expectedType.kind === 'variable' ||
+		expectedType.kind === 'constructor-variable' ||
+		expectedType.kind === 'type-application'
+	) {
+		return [];
+	}
+
+	const candidates = [];
+	for (const traitName of registry.valueTraits?.get(valueName) ?? []) {
+		const definition = registry.definitions.get(traitName);
+		const implementation = registry.implementations
+			.get(traitName)
+			?.get(typeName);
+		if (!definition || !implementation?.values?.has(valueName)) continue;
+		if (implementation.constructorAbstraction) {
+			if (
+				!matchConstructorAbstraction(
+					implementation.constructorAbstraction,
+					expectedType
+				)
+			)
+				continue;
+		}
+		const satisfaction = satisfyTrait(traitName, expectedType, state);
+		if (
+			satisfaction.kind !== 'registered' ||
+			satisfaction.implementation !== implementation
+		)
+			continue;
+		candidates.push({ traitName, typeName, definition, implementation });
+	}
+	return candidates;
 }
 
 // Get trait definition and function type for a trait function
