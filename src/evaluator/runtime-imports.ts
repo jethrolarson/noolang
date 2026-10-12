@@ -62,64 +62,99 @@ function evaluateDirectImport(
 		.finalResult;
 }
 
-function mergeRuntimeMetadata(
+function registerImportedConstructors(
+	adtDiff: RuntimeModuleCache['adtDiff'],
+	register: ImportRuntimeContext['registerConstructorVariant']
+): void {
+	for (const [typeName, adtEntry] of adtDiff) {
+		for (const constructorName of adtEntry.constructors.keys()) {
+			register(constructorName, typeName);
+		}
+	}
+}
+
+function implementationsFor(
+	traitName: string,
+	registry: TraitRegistry
+): Map<string, TraitImplementation> {
+	const existing = registry.implementations.get(traitName);
+	if (existing) return existing;
+
+	const created = new Map<string, TraitImplementation>();
+	registry.implementations.set(traitName, created);
+	return created;
+}
+
+function mergeCapturedMembers(
+	existing: TraitImplementation,
+	imported: TraitImplementation
+): void {
+	if (!existing.evaluatedFunctions && imported.evaluatedFunctions) {
+		existing.evaluatedFunctions = imported.evaluatedFunctions;
+	}
+	if (!existing.evaluatedValues && imported.evaluatedValues) {
+		existing.evaluatedValues = imported.evaluatedValues;
+	}
+}
+
+function mergeTraitImplementations(
+	traitImplDiff: RuntimeModuleCache['traitImplDiff'],
+	registry: TraitRegistry
+): void {
+	for (const [traitName, byType] of traitImplDiff) {
+		const implementations = implementationsFor(traitName, registry);
+		for (const [typeName, imported] of byType) {
+			const existing = implementations.get(typeName);
+			if (existing) {
+				mergeCapturedMembers(existing, imported);
+			} else {
+				implementations.set(typeName, imported);
+			}
+		}
+	}
+}
+
+function addTraitIndexEntry(
+	index: Map<string, string[]>,
+	memberName: string,
+	traitName: string
+): void {
+	const existing = index.get(memberName) ?? [];
+	if (!existing.includes(traitName)) {
+		index.set(memberName, [...existing, traitName]);
+	}
+}
+
+function mergeTraitDefinitions(
+	traitDefDiff: RuntimeModuleCache['traitDefDiff'],
+	registry: TraitRegistry
+): void {
+	const valueTraits =
+		registry.valueTraits ?? (registry.valueTraits = new Map());
+	for (const [traitName, definition] of traitDefDiff) {
+		if (registry.definitions.has(traitName)) continue;
+
+		registry.definitions.set(traitName, definition);
+		for (const functionName of definition.functions.keys()) {
+			addTraitIndexEntry(registry.functionTraits, functionName, traitName);
+		}
+		for (const valueName of definition.values?.keys() ?? []) {
+			addTraitIndexEntry(valueTraits, valueName, traitName);
+		}
+		implementationsFor(traitName, registry);
+	}
+}
+
+function mergeImportedMetadata(
 	cache: RuntimeModuleCache,
 	context: ImportRuntimeContext
 ): void {
-	for (const [typeName, adtEntry] of cache.adtDiff) {
-		for (const constructorName of adtEntry.constructors.keys()) {
-			context.registerConstructorVariant(constructorName, typeName);
-		}
-	}
-
-	for (const [traitName, byType] of cache.traitImplDiff) {
-		if (!context.traitRegistry.implementations.has(traitName)) {
-			context.traitRegistry.implementations.set(traitName, new Map());
-		}
-		const traitImplementations =
-			context.traitRegistry.implementations.get(traitName)!;
-		for (const [typeName, implementation] of byType) {
-			if (!traitImplementations.has(typeName)) {
-				traitImplementations.set(typeName, implementation);
-			} else {
-				const existing = traitImplementations.get(typeName)!;
-				if (!existing.evaluatedFunctions && implementation.evaluatedFunctions) {
-					existing.evaluatedFunctions = implementation.evaluatedFunctions;
-				}
-				if (!existing.evaluatedValues && implementation.evaluatedValues) {
-					existing.evaluatedValues = implementation.evaluatedValues;
-				}
-			}
-		}
-	}
-
-	const valueTraits =
-		context.traitRegistry.valueTraits ??
-		(context.traitRegistry.valueTraits = new Map());
-	for (const [traitName, traitDefinition] of cache.traitDefDiff) {
-		if (!context.traitRegistry.definitions.has(traitName)) {
-			context.traitRegistry.definitions.set(traitName, traitDefinition);
-			for (const functionName of traitDefinition.functions.keys()) {
-				const existing =
-					context.traitRegistry.functionTraits.get(functionName) ?? [];
-				if (!existing.includes(traitName)) {
-					context.traitRegistry.functionTraits.set(functionName, [
-						...existing,
-						traitName,
-					]);
-				}
-			}
-			for (const valueName of traitDefinition.values?.keys() ?? []) {
-				const existing = valueTraits.get(valueName) ?? [];
-				if (!existing.includes(traitName)) {
-					valueTraits.set(valueName, [...existing, traitName]);
-				}
-			}
-			if (!context.traitRegistry.implementations.has(traitName)) {
-				context.traitRegistry.implementations.set(traitName, new Map());
-			}
-		}
-	}
+	registerImportedConstructors(
+		cache.adtDiff,
+		context.registerConstructorVariant
+	);
+	mergeTraitImplementations(cache.traitImplDiff, context.traitRegistry);
+	mergeTraitDefinitions(cache.traitDefDiff, context.traitRegistry);
 }
 
 function formatImportFailure(error: unknown): string {
@@ -148,7 +183,7 @@ export function evaluateRuntimeImport(
 
 	try {
 		const cache = context.loadModule(expr.path, context.currentFileDir);
-		mergeRuntimeMetadata(cache, context);
+		mergeImportedMetadata(cache, context);
 		return cache.exportValue;
 	} catch (error) {
 		const filePath = expr.path.endsWith('.noo')
