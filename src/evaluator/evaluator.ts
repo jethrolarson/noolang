@@ -1430,9 +1430,9 @@ export class Evaluator {
 				}),
 			loadModule: (specifier, currentFileDir) => {
 				// Keep this lazy: module-loader imports Evaluator to populate its cache.
-				const moduleLoader =
+				const moduleLoader: typeof import('../module-loader') =
 					// eslint-disable-next-line @typescript-eslint/no-var-requires
-					require('../module-loader') as typeof import('../module-loader');
+					require('../module-loader');
 				return moduleLoader.loadModule(
 					moduleLoader.resolveModulePath(specifier, currentFileDir)
 				);

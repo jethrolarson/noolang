@@ -1,7 +1,7 @@
 import { describe, expect, mock, test } from 'bun:test';
 import * as defaultFs from 'node:fs';
 import * as defaultPath from 'node:path';
-import type { ImportExpression } from '../../ast';
+import type { FunctionType, ImportExpression, Type } from '../../ast';
 import { createNumber } from '../evaluator-utils';
 import {
 	evaluateRuntimeImport,
@@ -152,11 +152,18 @@ describe('runtime import extraction seam', () => {
 			evaluatedFunctions: backfillFunctions,
 			evaluatedValues: backfillValues,
 		} satisfies TraitImplementation;
+		const stringType: Type = { kind: 'primitive', name: 'String' };
+		const showType: FunctionType = {
+			kind: 'function',
+			params: [],
+			return: stringType,
+			effects: new Set(),
+		};
 		const traitDefinition = {
 			name: 'Visible',
 			typeParam: 'a',
-			functions: new Map([['show', {} as never]]),
-			values: new Map([['default', {} as never]]),
+			functions: new Map([['show', showType]]),
+			values: new Map([['default', stringType]]),
 		} satisfies TraitDefinition;
 		const registerConstructorVariant = mock(
 			(_constructorName: string, _typeName: string) => {}
@@ -236,10 +243,18 @@ describe('runtime import extraction seam', () => {
 			location: { line: 3, column: 5, start: 3, end: 3 },
 			context: 'import "./missing"',
 		});
-		expect((thrown as { message: string }).message).toContain(
+		if (
+			!thrown ||
+			typeof thrown !== 'object' ||
+			!('message' in thrown) ||
+			typeof thrown.message !== 'string'
+		) {
+			throw new Error('Expected a structured import error');
+		}
+		expect(thrown.message).toContain(
 			"Failed to import './missing': underlying failure"
 		);
-		expect((thrown as { message: string }).message).toContain(
+		expect(thrown.message).toContain(
 			'Tried to resolve: /home/importer/missing.noo'
 		);
 	});
