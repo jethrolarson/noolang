@@ -52,7 +52,7 @@ const realFsContext = (
 describe('runtime import extraction seam', () => {
 	test('custom filesystems keep the direct path and create a fresh child for each import', () => {
 		const readFileSync = mock(() => '7');
-		const customFs = { readFileSync } as unknown as typeof defaultFs;
+		const customFs = { readFileSync };
 		const evaluateProgram = mock(() => ({ finalResult: createNumber(7) }));
 		const createChildEvaluator = mock(() => ({ evaluateProgram }));
 		const loadModule = mock(() => moduleCache());
@@ -85,7 +85,7 @@ describe('runtime import extraction seam', () => {
 			readFileSync: () => {
 				throw rawFailure;
 			},
-		} as unknown as typeof defaultFs;
+		};
 
 		expect(() =>
 			evaluateRuntimeImport(

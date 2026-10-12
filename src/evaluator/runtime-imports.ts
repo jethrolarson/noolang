@@ -1,4 +1,3 @@
-import type * as defaultFs from 'node:fs';
 import type * as defaultPath from 'node:path';
 import type { ImportExpression, Program } from '../ast';
 import { createError } from '../errors';
@@ -22,8 +21,12 @@ type ChildEvaluator = {
 	evaluateProgram(program: Program, filePath?: string): { finalResult: Value };
 };
 
+type RuntimeFileSystem = {
+	readFileSync(path: string, encoding: 'utf8'): string;
+};
+
 export type ImportRuntimeContext = {
-	fs: typeof defaultFs;
+	fs: RuntimeFileSystem;
 	path: typeof defaultPath;
 	usesCustomFileSystem: boolean;
 	currentFileDir?: string;
