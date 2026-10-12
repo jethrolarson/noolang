@@ -156,6 +156,29 @@ describe('[characterization] evaluator state restoration', () => {
 	});
 });
 
+test('[characterization] destructuring expressions return their right-hand-side value', () => {
+	const tupleEvaluator = createBareEvaluator();
+	expect(
+		tupleEvaluator.evaluateProgram(parseProgram('{left, right} = {1, 2}'))
+			.finalResult
+	).toEqual({
+		tag: 'tuple',
+		values: [
+			{ tag: 'number', value: 1 },
+			{ tag: 'number', value: 2 },
+		],
+	});
+
+	const recordEvaluator = createBareEvaluator();
+	expect(
+		recordEvaluator.evaluateProgram(parseProgram('{@field} = {@field 3}'))
+			.finalResult
+	).toEqual({
+		tag: 'record',
+		fields: { field: { tag: 'number', value: 3 } },
+	});
+});
+
 test('[characterization] destructuring retains earlier bindings when a later nested binding fails', () => {
 	const evaluator = createBareEvaluator();
 	expect(() =>
