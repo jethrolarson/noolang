@@ -5,6 +5,7 @@ import type { FunctionType, ImportExpression, Type } from '../../ast';
 import { createNumber } from '../evaluator-utils';
 import {
 	evaluateRuntimeImport,
+	mergeImportedMetadata,
 	type ImportRuntimeContext,
 	type RuntimeModuleCache,
 } from '../runtime-imports';
@@ -40,12 +41,11 @@ const realFsContext = (
 	path: defaultPath,
 	usesCustomFileSystem: false,
 	currentFileDir: '/home/importer',
-	traitRegistry: createTraitRegistry(),
 	createChildEvaluator: () => {
 		throw new Error('real imports must not create a direct child evaluator');
 	},
 	loadModule: () => moduleCache(),
-	registerConstructorVariant: () => {},
+	mergeMetadata: () => {},
 	...overrides,
 });
 
@@ -56,12 +56,10 @@ describe('runtime import extraction seam', () => {
 		const evaluateProgram = mock(() => ({ finalResult: createNumber(7) }));
 		const createChildEvaluator = mock(() => ({ evaluateProgram }));
 		const loadModule = mock(() => moduleCache());
-		const traitRegistry = createTraitRegistry();
 		const context = realFsContext({
 			fs: customFs,
 			usesCustomFileSystem: true,
 			currentFileDir: '/project/nested',
-			traitRegistry,
 			createChildEvaluator,
 			loadModule,
 		});
@@ -196,9 +194,12 @@ describe('runtime import extraction seam', () => {
 		evaluateRuntimeImport(
 			importExpression('./module'),
 			realFsContext({
-				traitRegistry,
 				loadModule: () => cache,
-				registerConstructorVariant,
+				mergeMetadata: importedCache =>
+					mergeImportedMetadata(importedCache, {
+						traitRegistry,
+						registerConstructorVariant,
+					}),
 			})
 		);
 

@@ -84,7 +84,10 @@ import {
 	resolveTraitValue,
 	type TraitRuntimeContext,
 } from './trait-runtime';
-import { evaluateRuntimeImport } from './runtime-imports';
+import {
+	evaluateRuntimeImport,
+	mergeImportedMetadata,
+} from './runtime-imports';
 
 // Retained compatibility surface: repository code imports evaluator-utils directly,
 // but downstream consumers cannot be exhaustively audited without an owner decision.
@@ -1421,7 +1424,6 @@ export class Evaluator {
 			path: this.path,
 			usesCustomFileSystem: this.fs !== defaultFs,
 			currentFileDir: this.currentFileDir,
-			traitRegistry: this.traitRegistry,
 			createChildEvaluator: () =>
 				new Evaluator({
 					fs: this.fs,
@@ -1437,9 +1439,13 @@ export class Evaluator {
 					moduleLoader.resolveModulePath(specifier, currentFileDir)
 				);
 			},
-			registerConstructorVariant: (constructorName, typeName) => {
-				this.constructorVariants.set(constructorName, typeName);
-			},
+			mergeMetadata: cache =>
+				mergeImportedMetadata(cache, {
+					traitRegistry: this.traitRegistry,
+					registerConstructorVariant: (constructorName, typeName) => {
+						this.constructorVariants.set(constructorName, typeName);
+					},
+				}),
 		});
 	}
 

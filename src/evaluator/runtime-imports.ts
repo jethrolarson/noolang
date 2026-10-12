@@ -30,12 +30,16 @@ export type ImportRuntimeContext = {
 	path: typeof defaultPath;
 	usesCustomFileSystem: boolean;
 	currentFileDir?: string;
-	traitRegistry: TraitRegistry;
 	createChildEvaluator: () => ChildEvaluator;
 	loadModule: (
 		specifier: string,
 		currentFileDir?: string
 	) => RuntimeModuleCache;
+	mergeMetadata: (cache: RuntimeModuleCache) => void;
+};
+
+type ImportMetadataTarget = {
+	traitRegistry: TraitRegistry;
 	registerConstructorVariant: (
 		constructorName: string,
 		typeName: string
@@ -64,7 +68,7 @@ function evaluateDirectImport(
 
 function registerImportedConstructors(
 	adtDiff: RuntimeModuleCache['adtDiff'],
-	register: ImportRuntimeContext['registerConstructorVariant']
+	register: ImportMetadataTarget['registerConstructorVariant']
 ): void {
 	for (const [typeName, adtEntry] of adtDiff) {
 		for (const constructorName of adtEntry.constructors.keys()) {
@@ -145,16 +149,16 @@ function mergeTraitDefinitions(
 	}
 }
 
-function mergeImportedMetadata(
+export function mergeImportedMetadata(
 	cache: RuntimeModuleCache,
-	context: ImportRuntimeContext
+	target: ImportMetadataTarget
 ): void {
 	registerImportedConstructors(
 		cache.adtDiff,
-		context.registerConstructorVariant
+		target.registerConstructorVariant
 	);
-	mergeTraitImplementations(cache.traitImplDiff, context.traitRegistry);
-	mergeTraitDefinitions(cache.traitDefDiff, context.traitRegistry);
+	mergeTraitImplementations(cache.traitImplDiff, target.traitRegistry);
+	mergeTraitDefinitions(cache.traitDefDiff, target.traitRegistry);
 }
 
 function formatImportFailure(error: unknown): string {
@@ -183,7 +187,7 @@ export function evaluateRuntimeImport(
 
 	try {
 		const cache = context.loadModule(expr.path, context.currentFileDir);
-		mergeImportedMetadata(cache, context);
+		context.mergeMetadata(cache);
 		return cache.exportValue;
 	} catch (error) {
 		const filePath = expr.path.endsWith('.noo')
