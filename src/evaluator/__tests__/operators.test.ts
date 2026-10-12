@@ -37,7 +37,8 @@ const binary = (
 
 const context = (
 	values: Record<string, Value>,
-	trace: string[] = []
+	trace: string[] = [],
+	overrides: Partial<OperatorContext> = {}
 ): OperatorContext => ({
 	traitRegistry: createTraitRegistry(),
 	evaluateExpression: expression => {
@@ -57,6 +58,7 @@ const context = (
 		throw new Error('unexpected trait application');
 	},
 	lookupOperator: () => undefined,
+	...overrides,
 });
 
 describe('operator evaluation', () => {
@@ -100,6 +102,38 @@ describe('operator evaluation', () => {
 		expect(orTrace).toEqual(['evaluate:left']);
 	});
 
+	test('thrush and dollar evaluate operands before invoking their function', () => {
+		const thrushTrace: string[] = [];
+		const thrushFunction = createFunction(value => {
+			thrushTrace.push('invoke:right');
+			return value;
+		});
+		evaluateBinary(
+			binary('|'),
+			context({ left: createNumber(1), right: thrushFunction }, thrushTrace)
+		);
+		expect(thrushTrace).toEqual([
+			'evaluate:left',
+			'evaluate:right',
+			'invoke:right',
+		]);
+
+		const dollarTrace: string[] = [];
+		const dollarFunction = createFunction(value => {
+			dollarTrace.push('invoke:left');
+			return value;
+		});
+		evaluateBinary(
+			binary('$'),
+			context({ left: dollarFunction, right: createNumber(1) }, dollarTrace)
+		);
+		expect(dollarTrace).toEqual([
+			'evaluate:left',
+			'evaluate:right',
+			'invoke:left',
+		]);
+	});
+
 	test('safe thrush evaluates both operands but does not invoke the function for None', () => {
 		const trace: string[] = [];
 		const none = createConstructor('None', []);
@@ -114,6 +148,26 @@ describe('operator evaluation', () => {
 
 		expect(result).toEqual(none);
 		expect(trace).toEqual(['evaluate:left', 'evaluate:right']);
+	});
+
+	test('arithmetic trait failures retain the operator-level error', () => {
+		const operatorContext = context(
+			{
+				left: createConstructor('Box', []),
+				right: createConstructor('Box', []),
+			},
+			[],
+			{
+				isTraitFunction: name => name === 'add',
+				resolveTraitFunctionWithArgs: () => {
+					throw new Error('trait-specific failure');
+				},
+			}
+		);
+
+		expect(() => evaluateBinary(binary('+'), operatorContext)).toThrow(
+			'Cannot add constructor and constructor'
+		);
 	});
 
 	test('/ and % retain Option results including zero divisors', () => {
