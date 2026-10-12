@@ -66,8 +66,8 @@ import {
 	isCell,
 	createCell,
 	valueToString,
-	compareStructuralValues,
 	type TupleValue,
+	type TraitFunctionValue,
 	RecordValue,
 	type Environment,
 } from './evaluator-utils';
@@ -75,6 +75,15 @@ import { createBuiltinEnvironment } from './builtins';
 import { matchPattern } from './pattern-matching';
 import { containsVariable } from './recursion-analysis';
 import { expressionToString } from './trace-format';
+import {
+	applyTraitFunctionWithValues as runtimeApplyTraitFunctionWithValues,
+	evaluateEquality as runtimeEvaluateEquality,
+	evaluateTraitFunctionApplication as runtimeEvaluateTraitFunctionApplication,
+	isTraitFunction as runtimeIsTraitFunction,
+	resolveTraitFunctionWithArgs as runtimeResolveTraitFunctionWithArgs,
+	resolveTraitValue,
+	type TraitRuntimeContext,
+} from './trait-runtime';
 
 // Retained compatibility surface: repository code imports evaluator-utils directly,
 // but downstream consumers cannot be exhaustively audited without an owner decision.
@@ -694,29 +703,11 @@ export class Evaluator {
 		const value = this.environment.get(expr.name);
 		if (value === undefined) {
 			if (expr.traitValueSelection) {
-				const { traitName, typeName } = expr.traitValueSelection;
-				const implementation = this.traitRegistry.implementations
-					.get(traitName)
-					?.get(typeName);
-				if (!implementation?.values?.has(expr.name)) {
-					throw new Error(
-						`Missing selected associated value ${traitName}.${expr.name} for ${typeName}`
-					);
-				}
-				const captured = implementation.evaluatedValues?.get(expr.name);
-				if (captured !== undefined) return captured as Value;
-				const valueExpression = implementation.values.get(expr.name);
-				if (!valueExpression) {
-					throw new Error(
-						`Missing selected associated value ${traitName}.${expr.name} for ${typeName}`
-					);
-				}
-				const evaluated = this.evaluateExpression(valueExpression);
-				if (!implementation.evaluatedValues) {
-					implementation.evaluatedValues = new Map();
-				}
-				implementation.evaluatedValues.set(expr.name, evaluated);
-				return evaluated;
+				return resolveTraitValue(
+					this.traitRuntimeContext(),
+					expr.name,
+					expr.traitValueSelection
+				);
 			}
 
 			// NEW: Check if this is a trait function before throwing error
@@ -1668,87 +1659,28 @@ export class Evaluator {
 		);
 	}
 
-	// Check if a function name is a trait function
+	private traitRuntimeContext(): TraitRuntimeContext {
+		return {
+			traitRegistry: this.traitRegistry,
+			evaluateExpression: expression => this.evaluateExpression(expression),
+			variantNameForConstructor: constructorName =>
+				this.constructorVariants.get(constructorName),
+		};
+	}
+
 	private isTraitFunction(functionName: string): boolean {
-		if (!this.traitRegistry) return false;
-
-		// Check if any trait defines this function
-		for (const traitDef of this.traitRegistry.definitions.values()) {
-			if (traitDef.functions.has(functionName)) {
-				return true;
-			}
-		}
-		return false;
+		return runtimeIsTraitFunction(this.traitRuntimeContext(), functionName);
 	}
 
-	// Handle trait function application at runtime
 	private evaluateTraitFunctionApplication(
-		traitFunc: {
-			name: string;
-			partialArgs?: Value[];
-			traitRegistry: TraitRegistry;
-		},
-		argExprs: Expression[]
+		traitFunction: TraitFunctionValue,
+		argExpressions: Expression[]
 	): Value {
-		if (!this.traitRegistry) {
-			throw new Error(
-				`No trait registry available for trait function ${traitFunc.name}`
-			);
-		}
-
-		// Evaluate the arguments to get their runtime values
-		const argValues = argExprs.map(arg => this.evaluateExpression(arg));
-
-		// For partial application, return a curried function that accumulates arguments
-		// until we have enough information to do trait dispatch
-		if (traitFunc.partialArgs) {
-			// This is already a partially applied trait function - add more arguments
-			const allArgs = [...traitFunc.partialArgs, ...argValues];
-			return this.resolveTraitFunctionWithArgs(
-				traitFunc.name,
-				allArgs,
-				traitFunc.traitRegistry
-			);
-		} else {
-			// This is the first application - start accumulating arguments
-			return this.resolveTraitFunctionWithArgs(
-				traitFunc.name,
-				argValues,
-				this.traitRegistry
-			);
-		}
-	}
-
-	private applyRegisteredTraitFunction(
-		functionName: string,
-		argValues: Value[],
-		traitRegistry: TraitRegistry,
-		dispatchValue = argValues[0]
-	): Value | null {
-		const dispatchTypeName = this.getValueTypeName(dispatchValue);
-		for (const [traitName, traitDef] of traitRegistry.definitions) {
-			if (!traitDef.functions.has(functionName)) continue;
-			const impl = traitRegistry.implementations
-				.get(traitName)
-				?.get(dispatchTypeName);
-			const hasEvaluated = impl?.evaluatedFunctions?.has(functionName);
-			const hasAst = impl?.functions.has(functionName);
-			if (!impl || (!hasEvaluated && !hasAst)) continue;
-			let result = hasEvaluated
-				? (impl.evaluatedFunctions!.get(functionName) as Value)
-				: this.evaluateExpression(impl.functions.get(functionName)!);
-			for (const argument of argValues) {
-				if (isFunction(result) || isNativeFunction(result)) {
-					result = result.fn(argument);
-				} else {
-					throw new Error(
-						'Cannot apply argument to non-function during trait resolution'
-					);
-				}
-			}
-			return result;
-		}
-		return null;
+		return runtimeEvaluateTraitFunctionApplication(
+			this.traitRuntimeContext(),
+			traitFunction,
+			argExpressions
+		);
 	}
 
 	private evaluateEquality(
@@ -1756,30 +1688,11 @@ export class Evaluator {
 		right: Value,
 		traitRegistry: TraitRegistry
 	): Value {
-		if (isNumber(left) && isNumber(right)) {
-			return createBool(left.value === right.value);
-		}
-		if (isString(left) && isString(right)) {
-			return createBool(left.value === right.value);
-		}
-		if (isUnit(left) && isUnit(right)) return createBool(true);
-
-		const registered = this.applyRegisteredTraitFunction(
-			'equals',
-			[left, right],
-			traitRegistry
-		);
-		if (registered) return registered;
-
-		const structural = compareStructuralValues(
+		return runtimeEvaluateEquality(
+			this.traitRuntimeContext(),
 			left,
 			right,
-			(a, b) => boolValue(this.evaluateEquality(a, b, traitRegistry)),
-			value => this.constructorVariants.has(value.name)
-		);
-		if (structural !== null) return createBool(structural);
-		throw new Error(
-			`Cannot compare ${left?.tag || 'unit'} and ${right?.tag || 'unit'} for equality`
+			traitRegistry
 		);
 	}
 
@@ -1788,62 +1701,12 @@ export class Evaluator {
 		argValues: Value[],
 		traitRegistry: TraitRegistry
 	): Value {
-		// Get the type names of the arguments for trait resolution
-		const argTypeNames = argValues.map(val => this.getValueTypeName(val));
-
-		// Try to resolve the trait function based on different arguments
-		// For Functor map: try the last argument (container) first
-		const possibleDispatchIndices =
-			argTypeNames.length > 1 ? [argTypeNames.length - 1, 0] : [0];
-
-		for (const dispatchIndex of possibleDispatchIndices) {
-			const result = this.applyRegisteredTraitFunction(
-				functionName,
-				argValues,
-				traitRegistry,
-				argValues[dispatchIndex]
-			);
-			if (result) return result;
-		}
-
-		if (functionName === 'equals' && argValues.length >= 2) {
-			return this.evaluateEquality(argValues[0], argValues[1], traitRegistry);
-		}
-
-		// If we get here, we don't have enough type info yet - return a partial application
-		// that will try again when more arguments are provided
-		if (argTypeNames.every(t => t === 'Unknown') || argTypeNames.length < 2) {
-			return {
-				tag: 'trait-function',
-				name: functionName,
-				traitRegistry: traitRegistry,
-				partialArgs: argValues,
-			};
-		}
-
-		// No implementation found even with type info
-		const knownTypes = argTypeNames.filter(t => t !== 'Unknown');
-		const typeStr = knownTypes.length > 0 ? knownTypes.join(', ') : 'Unknown';
-		throw new Error(
-			`No implementation of trait function ${functionName} for ${typeStr}`
+		return runtimeResolveTraitFunctionWithArgs(
+			this.traitRuntimeContext(),
+			functionName,
+			argValues,
+			traitRegistry
 		);
-	}
-
-	private getValueTypeName(value: Value): string {
-		// Get a type name from a runtime value for constraint resolution
-		if (isNumber(value)) return 'Float';
-		if (isString(value)) return 'String';
-		if (isBool(value)) return 'Bool';
-		if (isList(value)) return 'List';
-		if (isRecord(value)) return 'Record';
-		if (isTuple(value)) return 'Tuple';
-		if (isConstructor(value)) {
-			// Resolve the constructor to its variant type; fall back to the
-			// constructor name for values whose definition this evaluator never
-			// saw (e.g. constructed by an imported module)
-			return this.constructorVariants.get(value.name) ?? value.name;
-		}
-		return 'Unknown';
 	}
 
 	private evaluateTypeDefinition(expr: TypeDefinitionExpression): Value {
@@ -1910,38 +1773,14 @@ export class Evaluator {
 		throw new Error('No pattern matched in match expression');
 	}
 
-	// Apply trait function directly with runtime values (used by $ operator)
 	private applyTraitFunctionWithValues(
-		traitFunc: {
-			name: string;
-			partialArgs?: Value[];
-			traitRegistry: TraitRegistry;
-		},
+		traitFunction: TraitFunctionValue,
 		argValues: Value[]
 	): Value {
-		if (!this.traitRegistry) {
-			throw new Error(
-				`No trait registry available for trait function ${traitFunc.name}`
-			);
-		}
-
-		// For partial application, return a curried function that accumulates arguments
-		// until we have enough information to do trait dispatch
-		if (traitFunc.partialArgs) {
-			// This is already a partially applied trait function - add more arguments
-			const allArgs = [...traitFunc.partialArgs, ...argValues];
-			return this.resolveTraitFunctionWithArgs(
-				traitFunc.name,
-				allArgs,
-				traitFunc.traitRegistry
-			);
-		} else {
-			// This is the first application - start accumulating arguments
-			return this.resolveTraitFunctionWithArgs(
-				traitFunc.name,
-				argValues,
-				traitFunc.traitRegistry
-			);
-		}
+		return runtimeApplyTraitFunctionWithValues(
+			this.traitRuntimeContext(),
+			traitFunction,
+			argValues
+		);
 	}
 }
