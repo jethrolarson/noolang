@@ -8,7 +8,7 @@ import { expectSuccess, runCode } from '../utils';
 // First test in this file pays the one-time module-typecheck cost; see the
 // identical note in std-json-module.test.ts.
 setDefaultTimeout(30000);
-
+// FIXME unnecessary aliases?
 const importParser = `{@char char, @satisfy satisfy, @string_lit string_lit, @is_digit is_digit, @is_whitespace is_whitespace, @is_alpha is_alpha, @is_alnum is_alnum, @take_while take_while, @take_while1 take_while1, @skip_ws skip_ws, @lexeme lexeme, @pmap pmap, @pbind pbind, @succeed succeed, @fail fail, @choice2 choice2, @choice choice, @optional optional, @many many, @many1 many1, @sep_by sep_by, @sep_by1 sep_by1, @between between, @ParseError ParseError} = import "std/parser";`;
 
 // Renders a `Result {@value a, @pos Float} ParseError` down to a plain

@@ -1,3 +1,5 @@
+// FIXCME excessively long comments?
+
 // Tail-position trampolining for the evaluator — see ADR 8.
 //
 // `[fixed]` blocks assert correctness at a depth that overflows without the
@@ -183,7 +185,7 @@ describe('[characterization — must stay green before AND after] cross-module o
 		fs.rmSync(dir, { recursive: true, force: true });
 	}
 
-	test('a local tail call into an imported closure still resolves the closure\'s own relative imports correctly', () => {
+	test("a local tail call into an imported closure still resolves the closure's own relative imports correctly", () => {
 		setup();
 		try {
 			const src = `

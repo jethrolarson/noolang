@@ -1,8 +1,6 @@
 import { test, expect } from 'bun:test';
 import { runCode } from '../utils';
 
-// List cases
-
 test('at works on lists: index 0', () => {
   const code = `at 0 [1, 2, 3]`;
   const result = runCode(code);

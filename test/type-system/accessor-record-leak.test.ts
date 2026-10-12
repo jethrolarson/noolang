@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import { parseAndType, expectError } from '../utils';
-
+// FIXME missing describe block
 // Regression tests for issue #103: "Required field missing" leaking across
 // top-level statements.
 //

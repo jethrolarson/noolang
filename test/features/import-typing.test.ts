@@ -3,6 +3,7 @@ import { runCode, parseAndType } from '../utils';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+// FIXME why is the `as any` required here??? Create whatever helpers needed to test this without cheating
 describe('Import Type Inference', () => {
   
   const testModuleDir = path.join(process.cwd(), 'temp_test_modules');

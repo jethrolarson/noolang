@@ -1,3 +1,5 @@
+// FIXME comments wrong, Use of `as any`.
+
 import { Lexer } from '../../src/lexer/lexer';
 import { parse } from '../../src/parser/parser';
 import { Evaluator } from '../../src/evaluator/evaluator';
@@ -40,14 +42,11 @@ test('should import from same directory', () => {
 	const lexer = new Lexer(testCode);
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	const evaluator = new Evaluator({ 
+	const evaluator = new Evaluator({
 		fs: mockFs as any,
-		traitRegistry: createTraitRegistry()
+		traitRegistry: createTraitRegistry(),
 	});
-	const result = evaluator.evaluateProgram(
-		program,
-		'/test/dir/test_file.noo'
-	);
+	const result = evaluator.evaluateProgram(program, '/test/dir/test_file.noo');
 	expect(result.finalResult).toEqual({ tag: 'number', value: 5 });
 });
 
@@ -59,9 +58,9 @@ test('should import from parent directory', () => {
 	const lexer = new Lexer(testCode);
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	const evaluator = new Evaluator({ 
+	const evaluator = new Evaluator({
 		fs: mockFs as any,
-		traitRegistry: createTraitRegistry()
+		traitRegistry: createTraitRegistry(),
 	});
 	const result = evaluator.evaluateProgram(
 		program,
@@ -78,14 +77,11 @@ test('should handle absolute paths', () => {
 	const lexer = new Lexer(testCode);
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	const evaluator = new Evaluator({ 
+	const evaluator = new Evaluator({
 		fs: mockFs as any,
-		traitRegistry: createTraitRegistry()
+		traitRegistry: createTraitRegistry(),
 	});
-	const result = evaluator.evaluateProgram(
-		program,
-		'/test/dir/test_file.noo'
-	);
+	const result = evaluator.evaluateProgram(program, '/test/dir/test_file.noo');
 	expect(result.finalResult).toEqual({ tag: 'number', value: 15 });
 });
 
@@ -97,11 +93,10 @@ test('should fall back to current working directory when no file path provided',
 	const lexer = new Lexer(testCode);
 	const tokens = lexer.tokenize();
 	const program = parse(tokens);
-	const evaluator = new Evaluator({ 
+	const evaluator = new Evaluator({
 		fs: mockFs as any,
-		traitRegistry: createTraitRegistry()
+		traitRegistry: createTraitRegistry(),
 	});
 	const result = evaluator.evaluateProgram(program); // No file path
 	expect(result.finalResult).toEqual({ tag: 'number', value: 10 });
 });
-

@@ -1,6 +1,7 @@
+// FIXME either switch require to import or suppress lint error
+
 import { test, expect } from 'bun:test';
 import { runCode } from '../utils';
-
 test('should destructure simple tuple', () => {
 	const source = '{x, y} = {1, 2}; x + y';
 	expect(runCode(source).finalValue).toEqual(3);
@@ -53,13 +54,14 @@ test('should work with import destructuring', () => {
 		multiply_fn = fn x y => x * y;
 		{@add add_fn, @multiply multiply_fn}
 	`;
-	
+
 	// Write the module to a temporary file
 	const fs = require('fs');
 	fs.writeFileSync('temp_test_module.noo', moduleSource);
-	
+
 	try {
-		const source = '{@add, @multiply} = import "./temp_test_module"; add 3 4 + multiply 2 5';
+		const source =
+			'{@add, @multiply} = import "./temp_test_module"; add 3 4 + multiply 2 5';
 		expect(runCode(source).finalValue).toEqual(17);
 	} finally {
 		// Clean up
@@ -74,13 +76,14 @@ test('should work with import destructuring and renaming', () => {
 		cube = fn x => x * x * x;
 		{@square square, @cube cube}
 	`;
-	
+
 	// Write the module to a temporary file
 	const fs = require('fs');
 	fs.writeFileSync('temp_test_module2.noo', moduleSource);
-	
+
 	try {
-		const source = '{@square sq, @cube cb} = import "./temp_test_module2"; sq 4 + cb 2';
+		const source =
+			'{@square sq, @cube cb} = import "./temp_test_module2"; sq 4 + cb 2';
 		expect(runCode(source).finalValue).toEqual(24);
 	} finally {
 		// Clean up

@@ -1,3 +1,5 @@
+// FIXME excessive comments
+
 // std/json is an ordinary unprivileged userland noolang module (not part
 // of stdlib.noo, which every program gets for free) — its behavior is
 // exercised in std/json.test.noo (run via `noo test`), the way an idiomatic
