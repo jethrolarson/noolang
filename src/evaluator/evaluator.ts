@@ -7,8 +7,6 @@ import type {
 	VariableExpression,
 	FunctionExpression,
 	ApplicationExpression,
-	PipelineExpression,
-	BinaryExpression,
 	IfExpression,
 	DefinitionExpression,
 	TupleDestructuringExpression,
@@ -29,10 +27,7 @@ import type {
 	RecordDestructuringField,
 	Type,
 } from '../ast';
-import {
-	getTypeName,
-	type TraitRegistry,
-} from '../typer/trait-system';
+import { getTypeName, type TraitRegistry } from '../typer/trait-system';
 // Aliased: an existing local `flattenStatements` (below) fully recurses
 // through parens for stdlib loading; this one stops at a parenthesized `;`
 // boundary, matching the typer's own top-level-vs-nested-sequence
@@ -47,7 +42,6 @@ import {
 	createFunction,
 	createNumber,
 	createString,
-	createBool,
 	boolValue,
 	createUnit,
 	createTuple,
@@ -65,7 +59,6 @@ import {
 	isTuple,
 	isCell,
 	createCell,
-	valueToString,
 	type TupleValue,
 	type TraitFunctionValue,
 	RecordValue,
@@ -75,6 +68,11 @@ import { createBuiltinEnvironment } from './builtins';
 import { matchPattern } from './pattern-matching';
 import { containsVariable } from './recursion-analysis';
 import { expressionToString } from './trace-format';
+import {
+	evaluateBinary,
+	evaluatePipeline,
+	type OperatorContext,
+} from './operators';
 import {
 	applyTraitFunctionWithValues as runtimeApplyTraitFunctionWithValues,
 	evaluateEquality as runtimeEvaluateEquality,
@@ -189,11 +187,7 @@ export class Evaluator {
 			applyTraitFunctionWithValues: (traitFunction, values) =>
 				this.applyTraitFunctionWithValues(traitFunction, values),
 			resolveTraitFunctionWithArgs: (functionName, values, traitRegistry) =>
-				this.resolveTraitFunctionWithArgs(
-					functionName,
-					values,
-					traitRegistry
-				),
+				this.resolveTraitFunctionWithArgs(functionName, values, traitRegistry),
 		});
 		this.environmentStack = [];
 
@@ -201,7 +195,6 @@ export class Evaluator {
 			this.loadStdlib();
 		}
 	}
-
 
 	private loadStdlib(): void {
 		// Try multiple possible paths for stdlib.noo.
@@ -302,7 +295,10 @@ export class Evaluator {
 	// uses for the identical distinction) and traces one leaf at a time
 	// instead, without changing evaluateProgram's own behavior or its
 	// existing consumers (REPL, --verbose, general `.noo` execution).
-	evaluateProgramForAssertions(program: Program, filePath?: string): ProgramResult {
+	evaluateProgramForAssertions(
+		program: Program,
+		filePath?: string
+	): ProgramResult {
 		if (filePath) {
 			this.currentFileDir = this.path.dirname(this.path.resolve(filePath));
 		}
@@ -573,10 +569,10 @@ export class Evaluator {
 				return this.evaluateApplication(expr);
 
 			case 'pipeline':
-				return this.evaluatePipeline(expr);
+				return evaluatePipeline(expr, this.operatorContext());
 
 			case 'binary':
-				return this.evaluateBinary(expr);
+				return evaluateBinary(expr, this.operatorContext());
 
 			case 'if':
 				return this.evaluateIf(expr);
@@ -747,7 +743,10 @@ export class Evaluator {
 
 	// Bounces through same-owner tail calls in a loop instead of recursing in
 	// JS — one JS frame for the whole run, not one per bounce (ADR 8).
-	private runTrampolined(initialBody: Expression, initialEnv: Environment): Value {
+	private runTrampolined(
+		initialBody: Expression,
+		initialEnv: Environment
+	): Value {
 		let currentBody = initialBody;
 		let currentEnv = initialEnv;
 		for (;;) {
@@ -867,65 +866,70 @@ export class Evaluator {
 
 		function createCurriedFunction(params: string[], body: Expression): Value {
 			const isTerminal = params.length === 1;
-			return createFunction((arg: Value) => {
-				// Create a new environment for this function call
-				const callEnv = new Map(closureEnv);
+			return createFunction(
+				(arg: Value) => {
+					// Create a new environment for this function call
+					const callEnv = new Map(closureEnv);
 
-				// Set the parameter in the call environment
-				const param = params[0];
-				callEnv.set(param, arg);
+					// Set the parameter in the call environment
+					const param = params[0];
+					callEnv.set(param, arg);
 
-				let result: Value;
-				if (params.length === 1) {
-					// The whole trampoline loop runs inside one withNewEnvironment.
-					result = self.withNewEnvironment(() => {
-						self.environment = callEnv;
-						return self.runTrampolined(body, callEnv);
-					});
-				} else {
-					// Create a function that captures the current parameter
-					const remainingParams = params.slice(1);
-					const nextIsTerminal = remainingParams.length === 1;
+					let result: Value;
+					if (params.length === 1) {
+						// The whole trampoline loop runs inside one withNewEnvironment.
+						result = self.withNewEnvironment(() => {
+							self.environment = callEnv;
+							return self.runTrampolined(body, callEnv);
+						});
+					} else {
+						// Create a function that captures the current parameter
+						const remainingParams = params.slice(1);
+						const nextIsTerminal = remainingParams.length === 1;
 
-					const nextFunction = createFunction(
-						(nextArg: Value) => {
-							const nextCallEnv = new Map(callEnv);
-							nextCallEnv.set(remainingParams[0], nextArg);
+						const nextFunction = createFunction(
+							(nextArg: Value) => {
+								const nextCallEnv = new Map(callEnv);
+								nextCallEnv.set(remainingParams[0], nextArg);
 
-							if (remainingParams.length === 1) {
-								return self.withNewEnvironment(() => {
-									self.environment = nextCallEnv;
-									return self.runTrampolined(body, nextCallEnv);
-								});
-							} else {
-								// Continue currying for remaining parameters
-								const remainingFunction = self.withNewEnvironment(() => {
-									self.environment = nextCallEnv;
-									return self.evaluateFunction({
-										...expr,
-										params: remainingParams,
+								if (remainingParams.length === 1) {
+									return self.withNewEnvironment(() => {
+										self.environment = nextCallEnv;
+										return self.runTrampolined(body, nextCallEnv);
 									});
-								});
-								if (isFunction(remainingFunction)) {
-									return remainingFunction.fn(nextArg);
 								} else {
-									throw new Error(
-										`Expected function but got: ${typeof remainingFunction}`
-									);
+									// Continue currying for remaining parameters
+									const remainingFunction = self.withNewEnvironment(() => {
+										self.environment = nextCallEnv;
+										return self.evaluateFunction({
+											...expr,
+											params: remainingParams,
+										});
+									});
+									if (isFunction(remainingFunction)) {
+										return remainingFunction.fn(nextArg);
+									} else {
+										throw new Error(
+											`Expected function but got: ${typeof remainingFunction}`
+										);
+									}
 								}
-							}
-						},
-						// tailInfo only on the terminal closure for this arity.
-						nextIsTerminal
-							? { param: remainingParams[0], body, env: callEnv, owner: self }
-							: undefined
-					);
+							},
+							// tailInfo only on the terminal closure for this arity.
+							nextIsTerminal
+								? { param: remainingParams[0], body, env: callEnv, owner: self }
+								: undefined
+						);
 
-					result = nextFunction;
-				}
+						result = nextFunction;
+					}
 
-				return result;
-			}, isTerminal ? { param: params[0], body, env: closureEnv, owner: self } : undefined);
+					return result;
+				},
+				isTerminal
+					? { param: params[0], body, env: closureEnv, owner: self }
+					: undefined
+			);
 		}
 
 		return createCurriedFunction(expr.params, expr.body);
@@ -986,425 +990,6 @@ export class Evaluator {
 			);
 		}
 	}
-
-	private evaluatePipeline(expr: PipelineExpression): Value {
-		// Pipeline should be function composition, not function application
-		// For a pipeline like f |> g |> h, we want to compose them as h(g(f(x)))
-		// For a pipeline like f <| g <| h, we want to compose them as f(g(h(x)))
-
-		if (expr.steps.length === 1) {
-			return this.evaluateExpression(expr.steps[0]);
-		}
-
-		// Determine composition direction based on operators
-		const isLeftToRight = expr.operators.every(op => op === '|>');
-		const isRightToLeft = expr.operators.every(op => op === '<|');
-
-		if (!isLeftToRight && !isRightToLeft) {
-			throw new Error(
-				`Cannot mix pipeline operators |> and <| in the same expression`
-			);
-		}
-
-		// For right-to-left composition (<|), reverse the steps
-		const steps = isRightToLeft ? [...expr.steps].reverse() : expr.steps;
-
-		// Start with the first function
-		let composed = this.evaluateExpression(steps[0]);
-
-		// Compose with each subsequent function
-		for (let i = 1; i < steps.length; i++) {
-			const nextFunc = this.evaluateExpression(steps[i]);
-
-			if (isAnyFunction(composed) && isAnyFunction(nextFunc)) {
-				// Capture the current composed function to avoid infinite recursion
-				const currentComposed = composed;
-				// Compose: nextFunc(composed(x))
-				composed = createFunction((x: Value) => {
-					// Apply currentComposed to x
-					let intermediate: Value;
-					if (
-						isFunction(currentComposed) ||
-						isNativeFunction(currentComposed)
-					) {
-						intermediate = currentComposed.fn(x);
-					} else if (isTraitFunctionValue(currentComposed)) {
-						intermediate = this.applyTraitFunctionWithValues(currentComposed, [
-							x,
-						]);
-					} else {
-						throw new Error(
-							`Invalid function type in pipeline: ${(currentComposed as Value).tag}`
-						);
-					}
-
-					// Apply nextFunc to the result
-					if (isFunction(nextFunc) || isNativeFunction(nextFunc)) {
-						return nextFunc.fn(intermediate);
-					} else if (isTraitFunctionValue(nextFunc)) {
-						return this.applyTraitFunctionWithValues(nextFunc, [intermediate]);
-					} else {
-						throw new Error(
-							`Invalid function type in pipeline: ${(nextFunc as Value).tag}`
-						);
-					}
-				});
-			} else {
-				throw new Error(
-					`Cannot compose non-functions in pipeline: ${valueToString(
-						composed
-					)} and ${valueToString(nextFunc)}`
-				);
-			}
-		}
-
-		return composed;
-	}
-
-	private evaluateBinary(expr: BinaryExpression): Value {
-		if (expr.operator === ';') {
-			// Handle semicolon operator (sequence)
-			// Evaluate left expression and discard result
-			this.evaluateExpression(expr.left);
-			// Evaluate and return right expression
-			return this.evaluateExpression(expr.right);
-		} else if (expr.operator === '&&') {
-			// Short-circuit: only evaluate right if left is True
-			const left = this.evaluateExpression(expr.left);
-			if (!boolValue(left)) return left;
-			return this.evaluateExpression(expr.right);
-		} else if (expr.operator === '||') {
-			// Short-circuit: only evaluate right if left is False
-			const left = this.evaluateExpression(expr.left);
-			if (boolValue(left)) return left;
-			return this.evaluateExpression(expr.right);
-		} else if (expr.operator === '|') {
-			// Handle thrush operator
-			const left = this.evaluateExpression(expr.left);
-			const right = this.evaluateExpression(expr.right);
-
-			// Support trait-function partial application: map (add 1) | [1,2,3]
-			if (right.tag === 'trait-function') {
-				const tf = right;
-				const args = Array.isArray(tf.partialArgs)
-					? [...tf.partialArgs, left]
-					: [left];
-				return this.resolveTraitFunctionWithArgs(
-					tf.name,
-					args,
-					tf.traitRegistry || this.traitRegistry
-				);
-			}
-
-			if (isFunction(right)) {
-				return right.fn(left);
-			} else if (isNativeFunction(right)) {
-				return right.fn(left);
-			} else {
-				throw new Error(
-					`Cannot apply non-function in thrush: ${valueToString(right)}`
-				);
-			}
-		} else if (expr.operator === '|?') {
-			// |? auto-wraps a plain (non-Option/Result-returning) right-hand
-			// function's result, unlike a lawful Monad.bind (which cannot express
-			// that: unifying the result type with its own wrapped form is an
-			// infinite type, caught by the occurs check). So this can't delegate
-			// to bind — it applies the payload directly and wraps on the way out.
-			const left = this.evaluateExpression(expr.left);
-			const right = this.evaluateExpression(expr.right);
-
-			if (!isAnyFunction(right)) {
-				throw new Error(
-					`Cannot apply non-function in safe thrush: ${valueToString(right)}`
-				);
-			}
-			if (!isConstructor(left)) {
-				throw new Error(
-					`Safe thrush operator (|?) requires an Option or Result, got ${valueToString(left)}`
-				);
-			}
-
-			const applyRight = (arg: Value): Value =>
-				isFunction(right) || isNativeFunction(right)
-					? right.fn(arg)
-					: (() => {
-							throw new Error(
-								`Cannot apply non-function in safe thrush: ${valueToString(right)}`
-							);
-						})();
-
-			if (left.name === 'None' || left.name === 'Err') {
-				return left;
-			}
-			if (left.name === 'Some') {
-				const result = applyRight(left.args[0]);
-				if (isConstructor(result) && (result.name === 'Some' || result.name === 'None')) {
-					return result;
-				}
-				return { tag: 'constructor', name: 'Some', args: [result] };
-			}
-			if (left.name === 'Ok') {
-				const result = applyRight(left.args[0]);
-				if (isConstructor(result) && (result.name === 'Ok' || result.name === 'Err')) {
-					return result;
-				}
-				return { tag: 'constructor', name: 'Ok', args: [result] };
-			}
-
-			throw new Error(
-				`Safe thrush operator (|?) requires an Option or Result, got ${left.name}`
-			);
-		} else if (expr.operator === '$') {
-			// Handle dollar operator (low precedence function application)
-			const left = this.evaluateExpression(expr.left);
-			const right = this.evaluateExpression(expr.right);
-
-			if (isFunction(left) || isNativeFunction(left)) {
-				return left.fn(right);
-			} else if (isTraitFunctionValue(left)) {
-				return this.applyTraitFunctionWithValues(left, [right]);
-			} else {
-				throw new Error(
-					`Cannot apply non-function in dollar operator: ${valueToString(left)}`
-				);
-			}
-		} else if (expr.operator === '|>') {
-			// Left-to-right composition: f |> g means g(f(x))
-			const left = this.evaluateExpression(expr.left);
-			const leftVal = isCell(left) ? left.value : left;
-			const right = this.evaluateExpression(expr.right);
-			const rightVal = isCell(right) ? right.value : right;
-
-			if (!isAnyFunction(leftVal) || !isAnyFunction(rightVal)) {
-				throw new Error(
-					`Both operands of |> must be functions, got ${leftVal.tag} and ${rightVal.tag}`
-				);
-			}
-
-			// Left-to-right composition: g(f(x))
-			return createFunction((x: Value) => {
-				// Apply left function first
-				let intermediate: Value;
-				if (isFunction(leftVal) || isNativeFunction(leftVal)) {
-					intermediate = leftVal.fn(x);
-				} else if (isTraitFunctionValue(leftVal)) {
-					intermediate = this.applyTraitFunctionWithValues(leftVal, [x]);
-				} else {
-					throw new Error(
-						`Invalid function type in |> composition: ${(leftVal as Value).tag}`
-					);
-				}
-
-				// Apply right function to the result
-				if (isFunction(rightVal) || isNativeFunction(rightVal)) {
-					return rightVal.fn(intermediate);
-				} else if (isTraitFunctionValue(rightVal)) {
-					return this.applyTraitFunctionWithValues(rightVal, [intermediate]);
-				} else {
-					throw new Error(
-						`Invalid function type in |> composition: ${(rightVal as Value).tag}`
-					);
-				}
-			});
-		} else if (expr.operator === '<|') {
-			// Right-to-left composition: f <| g means f(g(x))
-			const left = this.evaluateExpression(expr.left);
-			const leftVal = isCell(left) ? left.value : left;
-			const right = this.evaluateExpression(expr.right);
-			const rightVal = isCell(right) ? right.value : right;
-
-			if (!isAnyFunction(leftVal) || !isAnyFunction(rightVal)) {
-				throw new Error(
-					`Both operands of <| must be functions, got ${leftVal.tag} and ${rightVal.tag}`
-				);
-			}
-
-			// Right-to-left composition: f(g(x))
-			return createFunction((x: Value) => {
-				// Apply right function first
-				let intermediate: Value;
-				if (isFunction(rightVal) || isNativeFunction(rightVal)) {
-					intermediate = rightVal.fn(x);
-				} else if (isTraitFunctionValue(rightVal)) {
-					intermediate = this.applyTraitFunctionWithValues(rightVal, [x]);
-				} else {
-					throw new Error(
-						`Invalid function type in <| composition: ${(rightVal as Value).tag}`
-					);
-				}
-
-				// Apply left function to the result
-				if (isFunction(leftVal) || isNativeFunction(leftVal)) {
-					return leftVal.fn(intermediate);
-				} else if (isTraitFunctionValue(leftVal)) {
-					return this.applyTraitFunctionWithValues(leftVal, [intermediate]);
-				} else {
-					throw new Error(
-						`Invalid function type in <| composition: ${(leftVal as Value).tag}`
-					);
-				}
-			});
-		} else {
-			// Handle other binary operators (arithmetic, comparison, etc.)
-			const left = this.evaluateExpression(expr.left);
-			const right = this.evaluateExpression(expr.right);
-			const leftVal = isCell(left) ? left.value : left;
-			const rightVal = isCell(right) ? right.value : right;
-
-			// Special handling for arithmetic operators - use primitive operations for basic types
-			if (expr.operator === '+') {
-				if (isNumber(leftVal) && isNumber(rightVal)) {
-					return createNumber(leftVal.value + rightVal.value);
-				}
-				if (isString(leftVal) && isString(rightVal)) {
-					return createString(leftVal.value + rightVal.value);
-				}
-				// For complex types, try trait resolution
-				if (this.isTraitFunction('add')) {
-					try {
-						const result = this.resolveTraitFunctionWithArgs(
-							'add',
-							[leftVal, rightVal],
-							this.traitRegistry
-						);
-						return result;
-					} catch (_e) {
-						// Fall through to error
-					}
-				}
-				throw new Error(
-					`Cannot add ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`
-				);
-			}
-
-			if (expr.operator === '-') {
-				if (isNumber(leftVal) && isNumber(rightVal)) {
-					return createNumber(leftVal.value - rightVal.value);
-				}
-				// For complex types, try trait resolution
-				if (this.isTraitFunction('subtract')) {
-					try {
-						const result = this.resolveTraitFunctionWithArgs(
-							'subtract',
-							[leftVal, rightVal],
-							this.traitRegistry
-						);
-						return result;
-					} catch (_e) {
-						// Fall through to error
-					}
-				}
-				throw new Error(
-					`Cannot subtract ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`
-				);
-			}
-
-			if (expr.operator === '*') {
-				if (isNumber(leftVal) && isNumber(rightVal)) {
-					return createNumber(leftVal.value * rightVal.value);
-				}
-				// For complex types, try trait resolution
-				if (this.isTraitFunction('multiply')) {
-					try {
-						const result = this.resolveTraitFunctionWithArgs(
-							'multiply',
-							[leftVal, rightVal],
-							this.traitRegistry
-						);
-						return result;
-					} catch (_e) {
-						// Fall through to error
-					}
-				}
-				throw new Error(
-					`Cannot multiply ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`
-				);
-			}
-
-			if (expr.operator === '/') {
-				if (isNumber(leftVal) && isNumber(rightVal)) {
-					if (rightVal.value === 0) {
-						return createConstructor('None', []); // None for division by zero
-					}
-					return createConstructor('Some', [
-						createNumber(leftVal.value / rightVal.value),
-					]); // Some(result)
-				}
-				// For complex types, try trait resolution
-				if (this.isTraitFunction('divide')) {
-					try {
-						const result = this.resolveTraitFunctionWithArgs(
-							'divide',
-							[leftVal, rightVal],
-							this.traitRegistry
-						);
-						return result;
-					} catch (_e) {
-						// Fall through to error
-					}
-				}
-				throw new Error(
-					`Cannot divide ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`
-				);
-			}
-
-			if (expr.operator === '%') {
-				if (isNumber(leftVal) && isNumber(rightVal)) {
-					if (rightVal.value === 0) {
-						return createConstructor('None', []); // None for modulo by zero
-					}
-					return createConstructor('Some', [
-						createNumber(leftVal.value % rightVal.value),
-					]); // Some(result)
-				}
-				// For complex types, try trait resolution
-				if (this.isTraitFunction('modulus')) {
-					try {
-						const result = this.resolveTraitFunctionWithArgs(
-							'modulus',
-							[leftVal, rightVal],
-							this.traitRegistry
-						);
-						return result;
-					} catch (_e) {
-						// Fall through to error
-					}
-				}
-				throw new Error(
-					`Cannot modulus ${leftVal?.tag || 'unit'} and ${rightVal?.tag || 'unit'}`
-				);
-			}
-
-			if (expr.operator === '==' || expr.operator === '!=') {
-				const result = this.evaluateEquality(
-					leftVal,
-					rightVal,
-					this.traitRegistry
-				);
-				return expr.operator === '!='
-					? createBool(!boolValue(result))
-					: result;
-			}
-
-			const operator = this.environment.get(expr.operator);
-			const operatorVal = isCell(operator) ? operator.value : operator;
-			if (operatorVal && isNativeFunction(operatorVal)) {
-				const fn: any = operatorVal.fn(leftVal);
-				if (typeof fn === 'function') {
-					return fn(rightVal);
-				} else if (isFunction(fn)) {
-					return fn.fn(rightVal);
-				} else if (isNativeFunction(fn)) {
-					return fn.fn(rightVal);
-				}
-				throw new Error(`Operator ${expr.operator} did not return a function`);
-			}
-
-			throw new Error(`Unknown operator: ${expr.operator}`);
-		}
-	}
-
 	private evaluateIf(expr: IfExpression): Value {
 		const condition = this.evaluateExpression(expr.condition);
 
@@ -1538,6 +1123,25 @@ export class Evaluator {
 				isCell(v) ? v.value : v,
 			])
 		);
+	}
+
+	private operatorContext(): OperatorContext {
+		return {
+			traitRegistry: this.traitRegistry,
+			evaluateExpression: expression => this.evaluateExpression(expression),
+			isTraitFunction: functionName => this.isTraitFunction(functionName),
+			resolveTraitFunctionWithArgs: (functionName, argValues, traitRegistry) =>
+				this.resolveTraitFunctionWithArgs(
+					functionName,
+					argValues,
+					traitRegistry
+				),
+			evaluateEquality: (left, right, traitRegistry) =>
+				this.evaluateEquality(left, right, traitRegistry),
+			applyTraitFunctionWithValues: (traitFunction, argValues) =>
+				this.applyTraitFunctionWithValues(traitFunction, argValues),
+			lookupOperator: operator => this.environment.get(operator),
+		};
 	}
 
 	private traitRuntimeContext(): TraitRuntimeContext {
