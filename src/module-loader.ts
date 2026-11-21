@@ -421,6 +421,32 @@ function extractDiffsAndManifest(
 		}
 	}
 
+	// Cache metadata from imports as well as declarations in this AST. The cache
+	// is the next importer's only source for metadata, including at later hops.
+	for (const [name, info] of moduleState.adtRegistry) {
+		if (!frozenBase.adtRegistry.has(name)) {
+			adtDiff.set(name, {
+				typeParams: info.typeParams,
+				constructors: info.constructors,
+			});
+		}
+	}
+	for (const [name, definition] of moduleState.traitRegistry.definitions) {
+		if (!frozenBase.traitRegistry.definitions.has(name)) {
+			traitDefDiff.set(name, definition);
+		}
+	}
+	for (const [traitName, implementations] of moduleState.traitRegistry.implementations) {
+		const baseImplementations = frozenBase.traitRegistry.implementations.get(traitName);
+		for (const [typeName, implementation] of implementations) {
+			if (!baseImplementations?.has(typeName)) {
+				const diff = traitImplDiff.get(traitName) ?? new Map();
+				diff.set(typeName, implementation);
+				traitImplDiff.set(traitName, diff);
+			}
+		}
+	}
+
 	// Environment diff: everything in moduleState.environment NOT in frozenBase.environment
 	const envDiff = new Map<string, TypeScheme>();
 	for (const [name, scheme] of moduleState.environment) {
