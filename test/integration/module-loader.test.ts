@@ -157,6 +157,37 @@ c = import "${cPath}";
 	});
 });
 
+// ─── TRANSITIVE METADATA: D → B → A ──────────────────────────────────────────
+
+describe('TRANSITIVE: imported trait metadata crosses re-export boundaries', () => {
+	test('D can dispatch an implementation imported transitively through B from A', () => {
+		const aPath = path.join(TMPDIR, 'transitive_a');
+		const bPath = path.join(TMPDIR, 'transitive_b');
+		const dPath = path.join(TMPDIR, 'transitive_d');
+
+		writeTmp('transitive_a.noo', `
+constraint Label a (
+  label : a -> String
+);
+implement Label Float (
+  label = fn _ => "from A"
+);
+{}
+`);
+		writeTmp('transitive_b.noo', `
+import "${aPath}";
+{}
+`);
+		writeTmp('transitive_d.noo', `
+import "${bPath}";
+label 1
+`);
+
+		const result = runCode(`import "${dPath}"`);
+		expect(result.finalValue).toBe('from A');
+	});
+});
+
 // ─── COHERENCE: conflicting instances → hard error ────────────────────────────
 
 describe('COHERENCE: conflicting instances fail-closed', () => {
